@@ -113,7 +113,9 @@ def compare_13f_tool(
             holdings_before=holdings_before,
         )
         period_before = before[0].period
-        title = f"{filer.name} 13F: {current.period} vs {period_before}"
+        quarter = thirteenf.quarter_label(current.period)
+        quarter_before = thirteenf.quarter_label(period_before)
+        title = f"{filer.name} 13F: {quarter} vs {quarter_before}"
         evidence, reused = await capture_text(
             ctx,
             url=canonical_url(ref.index_url),
@@ -145,6 +147,8 @@ def compare_13f_tool(
                 "filer": filer.name,
                 "period": str(current.period),
                 "previous_period": str(period_before),
+                "quarter": quarter,
+                "previous_quarter": quarter_before,
                 "previous_filers": [filers[listed.cik].name for listed in before],
                 "counts": counts,
                 "reused": reused,

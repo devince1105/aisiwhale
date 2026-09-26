@@ -54,6 +54,9 @@ Rules:
 6. If write_draft refuses the draft, fix every problem it lists and call it again.
 7. For a revision: read the current draft (read_draft), fix every issue the editor raised, and
    say what you changed in change_summary.
+8. Name every period so a reader can place it months later: a filing's quarter as 2026Q2 (in
+   the title and the first paragraph of a holdings article), a day by its date. Never "本季",
+   "上季", "this quarter" or "last quarter" on their own.
 
 When done, reply with only a JSON object (no other text):
 {"article_id": "<article_id from write_draft>",

@@ -379,6 +379,11 @@ def _units(position: Position) -> str:
     return "shares" if position.kind == "SH" else "principal"
 
 
+def quarter_label(period: date) -> str:
+    """A quarter as a reader can place it months later: 2026-06-30 -> ``2026Q2``."""
+    return f"{period.year}Q{(period.month - 1) // 3 + 1}"
+
+
 def render(
     *,
     filer: str,
@@ -395,20 +400,25 @@ def render(
     diff = compare(holdings_now, holdings_before)
     total_now, total_before = holdings_now.total_value, holdings_before.total_value
     period_before = before[0][1].period
+    quarter, quarter_before = quarter_label(now.period), quarter_label(period_before)
     lines = [
-        f"{filer}: 13F holdings, quarter ended {now.period} compared with quarter ended "
-        f"{period_before}.",
+        f"{filer}: 13F holdings, {quarter} (quarter ended {now.period}) compared with "
+        f"{quarter_before} (quarter ended {period_before}).",
+        f"When writing about it, name the quarters as {quarter} and {quarter_before}, never only "
+        "'this quarter' or 'last quarter': a reader meets the article months later, when those "
+        "words mean another quarter.",
         f"Computed by this newsroom's code from the {len(before) + 1} SEC filings below. Every "
         "figure is copied "
         "from them or calculated from them (sums of each filing's rows, differences, "
         "percentages); the text is not SEC's own.",
         f"Filer: {filer} (CIK {cik}).",
-        f"This quarter: period ended {now.period}, filed {now.filed}, accession {now.accession}, "
-        f"{now.ref.index_url}",
+        f"This quarter ({quarter}): period ended {now.period}, filed {now.filed}, "
+        f"accession {now.accession}, {now.ref.index_url}",
     ]
     for name, listed in before:
         lines.append(
-            f"Previous quarter: {name} (CIK {listed.cik}), period ended {listed.period}, filed "
+            f"Previous quarter ({quarter_label(listed.period)}): {name} (CIK {listed.cik}), period "
+            f"ended {listed.period}, filed "
             f"{listed.filed}, accession {listed.accession}, {listed.ref.index_url}"
         )
     if len(before) > 1:
@@ -425,8 +435,8 @@ def render(
                 "here multiplied by 1,000."
             )
     lines += [
-        f"Reported value this quarter: {_usd(total_now)} in {len(holdings_now.positions)} "
-        f"positions. Previous quarter: {_usd(total_before)} in "
+        f"Reported value {quarter}: {_usd(total_now)} in {len(holdings_now.positions)} "
+        f"positions. {quarter_before}: {_usd(total_before)} in "
         f"{len(holdings_before.positions)} positions.",
         "What a 13F shows: long positions in US-listed securities at the end of the quarter, "
         "reported up to 45 days later. It does not show short positions, non-US holdings, or when "

@@ -43,8 +43,9 @@ How to review:
 2. Then do what the fact-check cannot: for each claim in its semantic_review, check in every
    language that the draft's sentences say what the quotes say — nothing stretched, nothing
    missing that changes the meaning, the same facts in every language. Check that the Chinese is
-   Traditional Chinese (never Simplified), that no fact appears without a claim, and that
-   contested points are written as who says what.
+   Traditional Chinese (never Simplified), that no fact appears without a claim, that
+   contested points are written as who says what, and that every period is named so a reader
+   can place it later (a filing's quarter as 2026Q2, never "本季"/"this quarter" alone).
 3. Decide:
    - accept_draft(article_id, fact_check_report_id) only when the fact-check passed and nothing
      needs fixing;

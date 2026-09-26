@@ -206,7 +206,24 @@ def test_it_says_who_computed_it_and_from_which_filings(comparison):
     assert "adds up the filings" not in comparison and "thousands" not in comparison
     assert "the text is not SEC's own" in comparison
     assert INDEX in comparison and Q1 in comparison
-    assert "Reported value this quarter: US$299,253,556,246 in 29 positions." in comparison
+    assert "Reported value 2026Q2: US$299,253,556,246 in 29 positions." in comparison
+
+
+def test_it_names_the_quarters_so_a_reader_can_place_them_later(comparison):
+    """ "This quarter" in an article read months later means another quarter."""
+    assert comparison.startswith(
+        "BERKSHIRE HATHAWAY INC: 13F holdings, 2026Q2 (quarter ended 2026-06-30) compared with "
+        "2026Q1 (quarter ended 2026-03-31)."
+    )
+    assert "name the quarters as 2026Q2 and 2026Q1" in comparison
+    assert [thirteenf.quarter_label(date(2026, m, 28)) for m in (1, 3, 4, 9, 10, 12)] == [
+        "2026Q1",
+        "2026Q1",
+        "2026Q2",
+        "2026Q3",
+        "2026Q4",
+        "2026Q4",
+    ]
 
 
 def test_what_was_bought_added_to_cut_and_sold(comparison):
