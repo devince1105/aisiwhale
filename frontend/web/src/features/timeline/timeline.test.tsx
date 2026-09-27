@@ -77,7 +77,9 @@ describe("model", () => {
 describe("view", () => {
   const half = Math.floor(recent.length / 2);
 
-  it("pause freezes the list, counts what arrives, and resume shows it", () => {
+  // it renders the whole replay a few times over: slow when the suite runs in parallel, so it
+  // has more than the default five seconds (it timed out in full runs, never on its own)
+  it("pause freezes the list, counts what arrives, and resume shows it", { timeout: 20_000 }, () => {
     const { rerender } = render(<Timeline companyId={replayed.companyId} events={recent.slice(0, half)} agents={replayed.agents} />);
     const list = () => within(screen.getByRole("list", { name: "事件" })).getAllByRole("listitem");
     expect(list()).toHaveLength(half);
