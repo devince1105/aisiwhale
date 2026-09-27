@@ -406,3 +406,57 @@ async def test_the_scheduled_refresh_asks_for_the_index_first():
 
     symbols, _ = await keeper._tw(Session())
     assert symbols[0] == price_history.INDEX
+
+
+def _fugle(*rows: tuple[str, float, int]) -> dict:
+    return {
+        "symbol": "2330",
+        "timeframe": "15",
+        "data": [
+            {"date": d, "open": c, "high": c + 5, "low": c - 5, "close": c, "volume": v}
+            for d, c, v in rows
+        ],
+    }
+
+
+def test_fugle_bars_are_utc_and_their_volume_in_shares():
+    [bar] = price_history.parse_fugle(_fugle(("2026-09-24T09:00:00.000+08:00", 2480, 1200)))
+    assert bar.t.isoformat() == "2026-09-24T01:00:00+00:00"
+    assert (bar.c, bar.v) == (2480, 1_200_000)  # 1,200 張
+
+
+async def test_a_taiwan_stock_s_15_minutes_the_days_before_and_today_so_far():
+    """D-074: Fugle's history for the days before (complete after 16:30), its intraday candles
+    for today; the last five trading days, a bar a time; ten minutes for every reader."""
+    from datetime import UTC, datetime, timedelta
+
+    asked = []
+    days = [f"2026-09-{d:02d}" for d in (17, 18, 21, 22, 23, 24)]
+
+    async def get(url, params):
+        asked.append((url, params))
+        if url.endswith("/historical/candles/2330"):
+            return _fugle(*((f"{d}T09:00:00.000+08:00", 2400 + i, 100) for i, d in enumerate(days)))
+        return _fugle(
+            ("2026-09-24T09:00:00.000+08:00", 2499, 150),  # today's first bar, again: once
+            ("2026-09-25T09:00:00.000+08:00", 2500, 300),
+            ("2026-09-25T09:15:00.000+08:00", 2505, 200),
+        )
+
+    now = [datetime(2026, 9, 25, 2, 0, tzinfo=UTC)]  # 10:00 in Taipei
+    cache = price_history.TwIntradayCache(get, clock=lambda: now[0])
+    answer = await cache.bars("2330")
+    assert answer.source == "Fugle"
+    taipei = sorted({(b.t + timedelta(hours=8)).date().isoformat() for b in answer.bars})
+    assert taipei == ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"]
+    assert len({b.t for b in answer.bars}) == len(answer.bars) == 6  # five days, today's two
+    assert [b.c for b in answer.bars][-3:] == [2499, 2500, 2505]  # the later answer wins
+    history = asked[0][1]
+    assert (history["timeframe"], history["to"], history["sort"]) == ("15", "2026-09-25", "asc")
+    await cache.bars("2330")
+    assert len(asked) == 2, "one ask for every reader, for ten minutes"
+
+
+async def test_without_fugle_s_key_a_taiwan_stock_has_no_15_minutes():
+    answer = await price_history.TwIntradayCache(None).bars("2330")
+    assert (answer.source, answer.bars) == (None, [])

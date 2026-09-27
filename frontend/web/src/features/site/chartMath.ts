@@ -77,11 +77,12 @@ export const AVERAGES: Record<View, readonly number[]> = {
   month: [3, 6, 12, 24, 60],
 };
 
-/** A bar's start in US Eastern wall-clock time, "YYYY-MM-DD HH:mm": the market's own hours. */
-export function eastern(iso: string): string {
+/** A bar's start in its market's wall-clock time, "YYYY-MM-DD HH:mm": the market's own hours —
+ * US Eastern for a US stock, Taipei for a Taiwan one (D-074). */
+export function wallClock(iso: string, timeZone = "America/New_York"): string {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
+      timeZone,
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -93,6 +94,11 @@ export function eastern(iso: string): string {
       .map((p) => [p.type, p.value]),
   );
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+/** US Eastern wall-clock time (``wallClock``'s default). */
+export function eastern(iso: string): string {
+  return wallClock(iso);
 }
 
 /** A wall-clock "YYYY-MM-DD HH:mm" as the chart's seconds: drawn as it reads, not shifted. */

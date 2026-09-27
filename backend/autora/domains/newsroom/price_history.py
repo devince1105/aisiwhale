@@ -653,6 +653,45 @@ def parse_iex(rows: list[dict], days: int = INTRADAY_DAYS) -> list[PublicIntrada
     return [b for b in bars if b.t.date() in kept]
 
 
+FUGLE = "https://api.fugle.tw/marketdata/v1.0/stock"
+FUGLE_HISTORY = FUGLE + "/historical/candles/{symbol}"
+FUGLE_TODAY = FUGLE + "/intraday/candles/{symbol}"
+
+
+def parse_fugle(payload: dict) -> list[PublicIntradayBar]:
+    """Fugle's 15-minute candles (D-074): each bar's time with Taipei's offset, as UTC; the volume
+    in 張 (a thousand shares) as shares, as the daily bars have it."""
+    bars = []
+    for row in payload.get("data") or []:
+        try:
+            bars.append(
+                PublicIntradayBar(
+                    t=datetime.fromisoformat(str(row["date"])).astimezone(UTC),
+                    o=float(row["open"]),
+                    h=float(row["high"]),
+                    l=float(row["low"]),
+                    c=float(row["close"]),
+                    v=int(row.get("volume") or 0) * 1000,
+                )  # fmt: skip
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    return bars
+
+
+def last_days(bars: list[PublicIntradayBar], days: int = INTRADAY_DAYS) -> list[PublicIntradayBar]:
+    """The last ``days`` trading days (Taipei's) of bars, oldest first, one bar a time."""
+    by_time = {b.t: b for b in bars}
+    ordered = [by_time[t] for t in sorted(by_time)]
+    taipei = timedelta(hours=8)
+    kept = sorted({(b.t + taipei).date() for b in ordered})[-days:]
+    return [b for b in ordered if (b.t + taipei).date() in kept]
+
+
+GetFugle = Callable[[str, dict], Awaitable[dict]]
+"""(url, params) -> Fugle's answer; its key travels in a header."""
+
+
 class IntradayCache:
     """Each US stock's 15-minute bars, kept ``ttl`` seconds (the free plan's hourly limit)."""
 
@@ -688,3 +727,66 @@ class IntradayCache:
                 return kept[1] if kept else PublicIntraday(symbol=symbol, source=None, bars=[])
             self._kept[symbol] = (now, answer)
             return answer
+
+
+class TwIntradayCache:
+    """Each Taiwan stock's 15-minute bars (D-074) from Fugle: the days before from its history
+    (complete after 16:30 each trading day) and today's so far from its intraday candles, kept
+    ``ttl`` seconds. ``get`` is None without Fugle's key: no Taiwan intraday chart."""
+
+    def __init__(self, get: GetFugle | None, *, ttl: float = INTRADAY_TTL_SECONDS, clock=None):
+        self.get = get
+        self.ttl = ttl
+        self.clock = clock or (lambda: datetime.now(UTC))
+        self._kept: dict[str, tuple[datetime, PublicIntraday]] = {}
+        self._lock = asyncio.Lock()
+
+    async def bars(self, symbol: str) -> PublicIntraday:
+        if self.get is None:
+            return PublicIntraday(symbol=symbol, source=None, bars=[])
+        async with self._lock:
+            now = self.clock()
+            kept = self._kept.get(symbol)
+            if kept and (now - kept[0]).total_seconds() < self.ttl:
+                return kept[1]
+            today = (now + timedelta(hours=8)).date()
+            try:
+                history = await self.get(
+                    FUGLE_HISTORY.format(symbol=symbol),
+                    {
+                        "timeframe": "15",
+                        "from": (today - timedelta(days=INTRADAY_DAYS * 2 + 4)).isoformat(),
+                        "to": today.isoformat(),
+                        "fields": "open,high,low,close,volume",
+                        "sort": "asc",
+                    },
+                )
+                bars = parse_fugle(history)
+            except Exception as error:  # noqa: BLE001 — a page without its intraday chart
+                log.warning("intraday: %s not read: %s", symbol, _describe(error))
+                return kept[1] if kept else PublicIntraday(symbol=symbol, source=None, bars=[])
+            try:
+                # today's bars so far (not in the history until the evening); none on a day off
+                bars += parse_fugle(
+                    await self.get(FUGLE_TODAY.format(symbol=symbol), {"timeframe": "15"})
+                )
+            except Exception as error:  # noqa: BLE001 — the days before still stand
+                log.warning("intraday: %s today not read: %s", symbol, _describe(error))
+            answer = PublicIntraday(symbol=symbol, source="Fugle", bars=last_days(bars))
+            self._kept[symbol] = (now, answer)
+            return answer
+
+
+def fugle_json(api_key: str, timeout: float = 15.0) -> GetFugle:
+    import httpx
+
+    headers = {"X-API-KEY": api_key}
+
+    async def get(url: str, params: dict) -> dict:
+        async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+            response = await client.get(url, params=params)
+            if response.status_code == 404:  # Fugle: nothing in that range (a day off)
+                return {"data": []}
+            return response.raise_for_status().json()
+
+    return get

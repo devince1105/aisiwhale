@@ -5,6 +5,7 @@ import {
   AVERAGES,
   axisLabel,
   eastern,
+  wallClock,
   fullLabel,
   group,
   movingAverage,
@@ -55,6 +56,9 @@ describe("time on the chart", () => {
   it("reads a bar's start in US Eastern time, summer and winter", () => {
     expect(eastern("2026-09-24T13:30:00Z")).toBe("2026-09-24 09:30"); // EDT, UTC−4
     expect(eastern("2026-12-01T14:30:00Z")).toBe("2026-12-01 09:30"); // EST, UTC−5
+    // a Taiwan stock's bars in Taipei's time (D-074): no daylight saving, UTC+8
+    expect(wallClock("2026-09-24T01:00:00Z", "Asia/Taipei")).toBe("2026-09-24 09:00");
+    expect(wallClock("2026-12-01T05:15:00Z", "Asia/Taipei")).toBe("2026-12-01 13:15");
   });
 
   it("labels each view's axis its own way", () => {

@@ -1094,8 +1094,8 @@ export interface paths {
         };
         /**
          * Get Stock Intraday
-         * @description A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.
-         *     Empty for a Taiwan stock (no free intraday history) or without Tiingo's key.
+         * @description A stock's last five trading days in 15-minute bars: a US stock's from Tiingo's IEX feed
+         *     (D-059), a Taiwan stock's from Fugle (D-074). Empty without that service's key.
          */
         get: operations["get_stock_intraday_api_public_stocks__symbol__intraday_get"];
         put?: never;

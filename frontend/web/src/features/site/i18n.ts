@@ -113,6 +113,7 @@ const WORDS = {
       title: "走勢",
       intervals: { intraday: "15分", day: "日", week: "週", month: "月" },
       intradayNote: "15 分鐘線為美東時間，成交量僅含 IEX 交易所。",
+      intradayNoteTw: "15 分鐘線為台北時間。",
       average: (view: string, n: number) =>
         (
           {
@@ -365,6 +366,7 @@ const WORDS = {
       title: "Price",
       intervals: { intraday: "15m", day: "Day", week: "Week", month: "Month" },
       intradayNote: "15-minute bars in US Eastern time; volume is IEX's only.",
+      intradayNoteTw: "15-minute bars in Taipei time.",
       average: (view: string, n: number) =>
         view === "intraday" ? `MA${n}` : `${n}${({ day: "D", week: "W", month: "M" } as Record<string, string>)[view]}`,
       averageTitle: (view: string, n: number) =>

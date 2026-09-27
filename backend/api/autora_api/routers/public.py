@@ -53,7 +53,9 @@ from autora.domains.newsroom.price_history import (
     IntradayCache,
     PublicHistory,
     PublicIntraday,
+    TwIntradayCache,
     bar_quote,
+    fugle_json,
     history,
     refresh_us,
     tiingo_rows,
@@ -235,21 +237,29 @@ def intraday_cache() -> IntradayCache:
     return IntradayCache(tiingo_rows(key) if key else None)
 
 
+@lru_cache
+def tw_intraday_cache() -> TwIntradayCache:
+    """One per process, like the US one (D-074): Fugle asked once per stock every ten minutes."""
+    key = _secret(get_settings().fugle_api_key)
+    return TwIntradayCache(fugle_json(key) if key else None)
+
+
 @router.get("/api/public/stocks/{symbol}/intraday")
 async def get_stock_intraday(
     symbol: str,
     session: Session,
     response: Response,
     cache: Annotated[IntradayCache, Depends(intraday_cache)],
+    tw_cache: Annotated[TwIntradayCache, Depends(tw_intraday_cache)],
 ) -> PublicIntraday:
-    """A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.
-    Empty for a Taiwan stock (no free intraday history) or without Tiingo's key."""
+    """A stock's last five trading days in 15-minute bars: a US stock's from Tiingo's IEX feed
+    (D-059), a Taiwan stock's from Fugle (D-074). Empty without that service's key."""
     stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
     response.headers["Cache-Control"] = "public, max-age=300"
-    if stock.market != "us":
-        return PublicIntraday(symbol=stock.symbol, source=None, bars=[])
+    if stock.market == "tw":
+        return await tw_cache.bars(stock.symbol)
     return await cache.bars(stock.symbol)
 
 

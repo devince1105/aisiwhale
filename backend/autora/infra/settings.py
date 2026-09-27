@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     tiingo_api_key: SecretStr | None = None
     """Tiingo, free for personal use: US stocks' daily history for the stock pages' charts
     (D-059). Without it a US page has no chart. Its commercial plan before the site is public."""
+    fugle_api_key: SecretStr | None = None
+    """Fugle (富果), free for its members: Taiwan stocks' 15-minute bars for the stock pages'
+    charts (D-074). Without it a Taiwan page has days, weeks and months only. Its terms for a
+    public site to be checked before the site is public."""
 
     # --- Blob storage (T-210) ---
     blob_store_dir: Path = Path(__file__).resolve().parents[3] / "data" / "blobs"
@@ -205,6 +209,7 @@ class Settings(BaseSettings):
         "fred_api_key",
         "finnhub_api_key",
         "tiingo_api_key",
+        "fugle_api_key",
         "resend_api_key",
         "payuni_mer_id",
         "payuni_hash_key",

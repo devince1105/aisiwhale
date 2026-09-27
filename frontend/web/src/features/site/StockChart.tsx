@@ -25,7 +25,7 @@ import { fetchIntraday } from "./api";
 import {
   AVERAGES,
   axisLabel,
-  eastern,
+  wallClock,
   fullLabel,
   group,
   movingAverage,
@@ -96,7 +96,7 @@ function timeOf(bar: Bar, view: View): Time {
   return (view === "intraday" ? wallSeconds(bar.d) : bar.d) as Time;
 }
 
-type Intraday = { state: "idle" | "loading" | "failed" } | { state: "ready"; bars: Bar[] };
+type Intraday = { state: "idle" | "loading" | "failed" } | { state: "ready"; source: string | null; bars: Bar[] };
 
 /** Decimals for a price this size: a stock's two, a rate's more — the yen in NT$ is 0.2017, not
  * 0.2 (D-072). */
@@ -136,7 +136,8 @@ export function StockChart({
   const box = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>("day");
   const [intraday, setIntraday] = useState<Intraday>({ state: "idle" });
-  // 15 minutes only when there are such bars to show: a US stock, and Tiingo answered with some
+  // 15 minutes only when there are such bars to show: a US stock (Tiingo) or a Taiwan one (Fugle,
+  // D-074) whose service answered with some
   const views: View[] =
     intraday.state === "ready" && intraday.bars.length ? ["intraday", "day", "week", "month"] : ["day", "week", "month"];
   const shown = useMemo(() => {
@@ -151,15 +152,17 @@ export function StockChart({
   const [pointed, setPointed] = useState<number | null>(null);
   const [theme, setTheme] = useState(0);
 
-  // a US stock's 15-minute bars are asked for once, after the page: the button appears if any came
+  // a stock's 15-minute bars are asked for once, after the page: the button appears if any came
   useEffect(() => {
-    if (market !== "us" || intraday.state !== "idle") return;
+    if ((market !== "us" && market !== "tw") || intraday.state !== "idle") return;
     setIntraday({ state: "loading" });
+    const zone = market === "tw" ? "Asia/Taipei" : "America/New_York";
     fetchIntraday(symbol)
       .then((answer) =>
         setIntraday({
           state: "ready",
-          bars: answer.bars.map((b) => ({ d: eastern(b.t), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v })),
+          source: answer.source ?? null,
+          bars: answer.bars.map((b) => ({ d: wallClock(b.t, zone), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v })),
         }),
       )
       .catch(() => setIntraday({ state: "failed" }));
@@ -335,9 +338,12 @@ export function StockChart({
       </div>
       <div ref={box} className="mt-2 h-80 w-full" data-testid="stock-chart" />
       <p className="mt-2 text-xs text-muted">
-        {view === "intraday" ? `${w.intradayNote} ` : ""}
+        {view === "intraday" ? `${market === "tw" ? w.intradayNoteTw : w.intradayNote} ` : ""}
         {source
-          ? w.source(view === "intraday" ? "Tiingo IEX" : source, market === "us" && source === "Tiingo" && view !== "intraday")
+          ? w.source(
+              view === "intraday" && intraday.state === "ready" ? (intraday.source ?? source) : source,
+              market === "us" && source === "Tiingo" && view !== "intraday",
+            )
           : ""}
       </p>
     </div>
