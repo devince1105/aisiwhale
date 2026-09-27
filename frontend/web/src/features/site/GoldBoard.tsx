@@ -43,7 +43,7 @@ export function GoldBoard({ gold, lang, bare = false }: { gold: PublicGold; lang
         </span>
       </div>
       <div className="mt-4">
-        <StockChart bars={gold.bars} lang={lang} market="gold" symbol="XAUUSD" source={gold.source} volume={false} />
+        <StockChart bars={gold.bars} lang={lang} market="gold" symbol="XAUUSD" source={gold.source} volume={false} decimals={2} />
       </div>
       <p className="mt-1 text-xs leading-relaxed text-muted">
         {w.note}{" "}

@@ -48,7 +48,7 @@ import { StockChart } from "./StockChart";
 import { formatDate, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
-import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
+import { ARROW, direction, formatChange, formatValue, isCurrency, label, stockCode, stockPage, TONE } from "./quote";
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
 /** The strip's quotes: the popular stocks the watchlist page offers. */
@@ -706,6 +706,8 @@ function FigureChart({ item, lang }: { item: WatchedStock; lang: Lang }) {
         source={figure.source}
         volume={false}
         closeOnly
+        // a currency as a bank posts it (0.2017, 4.726); the Nasdaq, the yield and oil, two places
+        decimals={isCurrency(item.key) ? (figure.value < 1 ? 4 : 3) : 2}
       />
     </div>
   );

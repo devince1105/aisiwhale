@@ -98,6 +98,13 @@ function timeOf(bar: Bar, view: View): Time {
 
 type Intraday = { state: "idle" | "loading" | "failed" } | { state: "ready"; bars: Bar[] };
 
+/** Decimals for a price this size: a stock's two, a rate's more — the yen in NT$ is 0.2017, not
+ * 0.2 (D-072). */
+export function decimalsFor(price: number): number {
+  const size = Math.abs(price);
+  return size < 1 ? 4 : size < 10 ? 3 : 2;
+}
+
 export function StockChart({
   bars,
   lang,
@@ -107,6 +114,7 @@ export function StockChart({
   preparing = false,
   volume = true,
   closeOnly = false,
+  decimals,
 }: {
   bars: Bar[];
   lang: Lang;
@@ -120,6 +128,9 @@ export function StockChart({
   /** Each day's close and nothing else (D-072: FRED's figures, a currency cross): the legend
    * gives the close alone. */
   closeOnly?: boolean;
+  /** Its prices' decimals, when not a stock's (``decimalsFor``): a currency as a bank posts it,
+   * a yield's two. */
+  decimals?: number;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
@@ -173,6 +184,8 @@ export function StockChart({
     const element = box.current;
     if (!element || !shown.length) return;
     const colours = palette(element);
+    const digits = decimals ?? decimalsFor(shown[shown.length - 1].c);
+    const priceFormat = { type: "price" as const, precision: digits, minMove: 1 / 10 ** digits };
     const chart: IChartApi = createChart(element, {
       autoSize: true,
       layout: {
@@ -202,6 +215,7 @@ export function StockChart({
       bottomColor: alpha(colours.accent, "00"),
       lineWidth: 2,
       priceLineVisible: false,
+      priceFormat,
     });
     price.setData(shown.map((bar) => ({ time: timeOf(bar, view), value: bar.c })));
     for (const [place, n] of AVERAGES[view].entries()) {
@@ -211,6 +225,7 @@ export function StockChart({
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
+        priceFormat,
       });
       line.setData(
         shown.flatMap((bar, i) => {
@@ -250,7 +265,7 @@ export function StockChart({
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
     };
-  }, [shown, averages, view, lang, theme, volume]);
+  }, [shown, averages, view, lang, theme, volume, decimals]);
 
   if (!bars.length) {
     return (
@@ -259,8 +274,9 @@ export function StockChart({
       </p>
     );
   }
-  const number = (value: number) =>
-    value.toLocaleString(lang === "en" ? "en-US" : "zh-TW", { maximumFractionDigits: 2 });
+  const digits = decimals ?? (shown.length ? decimalsFor(shown[shown.length - 1].c) : 2);
+  const number = (value: number, places = digits) =>
+    value.toLocaleString(lang === "en" ? "en-US" : "zh-TW", { maximumFractionDigits: places });
   const at = Math.min(pointed ?? shown.length - 1, shown.length - 1);
   const bar = shown[at];
   const previous = at > 0 ? shown[at - 1].c : null;
@@ -282,7 +298,7 @@ export function StockChart({
               {volume ? (
                 <span>
                   <span className="text-muted">{w.volume}</span>{" "}
-                  {market === "tw" ? `${number(Math.round(bar.v / 1000))} ${w.lots}` : number(bar.v)}
+                  {market === "tw" ? `${number(Math.round(bar.v / 1000), 0)} ${w.lots}` : number(bar.v, 0)}
                 </span>
               ) : null}
             </>

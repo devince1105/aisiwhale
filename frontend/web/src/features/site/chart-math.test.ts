@@ -81,3 +81,10 @@ describe("each view's averages", () => {
     expect(AVERAGES.intraday).toEqual([5, 10, 20, 60]);
   });
 });
+
+describe("a price's decimals (D-072)", () => {
+  it("a stock's two, a rate's more", async () => {
+    const { decimalsFor } = await import("./StockChart");
+    expect([decimalsFor(2475), decimalsFor(31.7287), decimalsFor(4.7263), decimalsFor(0.2017)]).toEqual([2, 2, 3, 4]);
+  });
+});
