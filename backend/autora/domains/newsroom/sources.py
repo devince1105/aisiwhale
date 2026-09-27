@@ -143,6 +143,13 @@ def _validate(kind: SourceKind, url: str | None, config: dict[str, Any]) -> None
         k = config.get("k", 10)
         if not isinstance(k, int) or not 1 <= k <= 10:
             raise SourceConfigError("config.k must be 1-10")
+        domains = config.get("domains")
+        if domains is not None and (
+            not isinstance(domains, list)
+            or not domains
+            or not all(isinstance(d, str) and d and "/" not in d for d in domains)
+        ):
+            raise SourceConfigError("config.domains must be a list of site names (example.com)")
     age = config.get(MAX_AGE_DAYS)
     if age is not None and (not isinstance(age, int) or isinstance(age, bool) or age < 1):
         raise SourceConfigError("config.max_age_days must be a whole number of days, 1 or more")
@@ -296,8 +303,13 @@ class SourcePoller:
                     ]
                 )
             config = source.config
+            # only when set: a provider written before sites could be named still works
+            where = {"domains": list(config["domains"])} if config.get("domains") else {}
             response = await self.search.search(
-                config["query"], k=int(config.get("k", 10)), recency_days=config.get("recency_days")
+                config["query"],
+                k=int(config.get("k", 10)),
+                recency_days=config.get("recency_days"),
+                **where,
             )
             entries = [
                 FeedEntry(

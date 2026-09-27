@@ -96,6 +96,9 @@ def test_searches_stay_inside_the_free_plan():
     assert {s.poll_interval_seconds for s in searches if s not in daily} == {12 * 3600}
     assert {s.poll_interval_seconds for s in daily} == {24 * 3600}
     assert {s.config["recency_days"] for s in daily} == {7}
+    # only on the firms' own sites: an open query for ten names found no outlook at all
+    assert all(s.config["domains"] for s in daily)
+    assert "blackrock.com" in daily[0].config["domains"]
     monthly = sum(30 * 24 * 3600 // s.poll_interval_seconds for s in searches)
     assert monthly == 420
 

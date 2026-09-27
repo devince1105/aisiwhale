@@ -89,6 +89,7 @@ async def test_tavily_request_and_results():
     assert body["query"] == "microgrid" and body["max_results"] == 3
     assert body["time_range"] == "week" and body["include_usage"] is True
     assert body["search_depth"] == "basic" and body["include_raw_content"] is False
+    assert "include_domains" not in body  # the whole web unless sites are named (D-057)
 
     assert response.provider == "tavily"
     assert response.cost_usd == Decimal("0.008")
@@ -328,3 +329,15 @@ def test_profile_chooses_the_provider(committed):
     with pytest.raises(ValueError, match="TAVILY_API_KEY is required"):
         Settings(_env_file=None, database_url=DB, tools_profile="live")
     assert "web_search" in build_tools(committed).names()
+
+
+async def test_tavily_keeps_to_the_sites_named():
+    """D-057: the asset managers' outlooks, only from their own sites."""
+    bodies = []
+
+    def handler(request):
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"results": [], "usage": {"credits": 1}})
+
+    await tavily(handler).search("outlook", k=5, domains=["blackrock.com", "ssga.com"])
+    assert bodies[0]["include_domains"] == ["blackrock.com", "ssga.com"]

@@ -46,7 +46,7 @@ from autora.db.models import Agent, Company, Project, ProjectState
 from autora.db.repositories.companies import get_company_by_slug, get_policies, upsert_policy
 from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
-from autora.domains.newsroom.models import Source
+from autora.domains.newsroom.models import Source, SourceStatus
 from autora.domains.newsroom.sources import (
     MAX_AGE_DAYS,
     OWN_STORY,
@@ -164,16 +164,38 @@ def _search(
     *,
     recency_days: int = 2,
     every: int = HALF_DAY,
+    domains: tuple[str, ...] = (),
+    name: str | None = None,
 ) -> MarketSource:
+    config: dict[str, Any] = {
+        "query": query,
+        "k": 5,
+        "recency_days": recency_days,
+        SECTION: section,
+    }
+    if domains:
+        config["domains"] = list(domains)
     return MarketSource(
-        name=f"搜尋：{query}",
+        name=f"搜尋：{name or query}",
         kind="search_query",
         trust_level=Decimal("0.5"),
         language=language,
-        config={"query": query, "k": 5, "recency_days": recency_days, SECTION: section},
+        config=config,
         poll_interval_seconds=every,
     )
 
+
+INSTITUTIONS_A = (
+    "blackrock.com", "vanguard.com", "fidelity.com", "fidelityinstitutional.com", "ubs.com",
+    "ssga.com", "statestreet.com",
+)  # fmt: skip
+"""Where BlackRock, Vanguard, Fidelity, UBS and State Street publish their outlooks."""
+INSTITUTIONS_B = (
+    "am.jpmorgan.com", "jpmorgan.com", "goldmansachs.com", "gsam.com", "capitalgroup.com",
+    "amundi.com", "bny.com",
+)  # fmt: skip
+"""J.P. Morgan Asset Management, Goldman Sachs, Capital Group, Amundi (Crédit Agricole's asset
+manager) and BNY Investments."""
 
 SOURCES: tuple[MarketSource, ...] = (
     _investor("巴菲特", "Berkshire Hathaway", "0001067983"),
@@ -201,22 +223,34 @@ SOURCES: tuple[MarketSource, ...] = (
     _press("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/", "crypto"),
     _search("比特幣 以太幣 ETF 監管", "crypto"),
     # 機構觀點 (D-057): the ten largest asset managers' own published outlooks — a weekly
-    # commentary is news for a week, so a day's search over seven days of results is enough
+    # commentary is news for a week, so a day's search over seven days of results is enough.
+    # Only on the firms' own sites: ten names in one open query found Quora, Instagram and a
+    # regulator's PDF, not one outlook
     _search(
-        "BlackRock Vanguard Fidelity UBS State Street market outlook commentary",
+        "market outlook weekly commentary",
         "institutions",
         "en",
         recency_days=7,
         every=DAY,
-    ),  # fmt: skip
+        domains=INSTITUTIONS_A,
+        name="機構觀點（貝萊德、先鋒、富達、瑞銀、道富）",
+    ),
     _search(
-        "J.P. Morgan Asset Management Goldman Sachs Capital Group Amundi BNY investment outlook",
+        "market outlook weekly commentary",
         "institutions",
         "en",
         recency_days=7,
         every=DAY,
-    ),  # fmt: skip
+        domains=INSTITUTIONS_B,
+        name="機構觀點（摩根大通、高盛、資本集團、Amundi、紐約梅隆）",
+    ),
 )
+
+RETIRED = (
+    "搜尋：BlackRock Vanguard Fidelity UBS State Street market outlook commentary",
+    "搜尋：J.P. Morgan Asset Management Goldman Sachs Capital Group Amundi BNY investment outlook",
+)
+"""Sources the code no longer defines: D-057's first two searches, which found no outlooks."""
 
 
 @dataclass
@@ -300,6 +334,9 @@ async def seed_markets(
             poll_interval_seconds=spec.poll_interval_seconds,
         )
         added.append(spec.name)
+    for name in RETIRED:  # replaced by a better source; paused, not deleted: its items stay
+        if (source := known.get(name)) is not None:
+            source.status = SourceStatus.PAUSED.value
     # the schedules too: one added later (the 13F positions, D-049) reaches a company seeded before
     await ensure_newsroom_schedules(session, company.id)
     sources = (await session.scalars(select(Source).where(Source.company_id == company.id))).all()

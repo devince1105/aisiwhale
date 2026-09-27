@@ -12,6 +12,7 @@ Implementations:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
@@ -54,9 +55,15 @@ class SearchProvider(Protocol):
     name: str
 
     async def search(
-        self, query: str, *, k: int, recency_days: int | None = None
+        self,
+        query: str,
+        *,
+        k: int,
+        recency_days: int | None = None,
+        domains: Sequence[str] | None = None,
     ) -> SearchResponse:
-        """Up to ``k`` results for ``query``; ``recency_days``: only pages from that many days."""
+        """Up to ``k`` results for ``query``; ``recency_days``: only pages from that many days;
+        ``domains``: only pages on these sites (and their subdomains)."""
         ...
 
 

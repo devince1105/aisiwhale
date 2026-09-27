@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -49,7 +51,12 @@ class FixtureSearchProvider:
         return cls(docs)
 
     async def search(
-        self, query: str, *, k: int, recency_days: int | None = None
+        self,
+        query: str,
+        *,
+        k: int,
+        recency_days: int | None = None,
+        domains: Sequence[str] | None = None,
     ) -> SearchResponse:
         wanted = _terms(query)
         cutoff = None
@@ -61,6 +68,8 @@ class FixtureSearchProvider:
             if not hits:
                 continue
             if cutoff is not None and (doc.published_at is None or doc.published_at < cutoff):
+                continue
+            if domains and not _on(doc.url, domains):
                 continue
             scored.append((-hits, order, doc, hits / max(len(wanted), 1)))
         scored.sort(key=lambda row: (row[0], row[1]))
@@ -75,3 +84,9 @@ class FixtureSearchProvider:
             for _, _, doc, score in scored[:k]
         ]
         return SearchResponse(results=results, provider=self.name, cost_usd=Decimal(0))
+
+
+def _on(url: str, domains: Sequence[str]) -> bool:
+    """Whether ``url`` is on one of ``domains`` or a subdomain of one, as Tavily reads them."""
+    host = (urlsplit(url).hostname or "").lower()
+    return any(host == d or host.endswith("." + d) for d in (d.lower() for d in domains))

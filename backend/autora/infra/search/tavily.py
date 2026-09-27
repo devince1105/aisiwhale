@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
@@ -92,7 +92,12 @@ class TavilySearchProvider:
         self._limiter = limiter or RateLimiter(requests_per_minute)
 
     async def search(
-        self, query: str, *, k: int, recency_days: int | None = None
+        self,
+        query: str,
+        *,
+        k: int,
+        recency_days: int | None = None,
+        domains: Sequence[str] | None = None,
     ) -> SearchResponse:
         body: dict[str, Any] = {
             "query": query,
@@ -105,6 +110,8 @@ class TavilySearchProvider:
         }
         if recency_days is not None:
             body["time_range"] = _time_range(recency_days)
+        if domains:
+            body["include_domains"] = list(domains)
         await self._limiter.acquire()
         headers = {"Authorization": f"Bearer {self._key.get_secret_value()}"}
         try:
