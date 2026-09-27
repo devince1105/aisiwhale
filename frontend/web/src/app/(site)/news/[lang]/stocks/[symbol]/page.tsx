@@ -47,7 +47,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
   // the reader's watchlist beside the stock (D-060), hidden until asked for (D-066): a column on
   // a wide screen, a row on a phone
   return (
-    <div className="mx-auto max-w-6xl lg:flex lg:gap-6 lg:px-4">
+    <div className="mx-auto max-w-6xl lg:flex lg:flex-wrap lg:gap-x-6 lg:px-4">
       <WatchlistSide lang={lang} current={`${stock.market}:${stock.symbol}`} />
       <div className="min-w-0 flex-1">
         <StockView stock={stock} lang={lang} history={history} coverage={{ page, to: (n) => `/news/${lang}/stocks/${stock.symbol}${n > 1 ? `?page=${n}` : ""}#coverage` }} />

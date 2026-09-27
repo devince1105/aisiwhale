@@ -152,8 +152,12 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
   const toggle = <SideToggle open={open} setOpen={setOpen} lang={lang} />;
   // hidden until asked for (D-066): the stock has the page; the list is a click away
   return (
-    <aside className={`lg:shrink-0 lg:pt-6 ${open ? "lg:w-56" : ""}`} data-testid="watchlist-side">
-      <div className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-none lg:px-0 lg:pt-0 lg:pb-2">{toggle}</div>
+    // closed, the button is a row of its own above the stock, in its column, so the page stays
+    // centred as every other page (D-076); open, a column beside it
+    <aside className={open ? "lg:w-56 lg:shrink-0 lg:pt-6" : "lg:basis-full"} data-testid="watchlist-side">
+      <div className={open ? "mx-auto max-w-3xl px-4 pt-4 lg:max-w-none lg:px-0 lg:pt-0 lg:pb-2" : "mx-auto max-w-3xl px-4 pt-4"}>
+        {toggle}
+      </div>
       {open ? <SideList id="watchlist-side-list" items={items} byKey={byKey} lang={lang} current={current} sample={sample} /> : null}
     </aside>
   );
@@ -542,7 +546,9 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
 
   return (
     // the settings in the page's reading column, centred, as they were; the list to watch wider
-    <div className={editing ? "mx-auto max-w-3xl" : undefined} data-testid="watchlist-page">
+    // the reading column of every other page (a 3xl page less its padding) while editing or with
+    // the list hidden; the wide board only with the list open beside the one picked (D-076)
+    <div className={editing || !listOpen ? "mx-auto max-w-[46rem]" : undefined} data-testid="watchlist-page">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{w.title}</h1>
         {/* the picked one's 已觀察 and the list's 編輯清單, side by side */}
