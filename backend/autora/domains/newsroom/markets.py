@@ -44,6 +44,7 @@ from autora.company.companies import create_company
 from autora.company.organization import bootstrap_executive, business_unit_by_key
 from autora.db.models import Agent, Company, Project, ProjectState
 from autora.db.repositories.companies import get_company_by_slug, get_policies, upsert_policy
+from autora.domains.newsroom import institutions
 from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source, SourceStatus
@@ -185,17 +186,10 @@ def _search(
     )
 
 
-INSTITUTIONS_A = (
-    "blackrock.com", "vanguard.com", "fidelity.com", "fidelityinstitutional.com", "ubs.com",
-    "ssga.com", "statestreet.com",
-)  # fmt: skip
+INSTITUTIONS_A = institutions.domains("blackrock", "vanguard", "fidelity", "ubs", "state_street")
 """Where BlackRock, Vanguard, Fidelity, UBS and State Street publish their outlooks."""
-INSTITUTIONS_B = (
-    "am.jpmorgan.com", "jpmorgan.com", "goldmansachs.com", "gsam.com", "capitalgroup.com",
-    "amundi.com", "bny.com",
-)  # fmt: skip
-"""J.P. Morgan Asset Management, Goldman Sachs, Capital Group, Amundi (Crédit Agricole's asset
-manager) and BNY Investments."""
+INSTITUTIONS_B = institutions.domains("jpmorgan", "goldman", "capital_group", "amundi", "bny")
+"""J.P. Morgan, Goldman Sachs, Capital Group, Amundi (Crédit Agricole's asset manager) and BNY."""
 
 SOURCES: tuple[MarketSource, ...] = (
     _investor("巴菲特", "Berkshire Hathaway", "0001067983"),

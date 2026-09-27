@@ -48,9 +48,10 @@ How to work:
    It captures the filing compared with the previous quarter — what was bought, sold, added to
    and cut, with shares and values — which is what the story is about. The filing is the record:
    it needs no second site, though coverage of it elsewhere may add context.
-6. A lead about an asset manager's market view (BlackRock, Vanguard, J.P. Morgan…): capture the
-   firm's own publication (its outlook or commentary page, on its own site) — that is the record
-   of what it said and when. News coverage of it is context, not a substitute.
+6. A lead about an asset manager's market view (BlackRock, Vanguard, J.P. Morgan…): capture only
+   that firm's own publication (its outlook or commentary page, on its own site) — that is the
+   record of what it said and when. Do not capture other firms' views or news coverage for it:
+   the article reports one firm's view, and a draft citing another site is refused.
 
 When done, reply with only a JSON object (no other text):
 {"story_id": "<the story id>",

@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 
 from autora.db.repositories.companies import get_policies
+from autora.domains.newsroom import institutions
 from autora.domains.newsroom.advice import advice_problems, no_advice
 from autora.domains.newsroom.articles import (
     ArticleState,
@@ -27,8 +28,19 @@ from autora.domains.newsroom.articles import (
     slugify,
 )
 from autora.domains.newsroom.events import ArticleCreated
-from autora.domains.newsroom.models import Article, ArticleVersion, Claim, Story
+from autora.domains.newsroom.models import (
+    Article,
+    ArticleVersion,
+    Claim,
+    ClaimEvidence,
+    Evidence,
+    Source,
+    SourceItem,
+    Story,
+    StoryItem,
+)
 from autora.domains.newsroom.policy import language_policy
+from autora.domains.newsroom.sources import SECTION, SECTIONS
 from autora.infra.ids import uuid7
 from autora.runtime.events.catalog import ProducedRef
 from autora.runtime.events.outbox import emit
@@ -74,6 +86,33 @@ def _draft_output(article: Article, rows: list[ArticleVersion], reused: bool) ->
         "versions": {row.lang: str(row.id) for row in rows},
         "reused": reused,
     }
+
+
+async def _section_of(session, story_id: uuid.UUID) -> str | None:
+    """The section most of the story's sources name, as the site reads it (``site._section``)."""
+    named = Source.config[SECTION].astext
+    return await session.scalar(
+        select(named)
+        .select_from(StoryItem)
+        .join(SourceItem, SourceItem.id == StoryItem.source_item_id)
+        .join(Source, Source.id == SourceItem.source_id)
+        .where(StoryItem.story_id == story_id, named.in_(SECTIONS))
+        .group_by(named)
+        .order_by(func.count().desc(), named)
+        .limit(1)
+    )
+
+
+async def _evidence_urls(session, claim_ids: set[uuid.UUID]) -> dict[uuid.UUID, set[str]]:
+    """Where each claim's evidence was captured: the address asked for and where it ended."""
+    urls: dict[uuid.UUID, set[str]] = {}
+    for claim_id, url, final_url in await session.execute(
+        select(ClaimEvidence.claim_id, Evidence.url, Evidence.final_url)
+        .join(Evidence, Evidence.id == ClaimEvidence.evidence_id)
+        .where(ClaimEvidence.claim_id.in_(claim_ids))
+    ):
+        urls.setdefault(claim_id, set()).update(u for u in (url, final_url) if u)
+    return urls
 
 
 async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
@@ -124,6 +163,10 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
     )
     if no_advice(policies):
         issues += advice_problems(args.versions, {row.id: row.claim_type for row in rows})
+    if await _section_of(session, story.id) == institutions.SECTION:
+        issues += institutions.attribution_problems(
+            args.versions, await _evidence_urls(session, cited)
+        )
     if issues:
         raise DraftError("the draft was not saved:\n- " + "\n- ".join(issues))
 

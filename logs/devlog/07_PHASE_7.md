@@ -1600,6 +1600,12 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 改法：搜尋來源支援 `config.domains`（Tavily 的 `include_domains`；fixture 同樣過濾），兩個搜尋改為「market outlook weekly commentary」並限定各機構網域（blackrock.com、vanguard.com、fidelity.com、ubs.com、ssga.com…；am.jpmorgan.com、goldmansachs.com、capitalgroup.com、amundi.com、bny.com…）。舊的兩個搜尋來源暫停（`RETIRED`，保留歷史）。
 - 重跑後抓到貝萊德投資研究院週評（2026-09-21）、富達 Market Signals 週報、摩根大通的市場觀點；以貝萊德週評開寫第一篇機構觀點。
 
+## D-058：機構觀點的歸屬檢查
+
+- 富達、摩根大通兩篇被新聞室放棄（見 D-058 決策）。使用者同意三步：收緊研究規則、加歸屬檢查、兩篇重寫。
+- `institutions.py`：十家機構的名稱（貝萊德／BlackRock…）與網域；`attribution_problems` 對 `institutions` 分類的草稿逐段檢查。搜尋的網域改由同一清單產生，測試保證兩者一致。
+- 測試以實際失敗為例：富達引用 Vanguard 數字 → 拒絕；BlackRock 段落引用 InvestmentNews → 拒絕；未點名機構的段落 → 拒絕；已發布的 BlackRock 版本 → 通過。newsroom＋api 461 個全過。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
