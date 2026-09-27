@@ -3998,64 +3998,65 @@
     "title": "PublicBlock",
     "type": "object"
    },
-   "PublicFxBoard": {
+   "PublicFigure": {
     "properties": {
      "as_of": {
-      "format": "date-time",
+      "format": "date",
       "title": "As Of",
       "type": "string"
      },
-     "bank_url": {
-      "title": "Bank Url",
-      "type": "string"
-     },
-     "rates": {
+     "bars": {
       "items": {
-       "$ref": "#/components/schemas/PublicFxRate"
+       "$ref": "#/components/schemas/PublicBar"
       },
-      "title": "Rates",
+      "title": "Bars",
       "type": "array"
+     },
+     "change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change"
+     },
+     "change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change Pct"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
      },
      "source": {
       "title": "Source",
       "type": "string"
      },
-     "source_url": {
-      "title": "Source Url",
-      "type": "string"
-     }
-    },
-    "required": [
-     "as_of",
-     "source",
-     "source_url",
-     "bank_url",
-     "rates"
-    ],
-    "title": "PublicFxBoard",
-    "type": "object"
-   },
-   "PublicFxRate": {
-    "properties": {
-     "code": {
-      "title": "Code",
-      "type": "string"
-     },
-     "name": {
-      "title": "Name",
-      "type": "string"
-     },
-     "twd": {
-      "title": "Twd",
+     "value": {
+      "title": "Value",
       "type": "number"
      }
     },
     "required": [
-     "code",
-     "name",
-     "twd"
+     "key",
+     "as_of",
+     "value",
+     "change",
+     "change_pct",
+     "source",
+     "bars"
     ],
-    "title": "PublicFxRate",
+    "title": "PublicFigure",
     "type": "object"
    },
    "PublicGold": {
@@ -10220,19 +10221,18 @@
     ]
    }
   },
-  "/api/public/fx": {
+  "/api/public/figures/{key}": {
    "get": {
-    "description": "The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency\nBank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling\nrates, which the page links to. None when there are none to show.",
-    "operationId": "fx_api_public_fx_get",
+    "description": "A watchlist figure's chart (D-072): a currency against the New Taiwan dollar\n(``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five\nyears. None for a figure without one (or offline).",
+    "operationId": "figure_chart_api_public_figures__key__get",
     "parameters": [
      {
-      "in": "query",
-      "name": "lang",
+      "in": "path",
+      "name": "key",
       "required": true,
       "schema": {
-       "maxLength": 10,
-       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
-       "title": "Lang",
+       "pattern": "^[a-z0-9]{2,10}$",
+       "title": "Key",
        "type": "string"
       }
      }
@@ -10244,13 +10244,13 @@
         "schema": {
          "anyOf": [
           {
-           "$ref": "#/components/schemas/PublicFxBoard"
+           "$ref": "#/components/schemas/PublicFigure"
           },
           {
            "type": "null"
           }
          ],
-         "title": "Response Fx Api Public Fx Get"
+         "title": "Response Figure Chart Api Public Figures  Key  Get"
         }
        }
       },
@@ -10267,7 +10267,7 @@
       "description": "Validation Error"
      }
     },
-    "summary": "Fx",
+    "summary": "Figure Chart",
     "tags": [
      "public"
     ]
@@ -10275,7 +10275,7 @@
   },
   "/api/public/gold": {
    "get": {
-    "description": "The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, each\nday for about five years, and what that is in New Taiwan dollars a gram. None when there is\nnone to show.",
+    "description": "Spot gold's price and chart (D-070, on the watchlist since D-071): US dollars an ounce,\neach day for about five years, and what that is in New Taiwan dollars a gram. None when\nthere is none to show.",
     "operationId": "gold_api_public_gold_get",
     "parameters": [
      {
@@ -10404,7 +10404,7 @@
   },
   "/api/public/securities": {
    "get": {
-    "description": "Any listed Taiwan or US stock (D-061), by code, ticker or name.",
+    "description": "Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the\nNew Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``.",
     "operationId": "search_securities_api_public_securities_get",
     "parameters": [
      {

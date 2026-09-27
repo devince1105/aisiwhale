@@ -22,11 +22,14 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
-from typing import Literal
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING, Literal
 
 import httpx
 from pydantic import BaseModel
+
+if TYPE_CHECKING:  # the forex cache reads price_history, which reads this module
+    from autora.domains.newsroom.forex import TiingoFx
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +61,9 @@ ORDER = (
     "us10y",
     "wti",
     "xau",
+    "usdtwd",
+    "jpytwd",
+    "cnytwd",
     "btc",
     "eth",
 )
@@ -73,7 +79,6 @@ DAY = 24 * 3600
 FRED = "https://api.stlouisfed.org/fred/series/observations"
 COINGECKO = "https://api.coingecko.com/api/v3/simple/price"
 FINNHUB = "https://finnhub.io/api/v1/quote"
-TIINGO_GOLD = "https://api.tiingo.com/tiingo/fx/xauusd/prices"
 
 FRED_SERIES = {"nasdaq": "NASDAQCOM", "us10y": "DGS10", "wti": "DCOILWTICO"}
 """No S&P 500 index: VOO, beside the Nasdaq 100's QQQ, stands for it."""
@@ -337,40 +342,51 @@ async def coingecko(client: httpx.AsyncClient) -> list[PublicQuote]:
     return out
 
 
-def tiingo_gold(api_key: str):
-    """Spot gold (D-071): the last day's close from Tiingo's forex prices, against the day
-    before — the 黃金 tab's figure (D-070), the same key, one request an hour."""
-    from autora.domains.newsroom.gold import bars_from
+FOREX_KEYS = ("xau", "usdtwd", "jpytwd", "cnytwd")
+"""The strip's gold (D-071) and its currencies against the New Taiwan dollar (D-072): the US
+dollar, the yen and the yuan. Keyed as pairs — ``USD`` alone is a US fund's ticker, as ``GOLD``
+is Barrick Gold's."""
+
+
+def _close_quote(key: str, bars, currency: str) -> PublicQuote | None:
+    if not bars:
+        return None
+    last = bars[-1]
+    before = bars[-2].c if len(bars) > 1 else None
+    change = last.c - before if before else None
+    return PublicQuote(
+        key=key,
+        value=last.c,
+        change=change,
+        change_pct=None if change is None else round(change / before * 100, 2),
+        as_of=last.d,
+        basis="close",
+        source="Tiingo",
+        previous_close=before,
+        currency=currency,
+    )
+
+
+async def forex_quote(forex: TiingoFx, key: str) -> PublicQuote | None:
+    """Spot gold (``xau``) or a currency against the New Taiwan dollar (``eurtwd``): its last
+    close from the shared cache, as the strip and a watchlist show it (D-072)."""
+    from autora.domains.newsroom.figures import currency_of
+
+    if key == "xau":
+        return _close_quote(key, await forex.bars("xauusd"), "USD")
+    if (code := currency_of(key)) is None:
+        return None
+    bars, _ = await forex.twd_bars(code)
+    return _close_quote(key, bars, "TWD")
+
+
+def forex_figures(forex: TiingoFx):
+    """Gold and the three currencies from the shared Tiingo cache (D-072): no request of their
+    own — the cache asks for each pair once every few hours, for everything that shows it."""
 
     async def fetch(client: httpx.AsyncClient) -> list[PublicQuote]:
-        start = (datetime.now(UTC).date() - timedelta(days=10)).isoformat()
-        response = await client.get(
-            TIINGO_GOLD,
-            params={"startDate": start, "resampleFreq": "1day"},
-            headers={"Authorization": f"Token {api_key}"},
-        )
-        bars = bars_from(response.raise_for_status().json())
-        if not bars:
-            return []
-        last = bars[-1]
-        before = bars[-2].c if len(bars) > 1 else None
-        change = round(last.c - before, 2) if before else None
-        return [
-            PublicQuote(
-                key="xau",
-                value=last.c,
-                change=change,
-                change_pct=None if change is None else _pct(change, last.c),
-                as_of=last.d,
-                basis="close",
-                source="Tiingo",
-                open=last.o,
-                high=last.h,
-                low=last.l,
-                previous_close=before,
-                currency="USD",
-            )
-        ]
+        out = [await forex_quote(forex, key) for key in FOREX_KEYS]
+        return [q for q in out if q is not None]
 
     return fetch
 
@@ -452,7 +468,7 @@ def build_board(
     *,
     fred_api_key: str | None,
     finnhub_api_key: str | None = None,
-    tiingo_api_key: str | None = None,
+    forex: TiingoFx | None = None,
 ) -> QuoteBoard:
     """The site's board. Without a key, that service's figures are left out, not faked."""
     feeds = [
@@ -464,6 +480,7 @@ def build_board(
     if finnhub_api_key:
         # 13 symbols every 5 minutes: well inside the free plan's 60 calls a minute
         feeds.append(Feed("finnhub", finnhub(finnhub_api_key), every_seconds=5 * 60))
-    if tiingo_api_key:
-        feeds.append(Feed("tiingo", tiingo_gold(tiingo_api_key), every_seconds=3600))
+    if forex is not None and forex.get is not None:
+        # read from the shared cache, which asks Tiingo for a pair once every few hours
+        feeds.append(Feed("tiingo", forex_figures(forex), every_seconds=15 * 60))
     return QuoteBoard(feeds)

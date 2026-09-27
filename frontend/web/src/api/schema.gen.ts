@@ -934,7 +934,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/public/fx": {
+    "/api/public/figures/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -942,12 +942,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Fx
-         * @description The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency
-         *     Bank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling
-         *     rates, which the page links to. None when there are none to show.
+         * Figure Chart
+         * @description A watchlist figure's chart (D-072): a currency against the New Taiwan dollar
+         *     (``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five
+         *     years. None for a figure without one (or offline).
          */
-        get: operations["fx_api_public_fx_get"];
+        get: operations["figure_chart_api_public_figures__key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -965,9 +965,9 @@ export interface paths {
         };
         /**
          * Gold
-         * @description The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, each
-         *     day for about five years, and what that is in New Taiwan dollars a gram. None when there is
-         *     none to show.
+         * @description Spot gold's price and chart (D-070, on the watchlist since D-071): US dollars an ounce,
+         *     each day for about five years, and what that is in New Taiwan dollars a gram. None when
+         *     there is none to show.
          */
         get: operations["gold_api_public_gold_get"];
         put?: never;
@@ -1029,7 +1029,8 @@ export interface paths {
         };
         /**
          * Search Securities
-         * @description Any listed Taiwan or US stock (D-061), by code, ticker or name.
+         * @description Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the
+         *     New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``.
          */
         get: operations["search_securities_api_public_securities_get"];
         put?: never;
@@ -2799,30 +2800,25 @@ export interface components {
             /** Type */
             type: string;
         };
-        /** PublicFxBoard */
-        PublicFxBoard: {
+        /** PublicFigure */
+        PublicFigure: {
             /**
              * As Of
-             * Format: date-time
+             * Format: date
              */
             as_of: string;
-            /** Bank Url */
-            bank_url: string;
-            /** Rates */
-            rates: components["schemas"]["PublicFxRate"][];
+            /** Bars */
+            bars: components["schemas"]["PublicBar"][];
+            /** Change */
+            change: number | null;
+            /** Change Pct */
+            change_pct: number | null;
+            /** Key */
+            key: string;
             /** Source */
             source: string;
-            /** Source Url */
-            source_url: string;
-        };
-        /** PublicFxRate */
-        PublicFxRate: {
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Twd */
-            twd: number;
+            /** Value */
+            value: number;
         };
         /** PublicGold */
         PublicGold: {
@@ -5606,13 +5602,13 @@ export interface operations {
             };
         };
     };
-    fx_api_public_fx_get: {
+    figure_chart_api_public_figures__key__get: {
         parameters: {
-            query: {
-                lang: string;
-            };
+            query?: never;
             header?: never;
-            path?: never;
+            path: {
+                key: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -5623,7 +5619,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublicFxBoard"] | null;
+                    "application/json": components["schemas"]["PublicFigure"] | null;
                 };
             };
             /** @description Validation Error */

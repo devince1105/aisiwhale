@@ -44,7 +44,7 @@ from autora.company.companies import create_company
 from autora.company.organization import bootstrap_executive, business_unit_by_key
 from autora.db.models import Agent, Company, Project, ProjectState
 from autora.db.repositories.companies import get_company_by_slug, get_policies, upsert_policy
-from autora.domains.newsroom import fx_rates, institutions
+from autora.domains.newsroom import forex, institutions
 from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source, SourceStatus
@@ -312,7 +312,7 @@ SOURCES: tuple[MarketSource, ...] = (
     ),
 )
 
-FX_CURRENCIES = tuple(code for code, _, _ in fx_rates.CURRENCIES)
+FX_CURRENCIES = tuple(code for code, _, _ in forex.CURRENCIES)
 """The foreign currencies Bank of Taiwan posts rates for: what 外匯 covers (D-067)."""
 
 RETIRED = (

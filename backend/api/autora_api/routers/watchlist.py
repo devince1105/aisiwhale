@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from autora.accounts import SESSION_COOKIE, reader_for
 from autora.accounts import watchlist as reader_watchlist
 from autora.domains.newsroom import securities
+from autora.domains.newsroom.forex import CHARTED, NAMES
 from autora.domains.newsroom.holdings import Stock
 from autora.domains.newsroom.market_strip import ORDER
 from autora_api.deps import Session
@@ -37,10 +38,13 @@ FIGURES = {
     "XAU": ("黃金", "Gold"),
     "BTC": ("比特幣", "Bitcoin"),
     "ETH": ("以太幣", "Ether"),
+    # every currency with a chart against the New Taiwan dollar (D-072): the strip has three,
+    # a reader may keep any of them
+    **{f"{code}TWD": NAMES[code] for code in CHARTED},
 }
-"""The strip's figures that are not stocks, as a watchlist keeps them (market ``market``); the
-strip keys them in lower case, ``taiex``, ``btc``."""
-assert {key.lower() for key in FIGURES} == {k for k in ORDER if ":" not in k}
+"""The figures that are not stocks, as a watchlist keeps them (market ``market``): the strip's,
+and the currencies; the strip keys them in lower case, ``taiex``, ``btc``, ``jpytwd``."""
+assert {k for k in ORDER if ":" not in k} <= {key.lower() for key in FIGURES}
 
 DEFAULTS = [
     (key.split(":")[0], key.split(":")[1]) if ":" in key else ("market", key.upper())

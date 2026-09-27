@@ -106,6 +106,7 @@ export function StockChart({
   source,
   preparing = false,
   volume = true,
+  closeOnly = false,
 }: {
   bars: Bar[];
   lang: Lang;
@@ -116,6 +117,9 @@ export function StockChart({
   preparing?: boolean;
   /** Gold has none (D-070): no volume pane, and none in the legend. */
   volume?: boolean;
+  /** Each day's close and nothing else (D-072: FRED's figures, a currency cross): the legend
+   * gives the close alone. */
+  closeOnly?: boolean;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
@@ -270,7 +274,7 @@ export function StockChart({
           {bar ? (
             <>
               <span className="font-medium">{fullLabel(partsOf(timeOf(bar, view)), view)}</span>
-              {(["o", "h", "l", "c"] as const).map((k) => (
+              {(closeOnly ? (["c"] as const) : (["o", "h", "l", "c"] as const)).map((k) => (
                 <span key={k}>
                   <span className="text-muted">{w.ohlc[k]}</span> <span className={tone(bar[k])}>{number(bar[k])}</span>
                 </span>

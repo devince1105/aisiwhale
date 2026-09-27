@@ -29,12 +29,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL } from "@/config";
 
 import {
+  fetchFigure,
   fetchGold,
   fetchHistory,
   fetchMarkets,
   fetchQuotes,
   fetchStock,
   searchSecurities,
+  type PublicFigure,
   type PublicGold,
   type PublicHistory,
   type PublicQuote,
@@ -42,6 +44,7 @@ import {
   type PublicStock,
 } from "./api";
 import { GoldBoard } from "./GoldBoard";
+import { StockChart } from "./StockChart";
 import { formatDate, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
@@ -377,18 +380,24 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
         found.length ? (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line" data-testid="search-results">
             {found.map((security) => {
-              const key = `${security.market}:${security.symbol}`;
+              // a currency (D-072) is a figure: keyed as the strip keys it, with no page of its own
+              const currency = security.kind === "fx";
+              const key = currency ? security.symbol.toLowerCase() : `${security.market}:${security.symbol}`;
               return (
                 <li key={key} className="flex items-center gap-3 px-3 py-2 text-sm">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{security.name}</span>
                     <span className="block text-xs text-muted">
-                      {stockCode(key, security.exchange)}・{security.exchange}・{w.kinds[security.kind] ?? security.kind}
+                      {currency
+                        ? `${stockCode(key)}・${w.kinds.fx}`
+                        : `${stockCode(key, security.exchange)}・${security.exchange}・${w.kinds[security.kind] ?? security.kind}`}
                     </span>
                   </span>
-                  <a href={stockPage(key, lang) ?? "#"} className="text-xs text-accent underline">
-                    {w.view}
-                  </a>
+                  {currency ? null : (
+                    <a href={stockPage(key, lang) ?? "#"} className="text-xs text-accent underline">
+                      {w.view}
+                    </a>
+                  )}
                   {watched === null ? (
                     <a
                       href={`/news/${lang}/login?next=${encodeURIComponent(`/news/${lang}/watchlist`)}`}
@@ -668,8 +677,37 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
           </span>
         </div>
       ) : null}
-      <p className="mt-5 rounded-lg border border-line p-4 text-sm text-muted">{w.watch.noChart}</p>
+      <FigureChart item={item} lang={lang} />
     </section>
+  );
+}
+
+/** A figure's chart (D-072): a currency in NT$, the Nasdaq, the yield, oil — each day's close.
+ * The TAIEX and the coins have none yet, and say so. */
+function FigureChart({ item, lang }: { item: WatchedStock; lang: Lang }) {
+  const w = words(lang);
+  const [figure, setFigure] = useState<PublicFigure | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void fetchFigure(item.key, { baseUrl: API_URL }).then((found) => live && setFigure(found));
+    return () => {
+      live = false;
+    };
+  }, [item.key]);
+  if (figure === undefined) return <p className="mt-5 flex h-80 items-center justify-center text-sm text-muted">…</p>;
+  if (!figure) return <p className="mt-5 rounded-lg border border-line p-4 text-sm text-muted">{w.watch.noChart}</p>;
+  return (
+    <div className="mt-5" data-testid="figure-chart">
+      <StockChart
+        bars={figure.bars}
+        lang={lang}
+        market="figure"
+        symbol={item.symbol}
+        source={figure.source}
+        volume={false}
+        closeOnly
+      />
+    </div>
   );
 }
 

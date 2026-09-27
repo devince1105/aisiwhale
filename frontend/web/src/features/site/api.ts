@@ -18,7 +18,7 @@ export type PublicIntraday = Schemas["PublicIntraday"];
 export type PublicSecurity = Schemas["PublicSecurity"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
-export type PublicFxBoard = Schemas["PublicFxBoard"];
+export type PublicFigure = Schemas["PublicFigure"];
 export type PublicGold = Schemas["PublicGold"];
 
 export interface SiteClientOptions {
@@ -92,10 +92,11 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
   }
 }
 
-/** The 外匯 tab's reference rates (D-069). Never throws: the tab has its stories without them. */
-export async function fetchFx(lang: string, options: SiteClientOptions = {}): Promise<PublicFxBoard | null> {
+/** A watchlist figure's chart (D-072): a currency in NT$, the Nasdaq, the yield, oil. Never
+ * throws: null is "no chart". */
+export async function fetchFigure(key: string, options: SiteClientOptions = {}): Promise<PublicFigure | null> {
   try {
-    const { data } = await client(options).GET("/api/public/fx", { params: { query: { lang } } });
+    const { data } = await client(options).GET("/api/public/figures/{key}", { params: { path: { key } } });
     return data ?? null;
   } catch {
     return null;

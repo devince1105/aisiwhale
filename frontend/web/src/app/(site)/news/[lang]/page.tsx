@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage, fetchFx } from "@/features/site/api";
+import { fetchArticlePage } from "@/features/site/api";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -28,16 +28,12 @@ export default async function Page({ params, searchParams }: { params: Params; s
   const { lang } = await params;
   if (!isLang(lang)) notFound();
   const { section, page } = await where(searchParams);
-  const [{ articles, total }, fx] = await Promise.all([
-    fetchArticlePage(lang, {
-      company: process.env.SITE_COMPANY || undefined,
-      section: section ? sectionsOf(section) : undefined,
-      limit: PAGE_SIZE,
-      offset: (page - 1) * PAGE_SIZE,
-    }),
-    // the 外匯 tab's reference rates, on its first page (D-069)
-    section === "fx" && page === 1 ? fetchFx(lang) : Promise.resolve(null),
-  ]);
+  const { articles, total } = await fetchArticlePage(lang, {
+    company: process.env.SITE_COMPANY || undefined,
+    section: section ? sectionsOf(section) : undefined,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
   return (
     <ArticleList
       articles={articles}
@@ -45,7 +41,6 @@ export default async function Page({ params, searchParams }: { params: Params; s
       section={section}
       page={page}
       pages={Math.ceil(total / PAGE_SIZE)}
-      fx={fx}
     />
   );
 }

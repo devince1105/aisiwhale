@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // A reader's watchlist (D-060): signed out, a way to sign in; signed in, a button that puts a
 // stock on the list and takes it off, and a page that lists it with the stocks still to add.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // the page's address: ?s= the one picked, ?edit=1 its settings (D-064)
@@ -47,6 +47,12 @@ beforeEach(() => {
       return Response.json(QUOTES.filter((q) => keys.includes(q.key)));
     }
     if (url.includes("/api/public/securities")) return Response.json(FOUND);
+    if (url.includes("/api/public/figures/"))
+      return Response.json(
+        url.endsWith("/taiex")
+          ? null
+          : { key: "jpytwd", as_of: "2026-09-25", value: 0.2017, change: 0, change_pct: 0, source: "Tiingo", bars: [] },
+      );
     if (url.includes("/api/public/gold"))
       return Response.json({ as_of: "2026-09-25", usd_per_oz: 4284.91, change: 19.82, change_pct: 0.46, twd_per_gram: 4375, source: "Tiingo", bars: [] });
     if (url.includes("/history")) return Response.json({ symbol: "NVDA", market: "us", source: "Tiingo", bars: [], preparing: false });
@@ -223,7 +229,7 @@ describe("the watchlist page to watch (D-064)", () => {
     render(<WatchlistPage lang="zh-TW" />);
     const pane = await screen.findByTestId("watch-pane");
     expect(pane.textContent).toContain("加權指數");
-    expect(pane.textContent).toContain("沒有個股走勢圖");
+    expect(await within(pane).findByText(/目前沒有走勢圖/)).toBeTruthy(); // the TAIEX has no chart yet
     fireEvent.click(screen.getAllByRole("button", { name: /輝達/ })[0]);
     expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?s=us%3ANVDA", { scroll: false });
   });
@@ -260,5 +266,36 @@ describe("spot gold on the watchlist (D-071)", () => {
     expect(gold.textContent).toContain("4,284.91");
     expect(gold.textContent).toContain("約新台幣／公克 4,375");
     expect(screen.queryByText(/沒有個股走勢圖/)).toBeNull();
+  });
+});
+
+describe("the other figures' charts, and currencies (D-072)", () => {
+  it("a currency, the Nasdaq, the yield or oil shows its chart; the TAIEX says it has none", async () => {
+    list = [
+      { symbol: "JPYTWD", market: "market", key: "jpytwd", name: "日圓" },
+      { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" },
+    ];
+    params = new URLSearchParams("s=jpytwd");
+    const { unmount } = render(<WatchlistPage lang="zh-TW" />);
+    expect(await screen.findByTestId("figure-chart")).toBeTruthy();
+    unmount();
+    params = new URLSearchParams("s=taiex");
+    render(<WatchlistPage lang="zh-TW" />);
+    expect(await screen.findByText(/加權指數與加密貨幣目前沒有走勢圖/)).toBeTruthy();
+  });
+
+  it("a currency found by name is added as a figure, with no stock page", async () => {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/api/public/securities"))
+        return Response.json([{ symbol: "EURTWD", market: "market", name: "歐元", name_en: "Euro", exchange: "Tiingo", kind: "fx" }]);
+      if (url.includes("/api/public/markets")) return Response.json([]);
+      return Response.json([]);
+    });
+    render(<WatchlistPage lang="zh-TW" />);
+    fireEvent.change(await screen.findByRole("searchbox", { name: "搜尋股票" }), { target: { value: "歐元" } });
+    const results = await screen.findByTestId("search-results", {}, { timeout: 2000 });
+    expect(results.textContent).toContain("EUR/TWD・匯率");
+    expect(results.querySelector("a[href*='/stocks/']")).toBeNull();
   });
 });

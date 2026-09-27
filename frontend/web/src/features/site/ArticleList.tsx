@@ -4,7 +4,7 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicFxBoard } from "./api";
+import type { PublicArticleSummary } from "./api";
 import {
   filterName,
   formatDate,
@@ -17,7 +17,6 @@ import {
   type Lang,
   type Section,
 } from "./i18n";
-import { FxBoard } from "./FxBoard";
 import { Pagination } from "./Pagination";
 
 export const PAGE_SIZE = 10;
@@ -107,13 +106,30 @@ function Tags({ lang, filter }: { lang: Lang; filter: Filter }) {
   );
 }
 
+function BankRates({ lang }: { lang: Lang }) {
+  const w = words(lang).fx;
+  return (
+    <a
+      href={w.bankUrl}
+      target="_blank"
+      rel="noopener"
+      className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-line p-4 hover:border-accent"
+      data-testid="bank-rates"
+    >
+      <span>
+        <span className="block font-semibold">{w.bank} ↗</span>
+        <span className="block text-xs text-muted">{w.bankNote}</span>
+      </span>
+    </a>
+  );
+}
+
 export function ArticleList({
   articles,
   lang,
   section = null,
   page = 1,
   pages = 1,
-  fx = null,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -122,8 +138,7 @@ export function ArticleList({
   page?: number;
   /** How many pages the list has in all. */
   pages?: number;
-  /** The 外匯 tab's reference rates (D-069), above its stories on its first page. */
-  fx?: PublicFxBoard | null;
+
 }) {
   const w = words(lang);
   // only the first page leads with a story: an older page is a plain continuation of the list
@@ -136,7 +151,8 @@ export function ArticleList({
         {page > 1 ? `・${w.page(page)}` : ""}
       </h1>
       {section ? <Tags lang={lang} filter={section} /> : null}
-      {fx && page === 1 ? <FxBoard board={fx} lang={lang} /> : null}
+      {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
+      {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
       {articles.length === 0 ? (
         <p className="py-16 text-center text-muted">{w.empty}</p>
       ) : (

@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchArticlePage, fetchArticles, fetchFx, type PublicArticle, type PublicArticleSummary } from "./api";
+import { fetchArticlePage, fetchArticles, fetchFigure, type PublicArticle, type PublicArticleSummary } from "./api";
 import { ArticleList, listHref } from "./ArticleList";
 import { ArticleView } from "./ArticleView";
 import { slots } from "./Pagination";
@@ -316,41 +316,26 @@ describe("持股觀察: two sections under one tab, told apart by tags (D-050)",
   });
 });
 
-describe("外匯's reference rates (D-069)", () => {
-  const board = {
-    as_of: "2026-09-27T00:02:31Z",
-    source: "ExchangeRate-API",
-    source_url: "https://www.exchangerate-api.com",
-    bank_url: "https://rate.bot.com.tw/xrt?Lang=zh-TW",
-    rates: [
-      { code: "USD", name: "美金", twd: 31.7601 },
-      { code: "JPY", name: "日圓", twd: 0.201934 },
-      { code: "IDR", name: "印尼幣", twd: 0.0018342 },
-    ],
-  };
-
-  it("shows each currency in NT$ for one unit, says what the rates are not, and credits them", () => {
-    render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="fx" fx={board} />);
-    const fx = within(screen.getByTestId("fx-board"));
-    expect(fx.getByText("美金").closest("div")!.textContent).toBe("美金USD31.76");
-    expect(fx.getByText("日圓").closest("div")!.textContent).toContain("0.2019");
-    expect(fx.getByText("印尼幣").closest("div")!.textContent).toContain("0.001834");
-    expect(fx.getByText(/並非臺灣銀行牌告匯率/)).toBeTruthy();
-    expect(fx.getByRole("link", { name: /臺灣銀行牌告匯率/ }).getAttribute("href")).toBe(board.bank_url);
-    expect(fx.getByRole("link", { name: "Rates By Exchange Rate API" }).getAttribute("href")).toBe(board.source_url);
+describe("外匯: the bank's rates a click away (D-072)", () => {
+  it("links to Bank of Taiwan's posted rates on its first page, and nowhere else", () => {
+    render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="fx" />);
+    expect(screen.getByTestId("bank-rates").getAttribute("href")).toBe("https://rate.bot.com.tw/xrt?Lang=zh-TW");
+    expect(screen.getByText("臺灣銀行牌告匯率 ↗")).toBeTruthy();
     cleanup();
-    // an older page of its stories, or no rates to show: the list alone
-    render(<ArticleList articles={[summary(11)]} lang="zh-TW" section="fx" fx={board} page={2} pages={2} />);
-    expect(screen.queryByTestId("fx-board")).toBeNull();
+    render(<ArticleList articles={[summary(11)]} lang="zh-TW" section="fx" page={2} pages={2} />);
+    expect(screen.queryByTestId("bank-rates")).toBeNull();
+    cleanup();
+    render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="gold" />);
+    expect(screen.queryByTestId("bank-rates")).toBeNull();
   });
 
-  it("is asked of the API, and a failure is no board rather than no page", async () => {
+  it("a watchlist figure's chart is asked of the API, and a failure is no chart", async () => {
     const answered = vi.fn<typeof fetch>(() =>
-      Promise.resolve(new Response(JSON.stringify(board), { headers: { "Content-Type": "application/json" } })),
+      Promise.resolve(new Response(JSON.stringify({ key: "jpytwd", bars: [] }), { headers: { "Content-Type": "application/json" } })),
     );
-    expect((await fetchFx("zh-TW", { baseUrl: "http://api", fetch: answered }))?.rates).toHaveLength(3);
-    expect((answered.mock.calls[0]![0] as Request).url).toBe("http://api/api/public/fx?lang=zh-TW");
+    expect((await fetchFigure("jpytwd", { baseUrl: "http://api", fetch: answered }))?.key).toBe("jpytwd");
+    expect((answered.mock.calls[0]![0] as Request).url).toBe("http://api/api/public/figures/jpytwd");
     const down = vi.fn<typeof fetch>(() => Promise.reject(new Error("down")));
-    expect(await fetchFx("zh-TW", { baseUrl: "http://api", fetch: down })).toBeNull();
+    expect(await fetchFigure("jpytwd", { baseUrl: "http://api", fetch: down })).toBeNull();
   });
 });

@@ -23,18 +23,30 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import select
 
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
 from autora.db.models import Company
-from autora.domains.newsroom import fx_rates, securities
-from autora.domains.newsroom.fx_rates import FxBoard, PublicFxBoard
+from autora.domains.newsroom import forex as currencies
+from autora.domains.newsroom import securities
+from autora.domains.newsroom.figures import (
+    Figures,
+    FredHistory,
+    PublicFigure,
+    fred_observations,
+)
+from autora.domains.newsroom.forex import TiingoFx
 from autora.domains.newsroom.gold import GoldBoard, PublicGold
 from autora.domains.newsroom.holdings import STOCKS, PublicHolder, holders
-from autora.domains.newsroom.market_strip import PublicQuote, QuoteBoard, build_board
+from autora.domains.newsroom.market_strip import (
+    PublicQuote,
+    QuoteBoard,
+    build_board,
+    forex_quote,
+)
 from autora.domains.newsroom.models import AnalyticsEventType
 from autora.domains.newsroom.official_trades import PublicTrade, trades_for
 from autora.domains.newsroom.price_history import (
@@ -119,7 +131,7 @@ def market_board() -> QuoteBoard:
     return build_board(
         fred_api_key=_secret(settings.fred_api_key),
         finnhub_api_key=_secret(settings.finnhub_api_key),
-        tiingo_api_key=_secret(settings.tiingo_api_key),
+        forex=forex_cache(),
     )
 
 
@@ -128,32 +140,17 @@ def _secret(value: SecretStr | None) -> str | None:
 
 
 @lru_cache
-def fx_board() -> FxBoard:
-    """One per process, like the market board: the provider is asked once per update (D-069)."""
-    live = get_settings().tools_profile == "live"
-    return FxBoard(fx_rates.http_json() if live else None)
-
-
-@router.get("/api/public/fx")
-async def fx(
-    response: Response,
-    board: Annotated[FxBoard, Depends(fx_board)],
-    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
-) -> PublicFxBoard | None:
-    """The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency
-    Bank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling
-    rates, which the page links to. None when there are none to show."""
-    response.headers["Cache-Control"] = "public, max-age=600"
-    return await board.board(lang)
-
-
-@lru_cache
-def gold_board() -> GoldBoard:
-    """One per process (D-070): Tiingo is asked a few times a day, for every reader."""
+def forex_cache() -> TiingoFx:
+    """One per process (D-072): gold and currencies from Tiingo, each pair asked for once every
+    few hours for the strip, the watchlist's charts and gold's price a gram."""
     settings = get_settings()
     key = _secret(settings.tiingo_api_key)
     live = settings.tools_profile == "live" and key is not None
-    return GoldBoard(tiingo_rows(key) if live else None, fx_board())
+    return TiingoFx(tiingo_rows(key) if live else None)
+
+
+def gold_board(forex: Annotated[TiingoFx, Depends(forex_cache)]) -> GoldBoard:
+    return GoldBoard(forex)
 
 
 @router.get("/api/public/gold")
@@ -162,11 +159,40 @@ async def gold(
     board: Annotated[GoldBoard, Depends(gold_board)],
     lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
 ) -> PublicGold | None:
-    """The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, each
-    day for about five years, and what that is in New Taiwan dollars a gram. None when there is
-    none to show."""
+    """Spot gold's price and chart (D-070, on the watchlist since D-071): US dollars an ounce,
+    each day for about five years, and what that is in New Taiwan dollars a gram. None when
+    there is none to show."""
     response.headers["Cache-Control"] = "public, max-age=600"
     return await board.gold(lang)
+
+
+@lru_cache
+def fred_history() -> FredHistory:
+    """One per process (D-072): each FRED series' five years, asked for every six hours."""
+    settings = get_settings()
+    key = _secret(settings.fred_api_key)
+    live = settings.tools_profile == "live" and key is not None
+    return FredHistory(fred_observations(key) if live else None)
+
+
+def figure_charts(
+    forex: Annotated[TiingoFx, Depends(forex_cache)],
+    fred: Annotated[FredHistory, Depends(fred_history)],
+) -> Figures:
+    return Figures(forex, fred)
+
+
+@router.get("/api/public/figures/{key}")
+async def figure_chart(
+    key: Annotated[str, Path(pattern=r"^[a-z0-9]{2,10}$")],
+    response: Response,
+    figures: Annotated[Figures, Depends(figure_charts)],
+) -> PublicFigure | None:
+    """A watchlist figure's chart (D-072): a currency against the New Taiwan dollar
+    (``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five
+    years. None for a figure without one (or offline)."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return await figures.figure(key)
 
 
 @router.get("/api/public/markets")
@@ -324,6 +350,19 @@ class PublicSecurity(BaseModel):
     kind: str
 
 
+def _currencies(query: str) -> list[PublicSecurity]:
+    """Currencies with a chart against the New Taiwan dollar whose code or name has ``query``
+    in it (D-072): 歐元, EUR or euro find ``EURTWD``."""
+    q = query.strip().lower()
+    return [
+        PublicSecurity(
+            symbol=f"{code}TWD", market="market", name=zh, name_en=en, exchange="Tiingo", kind="fx"
+        )
+        for code, zh, en in currencies.CURRENCIES
+        if code in currencies.CHARTED and (q in code.lower() or q in zh or q in en.lower())
+    ]
+
+
 @router.get("/api/public/securities")
 async def search_securities(
     session: Session,
@@ -331,9 +370,10 @@ async def search_securities(
     q: Annotated[str, Query(min_length=1, max_length=40)],
     limit: Annotated[int, Query(ge=1, le=20)] = 12,
 ) -> list[PublicSecurity]:
-    """Any listed Taiwan or US stock (D-061), by code, ticker or name."""
+    """Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the
+    New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``."""
     response.headers["Cache-Control"] = "public, max-age=3600"
-    return [
+    return _currencies(q) + [
         PublicSecurity(
             symbol=row.symbol,
             market=row.market,
@@ -351,6 +391,7 @@ async def get_quotes(
     session: Session,
     board: Annotated[QuoteBoard, Depends(market_board)],
     keys: Annotated[str, Query(max_length=2000, description="tw:2330,us:PLTR — at most 60")],
+    forex: Annotated[TiingoFx, Depends(forex_cache)],
 ) -> list[PublicQuote]:
     """Quotes for a watchlist (D-061): the strip's own for its stocks, the last stored close for
     any other. A key without a quote yet is left out."""
@@ -360,6 +401,10 @@ async def get_quotes(
     for key in wanted:
         if key in strip:
             out.append(strip[key])
+            continue
+        # a currency the reader added (D-072): its last close from the shared cache
+        if (q := await forex_quote(forex, key)) is not None:
+            out.append(q)
             continue
         market, _, symbol = key.partition(":")
         if market in ("tw", "us") and symbol and (q := await bar_quote(session, market, symbol)):

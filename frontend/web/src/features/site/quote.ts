@@ -10,7 +10,15 @@ export function stockCode(key: string, exchange?: string | null): string | null 
   // a TPEx (over-the-counter) stock is 6488.TWO, as Taiwan's quote services write it
   if (key.startsWith("tw:")) return `${key.slice(3)}.${exchange === "TPEx" ? "TWO" : "TW"}`;
   if (key.startsWith("us:")) return key.slice(3);
+  // a currency against the New Taiwan dollar, and spot gold (D-071, D-072)
+  if (isCurrency(key)) return `${key.slice(0, 3).toUpperCase()}/TWD`;
+  if (key === "xau") return "XAU/USD";
   return null;
+}
+
+/** ``jpytwd``: a currency against the New Taiwan dollar (D-072). */
+export function isCurrency(key: string): boolean {
+  return /^[a-z]{3}twd$/.test(key);
 }
 
 /** A stock's page on the site (D-049): ``us:NVDA`` → ``/news/en/stocks/NVDA``; none for the rest. */
@@ -45,7 +53,10 @@ export function formatPrice(quote: PublicQuote, price: number, lang: Lang): stri
 
 export function formatValue(quote: PublicQuote, lang: Lang): string {
   // a Taiwan stock is quoted to its tick: whole dollars above 1,000, else two places
-  const digits = DECIMALS[quote.key] ?? (quote.key.startsWith("tw:") && quote.value >= 1000 ? 0 : 2);
+  // a currency in NT$ as a bank posts it: three places, four below one (0.2017 for the yen)
+  const digits =
+    DECIMALS[quote.key] ??
+    (isCurrency(quote.key) ? (quote.value < 1 ? 4 : 3) : quote.key.startsWith("tw:") && quote.value >= 1000 ? 0 : 2);
   const value = new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
     quote.value,
   );
