@@ -20,8 +20,12 @@ export function stockPage(key: string, lang: Lang): string | null {
 }
 
 /** Its name in the reader's language, and its code when that is not the name already. */
-export function label(key: string, names: Record<string, string>): [name: string, code: string | null] {
-  const code = stockCode(key);
+export function label(
+  key: string,
+  names: Record<string, string>,
+  exchange?: string | null,
+): [name: string, code: string | null] {
+  const code = stockCode(key, exchange);
   const name = names[key] ?? code ?? key;
   return [name, code === name ? null : code];
 }

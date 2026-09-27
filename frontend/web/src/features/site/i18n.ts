@@ -193,6 +193,7 @@ const WORDS = {
     signOut: "登出",
     watch: {
       title: "我的觀察清單",
+      sample: "觀察清單範例・登入後自訂",
       link: "觀察清單",
       add: "☆ 加入觀察",
       added: "★ 已觀察",
@@ -394,6 +395,7 @@ const WORDS = {
     signOut: "Sign out",
     watch: {
       title: "My watchlist",
+      sample: "Sample watchlist · sign in to make yours",
       link: "Watchlist",
       add: "☆ Watch",
       added: "★ Watching",

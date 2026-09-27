@@ -3,23 +3,30 @@
 // stocks, rates, oil and crypto, all from the API in one form. It drifts slowly to the left and
 // loops (drift.ts), stopping under the pointer; it also scrolls by hand (arrows on a wide screen,
 // a swipe on a phone). Every figure says what it is — a close, the previous close, the latest,
-// 24 hours.
+// 24 hours. A signed-in reader's strip is their watchlist, in its order (D-062): the page comes
+// with the site's figures, and the reader's replace them once their list is known.
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { PublicQuote } from "./api";
+import { fetchQuotes, type PublicQuote } from "./api";
 import { useDrift } from "./drift";
 import { words, type Lang } from "./i18n";
 import { ARROW, direction, formatChange, formatValue, label, stockPage, TONE } from "./quote";
+import { useWatchlist } from "./watchlistStore";
 
 
-function Quote({ quote, lang, copy = false }: { quote: PublicQuote; lang: Lang; copy?: boolean }) {
+interface Naming {
+  names: Record<string, string>;
+  exchanges: Record<string, string | null | undefined>;
+}
+
+function Quote({ quote, lang, naming, copy = false }: { quote: PublicQuote; lang: Lang; naming: Naming; copy?: boolean }) {
   const w = words(lang);
   const way = direction(quote);
   const change = formatChange(quote);
-  const [name, code] = label(quote.key, w.quoteNames);
+  const [name, code] = label(quote.key, naming.names, naming.exchanges[quote.key]);
   const day = new Intl.DateTimeFormat(lang, { month: "numeric", day: "numeric", timeZone: "UTC" }).format(new Date(quote.as_of));
   // one line, after the WSJ's: name, code, value and change at 12px. The day and source are in
   // the title.
@@ -62,9 +69,43 @@ function Quote({ quote, lang, copy = false }: { quote: PublicQuote; lang: Lang; 
   );
 }
 
-export function MarketStrip({ quotes, lang }: { quotes: PublicQuote[]; lang: Lang }) {
+/** The strip's figures, or the signed-in reader's watchlist in its order: the site's quotes
+ * for what the strip has, the last close for any other stock on the list. */
+function useShown(quotes: PublicQuote[], lang: Lang): [PublicQuote[], Naming] {
+  const w = words(lang);
+  const watch = useWatchlist(lang);
+  const items = watch.status === "ready" ? watch.items : null;
+  const have = useMemo(() => new Map(quotes.map((q) => [q.key, q])), [quotes]);
+  const missing = (items ?? []).map((i) => i.key).filter((key) => !have.has(key)).join(",");
+  const [extra, setExtra] = useState<PublicQuote[]>([]);
+  useEffect(() => {
+    let live = true;
+    void fetchQuotes(missing ? missing.split(",") : []).then((answer) => live && setExtra(answer));
+    return () => {
+      live = false;
+    };
+  }, [missing]);
+  return useMemo(() => {
+    if (!items) return [quotes, { names: w.quoteNames, exchanges: {} }];
+    const more = new Map(extra.map((q) => [q.key, q]));
+    const shown = items.flatMap((i) => {
+      const quote = have.get(i.key) ?? more.get(i.key);
+      return quote ? [quote] : []; // a stock whose prices are still being fetched: not yet
+    });
+    return [
+      shown,
+      {
+        names: { ...w.quoteNames, ...Object.fromEntries(items.map((i) => [i.key, i.name])) },
+        exchanges: Object.fromEntries(items.map((i) => [i.key, i.exchange])),
+      },
+    ];
+  }, [items, quotes, have, extra, w.quoteNames]);
+}
+
+export function MarketStrip({ quotes: site, lang }: { quotes: PublicQuote[]; lang: Lang }) {
   const w = words(lang);
   const list = useRef<HTMLUListElement>(null);
+  const [quotes, naming] = useShown(site, lang);
   // it drifts slowly and loops: the figures are drawn a second time, for the eye only
   const loops = useDrift(list, quotes.length);
   if (quotes.length === 0) return null;
@@ -84,10 +125,10 @@ export function MarketStrip({ quotes, lang }: { quotes: PublicQuote[]; lang: Lan
             positioned row they escape its clipping and widen the whole page */}
         <ul ref={list} className="relative flex min-w-0 flex-1 gap-3 overflow-x-auto px-2 [scrollbar-width:none]">
           {quotes.map((quote) => (
-            <Quote key={quote.key} quote={quote} lang={lang} />
+            <Quote key={quote.key} quote={quote} lang={lang} naming={naming} />
           ))}
           {loops
-            ? quotes.map((quote) => <Quote key={`${quote.key}:again`} quote={quote} lang={lang} copy />)
+            ? quotes.map((quote) => <Quote key={`${quote.key}:again`} quote={quote} lang={lang} naming={naming} copy />)
             : null}
         </ul>
         <button type="button" aria-label={w.scrollRight} onClick={() => scroll(240)} className={arrow}>

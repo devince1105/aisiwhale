@@ -38,7 +38,19 @@ function useQuotes(keys: string[]): Map<string, PublicQuote> {
   return useMemo(() => new Map(quotes.map((q) => [q.key, q])), [quotes]);
 }
 
-const isStock = (key: string) => key.startsWith("tw:") || key.startsWith("us:");
+/** The symbol the watchlist API takes for a strip key: ``tw:2330`` → 2330, ``btc`` → BTC. */
+export const symbolOf = (key: string) => (key.includes(":") ? key.split(":")[1] : key.toUpperCase());
+
+/** The strip's entries as watchlist items: what a signed-out reader is shown as a sample, and
+ * what a new watchlist starts as (D-062). */
+export function stripItems(quotes: PublicQuote[], names: Record<string, string>): WatchedStock[] {
+  return quotes.map((q) => ({
+    key: q.key,
+    symbol: symbolOf(q.key),
+    market: q.key.includes(":") ? q.key.split(":")[0] : "market",
+    name: label(q.key, names)[0],
+  }));
+}
 
 /** 加入觀察 / 已觀察 on a stock's page; signed out, a way to sign in and come back. */
 export function WatchButton({ symbol, lang }: { symbol: string; lang: Lang }) {
@@ -78,11 +90,13 @@ function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: Publi
   const way = quote ? direction(quote) : "flat";
   const change = quote ? formatChange(quote) : null;
   const code = stockCode(item.key, item.exchange);
+  const page = stockPage(item.key, lang); // an index, a rate, oil or a coin has none
+  const Tag = page ? "a" : "div";
   return (
-    <a
-      href={stockPage(item.key, lang) ?? "#"}
+    <Tag
+      href={page ?? undefined}
       aria-current={current ? "page" : undefined}
-      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm hover:bg-canvas ${current ? "bg-canvas ring-1 ring-accent" : ""}`}
+      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm ${page ? "hover:bg-canvas" : ""} ${current ? "bg-canvas ring-1 ring-accent" : ""}`}
     >
       <span className="min-w-0">
         <span className="block truncate font-medium">{item.name}</span>
@@ -99,7 +113,7 @@ function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: Publi
           ) : null}
         </span>
       ) : null}
-    </a>
+    </Tag>
   );
 }
 
@@ -108,22 +122,32 @@ function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: Publi
 export function WatchlistSide({ lang, current }: { lang: Lang; current: string }) {
   const w = words(lang).watch;
   const list = useWatchlist(lang);
-  const byKey = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
-  if (list.status !== "ready" || !list.items.length) return null;
+  const strip = useStrip();
+  const sample = list.status === "signedOut";
+  // signed out: the strip itself, as a sample of what a list can be (D-062)
+  const items =
+    list.status === "ready" ? list.items : sample ? stripItems(strip, words(lang).quoteNames) : [];
+  const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
+  const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
+  if (!items.length) return null;
   return (
     <nav aria-label={w.title} data-testid="watchlist-side">
       {/* a phone: a row to scroll above the stock */}
       <div className="mx-auto max-w-3xl px-4 pt-4 lg:hidden">
         <ul className="flex gap-2 overflow-x-auto pb-1">
-          {list.items.map((item) => (
+          {items.map((item) => (
             <li key={item.key} className="shrink-0">
-              <a
-                href={stockPage(item.key, lang) ?? "#"}
-                aria-current={item.key === current ? "page" : undefined}
-                className={`block rounded-full border px-3 py-1 text-sm ${item.key === current ? "border-accent text-accent" : "border-line"}`}
-              >
-                {item.name}
-              </a>
+              {stockPage(item.key, lang) ? (
+                <a
+                  href={stockPage(item.key, lang)!}
+                  aria-current={item.key === current ? "page" : undefined}
+                  className={`block rounded-full border px-3 py-1 text-sm ${item.key === current ? "border-accent text-accent" : "border-line"}`}
+                >
+                  {item.name}
+                </a>
+              ) : (
+                <span className="block rounded-full border border-line px-3 py-1 text-sm text-muted">{item.name}</span>
+              )}
             </li>
           ))}
         </ul>
@@ -132,11 +156,11 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
       <div className="hidden lg:block">
         <p className="mb-2 px-3 text-xs tracking-wide text-muted">
           <a href={`/news/${lang}/watchlist`} className="hover:text-accent">
-            {w.title}
+            {sample ? w.sample : w.title}
           </a>
         </p>
         <ul className="grid gap-1">
-          {list.items.map((item) => (
+          {items.map((item) => (
             <li key={item.key}>
               <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === current} />
             </li>
@@ -174,7 +198,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
     );
   }
   const watched = new Set(list.items.map((item) => item.key));
-  const addable = quotes.filter((q) => isStock(q.key) && !watched.has(q.key));
+  const addable = quotes.filter((q) => !watched.has(q.key));
   return (
     <div className="grid gap-8">
       <Search lang={lang} watched={watched} />
@@ -210,7 +234,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
                 <li key={quote.key}>
                   <button
                     type="button"
-                    onClick={() => void setWatched(quote.key.slice(3), true)}
+                    onClick={() => void setWatched(symbolOf(quote.key), true)}
                     className="rounded-full border border-line px-3 py-1 text-sm hover:border-accent hover:text-accent"
                   >
                     ＋ {name}

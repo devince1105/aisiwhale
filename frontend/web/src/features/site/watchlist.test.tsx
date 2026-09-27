@@ -4,6 +4,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MarketStrip } from "./MarketStrip";
 import { WatchButton, WatchlistPage, WatchlistSide } from "./Watchlist";
 import { resetWatchlist } from "./watchlistStore";
 
@@ -63,7 +64,7 @@ describe("the watch button", () => {
 });
 
 describe("the watchlist", () => {
-  it("lists the reader's stocks with prices, and offers the stocks not on it (not the index)", async () => {
+  it("lists the reader's stocks with prices, and offers what else the strip has", async () => {
     list = [NVDA];
     render(<WatchlistPage lang="zh-TW" />);
     const rows = await screen.findByTestId("watchlist");
@@ -72,7 +73,7 @@ describe("the watchlist", () => {
     const addable = await screen.findByTestId("addable");
     expect(addable.textContent).toContain("台積電");
     expect(addable.textContent).not.toContain("輝達");
-    expect(addable.textContent).not.toContain("加權");
+    expect(addable.textContent).toContain("加權指數"); // the strip's index can be kept too (D-062)
   });
 
   it("asks a signed-out reader to sign in", async () => {
@@ -105,5 +106,29 @@ describe("finding any stock", () => {
     expect(results.querySelector("a")!.getAttribute("href")).toBe("/news/zh-TW/stocks/6488");
     fireEvent.click(screen.getByRole("button", { name: "＋ 加入" }));
     await waitFor(() => expect(calls).toContain("POST /6488"));
+  });
+});
+
+describe("the strip and the list together (D-062)", () => {
+  it("a signed-in reader's strip is their list, in its order", async () => {
+    list = [{ ...NVDA }, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    render(<MarketStrip quotes={QUOTES as never} lang="zh-TW" />);
+    await waitFor(() => {
+      const names = [...screen.getByTestId("market-strip").querySelectorAll("li:not([aria-hidden]) .font-semibold")].map(
+        (n) => n.textContent,
+      );
+      expect(names).toEqual(["輝達", "加權指數"]); // 台積電 is not on their list: not on their strip
+    });
+  });
+
+  it("signed out, the strip is the site's, and the list beside a stock is a sample of it", async () => {
+    list = null;
+    render(<MarketStrip quotes={QUOTES as never} lang="zh-TW" />);
+    expect(screen.getByTestId("market-strip").textContent).toContain("台積電");
+    cleanup();
+    render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
+    const side = await screen.findByTestId("watchlist-side");
+    await waitFor(() => expect(side.textContent).toContain("觀察清單範例"));
+    expect(side.textContent).toContain("加權指數");
   });
 });

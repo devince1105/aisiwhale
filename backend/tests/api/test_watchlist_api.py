@@ -29,13 +29,15 @@ async def _sign_in(client, mailbox, address):
 
 
 async def test_a_new_list_starts_with_the_strip_s_stocks_once(site, mailbox):
-    """D-062: a first look fills it with the market strip's twenty; emptied, it stays empty."""
+    """D-062: a first look fills it with the market strip as it is; emptied, it stays empty."""
+    from autora.domains.newsroom.market_strip import ORDER
+
     await _sign_in(site, mailbox, "watcher@example.com")
     first = (await site.get(URL, params={"lang": "zh-TW"})).json()
-    assert len(first) == 20
-    assert first[0] == {"symbol": "2330", "market": "tw", "key": "tw:2330", "name": "台積電",
-                        "exchange": None}  # fmt: skip
-    assert [s["key"] for s in first][7:9] == ["us:NVDA", "us:AAPL"]  # Taiwan's, then the US's
+    assert [s["key"] for s in first] == list(ORDER)  # the strip's own order, all of it
+    assert first[0] == {"symbol": "TAIEX", "market": "market", "key": "taiex",
+                        "name": "加權指數", "exchange": None}  # fmt: skip
+    assert first[1]["name"] == "台積電" and first[-1]["name"] == "以太幣"
     for stock in first:
         assert (await site.delete(f"{URL}/{stock['symbol']}")).status_code == 204
     assert (await site.get(URL)).json() == []  # not filled again
@@ -94,3 +96,16 @@ async def test_any_listed_stock_can_be_kept_and_is_then_tracked(site, mailbox, d
         select(TrackedSecurity).where(TrackedSecurity.symbol == "6488")
     )
     assert tracked is not None and not hasattr(tracked, "reader_id")
+
+
+async def test_the_strip_s_other_figures_come_and_go_like_stocks(site, mailbox):
+    await _sign_in(site, mailbox, "coins@example.com")
+    await site.get(URL)
+    assert (await site.delete(f"{URL}/btc")).status_code == 204
+    keys = [s["key"] for s in (await site.get(URL)).json()]
+    assert "btc" not in keys and "eth" in keys
+    assert (await site.post(f"{URL}/BTC")).status_code == 204
+    listed = (await site.get(URL, params={"lang": "en"})).json()
+    assert listed[-1] == {"symbol": "BTC", "market": "market", "key": "btc", "name": "Bitcoin",
+                          "exchange": None}  # fmt: skip
+    assert (await site.post(f"{URL}/DOGE")).status_code == 404  # not on the strip

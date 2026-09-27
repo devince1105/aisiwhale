@@ -85,7 +85,7 @@ class WatchlistItem(IdMixin, CreatedAtMixin, Base):
     __tablename__ = "watchlist_items"
     __table_args__ = (
         UniqueConstraint("reader_id", "market", "symbol"),
-        CheckConstraint("market in ('tw', 'us')", name="market"),
+        CheckConstraint("market in ('tw', 'us', 'market')", name="market"),
     )
 
     reader_id: Mapped[uuid.UUID] = mapped_column(
@@ -93,4 +93,5 @@ class WatchlistItem(IdMixin, CreatedAtMixin, Base):
     )
     market: Mapped[str]
     symbol: Mapped[str]
-    """As the site's stock pages name it: ``NVDA``, ``2330``."""
+    """As the site's stock pages name it: ``NVDA``, ``2330``; one of the strip's other figures
+    (``market``) by its key: ``TAIEX``, ``BTC`` (D-062)."""
