@@ -217,3 +217,42 @@ async def test_intraday_asks_tiingo_at_most_every_ten_minutes_and_keeps_the_last
     now[0] += timedelta(minutes=6)
     assert await cache.bars("NVDA") == first and len(asked) == 2  # asked; failed; the last kept
     assert (await price_history.IntradayCache(None).bars("NVDA")).bars == []  # no key
+
+
+def _bars(*closes: float) -> list:
+    return [
+        price_history.PublicBar(d=date(2025, 6, 10 + i), o=c, h=c, l=c, c=c, v=1000)
+        for i, c in enumerate(closes)
+    ]
+
+
+def test_a_split_is_read_from_the_prices_and_the_bars_before_it_scaled():
+    """0050, 2025-06-18: 188.65 then 47.57, a 1-for-4 split TWSE's figures leave unadjusted."""
+    assert price_history.split_factors(_bars(186.0, 188.65, 47.57, 48.0)) == [4, 4, 1, 1]
+    # a reverse split, 1 share for 2
+    assert price_history.split_factors(_bars(10.0, 20.2, 20.5)) == [0.5, 1, 1]
+
+
+def test_ordinary_days_and_odd_jumps_are_left_alone():
+    assert price_history.split_factors(_bars(100, 110, 99, 108.9)) == [1, 1, 1, 1]  # limit moves
+    # a capital reduction (a ratio that is not whole) is not taken for a split
+    assert price_history.split_factors(_bars(30.0, 43.5)) == [1, 1]
+
+
+async def test_a_taiwan_history_is_served_split_adjusted(db_session):
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+    bars = [
+        price_history.Bar(date(2025, 6, 17), Decimal("188"), Decimal("189"), Decimal("187"),
+                          Decimal("188.65"), 1000),
+        price_history.Bar(date(2025, 6, 18), Decimal("47.5"), Decimal("48"), Decimal("47"),
+                          Decimal("47.57"), 4000),
+    ]  # fmt: skip
+    await price_history._store(db_session, "tw", "TEST", bars, source="TWSE")
+    served = (await price_history.history(db_session, "tw", "TEST")).bars
+    assert served[0].c == round(188.65 / 4, 4) and served[0].v == 4000
+    assert served[1].c == 47.57
+    stored = await db_session.scalar(
+        select(PriceBar.close).where(PriceBar.symbol == "TEST").order_by(PriceBar.day)
+    )
+    assert stored == Decimal("188.6500")  # kept as the exchange published it
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))

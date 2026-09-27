@@ -332,7 +332,33 @@ class PublicHistory(BaseModel):
     """Oldest first, every stored trading day (about five years)."""
 
 
+DAILY_LIMIT = 0.10
+"""TWSE's price limit: no stock closes more than 10% from the day before, except across a split."""
+
+
+def split_factors(bars: list[PublicBar]) -> list[float]:
+    """For each bar, what its prices are divided by to read on today's shares.
+
+    TWSE's figures are not adjusted: 0050's 1-for-4 split of 2025-06-18 is a 74.8% fall from
+    one close to the next. A move past the daily limit whose ratio is a whole number (2, 4, 10…
+    or, for a reverse split, its inverse) can only be a split; every bar before it is scaled.
+    A capital reduction or a listing's first day moves by a ratio that is not whole, and is left
+    as it is."""
+    factors = [1.0] * len(bars)
+    for i in range(len(bars) - 1, 0, -1):
+        before, after = bars[i - 1].c, bars[i].c
+        if not before or not after or abs(after / before - 1) <= DAILY_LIMIT + 0.005:
+            continue
+        ratio = before / after
+        whole = round(ratio) if ratio >= 1 else 1 / round(1 / ratio)
+        if (ratio >= 1.9 or ratio <= 1 / 1.9) and abs(ratio / whole - 1) <= DAILY_LIMIT:
+            for j in range(i):
+                factors[j] *= whole
+    return factors
+
+
 async def history(session: AsyncSession, market: str, symbol: str) -> PublicHistory:
+    """Oldest first; a Taiwan stock's split-adjusted (Tiingo's already are)."""
     rows = (
         await session.scalars(
             select(PriceBar)
@@ -340,21 +366,31 @@ async def history(session: AsyncSession, market: str, symbol: str) -> PublicHist
             .order_by(PriceBar.day)
         )
     ).all()
-    return PublicHistory(
-        symbol=symbol,
-        market=market,
-        source=rows[-1].source if rows else None,
-        bars=[
+    bars = [
+        PublicBar(
+            d=r.day,
+            o=float(r.open),
+            h=float(r.high),
+            l=float(r.low),
+            c=float(r.close),
+            v=int(r.volume),
+        )  # fmt: skip
+        for r in rows
+    ]
+    if market == "tw":
+        bars = [
             PublicBar(
-                d=r.day,
-                o=float(r.open),
-                h=float(r.high),
-                l=float(r.low),
-                c=float(r.close),
-                v=int(r.volume),
+                d=b.d,
+                o=round(b.o / f, 4),
+                h=round(b.h / f, 4),
+                l=round(b.l / f, 4),
+                c=round(b.c / f, 4),
+                v=round(b.v * f),
             )  # fmt: skip
-            for r in rows
-        ],
+            for b, f in zip(bars, split_factors(bars), strict=True)
+        ]
+    return PublicHistory(
+        symbol=symbol, market=market, source=rows[-1].source if rows else None, bars=bars
     )
 
 

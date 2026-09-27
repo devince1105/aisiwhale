@@ -173,59 +173,65 @@ export function StockView({
         </section>
       ) : null}
 
-      <section className="mt-8" aria-labelledby="holders">
-        <h2 id="holders" className="text-xl font-bold">
-          {s.holders}
-        </h2>
-        {stock.holders.length ? (
-          <>
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              {stock.market === "tw" ? `${s.holdersUs} ` : ""}
-              {period ? s.holdersNote(formatDate(lang, period), before ? formatDate(lang, before) : null) : null}
-            </p>
-            <ul className="mt-2 divide-y divide-line">
-              {stock.holders.map((holder, i) => (
-                <Holder key={`${holder.investor}-${holder.title_of_class}-${holder.put_call}-${i}`} holder={holder} lang={lang} />
-              ))}
-            </ul>
-          </>
-        ) : (
-          <p className="mt-3 text-muted">{stock.market === "tw" ? s.twNo13f : s.holdersNone}</p>
-        )}
-      </section>
+      {/* US filings say nothing about a stock with no US listing: 13F holders and officials'
+          trades only for a US stock or a Taiwan one's ADR (2330 → TSM) */}
+      {stock.us_listing ? (
+        <>
+        <section className="mt-8" aria-labelledby="holders">
+          <h2 id="holders" className="text-xl font-bold">
+            {s.holders}
+          </h2>
+          {stock.holders.length ? (
+            <>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                {stock.market === "tw" ? `${s.holdersUs} ` : ""}
+                {period ? s.holdersNote(formatDate(lang, period), before ? formatDate(lang, before) : null) : null}
+              </p>
+              <ul className="mt-2 divide-y divide-line">
+                {stock.holders.map((holder, i) => (
+                  <Holder key={`${holder.investor}-${holder.title_of_class}-${holder.put_call}-${i}`} holder={holder} lang={lang} />
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="mt-3 text-muted">{stock.market === "tw" ? s.twNo13f : s.holdersNone}</p>
+          )}
+        </section>
 
-      <section className="mt-10" aria-labelledby="trades">
-        <h2 id="trades" className="text-xl font-bold">
-          {s.trades}
-        </h2>
-        {/* D-052: pointed to where these are already published, not compiled here — any trades
-            a person has checked from our own transcriptions (D-051, now off) still show */}
-        {stock.trades.length ? (
-          <>
-            <p className="mt-2 text-xs leading-relaxed text-muted">{s.tradesNote}</p>
-            <ul className="mt-2 divide-y divide-line">
-              {stock.trades.map((trade, i) => (
-                <Trade key={`${trade.report_url}-${i}`} trade={trade} lang={lang} />
-              ))}
-            </ul>
-          </>
-        ) : null}
-        <p className="mt-3 text-sm text-muted">{s.tradesElsewhere}</p>
-        <ul className="mt-2 flex flex-wrap gap-2 text-sm" data-testid="trackers">
-          {s.trackers.map(([label, href]) => (
-            <li key={href}>
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener nofollow"
-                className="inline-block rounded-full border border-line px-3 py-1 hover:border-accent hover:text-accent"
-              >
-                {label} ↗
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <section className="mt-10" aria-labelledby="trades">
+          <h2 id="trades" className="text-xl font-bold">
+            {s.trades}
+          </h2>
+          {/* D-052: pointed to where these are already published, not compiled here — any trades
+              a person has checked from our own transcriptions (D-051, now off) still show */}
+          {stock.trades.length ? (
+            <>
+              <p className="mt-2 text-xs leading-relaxed text-muted">{s.tradesNote}</p>
+              <ul className="mt-2 divide-y divide-line">
+                {stock.trades.map((trade, i) => (
+                  <Trade key={`${trade.report_url}-${i}`} trade={trade} lang={lang} />
+                ))}
+              </ul>
+            </>
+          ) : null}
+          <p className="mt-3 text-sm text-muted">{s.tradesElsewhere}</p>
+          <ul className="mt-2 flex flex-wrap gap-2 text-sm" data-testid="trackers">
+            {s.trackers.map(([label, href]) => (
+              <li key={href}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener nofollow"
+                  className="inline-block rounded-full border border-line px-3 py-1 hover:border-accent hover:text-accent"
+                >
+                  {label} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+        </>
+      ) : null}
 
       <section className="mt-10" aria-labelledby="coverage">
         <h2 id="coverage" className="text-xl font-bold">

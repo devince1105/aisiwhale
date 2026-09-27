@@ -132,6 +132,9 @@ class PublicStock(BaseModel):
     trades: list[PublicTrade] = []
     """Public officials' trades in it, from their checked transaction reports (D-051)."""
     articles: list[PublicArticleSummary]
+    us_listing: str | None = None
+    """Where it trades in the US: its own symbol, or a Taiwan stock's ADR (TSM for 2330). None:
+    US filings (13F holders, officials' trades) can say nothing about it."""
 
 
 @lru_cache
@@ -196,6 +199,7 @@ async def get_stock(
         articles=await published_articles_mentioning(
             session, lang, stock.terms, company_slug=company
         ),
+        us_listing=stock.tickers[0] if stock.tickers else None,
     )
 
 

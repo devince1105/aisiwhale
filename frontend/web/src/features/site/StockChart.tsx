@@ -265,7 +265,7 @@ export function StockChart({
               ))}
               <span>
                 <span className="text-muted">{w.volume}</span>{" "}
-                {market === "tw" ? `${number(bar.v / 1000)} ${w.lots}` : number(bar.v)}
+                {market === "tw" ? `${number(Math.round(bar.v / 1000))} ${w.lots}` : number(bar.v)}
               </span>
             </>
           ) : null}

@@ -4392,6 +4392,17 @@
       },
       "title": "Trades",
       "type": "array"
+     },
+     "us_listing": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Us Listing"
      }
     },
     "required": [

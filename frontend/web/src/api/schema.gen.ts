@@ -2802,6 +2802,8 @@ export interface components {
              * @default []
              */
             trades: components["schemas"]["PublicTrade"][];
+            /** Us Listing */
+            us_listing?: string | null;
         };
         /** PublicTrade */
         PublicTrade: {

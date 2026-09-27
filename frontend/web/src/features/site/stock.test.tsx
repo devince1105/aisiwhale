@@ -28,6 +28,7 @@ const holder = (over: Partial<PublicHolder>): PublicHolder => ({
 });
 
 const NVDA: PublicStock = {
+  us_listing: "NVDA",
   symbol: "NVDA",
   market: "us",
   name: "輝達",
@@ -163,14 +164,23 @@ describe("a stock's page", () => {
     expect(trade!.textContent).not.toContain("逾 30 天");
   });
 
-  it("a Taiwan stock says what 13F does and does not cover; an empty one says so", () => {
-    render(<StockView stock={{ ...NVDA, symbol: "2330", market: "tw", name: "台積電", quote: null }} lang="zh-TW" />);
+  it("a Taiwan stock with an ADR shows the ADR's holders; one without has no US sections", () => {
+    render(
+      <StockView stock={{ ...NVDA, symbol: "2330", market: "tw", name: "台積電", quote: null, us_listing: "TSM" }} lang="zh-TW" />,
+    );
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("台積電2330.TW");
     expect(document.body.textContent).toContain("美國存託憑證（TSM）的持有人");
     expect(document.body.textContent).toContain("目前沒有報價。");
     cleanup();
-    render(<StockView stock={{ ...NVDA, symbol: "2454", market: "tw", name: "聯發科", holders: [], articles: [] }} lang="zh-TW" />);
-    expect(document.body.textContent).toContain("13F 只涵蓋美國上市證券");
+    render(
+      <StockView
+        stock={{ ...NVDA, symbol: "2454", market: "tw", name: "聯發科", holders: [], articles: [], us_listing: null }}
+        lang="zh-TW"
+      />,
+    );
+    // no US listing: 13F and officials' trades can say nothing about it, so they are not shown
+    expect(screen.queryByRole("heading", { name: "大戶持股（13F）" })).toBeNull();
+    expect(screen.queryByTestId("trackers")).toBeNull();
     expect(document.body.textContent).toContain("還沒有提到這檔股票的報導。");
   });
 
