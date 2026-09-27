@@ -212,7 +212,7 @@ def test_the_figures_a_story_names_by_its_section():
     keys = lambda text, section: [k for k, _, _ in figures_named(text, section)]  # noqa: E731
     assert keys("比特幣 ETF 資金流入，以太幣走弱", "crypto") == ["btc", "eth"]
     assert keys("金價創高", "gold") == ["xau"]
-    assert keys("國際油價下跌，黃金走高", "commodities") == ["wti", "xau"]
+    assert keys("國際油價下跌，黃金走高", "commodities") == ["wti", "us:USO", "xau"]  # D-081
     assert keys("CBOT 玉米期貨下跌", "commodities") == ["maize", "us:CORN"]  # D-080
     assert keys("新台幣兌美元收 31.716，日圓、人民幣走弱，歐元持平", "fx") == [
         "usdtwd",

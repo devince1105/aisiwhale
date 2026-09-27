@@ -207,6 +207,9 @@ FIGURE_TERMS: dict[str, tuple[str, str, tuple[str, ...]]] = {
             )
         )
     },
+    # WTI's own price has no free intraday source; the fund that holds its futures has 15-minute
+    # bars as any US stock does (D-081)
+    "us:USO": ("原油 ETF", "Oil ETF", ("原油", "油價", "WTI", "crude", "Crude")),
     "us:CORN": ("玉米 ETF", "Corn ETF", ("玉米", "corn", "Corn")),
     "us:SOYB": ("黃豆 ETF", "Soybean ETF", ("黃豆", "大豆", "soybean", "Soybean", "soybeans")),
     "us:WEAT": ("小麥 ETF", "Wheat ETF", ("小麥", "wheat", "Wheat")),
@@ -235,6 +238,7 @@ SECTION_FIGURES = {
     "gold": ("xau",),
     "commodities": (
         "wti",
+        "us:USO",
         "xau",
         "maize",
         "us:CORN",
