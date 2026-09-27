@@ -111,6 +111,28 @@ STOCKS: dict[str, Stock] = {
 """Every stock with a page: the market strip's (``market_strip.TW_STOCKS``/``US_STOCKS``)."""
 
 
+def _said(term: str, text: str) -> bool:
+    """A Latin term as a whole word in its own case (``MU`` is not in "MUST"), others anywhere —
+    as a stock page finds the articles that name it (D-049)."""
+    if term.isascii():
+        return re.search(rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", text) is not None
+    return term in text
+
+
+def stocks_named(text: str, *, limit: int = 8) -> list[Stock]:
+    """The strip's stocks an article names (D-077), Taiwan's first, in the strip's order. A
+    stock named only by what another named one is also called is left out: 台積電 is 2330, and
+    its ADR (TSM) only where "TSM" itself is said."""
+    claimed: set[str] = set()
+    out = []
+    for stock in sorted(STOCKS.values(), key=lambda s: s.market != "tw"):
+        said = {term for term in stock.terms if _said(term, text)}
+        if said and not said <= claimed:
+            out.append(stock)
+        claimed |= said
+    return out[:limit]
+
+
 def investor_name(source: Source) -> str:
     """Who the investor is, as the source's title prefix says: ``巴菲特（Berkshire Hathaway）``
     → ``巴菲特``."""

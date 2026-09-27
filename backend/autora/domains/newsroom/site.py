@@ -37,6 +37,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Company
+from autora.domains.newsroom.holdings import stocks_named
 from autora.domains.newsroom.models import (
     AnalyticsEvent,
     AnalyticsEventType,
@@ -101,6 +102,14 @@ class PublicNeighbour(BaseModel):
     path: str
 
 
+class PublicNamedStock(BaseModel):
+    """A stock an article names (D-077): its strip key, and its name in the article's language."""
+
+    key: str
+    symbol: str
+    name: str
+
+
 class PublicArticle(PublicArticleSummary):
     locked: bool = False
     """True when ``blocks`` is only the opening, because this one is for members."""
@@ -116,6 +125,8 @@ class PublicArticle(PublicArticleSummary):
     """The same company, as the public API names one. The paywall asks what a year costs here."""
     newer: PublicNeighbour | None = None
     older: PublicNeighbour | None = None
+    stocks: list[PublicNamedStock] = []
+    """The strip's stocks it names, for quick links to their charts (D-077)."""
 
 
 def _summary(
@@ -206,6 +217,9 @@ async def published_article(
                 site = urlsplit(url).hostname or url
                 sources[url] = PublicSource(title=title or site, site=site, url=url)
     locked = article.access == ArticleAccess.MEMBERS.value and not unlocked
+    # the stocks it names, each a link to its chart on the watchlist page (D-077)
+    said = " ".join([version.title, version.summary or "", *(b["text"] for b in version.body)])
+    zh = lang.startswith("zh")
     body = preview(version.body) if locked else version.body
     newer, older = await _neighbours(session, lang, article)
     return PublicArticle(
@@ -219,6 +233,10 @@ async def published_article(
         company_slug=company.slug if company else "",
         newer=newer,
         older=older,
+        stocks=[
+            PublicNamedStock(key=s.key, symbol=s.symbol, name=s.zh if zh else s.en)
+            for s in stocks_named(said)
+        ],
     )
 
 

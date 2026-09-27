@@ -48,6 +48,7 @@ const ARTICLE: PublicArticle = {
   locked: false,
   blocks: [{ type: "paragraph", text: "段永平第二季出清台積電。" }],
   sources: [],
+  stocks: [],
   langs: { "zh-TW": "/news/zh-TW/articles/s1" },
   newer: { title: "較新的那篇", path: "/news/zh-TW/articles/s0" },
   older: null,

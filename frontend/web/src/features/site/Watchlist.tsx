@@ -540,7 +540,15 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   const items = list.status === "ready" ? list.items : sample ? stripItems(strip, words(lang).quoteNames) : [];
   const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
   const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
-  const picked = items.find((item) => item.key === params.get("s")) ?? items[0] ?? null;
+  // a stock from an article's link (D-077) may not be on the list: shown all the same, with
+  // 加入觀察 beside it
+  const asked = params.get("s");
+  const unlisted: WatchedStock | null =
+    asked && /^(tw|us):[A-Z0-9.\-]{1,12}$/.test(asked) && !items.some((item) => item.key === asked)
+      ? { key: asked, symbol: asked.split(":")[1], market: asked.split(":")[0], name: asked.split(":")[1] }
+      : null;
+  const picked =
+    (list.status === "loading" ? null : unlisted) ?? items.find((item) => item.key === asked) ?? items[0] ?? null;
   const [listOpen, setListOpen] = useSideOpen();
   const go = (query: Record<string, string>) => router.replace(`/news/${lang}/watchlist?${new URLSearchParams(query)}`, { scroll: false });
 
@@ -571,7 +579,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         <p className="text-muted">…</p>
       ) : list.status === "failed" ? (
         <p className="text-muted">{w.failed}</p>
-      ) : !items.length ? (
+      ) : !items.length && !picked ? (
         <p className="text-muted">{w.emptyBoard}</p>
       ) : (
         // grid-cols-1 and min-w-0: a phone's row of names scrolls within the screen, rather than

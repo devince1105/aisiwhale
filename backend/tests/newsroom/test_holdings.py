@@ -153,3 +153,18 @@ async def test_our_articles_that_name_it(newsroom_room):
             session, "zh-TW", ("微電網",), company_slug=room.company.slug, offset=1
         )
         assert past == []
+
+
+def test_the_stocks_an_article_names():
+    """D-077: the strip's stocks an article names, for links to their charts — by the names a
+    stock page looks for, Taiwan's first; 台積電 is 2330, its ADR only where TSM is said."""
+    from autora.domains.newsroom.holdings import stocks_named
+
+    keys = lambda text: [s.key for s in stocks_named(text)]  # noqa: E731
+    assert keys("輝達與台積電的 AI 伺服器訂單，鴻海受惠") == ["tw:2330", "tw:2317", "us:NVDA"]
+    assert keys("TSMC's ADR (TSM) rose") == ["tw:2330", "us:TSM"]
+    assert keys("台積電法說會") == ["tw:2330"]
+    # a Latin name as a whole word in its own case: not in MUST, metadata or NVDAX
+    assert keys("You MUST read the metadata of NVDAX") == []
+    assert keys("Micron (MU) and Meta") == ["us:META", "us:MU"]  # the strip's order
+    assert len(stocks_named(" ".join(s.symbol for s in STOCKS.values()))) == 8  # a few at most

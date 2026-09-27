@@ -187,6 +187,7 @@ const WORDS = {
     print: "列印",
     toDark: "切換為深色模式",
     toLight: "切換為淺色模式",
+    stocksNamed: "相關個股",
     readIn: "閱讀其他語言：",
     notice: "本站報導由 AI 新聞室撰寫、事實查核，並經人核准後發布。內容整理自公開資料，僅供參考，不構成投資建議；投資有風險，請自行判斷。",
     membersOnly: "這篇報導是會員專屬",
@@ -435,6 +436,7 @@ const WORDS = {
     print: "Print",
     toDark: "Switch to dark mode",
     toLight: "Switch to light mode",
+    stocksNamed: "Stocks mentioned",
     readIn: "Read in:",
     notice:
       "Stories are written and fact-checked by an AI newsroom and approved by a person before they are published. They summarise public information for reference only and are not investment advice; investing carries risk.",

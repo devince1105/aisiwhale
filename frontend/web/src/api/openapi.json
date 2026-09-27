@@ -3827,6 +3827,14 @@
       "title": "Sources",
       "type": "array"
      },
+     "stocks": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/PublicNamedStock"
+      },
+      "title": "Stocks",
+      "type": "array"
+     },
      "summary": {
       "anyOf": [
        {
@@ -4329,6 +4337,30 @@
      "v"
     ],
     "title": "PublicIntradayBar",
+    "type": "object"
+   },
+   "PublicNamedStock": {
+    "description": "A stock an article names (D-077): its strip key, and its name in the article's language.",
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "symbol",
+     "name"
+    ],
+    "title": "PublicNamedStock",
     "type": "object"
    },
    "PublicNeighbour": {

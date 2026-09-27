@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { PublicArticle } from "./api";
 import { listHref } from "./ArticleList";
 import { Beacon } from "./Beacon";
+import { stockCode } from "./quote";
 import { filterName, formatDate, isLang, isSection, LANG_NAMES, revisedOn, tagsOf, topicOf, words, type Lang } from "./i18n";
 import { MembersOnly } from "./MembersOnly";
 import { ListenButton, PrintButton } from "./ReadingTools";
@@ -55,6 +56,22 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
             </>
           ) : null}
         </p>
+        {/* the stocks it names, each straight to its chart on the watchlist page (D-077) */}
+        {article.stocks?.length ? (
+          <nav aria-label={w.stocksNamed} className="mt-4 flex flex-wrap items-center gap-2 text-sm print:hidden" data-testid="stocks-named">
+            <span className="text-muted">{w.stocksNamed}</span>
+            {article.stocks.map((stock) => (
+              <Link
+                key={stock.key}
+                href={`/news/${lang}/watchlist?${new URLSearchParams({ s: stock.key })}`}
+                className="rounded-full border border-line px-3 py-0.5 hover:border-accent hover:text-accent"
+              >
+                {stock.name}
+                <span className="ml-1 text-xs text-muted">{stockCode(stock.key) ?? stock.symbol}</span>
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-2 print:hidden">
           <ListenButton lang={lang} texts={spoken} />
           <PrintButton lang={lang} />

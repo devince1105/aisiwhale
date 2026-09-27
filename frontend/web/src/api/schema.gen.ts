@@ -2738,6 +2738,11 @@ export interface components {
             slug: string;
             /** Sources */
             sources: components["schemas"]["PublicSource"][];
+            /**
+             * Stocks
+             * @default []
+             */
+            stocks: components["schemas"]["PublicNamedStock"][];
             /** Summary */
             summary: string | null;
             /** Title */
@@ -2914,6 +2919,18 @@ export interface components {
             t: string;
             /** V */
             v: number;
+        };
+        /**
+         * PublicNamedStock
+         * @description A stock an article names (D-077): its strip key, and its name in the article's language.
+         */
+        PublicNamedStock: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Symbol */
+            symbol: string;
         };
         /**
          * PublicNeighbour

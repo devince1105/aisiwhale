@@ -34,6 +34,7 @@ const ARTICLE: PublicArticle = {
     { title: "Lumen City switches on its first microgrid", site: "news.fixtures.autora.test", url: "https://news.fixtures.autora.test/a" },
     { title: "流明市港區社區微電網啟用", site: "city.fixtures.autora.test", url: "https://city.fixtures.autora.test/b" },
   ],
+  stocks: [],
   langs: {
     "zh-TW": "/news/zh-TW/articles/lumen-city-microgrid-a1b2c3",
     en: "/news/en/articles/lumen-city-microgrid-a1b2c3",
@@ -80,6 +81,23 @@ describe("the article page", () => {
     const english = screen.getByRole("link", { name: "English" });
     expect(english.getAttribute("href")).toBe(ARTICLE.langs.en);
     expect(english.getAttribute("hreflang")).toBe("en");
+  });
+
+  it("links each stock it names to that stock's chart on the watchlist page (D-077)", () => {
+    render(
+      <ArticleView
+        article={{ ...ARTICLE, stocks: [{ key: "tw:2330", symbol: "2330", name: "台積電" }, { key: "us:NVDA", symbol: "NVDA", name: "輝達" }] }}
+        lang="zh-TW"
+      />,
+    );
+    const named = within(screen.getByRole("navigation", { name: "相關個股" }));
+    expect(named.getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["台積電2330.TW", "/news/zh-TW/watchlist?s=tw%3A2330"],
+      ["輝達NVDA", "/news/zh-TW/watchlist?s=us%3ANVDA"],
+    ]);
+    cleanup();
+    render(<ArticleView article={ARTICLE} lang="zh-TW" />);
+    expect(screen.queryByTestId("stocks-named")).toBeNull(); // none named: no row
   });
 
   it("a corrected article says when it was updated (D-045)", () => {

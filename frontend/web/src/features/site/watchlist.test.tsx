@@ -308,3 +308,14 @@ describe("the other figures' charts, and currencies (D-072)", () => {
     expect(results.querySelector("a[href*='/stocks/']")).toBeNull();
   });
 });
+
+describe("a stock from an article (D-077)", () => {
+  it("is shown on the watchlist page though not on the list, with 加入觀察 beside it", async () => {
+    list = [{ symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    params = new URLSearchParams("s=us:NVDA");
+    render(<WatchlistPage lang="zh-TW" />);
+    const pane = await screen.findByTestId("watch-pane");
+    expect(await within(pane).findByText("輝達")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /加入觀察/ })).toBeTruthy();
+  });
+});
