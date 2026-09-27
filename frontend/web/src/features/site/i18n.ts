@@ -72,6 +72,16 @@ const WORDS = {
       string,
       string
     >,
+    chart: {
+      title: "走勢",
+      intervals: { day: "日", week: "週", month: "月" },
+      ohlc: { o: "開", h: "高", l: "低", c: "收" },
+      volume: "成交量",
+      lots: "張",
+      none: "還沒有這檔股票的歷史價格。",
+      source: (source: string, adjusted: boolean) =>
+        `資料：${source}${adjusted ? "，已還原分割與股利" : ""}。僅供參考，不構成投資建議。`,
+    },
     stock: {
       day: { open: "開盤", high: "最高", low: "最低", previous_close: "前收" } as Record<string, string>,
       marketCap: "總市值",
@@ -236,6 +246,16 @@ const WORDS = {
       Finnhub: "Finnhub",
       CoinGecko: "CoinGecko",
     } as Record<string, string>,
+    chart: {
+      title: "Price",
+      intervals: { day: "Day", week: "Week", month: "Month" },
+      ohlc: { o: "O", h: "H", l: "L", c: "C" },
+      volume: "Volume",
+      lots: "lots",
+      none: "No price history for this stock yet.",
+      source: (source: string, adjusted: boolean) =>
+        `Data: ${source}${adjusted ? ", adjusted for splits and dividends" : ""}. For reference only, not investment advice.`,
+    },
     stock: {
       day: { open: "Open", high: "High", low: "Low", previous_close: "Prev. close" } as Record<string, string>,
       marketCap: "Market value",

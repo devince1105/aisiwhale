@@ -931,6 +931,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/stocks/{symbol}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stock History
+         * @description A stock's daily bars for its chart (D-059): oldest first, about two years. Empty ``bars``
+         *     when none are stored (a US stock, until Tiingo's key is set).
+         */
+        get: operations["get_stock_history_api_public_stocks__symbol__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/roles": {
         parameters: {
             query?: never;
@@ -2595,12 +2616,41 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** PublicBar */
+        PublicBar: {
+            /** C */
+            c: number;
+            /**
+             * D
+             * Format: date
+             */
+            d: string;
+            /** H */
+            h: number;
+            /** L */
+            l: number;
+            /** O */
+            o: number;
+            /** V */
+            v: number;
+        };
         /** PublicBlock */
         PublicBlock: {
             /** Text */
             text: string;
             /** Type */
             type: string;
+        };
+        /** PublicHistory */
+        PublicHistory: {
+            /** Bars */
+            bars: components["schemas"]["PublicBar"][];
+            /** Market */
+            market: string;
+            /** Source */
+            source: string | null;
+            /** Symbol */
+            symbol: string;
         };
         /** PublicHolder */
         PublicHolder: {
@@ -5192,6 +5242,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicStock"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stock_history_api_public_stocks__symbol__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicHistory"];
                 };
             };
             /** @description Validation Error */

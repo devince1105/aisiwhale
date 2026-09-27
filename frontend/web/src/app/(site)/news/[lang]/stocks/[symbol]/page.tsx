@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { fetchStock } from "@/features/site/api";
+import { fetchHistory, fetchStock } from "@/features/site/api";
 import { isLang, words } from "@/features/site/i18n";
 import { StockView } from "@/features/site/StockView";
 
@@ -26,7 +26,11 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function Page({ params }: { params: Params }) {
   const { lang, symbol } = await params;
   if (!isLang(lang)) notFound();
-  const stock = await load(symbol, lang);
+  const [stock, history] = await Promise.all([
+    load(symbol, lang),
+    // a chart that cannot be loaded leaves the page without one, not without a page
+    fetchHistory(symbol).catch(() => null),
+  ]);
   if (!stock) notFound();
-  return <StockView stock={stock} lang={lang} />;
+  return <StockView stock={stock} lang={lang} history={history} />;
 }

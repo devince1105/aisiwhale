@@ -611,3 +611,28 @@ class AnalyticsDaily(IdMixin, TimestampMixin, Base):
     views: Mapped[int] = mapped_column(server_default="0")
     uniques: Mapped[int] = mapped_column(server_default="0")
     read_complete: Mapped[int] = mapped_column(server_default="0")
+
+
+class PriceBar(IdMixin, CreatedAtMixin, Base):
+    """One trading day of one stock, for the stock pages' charts (D-059).
+
+    Market data, not the company's: no ``company_id``. Written by ``price_history`` from the
+    exchange's own daily figures (TWSE for Taiwan); a day already stored is overwritten, because
+    an exchange may correct a figure after the close."""
+
+    __tablename__ = "price_bars"
+    __table_args__ = (
+        UniqueConstraint("market", "symbol", "day"),
+        CheckConstraint("market in ('tw', 'us')", name="market"),
+    )
+
+    market: Mapped[str]
+    symbol: Mapped[str]
+    day: Mapped[date] = mapped_column(Date)
+    open: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    high: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    low: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    close: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    volume: Mapped[int] = mapped_column(Numeric(20, 0))
+    """Shares traded (a Taiwan page shows it in 張, a thousand shares)."""
+    source: Mapped[str]

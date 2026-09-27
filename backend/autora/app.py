@@ -173,6 +173,13 @@ def build_scheduler(
         HttpFetch,
         OfficialTradesKeeper,
     )
+    from autora.domains.newsroom.price_history import (
+        PRICES_SCHEDULE,
+        PricesKeeper,
+        http_json,
+        no_prices,
+        tiingo_rows,
+    )
     from autora.domains.newsroom.settings import get_newsroom_settings
     from autora.domains.newsroom.sources import POLL_SCHEDULE, SourcePoller
     from autora.domains.newsroom.stories import CLUSTER_SCHEDULE, StoryDesk
@@ -189,6 +196,15 @@ def build_scheduler(
     scheduler.register(CLUSTER_SCHEDULE, desk.schedule_handler())
     scheduler.register(ANALYTICS_SCHEDULE, AnalyticsCollector().schedule_handler())
     scheduler.register(HOLDINGS_SCHEDULE, HoldingsKeeper(fetcher).schedule_handler())
+    # the charts' daily prices, from the exchange (D-059)
+    # (the exchange only when the tools are live: a test's scheduler must not ask TWSE)
+    live = settings is not None and settings.tools_profile == "live"
+    tiingo = settings.tiingo_api_key if live and settings else None
+    prices = PricesKeeper(
+        http_json() if live else no_prices,
+        tiingo_rows(tiingo.get_secret_value()) if tiingo else None,
+    )
+    scheduler.register(PRICES_SCHEDULE, prices.schedule_handler())
     # officials' scanned reports need a model that reads a PDF (Gemini's) and a person to check
     # what it read; without either, nothing is transcribed (D-051)
     key = settings.gemini_api_key if settings else None

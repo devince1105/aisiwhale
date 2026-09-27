@@ -193,6 +193,7 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
             "newsroom.refresh_official_trades",
             "20 */6 * * *",
         ),
+        ("newsroom.refresh_prices", "newsroom.refresh_prices", "20 7,10 * * 1-5"),  # D-059
     ]
 
     bad = [

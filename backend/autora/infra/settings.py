@@ -139,6 +139,9 @@ class Settings(BaseSettings):
     finnhub_api_key: SecretStr | None = None
     """Finnhub, free for personal use: US stocks' latest price on the strip. Without it they are
     left out. Its paid plan (or another licensed feed) before the site is public."""
+    tiingo_api_key: SecretStr | None = None
+    """Tiingo, free for personal use: US stocks' daily history for the stock pages' charts
+    (D-059). Without it a US page has no chart. Its commercial plan before the site is public."""
 
     # --- Blob storage (T-210) ---
     blob_store_dir: Path = Path(__file__).resolve().parents[3] / "data" / "blobs"
@@ -201,6 +204,7 @@ class Settings(BaseSettings):
         "tavily_api_key",
         "fred_api_key",
         "finnhub_api_key",
+        "tiingo_api_key",
         "resend_api_key",
         "payuni_mer_id",
         "payuni_hash_key",

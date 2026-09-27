@@ -13,6 +13,7 @@ export type PublicArticle = Schemas["PublicArticle"];
 export type PublicArticleSummary = Schemas["PublicArticleSummary"];
 export type PublicQuote = Schemas["PublicQuote"];
 export type PublicStock = Schemas["PublicStock"];
+export type PublicHistory = Schemas["PublicHistory"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
 
@@ -84,6 +85,19 @@ export async function fetchStock(
 ): Promise<PublicStock | null> {
   const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}", {
     params: { path: { symbol }, query: { lang, company: options.company } },
+  });
+  if (response.status === 404) return null;
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+/** A stock's daily bars for its chart (D-059); null for a symbol with no page. */
+export async function fetchHistory(
+  symbol: string,
+  options: SiteClientOptions = {},
+): Promise<PublicHistory | null> {
+  const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}/history", {
+    params: { path: { symbol } },
   });
   if (response.status === 404) return null;
   if (error !== undefined || !data) throw ApiError.from(response, error);

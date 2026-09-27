@@ -3,8 +3,9 @@
 // name it. Server-rendered; nothing on it is advice, and it says so.
 import Link from "next/link";
 
-import type { PublicHolder, PublicStock, PublicTrade } from "./api";
+import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
+import { StockChart } from "./StockChart";
 import { ARROW, direction, formatCap, formatChange, formatPrice, formatValue, stockCode, TONE } from "./quote";
 
 // the day's figures, after the watch cards the site's owner uses: the high in the rising colour,
@@ -114,7 +115,15 @@ function Trade({ trade, lang }: { trade: PublicTrade; lang: Lang }) {
   );
 }
 
-export function StockView({ stock, lang }: { stock: PublicStock; lang: Lang }) {
+export function StockView({
+  stock,
+  lang,
+  history = null,
+}: {
+  stock: PublicStock;
+  lang: Lang;
+  history?: PublicHistory | null;
+}) {
   const w = words(lang);
   const s = w.stock;
   const quote = stock.quote;
@@ -165,6 +174,15 @@ export function StockView({ stock, lang }: { stock: PublicStock; lang: Lang }) {
           </dl>
         ) : null}
       </header>
+
+      {history ? (
+        <section className="mt-6" aria-labelledby="chart">
+          <h2 id="chart" className="sr-only">
+            {w.chart.title}
+          </h2>
+          <StockChart bars={history.bars} lang={lang} market={stock.market} source={history.source ?? null} />
+        </section>
+      ) : null}
 
       <section className="mt-8" aria-labelledby="holders">
         <h2 id="holders" className="text-xl font-bold">
