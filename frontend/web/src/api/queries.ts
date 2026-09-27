@@ -29,6 +29,8 @@ export const queryKeys = {
   cycle: (cycleId: string) => ["cycle", cycleId] as const,
   /** Budgets and capital (D-054). */
   finance: (companyId: string) => ["finance", companyId] as const,
+  /** Projects, with who paused them and why (D-056). */
+  projects: (companyId: string) => ["projects", companyId] as const,
 };
 
 export function companiesQuery(api: ApiClient = defaultApi) {
@@ -410,6 +412,41 @@ export async function addCapital(
     await api.POST("/api/companies/{company_id}/finance/capital", {
       params: { path: { company_id: companyId } },
       body: { amount, memo, request_id: requestId },
+    }),
+  );
+}
+
+export type ProjectLine = Schemas["ProjectOut"];
+
+export function projectsQuery(companyId: string, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.projects(companyId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/companies/{company_id}/projects", {
+          params: { path: { company_id: companyId } },
+        }),
+      ),
+    refetchInterval: 60_000,
+  });
+}
+
+/** Pause or resume a project, as the PauseProject / ResumeProject command (D-056). */
+export async function decideProject(
+  companyId: string,
+  projectId: string,
+  action: "pause" | "resume",
+  reason: string | null = null,
+  api: ApiClient = defaultApi,
+) {
+  const paths = {
+    pause: "/api/companies/{company_id}/projects/{project_id}/pause",
+    resume: "/api/companies/{company_id}/projects/{project_id}/resume",
+  } as const;
+  return unwrap(
+    await api.POST(paths[action], {
+      params: { path: { company_id: companyId, project_id: projectId } },
+      body: { reason },
     }),
   );
 }

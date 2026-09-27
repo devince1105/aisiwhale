@@ -56,6 +56,9 @@ export function eventToQueryKeys(event: EventEnvelope): QueryKey[] {
   if (KPI_CHANGES.has(event.event_type)) {
     keys.push(queryKeys.kpis(event.company_id));
   }
+  if (event.event_type.startsWith("PROJECT_")) {
+    keys.push(queryKeys.projects(event.company_id)); // the CEO paused or resumed one (D-056)
+  }
   if (NEWSROOM_PREFIXES.some((prefix) => event.event_type.startsWith(prefix))) {
     keys.push(["newsroom"]);
   } else if (event.correlation_id) {
