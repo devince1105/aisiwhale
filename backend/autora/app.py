@@ -174,6 +174,7 @@ def build_scheduler(
         OfficialTradesKeeper,
     )
     from autora.domains.newsroom.price_history import (
+        FILL_SCHEDULE,
         PAUSE_SECONDS,
         PRICES_SCHEDULE,
         PricesKeeper,
@@ -181,6 +182,12 @@ def build_scheduler(
         no_prices,
         tiingo_rows,
     )
+    from autora.domains.newsroom.securities import (
+        SECURITIES_SCHEDULE,
+        SecuritiesKeeper,
+        no_securities,
+    )
+    from autora.domains.newsroom.securities import http_json as securities_json
     from autora.domains.newsroom.settings import get_newsroom_settings
     from autora.domains.newsroom.sources import POLL_SCHEDULE, SourcePoller
     from autora.domains.newsroom.stories import CLUSTER_SCHEDULE, StoryDesk
@@ -207,6 +214,14 @@ def build_scheduler(
         pause=PAUSE_SECONDS if live else 0,  # waiting for an exchange nobody asks is only slow
     )
     scheduler.register(PRICES_SCHEDULE, prices.schedule_handler())
+    scheduler.register(FILL_SCHEDULE, prices.fill_handler())
+    # every listed stock, to look one up (D-061); offline, nothing is asked of anybody
+    finnhub = settings.finnhub_api_key if live and settings else None
+    keeper = SecuritiesKeeper(
+        securities_json() if live else no_securities,
+        finnhub.get_secret_value() if finnhub else None,
+    )
+    scheduler.register(SECURITIES_SCHEDULE, keeper.schedule_handler())
     # officials' scanned reports need a model that reads a PDF (Gemini's) and a person to check
     # what it read; without either, nothing is transcribed (D-051)
     key = settings.gemini_api_key if settings else None

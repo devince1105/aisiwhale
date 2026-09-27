@@ -19,6 +19,7 @@ nothing about the reader either way.
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -29,6 +30,7 @@ from sqlalchemy import select
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
 from autora.db.models import Company
+from autora.domains.newsroom import securities
 from autora.domains.newsroom.holdings import STOCKS, PublicHolder, holders
 from autora.domains.newsroom.market_strip import PublicQuote, QuoteBoard, build_board
 from autora.domains.newsroom.models import AnalyticsEventType
@@ -37,7 +39,9 @@ from autora.domains.newsroom.price_history import (
     IntradayCache,
     PublicHistory,
     PublicIntraday,
+    bar_quote,
     history,
+    refresh_us,
     tiingo_rows,
 )
 from autora.domains.newsroom.site import (
@@ -135,6 +139,9 @@ class PublicStock(BaseModel):
     us_listing: str | None = None
     """Where it trades in the US: its own symbol, or a Taiwan stock's ADR (TSM for 2330). None:
     US filings (13F holders, officials' trades) can say nothing about it."""
+    tracks_13f: bool = False
+    """Whether its 13F holders are looked for: the strip's stocks, whose CUSIPs are known. Any
+    other stock (D-061) has no 13F section, rather than one saying nobody holds it."""
 
 
 @lru_cache
@@ -147,12 +154,13 @@ def intraday_cache() -> IntradayCache:
 @router.get("/api/public/stocks/{symbol}/intraday")
 async def get_stock_intraday(
     symbol: str,
+    session: Session,
     response: Response,
     cache: Annotated[IntradayCache, Depends(intraday_cache)],
 ) -> PublicIntraday:
     """A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.
     Empty for a Taiwan stock (no free intraday history) or without Tiingo's key."""
-    stock = STOCKS.get(symbol.upper())
+    stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
     response.headers["Cache-Control"] = "public, max-age=300"
@@ -163,13 +171,30 @@ async def get_stock_intraday(
 
 @router.get("/api/public/stocks/{symbol}/history")
 async def get_stock_history(symbol: str, session: Session, response: Response) -> PublicHistory:
-    """A stock's daily bars for its chart (D-059): oldest first, about five years. Empty ``bars``
-    when none are stored (a US stock, until Tiingo's key is set)."""
-    stock = STOCKS.get(symbol.upper())
+    """A stock's daily bars for its chart (D-059): oldest first, about five years.
+
+    Any listed stock (D-061): asking tracks it, so its prices are kept from then on. A US stock
+    with none yet is fetched there and then (one Tiingo request); a Taiwan one is filled by the
+    worker within minutes (the exchanges answer a month at a time), and says ``preparing``."""
+    stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
-    response.headers["Cache-Control"] = "public, max-age=600"  # new bars arrive twice a day
-    return await history(session, stock.market, stock.symbol)
+    await securities.track(session, stock)
+    answer = await history(session, stock.market, stock.symbol)
+    key = _secret(get_settings().tiingo_api_key)
+    if not answer.bars and stock.market == "us" and key:
+        await refresh_us(
+            session, tiingo_rows(key), today=datetime.now(UTC).date(), symbols=(stock.symbol,),
+            pause=0,
+        )  # fmt: skip
+        answer = await history(session, stock.market, stock.symbol)
+    await session.commit()
+    if not answer.bars and stock.market == "tw":
+        answer.preparing = True
+        response.headers["Cache-Control"] = "no-store"
+    else:
+        response.headers["Cache-Control"] = "public, max-age=600"  # new bars twice a day
+    return answer
 
 
 @router.get("/api/public/stocks/{symbol}")
@@ -180,7 +205,7 @@ async def get_stock(
     lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
     company: Annotated[str | None, Query(max_length=100)] = None,
 ) -> PublicStock:
-    stock = STOCKS.get(symbol.upper())
+    stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
     company_id = None
@@ -188,7 +213,10 @@ async def get_stock(
         company_id = await session.scalar(select(Company.id).where(Company.slug == company))
         if company_id is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"no company {company}")
+    # the strip's twenty from its board; any other from its last stored close (D-061)
     quote = next((q for q in await board.quotes() if q.key == stock.key), None)
+    if quote is None and stock.symbol not in STOCKS:
+        quote = await bar_quote(session, stock.market, stock.symbol)
     return PublicStock(
         symbol=stock.symbol,
         market=stock.market,
@@ -197,10 +225,71 @@ async def get_stock(
         holders=await holders(session, stock, company_id=company_id),
         trades=await trades_for(session, stock.tickers, company_id=company_id),
         articles=await published_articles_mentioning(
-            session, lang, stock.terms, company_slug=company
+            session, lang, _terms(stock), company_slug=company
         ),
         us_listing=stock.tickers[0] if stock.tickers else None,
+        tracks_13f=bool(stock.cusips),
     )
+
+
+def _terms(stock) -> tuple[str, ...]:
+    """What an article naming it would say. A ticker of one or two letters ("A", "GE") is left
+    out for a stock off the strip: as a whole word it is in too many sentences."""
+    if stock.symbol in STOCKS:
+        return stock.terms
+    return tuple(t for t in stock.terms if not (t.isascii() and len(t) < 3))
+
+
+class PublicSecurity(BaseModel):
+    symbol: str
+    market: str
+    name: str
+    name_en: str | None
+    exchange: str
+    kind: str
+
+
+@router.get("/api/public/securities")
+async def search_securities(
+    session: Session,
+    response: Response,
+    q: Annotated[str, Query(min_length=1, max_length=40)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 12,
+) -> list[PublicSecurity]:
+    """Any listed Taiwan or US stock (D-061), by code, ticker or name."""
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return [
+        PublicSecurity(
+            symbol=row.symbol,
+            market=row.market,
+            name=row.name,
+            name_en=row.name_en,
+            exchange=row.exchange,
+            kind=row.kind,
+        )  # fmt: skip
+        for row in await securities.search(session, q, limit=limit)
+    ]
+
+
+@router.get("/api/public/quotes")
+async def get_quotes(
+    session: Session,
+    board: Annotated[QuoteBoard, Depends(market_board)],
+    keys: Annotated[str, Query(max_length=2000, description="tw:2330,us:PLTR — at most 60")],
+) -> list[PublicQuote]:
+    """Quotes for a watchlist (D-061): the strip's own for its stocks, the last stored close for
+    any other. A key without a quote yet is left out."""
+    wanted = list(dict.fromkeys(k.strip() for k in keys.split(",") if k.strip()))[:60]
+    strip = {q.key: q for q in await board.quotes()}
+    out = []
+    for key in wanted:
+        if key in strip:
+            out.append(strip[key])
+            continue
+        market, _, symbol = key.partition(":")
+        if market in ("tw", "us") and symbol and (q := await bar_quote(session, market, symbol)):
+            out.append(q)
+    return out
 
 
 class Beacon(BaseModel):

@@ -56,7 +56,8 @@ def test_months_run_from_first_to_last():
     assert months == [date(2025, 11, 1), date(2025, 12, 1), date(2026, 1, 1), date(2026, 2, 1)]
 
 
-async def test_a_first_fill_takes_five_years_and_a_later_one_only_the_months_since(db_session):
+async def test_a_first_fill_takes_the_last_year_and_a_later_one_only_the_months_since(db_session):
+    """D-061: a stock just asked for gets its last year first; the years before follow."""
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
     asked: list[str] = []
 
@@ -71,7 +72,12 @@ async def test_a_first_fill_takes_five_years_and_a_later_one_only_the_months_sin
     written = await price_history.refresh_tw(
         db_session, get, today=date(2026, 9, 27), symbols=("TEST",), pause=0
     )
-    assert written == 2 and len(asked) == 60 and asked[0] == "20211001" and asked[-1] == "20260901"
+    # twelve months to September, then back from August until a month has no trades (here: at
+    # once, as the fake has only September)
+    assert written == 2 and asked[:12] == [f"2025{m:02d}01" for m in (10, 11, 12)] + [
+        f"2026{m:02d}01" for m in range(1, 10)
+    ]
+    assert asked[12:] == ["20260801"]
 
     asked.clear()
     await price_history.refresh_tw(
@@ -255,4 +261,80 @@ async def test_a_taiwan_history_is_served_split_adjusted(db_session):
         select(PriceBar.close).where(PriceBar.symbol == "TEST").order_by(PriceBar.day)
     )
     assert stored == Decimal("188.6500")  # kept as the exchange published it
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+
+
+TPEX_SEPTEMBER = {
+    "stat": "ok",
+    "tables": [{
+        "fields": ["日 期", "成交張數", "成交仟元", "開盤", "最高", "最低", "收盤", "漲跌", "筆數"],
+        "data": [  # as TPEx answered for 6488, 2026-09
+            "115/09/01|12,770|12,430,205|908.00|998.00|908.00|994.00|82.00|31,831".split("|"),
+            "115/09/02|7,323|7,068,011|976.00|982.00|951.00|967.00|-27.00|22,814".split("|"),
+        ],
+    }],
+}  # fmt: skip
+
+
+def test_a_tpex_month_reads_as_bars_with_volume_in_shares():
+    bars = price_history.parse_tpex_month(TPEX_SEPTEMBER)
+    assert [b.day for b in bars] == [date(2026, 9, 1), date(2026, 9, 2)]
+    assert bars[0].close == Decimal("994.00") and bars[0].volume == 12_770_000  # 張 x 1000
+
+
+async def test_a_tpex_stock_is_asked_of_tpex_without_extending_on_a_first_fill(db_session):
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "6488"))
+    asked = []
+
+    async def get(url, params):
+        asked.append(url)
+        return (
+            TPEX_SEPTEMBER
+            if params.get("date") == "2026/09/01"
+            else {
+                "stat": "ok",
+                "tables": [{"fields": TPEX_SEPTEMBER["tables"][0]["fields"], "data": []}],
+            }
+        )
+
+    written = await price_history.refresh_tw(
+        db_session, get, today=date(2026, 9, 27), symbols=("6488",),
+        exchanges={"6488": "TPEx"}, pause=0, extend=False,
+    )  # fmt: skip
+    assert written == 2 and len(asked) == 12 and set(asked) == {price_history.TPEX_DAY}
+    source = await db_session.scalar(select(PriceBar.source).where(PriceBar.symbol == "6488"))
+    assert source == "TPEx"
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "6488"))
+
+
+async def test_a_quote_off_the_strip_is_its_last_two_closes(db_session):
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+    assert await price_history.bar_quote(db_session, "us", "TEST") is None
+    later = {**TIINGO_ROW, "date": "2026-09-22T00:00:00.000Z", "adjClose": 230.0}
+    bars = price_history.parse_tiingo([TIINGO_ROW, later])
+    await price_history._store(db_session, "us", "TEST", bars, source="Tiingo")
+    quote = await price_history.bar_quote(db_session, "us", "TEST")
+    assert quote.value == 230.0 and quote.previous_close == 227.38 and quote.basis == "close"
+    assert quote.change_pct == round((230 / 227.38 - 1) * 100, 2) and quote.key == "us:TEST"
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+
+
+async def test_a_us_stock_asks_for_the_days_since_and_everything_again_after_a_split(db_session):
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+    await price_history._store(
+        db_session, "us", "TEST", price_history.parse_tiingo([TIINGO_ROW]), source="Tiingo"
+    )
+    asked = []
+
+    async def get(url, params):
+        asked.append(params["startDate"])
+        split = len(asked) == 1
+        return [
+            {**TIINGO_ROW, "date": "2026-09-24T00:00:00.000Z", "splitFactor": 4.0 if split else 1.0}
+        ]
+
+    await price_history.refresh_us(
+        db_session, get, today=date(2026, 9, 27), symbols=("TEST",), pause=0
+    )
+    assert asked == ["2026-09-14", "2021-10-01"]  # a week before the last bar; then five years
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))

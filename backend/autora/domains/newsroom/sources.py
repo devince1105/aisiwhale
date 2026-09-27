@@ -163,10 +163,17 @@ async def ensure_newsroom_schedules(
 ) -> list[Schedule]:
     """The company's poll schedule and, two minutes behind it, the story clustering (T-504); and
     the refresh of its investors' 13F positions (D-049), of officials' transaction reports
-    (D-051) and of daily prices (D-059) for the stock pages."""
+    (D-051) and of daily prices (D-059) for the stock pages; the lists of every listed stock and
+    the first prices of one just asked about (D-061)."""
     from autora.domains.newsroom.holdings import HOLDINGS_CRON, HOLDINGS_SCHEDULE
     from autora.domains.newsroom.official_trades import OFFICIAL_CRON, OFFICIAL_SCHEDULE
-    from autora.domains.newsroom.price_history import PRICES_CRON, PRICES_SCHEDULE
+    from autora.domains.newsroom.price_history import (
+        FILL_CRON,
+        FILL_SCHEDULE,
+        PRICES_CRON,
+        PRICES_SCHEDULE,
+    )
+    from autora.domains.newsroom.securities import SECURITIES_CRON, SECURITIES_SCHEDULE
     from autora.domains.newsroom.stories import CLUSTER_CRON, CLUSTER_SCHEDULE
 
     schedules = []
@@ -176,6 +183,8 @@ async def ensure_newsroom_schedules(
         (HOLDINGS_SCHEDULE, HOLDINGS_CRON),
         (OFFICIAL_SCHEDULE, OFFICIAL_CRON),
         (PRICES_SCHEDULE, PRICES_CRON),
+        (FILL_SCHEDULE, FILL_CRON),
+        (SECURITIES_SCHEDULE, SECURITIES_CRON),
     ):
         existing = await session.scalar(
             select(Schedule).where(Schedule.company_id == company_id, Schedule.name == name)

@@ -30,7 +30,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
-from autora.domains.newsroom.market_strip import TW_STOCKS, US_STOCKS
+from autora.domains.newsroom import securities
+from autora.domains.newsroom.market_strip import TW_STOCKS, US_STOCKS, PublicQuote
 from autora.domains.newsroom.models import PriceBar
 from autora.runtime.scheduler import Handler
 
@@ -41,6 +42,10 @@ PRICES_CRON = "20 7,10 * * 1-5"
 """15:20 and 18:20 in Taipei, weekdays: after TWSE publishes the day, and once more in case."""
 
 TWSE_DAY = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
+TPEX_DAY = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
+FIRST_FILL_MONTHS = 12
+"""A stock's first fill: its last year, so its chart is there within a minute of being asked
+for; the years before are added by the next refresh (D-061)."""
 HISTORY_MONTHS = 60
 """Five years: a monthly chart with its 60-month average, and room for the yearly one."""
 PAUSE_SECONDS = 2.5
@@ -102,6 +107,37 @@ def parse_twse_month(payload: dict) -> list[Bar]:
     return bars
 
 
+TPEX_COLUMNS = ("日 期", "成交張數", "開盤", "最高", "最低", "收盤")
+
+
+def parse_tpex_month(payload: dict) -> list[Bar]:
+    """One month of a TPEx (上櫃) stock: the same figures as TWSE's, volume in lots (張)."""
+    if str(payload.get("stat", "")).lower() != "ok":
+        raise PriceError(f"TPEx answered {payload.get('stat')!r}")
+    tables = payload.get("tables") or [{}]
+    fields = tables[0].get("fields") or []
+    try:
+        at = {name: fields.index(name) for name in TPEX_COLUMNS}
+    except ValueError as error:
+        raise PriceError(f"TPEx's columns changed: {fields}") from error
+    bars = []
+    for row in tables[0].get("data") or []:
+        try:
+            bars.append(
+                Bar(
+                    day=_roc_day(row[at["日 期"]]),
+                    open=_number(row[at["開盤"]]),
+                    high=_number(row[at["最高"]]),
+                    low=_number(row[at["最低"]]),
+                    close=_number(row[at["收盤"]]),
+                    volume=int(_number(row[at["成交張數"]]) * 1000),
+                )
+            )
+        except (InvalidOperation, ValueError, IndexError):
+            continue
+    return bars
+
+
 def months_between(first: date, last: date) -> list[date]:
     """The first day of every month from ``first``'s to ``last``'s, in order."""
     months, year, month = [], first.year, first.month
@@ -127,10 +163,16 @@ async def refresh_tw(
     *,
     today: date,
     symbols: tuple[str, ...] = TW_STOCKS,
+    exchanges: dict[str, str] | None = None,
     pause: float = PAUSE_SECONDS,
+    extend: bool = True,
 ) -> int:
-    """Bring every Taiwan stock's bars up to ``today``. How many bars were written."""
+    """Bring every Taiwan stock's bars up to ``today``. How many bars were written.
+
+    ``exchanges``: where each symbol is listed (TWSE unless it says TPEx). A stock with no bars
+    yet gets its last ``FIRST_FILL_MONTHS``; ``extend`` then walks it back to five years."""
     written, requests = 0, 0
+    exchanges = exchanges or {}
 
     async def month_of(symbol: str, month: date) -> list[Bar] | None:
         """One month's bars; None when it could not be read (next time's)."""
@@ -139,6 +181,12 @@ async def refresh_tw(
             await asyncio.sleep(pause)
         requests += 1
         try:
+            if exchanges.get(symbol) == "TPEx":
+                payload = await get(
+                    TPEX_DAY,
+                    {"code": symbol, "date": month.strftime("%Y/%m/01"), "response": "json"},
+                )
+                return parse_tpex_month(payload)
             payload = await get(
                 TWSE_DAY, {"response": "json", "date": month.strftime("%Y%m01"), "stockNo": symbol}
             )
@@ -156,16 +204,21 @@ async def refresh_tw(
                 )
             )
         ).one()
-        for month in months_between(last or horizon, today):
+        source = exchanges.get(symbol, "TWSE")
+        for month in months_between(last or _months_back(today, FIRST_FILL_MONTHS), today):
             bars = await month_of(symbol, month)
-            written += await _store(session, "tw", symbol, bars or [], source="TWSE")
+            written += await _store(session, "tw", symbol, bars or [], source=source)
+        await session.commit()  # the last year first: the chart is there before the rest
         # the years before the first stored month, newest first, until the stock had no trades
-        if first is not None and first.replace(day=1) > horizon:
+        first = first or await session.scalar(
+            select(func.min(PriceBar.day)).where(PriceBar.market == "tw", PriceBar.symbol == symbol)
+        )
+        if extend and first is not None and first.replace(day=1) > horizon:
             for month in reversed(months_between(horizon, first.replace(day=1))[:-1]):
                 bars = await month_of(symbol, month)
                 if bars == []:
                     break  # not listed yet: nothing older either
-                written += await _store(session, "tw", symbol, bars or [], source="TWSE")
+                written += await _store(session, "tw", symbol, bars or [], source=source)
         await session.commit()  # a stock at a time: an interrupted first fill keeps its progress
     return written
 
@@ -204,17 +257,31 @@ async def refresh_us(
     symbols: tuple[str, ...] = US_STOCKS,
     pause: float = 1.0,
 ) -> int:
-    """Every US stock's last five years, again (a split rewrites them). Bars written."""
-    start = _months_back(today, HISTORY_MONTHS)
+    """Every US stock's bars up to ``today``. Bars written.
+
+    A stock with bars asks for the days since its last one (a week back, for corrections); one
+    without, or one whose new days carry a split, for all five years again — Tiingo's prices are
+    adjusted, so a split rewrites the past."""
+    horizon = _months_back(today, HISTORY_MONTHS)
     written = 0
     for number, symbol in enumerate(symbols):
         if number:
             await asyncio.sleep(pause)
+        last = await session.scalar(
+            select(func.max(PriceBar.day)).where(PriceBar.market == "us", PriceBar.symbol == symbol)
+        )
+        start = last - timedelta(days=7) if last else horizon
         try:
             rows = await get(
                 TIINGO_DAILY.format(symbol=symbol),
                 {"startDate": start.isoformat(), "endDate": today.isoformat()},
             )
+            if last and any(float(r.get("splitFactor") or 1) != 1 for r in rows):
+                await asyncio.sleep(pause)
+                rows = await get(
+                    TIINGO_DAILY.format(symbol=symbol),
+                    {"startDate": horizon.isoformat(), "endDate": today.isoformat()},
+                )
         except Exception as error:  # noqa: BLE001 — one stock missing is next time's
             log.warning("prices: %s not read: %s", symbol, _describe(error))
             continue
@@ -261,28 +328,124 @@ async def _store(
     return len(rows)
 
 
+FILL_SCHEDULE = "newsroom.fill_prices"
+FILL_CRON = "*/5 * * * *"
+"""Every five minutes: a stock somebody just asked about gets its chart within minutes."""
+FILL_TW_PER_RUN = 3
+FILL_US_PER_RUN = 2
+TIINGO_PAUSE_SECONDS = 75.0
+"""Between two scheduled Tiingo requests: its free plan allows 50 an hour."""
+
+
 class PricesKeeper:
     def __init__(
-        self, get: GetJson, us: GetRows | None = None, *, pause: float = PAUSE_SECONDS
+        self,
+        get: GetJson,
+        us: GetRows | None = None,
+        *,
+        pause: float = PAUSE_SECONDS,
+        us_pause: float = TIINGO_PAUSE_SECONDS,
     ) -> None:
         self.get = get
         self.pause = pause
         """Between two TWSE requests; 0 when nothing is asked of TWSE (offline)."""
         self.us = us
         """Tiingo's reader; None without its key, and the US pages have no chart."""
+        self.us_pause = us_pause
+
+    async def _tw(self, session: AsyncSession) -> tuple[tuple[str, ...], dict[str, str]]:
+        symbols = tuple(dict.fromkeys((*TW_STOCKS, *await securities.tracked(session, "tw"))))
+        return symbols, await securities.exchange_of(session, list(symbols))
 
     def schedule_handler(self) -> Handler:
-        """The ``newsroom.refresh_prices`` handler."""
+        """The ``newsroom.refresh_prices`` handler: the strip's stocks and every tracked one."""
 
         async def handler(
             session: AsyncSession, schedule: Schedule, scheduled_for: datetime
         ) -> None:
             today = datetime.now(UTC).date()
-            await refresh_tw(session, self.get, today=today, pause=self.pause)
+            symbols, exchanges = await self._tw(session)
+            await refresh_tw(
+                session, self.get, today=today, symbols=symbols, exchanges=exchanges,
+                pause=self.pause,
+            )  # fmt: skip
             if self.us is not None:
-                await refresh_us(session, self.us, today=today)
+                us = tuple(dict.fromkeys((*US_STOCKS, *await securities.tracked(session, "us"))))
+                await refresh_us(session, self.us, today=today, symbols=us, pause=self.us_pause)
 
         return handler
+
+    def fill_handler(self) -> Handler:
+        """The ``newsroom.fill_prices`` handler: a few tracked stocks with no bars yet, their last
+        year only (the next refresh adds the years before)."""
+
+        async def handler(
+            session: AsyncSession, schedule: Schedule, scheduled_for: datetime
+        ) -> None:
+            today = datetime.now(UTC).date()
+            tw = await without_bars(session, "tw", await securities.tracked(session, "tw"))
+            if tw:
+                picked = tuple(tw[:FILL_TW_PER_RUN])
+                await refresh_tw(
+                    session, self.get, today=today, symbols=picked,
+                    exchanges=await securities.exchange_of(session, list(picked)),
+                    pause=self.pause, extend=False,
+                )  # fmt: skip
+            us = await without_bars(session, "us", await securities.tracked(session, "us"))
+            if us and self.us is not None:
+                await refresh_us(
+                    session, self.us, today=today, symbols=tuple(us[:FILL_US_PER_RUN]),
+                    pause=self.us_pause,
+                )  # fmt: skip
+
+        return handler
+
+
+async def without_bars(session: AsyncSession, market: str, symbols: list[str]) -> list[str]:
+    if not symbols:
+        return []
+    have = set(
+        await session.scalars(
+            select(PriceBar.symbol)
+            .where(PriceBar.market == market, PriceBar.symbol.in_(symbols))
+            .distinct()
+        )
+    )
+    return [s for s in symbols if s not in have]
+
+
+async def bar_quote(session: AsyncSession, market: str, symbol: str) -> PublicQuote | None:
+    """A stock off the strip, quoted from its last two stored days: the close, against the one
+    before. None until it has a bar."""
+    rows = (
+        await session.scalars(
+            select(PriceBar)
+            .where(PriceBar.market == market, PriceBar.symbol == symbol)
+            .order_by(PriceBar.day.desc())
+            .limit(2)
+        )
+    ).all()
+    if not rows:
+        return None
+    last = rows[0]
+    before = float(rows[1].close) if len(rows) > 1 else None
+    close = float(last.close)
+    if before and market == "tw" and abs(close / before - 1) > DAILY_LIMIT + 0.005:
+        before = None  # across a split: no honest change to show
+    return PublicQuote(
+        key=f"{market}:{symbol}",
+        value=close,
+        change=round(close - before, 4) if before else None,
+        change_pct=round((close / before - 1) * 100, 2) if before else None,
+        as_of=last.day,
+        basis="close",
+        source=last.source,
+        open=float(last.open),
+        high=float(last.high),
+        low=float(last.low),
+        previous_close=before,
+        currency="TWD" if market == "tw" else "USD",
+    )
 
 
 async def no_prices(url: str, params: dict) -> dict:
@@ -330,6 +493,8 @@ class PublicHistory(BaseModel):
     source: str | None
     bars: list[PublicBar]
     """Oldest first, every stored trading day (about five years)."""
+    preparing: bool = False
+    """A Taiwan stock just asked for: its first year is being fetched (D-061)."""
 
 
 DAILY_LIMIT = 0.10

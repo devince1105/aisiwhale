@@ -183,18 +183,21 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
     schedules = (
         await db_session.scalars(select(Schedule).where(Schedule.company_id == company.id))
     ).all()
-    assert sorted((s.name, s.handler, s.cron) for s in schedules) == [
-        ("newsroom.cluster_stories", "newsroom.cluster_stories", "2-59/5 * * * *"),
-        (POLL_SCHEDULE, POLL_SCHEDULE, "*/5 * * * *"),
-        ("newsroom.refresh_holdings", "newsroom.refresh_holdings", "40 */6 * * *"),  # D-049
-        # D-051
-        (
-            "newsroom.refresh_official_trades",
-            "newsroom.refresh_official_trades",
-            "20 */6 * * *",
-        ),
-        ("newsroom.refresh_prices", "newsroom.refresh_prices", "20 7,10 * * 1-5"),  # D-059
-    ]
+    assert sorted((s.name, s.handler, s.cron) for s in schedules) == sorted(
+        [
+            ("newsroom.cluster_stories", "newsroom.cluster_stories", "2-59/5 * * * *"),
+            (POLL_SCHEDULE, POLL_SCHEDULE, "*/5 * * * *"),
+            ("newsroom.refresh_holdings", "newsroom.refresh_holdings", "40 */6 * * *"),  # D-049
+            (
+                "newsroom.refresh_official_trades",
+                "newsroom.refresh_official_trades",
+                "20 */6 * * *",
+            ),
+            ("newsroom.refresh_prices", "newsroom.refresh_prices", "20 7,10 * * 1-5"),  # D-059
+            ("newsroom.fill_prices", "newsroom.fill_prices", "*/5 * * * *"),  # D-061
+            ("newsroom.refresh_securities", "newsroom.refresh_securities", "10 23 * * *"),
+        ]
+    )
 
     bad = [
         {"kind": "rss", "url": "ftp://x.test/feed"},

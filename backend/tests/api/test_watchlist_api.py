@@ -70,3 +70,24 @@ async def test_stocks_added_together_keep_the_order_they_were_added_in(db_sessio
         "TSM",
         "AAPL",
     ]
+
+
+async def test_any_listed_stock_can_be_kept_and_is_then_tracked(site, mailbox, db_session):
+    """D-061: beyond the strip's twenty — and keeping one tracks it, without saying who."""
+    from sqlalchemy import select
+
+    from autora.domains.newsroom import securities
+    from autora.domains.newsroom.models import TrackedSecurity
+
+    await securities.store(
+        db_session, [securities.Listed("tw", "6488", "環球晶", None, "TPEx", "stock")]
+    )
+    await _sign_in(site, mailbox, "wide@example.com")
+    assert (await site.post(f"{URL}/6488")).status_code == 204
+    assert (await site.get(URL)).json() == [
+        {"symbol": "6488", "market": "tw", "key": "tw:6488", "name": "環球晶"}
+    ]
+    tracked = await db_session.scalar(
+        select(TrackedSecurity).where(TrackedSecurity.symbol == "6488")
+    )
+    assert tracked is not None and not hasattr(tracked, "reader_id")

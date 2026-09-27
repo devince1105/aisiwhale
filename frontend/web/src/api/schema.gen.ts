@@ -832,6 +832,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Watchlist */
+        get: operations["get_watchlist_api_me_watchlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/watchlist/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Watch */
+        post: operations["watch_api_me_watchlist__symbol__post"];
+        /** Unwatch */
+        delete: operations["unwatch_api_me_watchlist__symbol__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/payments/payuni/notify": {
         parameters: {
             query?: never;
@@ -914,6 +949,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quotes
+         * @description Quotes for a watchlist (D-061): the strip's own for its stocks, the last stored close for
+         *     any other. A key without a quote yet is left out.
+         */
+        get: operations["get_quotes_api_public_quotes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/securities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Securities
+         * @description Any listed Taiwan or US stock (D-061), by code, ticker or name.
+         */
+        get: operations["search_securities_api_public_securities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/stocks/{symbol}": {
         parameters: {
             query?: never;
@@ -940,8 +1016,11 @@ export interface paths {
         };
         /**
          * Get Stock History
-         * @description A stock's daily bars for its chart (D-059): oldest first, about five years. Empty ``bars``
-         *     when none are stored (a US stock, until Tiingo's key is set).
+         * @description A stock's daily bars for its chart (D-059): oldest first, about five years.
+         *
+         *     Any listed stock (D-061): asking tracks it, so its prices are kept from then on. A US stock
+         *     with none yet is fetched there and then (one Tiingo request); a Taiwan one is filled by the
+         *     worker within minutes (the exchanges answer a month at a time), and says ``preparing``.
          */
         get: operations["get_stock_history_api_public_stocks__symbol__history_get"];
         put?: never;
@@ -2668,6 +2747,11 @@ export interface components {
             bars: components["schemas"]["PublicBar"][];
             /** Market */
             market: string;
+            /**
+             * Preparing
+             * @default false
+             */
+            preparing: boolean;
             /** Source */
             source: string | null;
             /** Symbol */
@@ -2775,6 +2859,21 @@ export interface components {
             /** Value */
             value: number;
         };
+        /** PublicSecurity */
+        PublicSecurity: {
+            /** Exchange */
+            exchange: string;
+            /** Kind */
+            kind: string;
+            /** Market */
+            market: string;
+            /** Name */
+            name: string;
+            /** Name En */
+            name_en: string | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** PublicSource */
         PublicSource: {
             /** Site */
@@ -2797,6 +2896,11 @@ export interface components {
             quote: components["schemas"]["PublicQuote"] | null;
             /** Symbol */
             symbol: string;
+            /**
+             * Tracks 13F
+             * @default false
+             */
+            tracks_13f: boolean;
             /**
              * Trades
              * @default []
@@ -3415,6 +3519,17 @@ export interface components {
             published: boolean;
             /** Version */
             version: number;
+        };
+        /** WatchedStock */
+        WatchedStock: {
+            /** Key */
+            key: string;
+            /** Market */
+            market: string;
+            /** Name */
+            name: string;
+            /** Symbol */
+            symbol: string;
         };
         /** WorkflowRunOut */
         WorkflowRunOut: {
@@ -5162,6 +5277,101 @@ export interface operations {
             };
         };
     };
+    get_watchlist_api_me_watchlist_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchedStock"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    watch_api_me_watchlist__symbol__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unwatch_api_me_watchlist__symbol__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     payuni_notify_api_payments_payuni_notify_post: {
         parameters: {
             query?: never;
@@ -5267,6 +5477,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicQuote"][];
+                };
+            };
+        };
+    };
+    get_quotes_api_public_quotes_get: {
+        parameters: {
+            query: {
+                /** @description tw:2330,us:PLTR — at most 60 */
+                keys: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicQuote"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_securities_api_public_securities_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSecurity"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

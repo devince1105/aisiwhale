@@ -636,3 +636,43 @@ class PriceBar(IdMixin, CreatedAtMixin, Base):
     volume: Mapped[int] = mapped_column(Numeric(20, 0))
     """Shares traded (a Taiwan page shows it in 張, a thousand shares)."""
     source: Mapped[str]
+
+
+class Security(IdMixin, TimestampMixin, Base):
+    """A stock or fund a reader can look up (D-061): every one listed in Taiwan (TWSE and TPEx)
+    and every common stock, ETF and ADR on a main US exchange. Refreshed daily from the
+    exchanges' own lists (Finnhub's for the US)."""
+
+    __tablename__ = "securities"
+    __table_args__ = (
+        UniqueConstraint("market", "symbol"),
+        CheckConstraint("market in ('tw', 'us')", name="market"),
+        Index("ix_securities_name", "market", "name"),
+    )
+
+    market: Mapped[str]
+    symbol: Mapped[str]
+    name: Mapped[str]
+    """As its own market names it: 台泥 in Taiwan, NVIDIA CORP in the US."""
+    name_en: Mapped[str | None]
+    """A Taiwan company's English short name, where TWSE gives one (TCC)."""
+    exchange: Mapped[str]
+    """TWSE, TPEx; XNAS, XNYS, ARCX, BATS, XASE."""
+    kind: Mapped[str]
+    """``stock``, ``etf`` or ``adr``."""
+
+
+class TrackedSecurity(IdMixin, CreatedAtMixin, Base):
+    """A security somebody asked about — on a watchlist, or its page opened (D-061): its daily
+    prices are fetched and kept up to date while it is asked about. Which readers asked is not
+    here: the newsroom knows a stock is wanted, never by whom."""
+
+    __tablename__ = "tracked_securities"
+    __table_args__ = (
+        UniqueConstraint("market", "symbol"),
+        CheckConstraint("market in ('tw', 'us')", name="market"),
+    )
+
+    market: Mapped[str]
+    symbol: Mapped[str]
+    last_requested_at: Mapped[datetime]

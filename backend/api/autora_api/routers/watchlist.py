@@ -5,7 +5,8 @@
 - DELETE /api/me/watchlist/{symbol}      -> 204, off it
 
 The reader is whoever the site's cookie says, and nobody else: no reader id in any address.
-Only stocks with a page may be kept (phase 1: the market strip's twenty).
+Any listed Taiwan or US stock may be kept (D-061); keeping one tracks it, so its prices are
+fetched — the newsroom learns that a stock is wanted, never by whom.
 """
 
 from __future__ import annotations
@@ -17,7 +18,8 @@ from pydantic import BaseModel
 
 from autora.accounts import SESSION_COOKIE, reader_for
 from autora.accounts import watchlist as reader_watchlist
-from autora.domains.newsroom.holdings import STOCKS, Stock
+from autora.domains.newsroom import securities
+from autora.domains.newsroom.holdings import Stock
 from autora_api.deps import Session
 
 router = APIRouter(prefix="/api/me/watchlist", tags=["watchlist"])
@@ -40,8 +42,8 @@ async def _reader(session: Session, cookie: str | None):
     return reader
 
 
-def _stock(symbol: str) -> Stock:
-    stock = STOCKS.get(symbol.upper())
+async def _stock(session: Session, symbol: str) -> Stock:
+    stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
     return stock
@@ -58,7 +60,7 @@ async def get_watchlist(
     reader = await _reader(session, autora_reader)
     out = []
     for market, symbol in await reader_watchlist.items(session, reader.id):
-        stock = STOCKS.get(symbol)
+        stock = await securities.find(session, symbol)
         if stock is None or stock.market != market:
             continue  # a stock the site no longer has a page for
         out.append(
@@ -76,9 +78,10 @@ async def get_watchlist(
 @router.post("/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
 async def watch(symbol: str, session: Session, autora_reader: SessionCookie = None) -> Response:
     reader = await _reader(session, autora_reader)
-    stock = _stock(symbol)
+    stock = await _stock(session, symbol)
     try:
         await reader_watchlist.add(session, reader.id, stock.market, stock.symbol)
+        await securities.track(session, stock)
     except reader_watchlist.WatchlistFull as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     await session.commit()
@@ -88,7 +91,7 @@ async def watch(symbol: str, session: Session, autora_reader: SessionCookie = No
 @router.delete("/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
 async def unwatch(symbol: str, session: Session, autora_reader: SessionCookie = None) -> Response:
     reader = await _reader(session, autora_reader)
-    stock = _stock(symbol)
+    stock = await _stock(session, symbol)
     await reader_watchlist.remove(session, reader.id, stock.market, stock.symbol)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
