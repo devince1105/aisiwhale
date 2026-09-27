@@ -35,6 +35,7 @@ beforeEach(() => {
   params = new URLSearchParams("edit=1"); // most of these are about the settings
   replace.mockClear();
   resetWatchlist();
+  sessionStorage.clear(); // the list beside a stock starts hidden (D-066)
   calls.length = 0;
   list = [];
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -105,9 +106,26 @@ describe("the watchlist", () => {
     expect(sample.textContent).toContain("台積電");
   });
 
+  it("beside a stock, hidden until asked for, and open from stock to stock once asked (D-066)", async () => {
+    list = [NVDA];
+    const { unmount } = render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
+    const toggle = await screen.findByRole("button", { name: "觀察清單" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("link", { current: "page" })).toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "收起清單" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getAllByRole("link", { current: "page" }).length).toBeGreaterThan(0);
+    unmount();
+    render(<WatchlistSide lang="zh-TW" current="us:NVDA" />); // the next stock: still open
+    expect(await screen.findByRole("button", { name: "收起清單" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "收起清單" }));
+    expect(sessionStorage.getItem("autora:watchlist-side")).toBeNull();
+  });
+
   it("beside a stock, marks the one on show; nothing when the list is empty", async () => {
     list = [NVDA];
     const { unmount } = render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
+    fireEvent.click(await screen.findByRole("button", { name: "觀察清單" }));
     const current = await screen.findAllByRole("link", { current: "page" });
     expect(current.length).toBeGreaterThan(0);
     unmount();
@@ -152,6 +170,7 @@ describe("the strip and the list together (D-062)", () => {
     cleanup();
     render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
     const side = await screen.findByTestId("watchlist-side");
+    fireEvent.click(screen.getByRole("button", { name: "觀察清單" }));
     await waitFor(() => expect(side.textContent).toContain("觀察清單範例"));
     expect(side.textContent).toContain("加權指數");
   });
@@ -223,6 +242,7 @@ describe("the watchlist page to watch (D-064)", () => {
   it("beside a stock, the list is only to look at, with a way to its settings", async () => {
     list = [NVDA];
     render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
+    fireEvent.click(await screen.findByRole("button", { name: "觀察清單" }));
     const edit = await screen.findByTestId("watchlist-edit-link");
     expect(edit.getAttribute("href")).toBe("/news/zh-TW/watchlist?edit=1");
     expect(screen.queryByRole("button", { name: /拖曳/ })).toBeNull();

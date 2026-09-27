@@ -81,6 +81,7 @@ const NVDA: PublicStock = {
       option: false,
     },
   ],
+  articles_total: 1,
   articles: [
     {
       article_id: "a1",
@@ -210,6 +211,27 @@ describe("a stock's page", () => {
     expect((found.mock.calls[0]![0] as Request).url).toBe("http://api/api/public/stocks/NVDA?lang=zh-TW&company=c");
     const missing = vi.fn<typeof fetch>(() => Promise.resolve(new Response("{}", { status: 404 })));
     expect(await fetchStock("XYZ", "en", { baseUrl: "http://api", fetch: missing })).toBeNull();
+    await fetchStock("NVDA", "zh-TW", { baseUrl: "http://api", fetch: found, articlesOffset: 10 });
+    expect((found.mock.calls[1]![0] as Request).url).toBe("http://api/api/public/stocks/NVDA?lang=zh-TW&articles_offset=10");
+  });
+
+  it("pages through our stories that name it, ten at a time (D-066)", () => {
+    const { rerender } = render(<StockView stock={NVDA} lang="zh-TW" />);
+    expect(screen.queryByRole("navigation", { name: "分頁" })).toBeNull(); // one story: one page
+    rerender(<StockView stock={{ ...NVDA, articles_total: 23 }} lang="zh-TW" />);
+    const pages = within(screen.getByRole("navigation", { name: "分頁" }));
+    expect(pages.getByRole("link", { name: "下一頁" }).getAttribute("href")).toBe("/news/zh-TW/stocks/NVDA?page=2#coverage");
+    expect(pages.getByText("第 1／3 頁")).toBeTruthy();
+    rerender(
+      <StockView
+        stock={{ ...NVDA, articles_total: 23 }}
+        lang="zh-TW"
+        coverage={{ page: 3, to: (n) => `/news/zh-TW/watchlist?s=us%3ANVDA&page=${n}#coverage` }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "上一頁" }).getAttribute("href")).toBe("/news/zh-TW/watchlist?s=us%3ANVDA&page=2#coverage");
+    rerender(<StockView stock={{ ...NVDA, articles: [], articles_total: 23 }} lang="zh-TW" coverage={{ page: 9, to: String }} />);
+    expect(screen.getByText("這一頁沒有報導了。")).toBeTruthy(); // past the last page, not "none yet"
   });
 });
 

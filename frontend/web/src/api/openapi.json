@@ -4423,6 +4423,11 @@
       "title": "Articles",
       "type": "array"
      },
+     "articles_total": {
+      "default": 0,
+      "title": "Articles Total",
+      "type": "integer"
+     },
      "exchange": {
       "anyOf": [
        {
@@ -10223,6 +10228,7 @@
   },
   "/api/public/stocks/{symbol}": {
    "get": {
+    "description": "``articles_offset`` pages through our stories that name it, ten at a time (D-066).",
     "operationId": "get_stock_api_public_stocks__symbol__get",
     "parameters": [
      {
@@ -10260,6 +10266,18 @@
         }
        ],
        "title": "Company"
+      }
+     },
+     {
+      "in": "query",
+      "name": "articles_offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "maximum": 10000,
+       "minimum": 0,
+       "title": "Articles Offset",
+       "type": "integer"
       }
      }
     ],

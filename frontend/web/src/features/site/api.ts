@@ -94,10 +94,13 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
 export async function fetchStock(
   symbol: string,
   lang: string,
-  options: SiteClientOptions & { company?: string } = {},
+  options: SiteClientOptions & { company?: string; articlesOffset?: number } = {},
 ): Promise<PublicStock | null> {
   const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}", {
-    params: { path: { symbol }, query: { lang, company: options.company } },
+    params: {
+      path: { symbol },
+      query: { lang, company: options.company, articles_offset: options.articlesOffset || undefined },
+    },
   });
   if (response.status === 404) return null;
   if (error !== undefined || !data) throw ApiError.from(response, error);

@@ -1003,7 +1003,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Stock */
+        /**
+         * Get Stock
+         * @description ``articles_offset`` pages through our stories that name it, ten at a time (D-066).
+         */
         get: operations["get_stock_api_public_stocks__symbol__get"];
         put?: never;
         post?: never;
@@ -2898,6 +2901,11 @@ export interface components {
         PublicStock: {
             /** Articles */
             articles: components["schemas"]["PublicArticleSummary"][];
+            /**
+             * Articles Total
+             * @default 0
+             */
+            articles_total: number;
             /** Exchange */
             exchange?: string | null;
             /** Holders */
@@ -5598,6 +5606,7 @@ export interface operations {
             query: {
                 lang: string;
                 company?: string | null;
+                articles_offset?: number;
             };
             header?: never;
             path: {

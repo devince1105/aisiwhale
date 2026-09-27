@@ -294,10 +294,39 @@ async def published_articles_mentioning(
     *,
     company_slug: str | None = None,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[PublicArticleSummary]:
     """The newest published articles in ``lang`` whose title, summary or text names any of
     ``terms`` (D-049, a stock page's "our coverage"). A Latin term matches as a whole word and
-    in its own case — ``MU`` is not in "MUST", ``Meta`` is not "metadata" — others anywhere."""
+    in its own case — ``MU`` is not in "MUST", ``Meta`` is not "metadata" — others anywhere.
+    ``offset`` pages through them (D-066)."""
+    query = _mentioning(lang, terms, company_slug)
+    if query is None:
+        return []
+    query = (
+        query.order_by(Article.published_at.desc(), Article.id.desc())
+        .limit(min(max(limit, 1), MAX_LIST))
+        .offset(max(offset, 0))
+    )
+    rows = (await session.execute(query)).all()
+    return [_summary(article, version, named) for article, version, named in rows]
+
+
+async def count_articles_mentioning(
+    session: AsyncSession,
+    lang: str,
+    terms: tuple[str, ...],
+    *,
+    company_slug: str | None = None,
+) -> int:
+    """How many ``published_articles_mentioning`` pages through, all told."""
+    query = _mentioning(lang, terms, company_slug)
+    if query is None:
+        return 0
+    return int(await session.scalar(select(func.count()).select_from(query.subquery())) or 0)
+
+
+def _mentioning(lang: str, terms: tuple[str, ...], company_slug: str | None):
     text_of = func.concat_ws(
         " ", ArticleVersion.title, ArticleVersion.summary, cast(ArticleVersion.body, Text)
     )
@@ -308,18 +337,13 @@ async def published_articles_mentioning(
         else:
             matches.append(text_of.contains(term, autoescape=True))
     if not matches:
-        return []
-    query = (
-        _published(lang)
-        .where(or_(*matches))
-        .order_by(Article.published_at.desc(), Article.id.desc())
-    )
+        return None
+    query = _published(lang).where(or_(*matches))
     if company_slug is not None:
         query = query.join(Company, Company.id == Article.company_id).where(
             Company.slug == company_slug
         )
-    rows = (await session.execute(query.limit(min(max(limit, 1), MAX_LIST)))).all()
-    return [_summary(article, version, named) for article, version, named in rows]
+    return query
 
 
 class BeaconRejected(Exception):

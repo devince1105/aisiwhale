@@ -7,6 +7,7 @@ import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./ap
 import { formatDate, words, type Lang } from "./i18n";
 import { StockChart } from "./StockChart";
 import { WatchButton } from "./WatchButton";
+import { Pagination } from "./Pagination";
 import { ARROW, direction, formatCap, formatChange, formatValue, stockCode, TONE } from "./quote";
 
 // the day's figures, after the watch cards the site's owner uses: the high in the rising colour,
@@ -114,17 +115,24 @@ function Trade({ trade, lang }: { trade: PublicTrade; lang: Lang }) {
   );
 }
 
+/** How many of our stories a stock page lists at a time (the API's own ten). */
+export const COVERAGE_PAGE = 10;
+
 export function StockView({
   stock,
   lang,
   history = null,
   watch = true,
+  coverage,
 }: {
   stock: PublicStock;
   lang: Lang;
   history?: PublicHistory | null;
   /** Its own 加入觀察 button; the watchlist page puts it in its own title row instead (D-064). */
   watch?: boolean;
+  /** Which page of our stories that name it this is, and a page's address (D-066); the stock's
+   * own page by default. */
+  coverage?: { page: number; to: (page: number) => string };
 }) {
   const w = words(lang);
   const s = w.stock;
@@ -250,23 +258,33 @@ export function StockView({
         </>
       ) : null}
 
-      <section className="mt-10" aria-labelledby="coverage">
-        <h2 id="coverage" className="text-xl font-bold">
+      <section id="coverage" className="mt-10 scroll-mt-24" aria-labelledby="coverage-title">
+        <h2 id="coverage-title" className="text-xl font-bold">
           {s.coverage}
         </h2>
         {stock.articles.length ? (
-          <ul className="mt-2 divide-y divide-line">
-            {stock.articles.map((article) => (
-              <li key={article.article_id} className="py-4">
-                <Link href={article.path} className="font-semibold hover:text-accent">
-                  {article.title}
-                </Link>
-                <p className="mt-1 text-xs text-muted">
-                  <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
-                </p>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-2 divide-y divide-line">
+              {stock.articles.map((article) => (
+                <li key={article.article_id} className="py-4">
+                  <Link href={article.path} className="font-semibold hover:text-accent">
+                    {article.title}
+                  </Link>
+                  <p className="mt-1 text-xs text-muted">
+                    <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              lang={lang}
+              page={coverage?.page ?? 1}
+              total={Math.ceil((stock.articles_total ?? 0) / COVERAGE_PAGE)}
+              to={coverage?.to ?? ((n) => `/news/${lang}/stocks/${stock.symbol}${n > 1 ? `?page=${n}` : ""}#coverage`)}
+            />
+          </>
+        ) : (coverage?.page ?? 1) > 1 ? (
+          <p className="mt-3 text-muted">{s.coveragePast}</p>
         ) : (
           <p className="mt-3 text-muted">{s.coverageNone}</p>
         )}

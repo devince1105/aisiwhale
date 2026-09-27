@@ -40,7 +40,7 @@ import {
   type PublicStock,
 } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
-import { StockView } from "./StockView";
+import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
 import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
@@ -142,9 +142,75 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
     list.status === "ready" ? list.items : sample ? stripItems(strip, words(lang).quoteNames) : [];
   const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
   const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
+  const [open, setOpen] = useSideOpen();
   if (!items.length) return null;
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setOpen(!open)}
+      aria-expanded={open}
+      aria-controls="watchlist-side-list"
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${open ? "border-accent text-accent" : "border-line text-muted hover:border-accent hover:text-accent"}`}
+      data-testid="watchlist-side-toggle"
+    >
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M2.5 4h11M2.5 8h11M2.5 12h11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+      {open ? w.hideSide : w.showSide}
+    </button>
+  );
+  // hidden until asked for (D-066): the stock has the page; the list is a click away
   return (
-    <nav aria-label={w.title} data-testid="watchlist-side">
+    <aside className={`lg:shrink-0 lg:pt-6 ${open ? "lg:w-56" : ""}`} data-testid="watchlist-side">
+      <div className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-none lg:px-0 lg:pt-0 lg:pb-2">{toggle}</div>
+      {open ? <SideList id="watchlist-side-list" items={items} byKey={byKey} lang={lang} current={current} sample={sample} /> : null}
+    </aside>
+  );
+}
+
+const SIDE_OPEN = "autora:watchlist-side";
+
+/** Whether the list beside a stock is showing: closed at first; once opened, it stays open from
+ * stock to stock for the rest of the visit (this tab's session). */
+function useSideOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(SIDE_OPEN) === "1") setOpen(true);
+    } catch {
+      // no storage (a private window): closed, as at first
+    }
+  }, []);
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      if (next) sessionStorage.setItem(SIDE_OPEN, "1");
+      else sessionStorage.removeItem(SIDE_OPEN);
+    } catch {
+      // not remembered: it still opens now
+    }
+  };
+  return [open, set];
+}
+
+function SideList({
+  id,
+  items,
+  byKey,
+  lang,
+  current,
+  sample,
+}: {
+  id: string;
+  items: WatchedStock[];
+  byKey: Map<string, PublicQuote>;
+  lang: Lang;
+  current: string;
+  sample: boolean;
+}) {
+  const w = words(lang).watch;
+  return (
+    <nav id={id} aria-label={w.title}>
       {/* a phone: a row to scroll above the stock */}
       <div className="mx-auto max-w-3xl px-4 pt-4 lg:hidden">
         <ul className="flex gap-2 overflow-x-auto pb-1">
@@ -524,19 +590,34 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
 function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQuote; lang: Lang }) {
   const w = words(lang);
   const page = stockPage(item.key, lang);
-  const [detail, setDetail] = useState<{ stock: PublicStock | null; history: PublicHistory | null } | null>(null);
+  // which page of the stories that name it (D-066): ``?page=`` beside ``?s=``
+  const coveragePage = Math.min(Math.max(Number.parseInt(useSearchParams().get("page") ?? "1", 10) || 1, 1), 500);
+  // the stock (again for another page of its stories) and its chart (once), each as it comes;
+  // the pane waits for both the first time
+  const [stock, setStock] = useState<PublicStock | null | undefined>(undefined);
+  const [history, setHistory] = useState<PublicHistory | null | undefined>(undefined);
   useEffect(() => {
     if (!page) return;
     let live = true;
-    const symbol = symbolOf(item.key);
-    void Promise.all([
-      fetchStock(symbol, lang, { baseUrl: API_URL }).catch(() => null),
-      fetchHistory(symbol, { baseUrl: API_URL }).catch(() => null),
-    ]).then(([stock, history]) => live && setDetail({ stock, history }));
+    const offset = (coveragePage - 1) * COVERAGE_PAGE;
+    void fetchStock(symbolOf(item.key), lang, { baseUrl: API_URL, articlesOffset: offset })
+      .catch(() => null)
+      .then((found) => live && setStock((was) => found ?? (was === undefined ? null : was)));
     return () => {
       live = false;
     };
-  }, [item.key, lang, page]);
+  }, [item.key, lang, page, coveragePage]);
+  useEffect(() => {
+    if (!page) return;
+    let live = true;
+    void fetchHistory(symbolOf(item.key), { baseUrl: API_URL })
+      .catch(() => null)
+      .then((found) => live && setHistory(found));
+    return () => {
+      live = false;
+    };
+  }, [item.key, page]);
+  const detail = stock === undefined || history === undefined ? null : { stock, history };
 
   if (page) {
     return (
@@ -544,7 +625,17 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
         {detail === null ? (
           <p className="flex h-80 items-center justify-center text-sm text-muted">…</p>
         ) : detail.stock ? (
-          <StockView stock={detail.stock} lang={lang} history={detail.history} watch={false} />
+          <StockView
+            stock={detail.stock}
+            lang={lang}
+            history={detail.history}
+            watch={false}
+            coverage={{
+              page: coveragePage,
+              to: (n) =>
+                `/news/${lang}/watchlist?${new URLSearchParams(n > 1 ? { s: item.key, page: String(n) } : { s: item.key })}#coverage`,
+            }}
+          />
         ) : (
           <p className="rounded-lg border border-line p-4 text-sm text-muted">{w.stock.noQuote}</p>
         )}

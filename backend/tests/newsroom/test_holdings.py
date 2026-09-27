@@ -11,7 +11,7 @@ from autora.domains.newsroom import thirteenf
 from autora.domains.newsroom.holdings import STOCKS, holders, refresh_holdings
 from autora.domains.newsroom.markets import edgar_13f
 from autora.domains.newsroom.models import InvestorPosition, Source
-from autora.domains.newsroom.site import published_articles_mentioning
+from autora.domains.newsroom.site import count_articles_mentioning, published_articles_mentioning
 from autora.infra.http import FetchError
 from tests.conftest import unique_company
 
@@ -140,3 +140,16 @@ async def test_our_articles_that_name_it(newsroom_room):
         assert await by("en", "Lume") == []  # a Latin name is a whole word
         assert await by("en", "lumen") == []  # in its own case
         assert await by("en", "微電網") == []  # only the language asked for
+        # counted, and paged (D-066)
+        count = lambda lang, *terms: count_articles_mentioning(  # noqa: E731
+            session, lang, terms, company_slug=room.company.slug
+        )
+        assert (await count("zh-TW", "微電網"), await count("en", "Lume"), await count("en")) == (
+            1,
+            0,
+            0,
+        )
+        past = await published_articles_mentioning(
+            session, "zh-TW", ("微電網",), company_slug=room.company.slug, offset=1
+        )
+        assert past == []

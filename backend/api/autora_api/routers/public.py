@@ -49,6 +49,7 @@ from autora.domains.newsroom.site import (
     BeaconRejected,
     PublicArticle,
     PublicArticleSummary,
+    count_articles_mentioning,
     count_published_articles,
     published_article,
     published_articles,
@@ -141,6 +142,8 @@ class PublicStock(BaseModel):
     trades: list[PublicTrade] = []
     """Public officials' trades in it, from their checked transaction reports (D-051)."""
     articles: list[PublicArticleSummary]
+    articles_total: int = 0
+    """How many of our stories name it in all: ``articles`` is ten of them (D-066)."""
     us_listing: str | None = None
     """Where it trades in the US: its own symbol, or a Taiwan stock's ADR (TSM for 2330). None:
     US filings (13F holders, officials' trades) can say nothing about it."""
@@ -219,7 +222,9 @@ async def get_stock(
     board: Annotated[QuoteBoard, Depends(market_board)],
     lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
     company: Annotated[str | None, Query(max_length=100)] = None,
+    articles_offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> PublicStock:
+    """``articles_offset`` pages through our stories that name it, ten at a time (D-066)."""
     stock = await securities.find(session, symbol)
     if stock is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
@@ -244,6 +249,9 @@ async def get_stock(
         holders=await holders(session, stock, company_id=company_id),
         trades=await trades_for(session, stock.tickers, company_id=company_id),
         articles=await published_articles_mentioning(
+            session, lang, _terms(stock), company_slug=company, offset=articles_offset
+        ),
+        articles_total=await count_articles_mentioning(
             session, lang, _terms(stock), company_slug=company
         ),
         us_listing=stock.tickers[0] if stock.tickers else None,
