@@ -173,7 +173,14 @@ export function StockView({
           <h2 id="chart" className="sr-only">
             {w.chart.title}
           </h2>
-          <StockChart bars={history.bars} lang={lang} market={stock.market} symbol={stock.symbol} source={history.source ?? null} />
+          <StockChart
+            bars={history.bars}
+            lang={lang}
+            market={stock.market}
+            symbol={stock.symbol}
+            source={history.source ?? null}
+            preparing={history.preparing ?? false}
+          />
         </section>
       ) : null}
 
@@ -181,6 +188,8 @@ export function StockView({
           trades only for a US stock or a Taiwan one's ADR (2330 → TSM) */}
       {stock.us_listing ? (
         <>
+        {/* 13F holders only where the CUSIPs are known: the strip's stocks (D-061) */}
+        {stock.tracks_13f ? (
         <section className="mt-8" aria-labelledby="holders">
           <h2 id="holders" className="text-xl font-bold">
             {s.holders}
@@ -201,6 +210,7 @@ export function StockView({
             <p className="mt-3 text-muted">{stock.market === "tw" ? s.twNo13f : s.holdersNone}</p>
           )}
         </section>
+        ) : null}
 
         <section className="mt-10" aria-labelledby="trades">
           <h2 id="trades" className="text-xl font-bold">

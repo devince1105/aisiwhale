@@ -1,16 +1,18 @@
 "use client";
 
-// A reader's watchlist on the site (D-060): the button on a stock's page, the list beside it
-// (a column on a wide screen, a row to scroll on a phone), and the watchlist page. Prices are the
-// market strip's own, fetched once; a stock off the strip shows its name alone.
-import { useEffect, useState } from "react";
+// A reader's watchlist on the site (D-060, D-061): the button on a stock's page, the list beside
+// it (a column on a wide screen, a row to scroll on a phone), and the watchlist page with a search
+// for any listed Taiwan or US stock. Prices: the strip's own for its stocks, the last stored close
+// for any other (a stock just added has none until its prices are fetched).
+import { useEffect, useMemo, useState } from "react";
 
-import { fetchMarkets, type PublicQuote } from "./api";
+import { fetchMarkets, fetchQuotes, searchSecurities, type PublicQuote, type PublicSecurity } from "./api";
 import { words, type Lang } from "./i18n";
 import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
 import { setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
-function useQuotes(): PublicQuote[] {
+/** The strip's quotes: the popular stocks the watchlist page offers. */
+function useStrip(): PublicQuote[] {
   const [quotes, setQuotes] = useState<PublicQuote[]>([]);
   useEffect(() => {
     let live = true;
@@ -20,6 +22,20 @@ function useQuotes(): PublicQuote[] {
     };
   }, []);
   return quotes;
+}
+
+/** Quotes for the stocks on the list, whichever they are. */
+function useQuotes(keys: string[]): Map<string, PublicQuote> {
+  const [quotes, setQuotes] = useState<PublicQuote[]>([]);
+  const joined = keys.join(",");
+  useEffect(() => {
+    let live = true;
+    void fetchQuotes(joined ? joined.split(",") : []).then((answer) => live && setQuotes(answer));
+    return () => {
+      live = false;
+    };
+  }, [joined]);
+  return useMemo(() => new Map(quotes.map((q) => [q.key, q])), [quotes]);
 }
 
 const isStock = (key: string) => key.startsWith("tw:") || key.startsWith("us:");
@@ -92,9 +108,8 @@ function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: Publi
 export function WatchlistSide({ lang, current }: { lang: Lang; current: string }) {
   const w = words(lang).watch;
   const list = useWatchlist(lang);
-  const quotes = useQuotes();
+  const byKey = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
   if (list.status !== "ready" || !list.items.length) return null;
-  const byKey = new Map(quotes.map((q) => [q.key, q]));
   return (
     <nav aria-label={w.title} data-testid="watchlist-side">
       {/* a phone: a row to scroll above the stock */}
@@ -137,13 +152,15 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   const w = words(lang).watch;
   const names = words(lang).quoteNames;
   const list = useWatchlist(lang);
-  const quotes = useQuotes();
-  const byKey = new Map(quotes.map((q) => [q.key, q]));
+  const quotes = useStrip();
+  const byKey = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
 
   if (list.status === "loading") return <p className="text-muted">…</p>;
   if (list.status === "failed") return <p className="text-muted">{w.failed}</p>;
   if (list.status === "signedOut") {
     return (
+      <div className="grid gap-8">
+        <Search lang={lang} watched={null} />
       <div className="rounded-lg border border-line p-5" data-testid="watchlist-signed-out">
         <p>{w.signInToWatch}</p>
         <a
@@ -153,12 +170,14 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
           {words(lang).signIn}
         </a>
       </div>
+      </div>
     );
   }
   const watched = new Set(list.items.map((item) => item.key));
   const addable = quotes.filter((q) => isStock(q.key) && !watched.has(q.key));
   return (
     <div className="grid gap-8">
+      <Search lang={lang} watched={watched} />
       {list.items.length ? (
         <ul className="divide-y divide-line rounded-lg border border-line" data-testid="watchlist">
           {list.items.map((item) => (
@@ -204,6 +223,84 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         </section>
       ) : null}
       <p className="text-xs text-muted">{w.note}</p>
+    </div>
+  );
+}
+
+/** Any listed stock, by code, ticker or name: its page, or onto the list. */
+function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) {
+  const w = words(lang).watch;
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<PublicSecurity[] | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) {
+      setFound(null);
+      return;
+    }
+    let live = true;
+    const wait = setTimeout(() => {
+      void searchSecurities(q).then((answer) => live && setFound(answer));
+    }, 250); // a word, not every letter
+    return () => {
+      live = false;
+      clearTimeout(wait);
+    };
+  }, [query]);
+
+  return (
+    <div>
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={w.search}
+        aria-label={w.searchLabel}
+        className="w-full rounded-lg border border-line bg-surface px-3 py-2"
+      />
+      {found ? (
+        found.length ? (
+          <ul className="mt-2 divide-y divide-line rounded-lg border border-line" data-testid="search-results">
+            {found.map((security) => {
+              const key = `${security.market}:${security.symbol}`;
+              return (
+                <li key={key} className="flex items-center gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{security.name}</span>
+                    <span className="block text-xs text-muted">
+                      {stockCode(key)}・{security.exchange}・{w.kinds[security.kind] ?? security.kind}
+                    </span>
+                  </span>
+                  <a href={stockPage(key, lang) ?? "#"} className="text-xs text-accent underline">
+                    {w.view}
+                  </a>
+                  {watched === null ? (
+                    <a
+                      href={`/news/${lang}/login?next=${encodeURIComponent(`/news/${lang}/watchlist`)}`}
+                      className="rounded-full border border-line px-2 py-0.5 text-xs hover:border-accent hover:text-accent"
+                    >
+                      {w.addShort}
+                    </a>
+                  ) : watched.has(key) ? (
+                    <span className="text-xs text-muted">{w.added}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void setWatched(security.symbol, true)}
+                      className="rounded-full border border-line px-2 py-0.5 text-xs hover:border-accent hover:text-accent"
+                    >
+                      {w.addShort}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-muted">{w.noResults}</p>
+        )
+      ) : null}
     </div>
   );
 }

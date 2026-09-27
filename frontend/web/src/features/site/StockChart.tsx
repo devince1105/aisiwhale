@@ -104,12 +104,15 @@ export function StockChart({
   market,
   symbol,
   source,
+  preparing = false,
 }: {
   bars: Bar[];
   lang: Lang;
   market: string;
   symbol: string;
   source: string | null;
+  /** A Taiwan stock just asked for: its history is being fetched (D-061). */
+  preparing?: boolean;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
@@ -241,7 +244,11 @@ export function StockChart({
   }, [shown, averages, view, lang, theme]);
 
   if (!bars.length) {
-    return <p className="text-sm text-muted">{w.none}</p>;
+    return (
+      <p className="rounded-lg border border-line p-4 text-sm text-muted" data-testid="chart-empty">
+        {preparing ? w.preparing : w.none}
+      </p>
+    );
   }
   const number = (value: number) =>
     value.toLocaleString(lang === "en" ? "en-US" : "zh-TW", { maximumFractionDigits: 2 });

@@ -60,10 +60,13 @@ describe("the screen invents nothing (AC-S6)", () => {
     // PAYUNi's notification has arrived (D-034). What it shows is still only what the API says.
     // And one animation, by name: the market strip's slow drift (D-048) moves its scroll
     // position, frame by frame. It changes where the figures are, never what they are.
-    const named = ["features/site/PaymentDone.tsx:", "features/site/drift.ts:"];
+    // And the stock search's wait for a word rather than every letter (D-061): it only delays
+    // when the API is asked; the results are the API's.
+    const named = ["features/site/PaymentDone.tsx:", "features/site/drift.ts:", "features/site/Watchlist.tsx:"];
     expect(hits(timers, "features").filter((hit) => !named.some((file) => hit.startsWith(file)))).toEqual([]);
     expect(hits(timers, "features/site/PaymentDone.tsx")).toHaveLength(1);
     expect(hits(timers, "features/site/drift.ts")).toHaveLength(2); // the first frame and the next
+    expect(hits(timers, "features/site/Watchlist.tsx")).toHaveLength(1);
   });
 
   it("the socket's own timers are the connection's, and are listed here by name", () => {

@@ -14,6 +14,8 @@ const QUOTES = [
   { key: "taiex", value: 48024.6, change: 1, change_pct: 0.28, as_of: "2026-09-24", basis: "close", source: "TWSE" },
 ];
 
+const FOUND = [{ symbol: "6488", market: "tw", name: "環球晶", name_en: null, exchange: "TPEx", kind: "stock" }];
+
 let list: (typeof NVDA)[] | null;
 const calls: string[] = [];
 
@@ -25,6 +27,11 @@ beforeEach(() => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");
     if (url.includes("/api/public/markets")) return Response.json(QUOTES);
+    if (url.includes("/api/public/quotes")) {
+      const keys = decodeURIComponent(url.split("keys=")[1] ?? "").split(",");
+      return Response.json(QUOTES.filter((q) => keys.includes(q.key)));
+    }
+    if (url.includes("/api/public/securities")) return Response.json(FOUND);
     calls.push(`${method} ${url.replace(/^.*\/api\/me\/watchlist/, "")}`);
     if (list === null) return new Response(null, { status: 401 });
     if (method === "POST") list.push(NVDA);
@@ -85,5 +92,18 @@ describe("the watchlist", () => {
     render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
     await waitFor(() => expect(calls.length).toBeGreaterThan(0));
     expect(screen.queryByTestId("watchlist-side")).toBeNull();
+  });
+});
+
+describe("finding any stock", () => {
+  it("searches by what the reader types, and puts a result on the list", async () => {
+    render(<WatchlistPage lang="zh-TW" />);
+    fireEvent.change(await screen.findByRole("searchbox", { name: "搜尋股票" }), { target: { value: "環球" } });
+    const results = await screen.findByTestId("search-results", {}, { timeout: 2000 });
+    expect(results.textContent).toContain("環球晶");
+    expect(results.textContent).toContain("6488.TW・TPEx・股票");
+    expect(results.querySelector("a")!.getAttribute("href")).toBe("/news/zh-TW/stocks/6488");
+    fireEvent.click(screen.getByRole("button", { name: "＋ 加入" }));
+    await waitFor(() => expect(calls).toContain("POST /6488"));
   });
 });

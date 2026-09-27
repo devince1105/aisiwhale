@@ -169,6 +169,19 @@ async def get_stock_intraday(
     return await cache.bars(stock.symbol)
 
 
+async def _first_us_bars(session, stock) -> bool:
+    """A US stock nobody asked about before: its five years from Tiingo, now (one request). The
+    page asks for its figure and its chart at once, so either may be first."""
+    key = _secret(get_settings().tiingo_api_key)
+    if stock.market != "us" or not key:
+        return False
+    written = await refresh_us(
+        session, tiingo_rows(key), today=datetime.now(UTC).date(), symbols=(stock.symbol,),
+        pause=0,
+    )  # fmt: skip
+    return written > 0
+
+
 @router.get("/api/public/stocks/{symbol}/history")
 async def get_stock_history(symbol: str, session: Session, response: Response) -> PublicHistory:
     """A stock's daily bars for its chart (D-059): oldest first, about five years.
@@ -181,12 +194,7 @@ async def get_stock_history(symbol: str, session: Session, response: Response) -
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
     await securities.track(session, stock)
     answer = await history(session, stock.market, stock.symbol)
-    key = _secret(get_settings().tiingo_api_key)
-    if not answer.bars and stock.market == "us" and key:
-        await refresh_us(
-            session, tiingo_rows(key), today=datetime.now(UTC).date(), symbols=(stock.symbol,),
-            pause=0,
-        )  # fmt: skip
+    if not answer.bars and await _first_us_bars(session, stock):
         answer = await history(session, stock.market, stock.symbol)
     await session.commit()
     if not answer.bars and stock.market == "tw":
@@ -216,7 +224,11 @@ async def get_stock(
     # the strip's twenty from its board; any other from its last stored close (D-061)
     quote = next((q for q in await board.quotes() if q.key == stock.key), None)
     if quote is None and stock.symbol not in STOCKS:
+        await securities.track(session, stock)
         quote = await bar_quote(session, stock.market, stock.symbol)
+        if quote is None and await _first_us_bars(session, stock):
+            quote = await bar_quote(session, stock.market, stock.symbol)
+        await session.commit()
     return PublicStock(
         symbol=stock.symbol,
         market=stock.market,

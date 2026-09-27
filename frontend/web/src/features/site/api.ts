@@ -15,6 +15,7 @@ export type PublicQuote = Schemas["PublicQuote"];
 export type PublicStock = Schemas["PublicStock"];
 export type PublicHistory = Schemas["PublicHistory"];
 export type PublicIntraday = Schemas["PublicIntraday"];
+export type PublicSecurity = Schemas["PublicSecurity"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
 
@@ -112,4 +113,21 @@ export async function fetchIntraday(symbol: string, options: SiteClientOptions =
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
   return data;
+}
+
+/** Any listed Taiwan or US stock (D-061), by code, ticker or name. */
+export async function searchSecurities(q: string, options: SiteClientOptions = {}): Promise<PublicSecurity[]> {
+  const { data } = await client(options).GET("/api/public/securities", { params: { query: { q, limit: 12 } } });
+  return data ?? [];
+}
+
+/** Quotes for these keys (tw:2330, us:PLTR): the strip's own, else the last stored close. */
+export async function fetchQuotes(keys: string[], options: SiteClientOptions = {}): Promise<PublicQuote[]> {
+  if (!keys.length) return [];
+  try {
+    const { data } = await client(options).GET("/api/public/quotes", { params: { query: { keys: keys.join(",") } } });
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }

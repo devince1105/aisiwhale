@@ -29,6 +29,7 @@ const holder = (over: Partial<PublicHolder>): PublicHolder => ({
 
 const NVDA: PublicStock = {
   us_listing: "NVDA",
+  tracks_13f: true,
   symbol: "NVDA",
   market: "us",
   name: "輝達",
