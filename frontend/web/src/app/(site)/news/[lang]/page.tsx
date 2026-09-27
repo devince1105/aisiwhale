@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticles } from "@/features/site/api";
+import { fetchArticlePage } from "@/features/site/api";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -28,20 +28,19 @@ export default async function Page({ params, searchParams }: { params: Params; s
   const { lang } = await params;
   if (!isLang(lang)) notFound();
   const { section, page } = await where(searchParams);
-  // one more than a page: whether it comes back says whether there is a next page
-  const found = await fetchArticles(lang, {
+  const { articles, total } = await fetchArticlePage(lang, {
     company: process.env.SITE_COMPANY || undefined,
     section: section ? sectionsOf(section) : undefined,
-    limit: PAGE_SIZE + 1,
+    limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
   });
   return (
     <ArticleList
-      articles={found.slice(0, PAGE_SIZE)}
+      articles={articles}
       lang={lang}
       section={section}
       page={page}
-      hasMore={found.length > PAGE_SIZE}
+      pages={Math.ceil(total / PAGE_SIZE)}
     />
   );
 }

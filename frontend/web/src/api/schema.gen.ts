@@ -905,7 +905,8 @@ export interface paths {
         };
         /**
          * List Articles
-         * @description Newest first; ``offset`` pages through them (D-047).
+         * @description Newest first; ``offset`` pages through them (D-047). ``X-Total-Count`` says how many
+         *     there are in all, for the list's page numbers (D-065).
          */
         get: operations["list_articles_api_public_articles_get"];
         put?: never;

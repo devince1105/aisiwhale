@@ -255,7 +255,28 @@ async def published_articles(
     """Newest first. ``offset`` pages through them; a page that comes back shorter than
     ``limit`` is the last. ``section`` may be several: the site's 持股觀察 (holdings watch) is the
     big investors' and the public figures' together (D-050)."""
-    query = _published(lang).order_by(Article.published_at.desc(), Article.id.desc())
+    query = _listed(lang, company_slug, section).order_by(
+        Article.published_at.desc(), Article.id.desc()
+    )
+    query = query.limit(min(max(limit, 1), MAX_LIST)).offset(max(offset, 0))
+    rows = (await session.execute(query)).all()
+    return [_summary(article, version, named) for article, version, named in rows]
+
+
+async def count_published_articles(
+    session: AsyncSession,
+    lang: str,
+    *,
+    company_slug: str | None = None,
+    section: str | list[str] | None = None,
+) -> int:
+    """How many ``published_articles`` pages through, all told: a list's page numbers."""
+    listed = _listed(lang, company_slug, section).subquery()
+    return int(await session.scalar(select(func.count()).select_from(listed)) or 0)
+
+
+def _listed(lang: str, company_slug: str | None, section: str | list[str] | None):
+    query = _published(lang)
     if company_slug is not None:
         query = query.join(Company, Company.id == Article.company_id).where(
             Company.slug == company_slug
@@ -263,9 +284,7 @@ async def published_articles(
     if section:
         sections = [section] if isinstance(section, str) else list(section)
         query = query.where(_section().in_(sections))
-    query = query.limit(min(max(limit, 1), MAX_LIST)).offset(max(offset, 0))
-    rows = (await session.execute(query)).all()
-    return [_summary(article, version, named) for article, version, named in rows]
+    return query
 
 
 async def published_articles_mentioning(

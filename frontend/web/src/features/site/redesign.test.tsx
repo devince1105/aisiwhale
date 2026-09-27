@@ -3,9 +3,10 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchArticles, type PublicArticle, type PublicArticleSummary } from "./api";
+import { fetchArticlePage, fetchArticles, type PublicArticle, type PublicArticleSummary } from "./api";
 import { ArticleList, listHref } from "./ArticleList";
 import { ArticleView } from "./ArticleView";
+import { slots } from "./Pagination";
 import { currentSection, SectionNav } from "./SectionNav";
 import { SiteName } from "./SiteName";
 import { pickVoice } from "./ReadingTools";
@@ -88,18 +89,36 @@ describe("the front page", () => {
     expect(currentSection("zh-TW", "/news/zh-TW", "watch")).toBe("watch");
   });
 
-  it("pages to older stories and back, in the same section", () => {
-    const { rerender } = render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="tw" hasMore />);
-    expect(screen.getByRole("link", { name: "較舊的報導 →" }).getAttribute("href")).toBe("/news/zh-TW?section=tw&page=2");
-    expect(screen.queryByRole("link", { name: "← 較新的報導" })).toBeNull();
-    rerender(<ArticleList articles={[summary(11)]} lang="zh-TW" section="tw" page={2} />);
-    expect(screen.getByRole("link", { name: "← 較新的報導" }).getAttribute("href")).toBe("/news/zh-TW?section=tw");
-    expect(screen.queryByRole("link", { name: "較舊的報導 →" })).toBeNull();
-    expect(screen.getByText("第 2 頁")).toBeTruthy();
+  it("numbers the pages, each a link in the same section, with the ends dimmed", () => {
+    const { rerender } = render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="tw" pages={20} />);
+    const nav = within(screen.getByRole("navigation", { name: "分頁" }));
+    expect(nav.getByRole("link", { name: "下一頁" }).getAttribute("href")).toBe("/news/zh-TW?section=tw&page=2");
+    expect(nav.getByRole("link", { name: "最後一頁" }).getAttribute("href")).toBe("/news/zh-TW?section=tw&page=20");
+    expect(nav.queryByRole("link", { name: "上一頁" })).toBeNull(); // nowhere to go: not a link
+    expect(nav.getByLabelText("上一頁").getAttribute("aria-disabled")).toBe("true");
+    expect(nav.getByText("第 1／20 頁")).toBeTruthy();
+
+    rerender(<ArticleList articles={[summary(51)]} lang="zh-TW" section="tw" page={6} pages={20} />);
+    const again = within(screen.getByRole("navigation", { name: "分頁" }));
+    expect(again.getByRole("link", { name: "上一頁" }).getAttribute("href")).toBe("/news/zh-TW?section=tw&page=5");
+    expect(again.getByRole("link", { name: "第一頁" }).getAttribute("href")).toBe("/news/zh-TW?section=tw");
+    expect(document.querySelector("[aria-current=page]")?.textContent).toBe("6");
+    expect(
+      again.getAllByRole("link").map((a) => a.textContent).filter((t) => /^\d+$/.test(t ?? "")),
+    ).toEqual(["1", "4", "5", "7", "8", "20"]);
+    // a wide screen's "…" before 4 and 20; a phone's, one neighbour each side, before 5 and 20
+    expect(slots(6, 20).filter((x) => x.narrow).map((x) => [x.page, x.gap.narrow])).toEqual([
+      [1, false],
+      [5, true],
+      [6, false],
+      [7, false],
+      [20, true],
+    ]);
+    expect(slots(3, 5).every((x) => x.wide && !x.gap.wide)).toBe(true); // few pages: all of them
     expect(document.querySelector("article")).toBeNull(); // only the first page leads with one
     cleanup();
-    render(<ArticleList articles={[summary(1)]} lang="en" />);
-    expect(screen.queryByText("Page 1")).toBeNull(); // one page: nothing to page through
+    render(<ArticleList articles={[summary(1)]} lang="en" pages={1} />);
+    expect(screen.queryByRole("navigation", { name: "Pages" })).toBeNull(); // one page: nothing to page through
   });
 
   it("marks members-only stories, and knows its sections", () => {
@@ -117,6 +136,14 @@ describe("the front page", () => {
     expect((listed.mock.calls[0]![0] as Request).url).toBe(
       "http://api/api/public/articles?lang=zh-TW&section=us&limit=11&offset=10",
     );
+    // how many in all comes in a header (D-065); an API that does not say: what the page reaches
+    const counted = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response("[]", { headers: { "Content-Type": "application/json", "X-Total-Count": "57" } }),
+      ),
+    );
+    expect((await fetchArticlePage("zh-TW", { baseUrl: "http://api", fetch: counted })).total).toBe(57);
+    expect((await fetchArticlePage("zh-TW", { baseUrl: "http://api", fetch: listed, offset: 10 })).total).toBe(10);
   });
 });
 

@@ -59,6 +59,14 @@ export interface ListOptions extends SiteClientOptions {
 
 /** Newest first. A page that comes back shorter than ``limit`` is the last. */
 export async function fetchArticles(lang: string, options: ListOptions = {}): Promise<PublicArticleSummary[]> {
+  return (await fetchArticlePage(lang, options)).articles;
+}
+
+/** A page of the list, and how many articles there are in all (D-065): the list's page numbers. */
+export async function fetchArticlePage(
+  lang: string,
+  options: ListOptions = {},
+): Promise<{ articles: PublicArticleSummary[]; total: number }> {
   const { company, section, limit, offset } = options;
   const { data, error, response } = await client(options).GET("/api/public/articles", {
     params: {
@@ -66,7 +74,10 @@ export async function fetchArticles(lang: string, options: ListOptions = {}): Pr
     },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
-  return data;
+  const counted = Number.parseInt(response.headers.get("X-Total-Count") ?? "", 10);
+  // an API that does not count: at least what this page reaches
+  const total = Number.isFinite(counted) ? counted : (offset ?? 0) + data.length;
+  return { articles: data, total };
 }
 
 /** The market strip's figures (D-048). Never throws: the strip is left out instead of the page. */

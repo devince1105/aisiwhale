@@ -124,9 +124,14 @@ async def test_pages_and_the_next_article_along(public, newsroom_room):
         slugs = [newer.slug, first.slug, older.slug]
 
     list_ = {"lang": "zh-TW", "company": room.company.slug, "limit": 2}
-    page1 = (await public.get("/api/public/articles", params=list_)).json()
+    first_page = await public.get("/api/public/articles", params=list_)
+    page1 = first_page.json()
     page2 = (await public.get("/api/public/articles", params=list_ | {"offset": 2})).json()
     assert [a["slug"] for a in page1 + page2] == slugs
+    # how many in all, for the list's page numbers (D-065): every page says the same
+    assert first_page.headers["X-Total-Count"] == "3"
+    ai_only = await public.get("/api/public/articles", params=list_ | {"section": "ai"})
+    assert ai_only.headers["X-Total-Count"] == "0"
 
     middle = (await public.get(f"/api/public/articles/zh-TW/{first.slug}")).json()
     assert middle["newer"] == {

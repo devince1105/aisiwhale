@@ -49,6 +49,7 @@ from autora.domains.newsroom.site import (
     BeaconRejected,
     PublicArticle,
     PublicArticleSummary,
+    count_published_articles,
     published_article,
     published_articles,
     published_articles_mentioning,
@@ -70,13 +71,17 @@ Lang = Annotated[str, Field(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_len
 @router.get("/api/public/articles")
 async def list_articles(
     session: Session,
+    response: Response,
     lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
     company: Annotated[str | None, Query(max_length=100)] = None,
     section: Annotated[list[Section] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIST)] = 20,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
 ) -> list[PublicArticleSummary]:
-    """Newest first; ``offset`` pages through them (D-047)."""
+    """Newest first; ``offset`` pages through them (D-047). ``X-Total-Count`` says how many
+    there are in all, for the list's page numbers (D-065)."""
+    total = await count_published_articles(session, lang, company_slug=company, section=section)
+    response.headers["X-Total-Count"] = str(total)
     return await published_articles(
         session, lang, company_slug=company, section=section, limit=limit, offset=offset
     )

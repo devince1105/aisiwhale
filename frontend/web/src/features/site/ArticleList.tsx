@@ -1,6 +1,6 @@
 // The site's front page (D-047): the newest story large, then the rest as a list of headlines —
 // a news reader scans headlines, and these stories have no pictures to put in cards. Below them,
-// the way to older ones. The tabs are in the header (SectionNav); a tab of several sections
+// the page numbers (D-065). The tabs are in the header (SectionNav); a tab of several sections
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
@@ -16,6 +16,7 @@ import {
   type Lang,
   type Section,
 } from "./i18n";
+import { Pagination } from "./Pagination";
 
 export const PAGE_SIZE = 10;
 
@@ -109,15 +110,15 @@ export function ArticleList({
   lang,
   section = null,
   page = 1,
-  hasMore = false,
+  pages = 1,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
   /** The tab or the section shown (``?section=``). */
   section?: Filter | null;
   page?: number;
-  /** Is there a next page? (The page asked for one more than it shows.) */
-  hasMore?: boolean;
+  /** How many pages the list has in all. */
+  pages?: number;
 }) {
   const w = words(lang);
   // only the first page leads with a story: an older page is a plain continuation of the list
@@ -142,25 +143,7 @@ export function ArticleList({
           </ul>
         </>
       )}
-      {page > 1 || hasMore ? (
-        <nav className="mt-4 flex items-center justify-between border-t border-line pt-6 text-sm print:hidden">
-          {page > 1 ? (
-            <Link href={listHref(lang, section, page - 1)} rel="prev" className="text-accent hover:underline">
-              {w.newerPage}
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="text-muted">{w.page(page)}</span>
-          {hasMore ? (
-            <Link href={listHref(lang, section, page + 1)} rel="next" className="text-accent hover:underline">
-              {w.olderPage}
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      ) : null}
+      <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n)} />
     </section>
   );
 }
