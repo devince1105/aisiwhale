@@ -16,7 +16,8 @@ random id it makes each day (``session_hash``); no IP address or anything else a
 stored. One count per session, article, language, kind and day: repeats are dropped.
 
 The site is in sections (D-047): big investors' filings, public figures' holdings (D-050), AI
-and tech, Taiwan stocks, US stocks, crypto, institutions' market views (D-057). An article's
+and tech, Taiwan stocks, US stocks, crypto, institutions' market views (D-057), gold, the other
+commodities and foreign exchange (D-067). An article's
 section is not stored — it is its story's, which is the section most of the story's items'
 sources name (``config.section``).
 Retagging a source moves what is already written.

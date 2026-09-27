@@ -88,7 +88,7 @@ function Tags({ lang, filter }: { lang: Lang; filter: Filter }) {
   if (!tags.length) return null;
   const chips: [Filter, string][] = [[topic, w.all], ...tags.map((t): [Filter, string] => [t, w.sections[t]])];
   return (
-    <nav aria-label={w.tagsLabel} className="flex flex-wrap gap-2 pt-4 print:hidden">
+    <nav aria-label={w.tagsLabel(w.topics[topic] ?? topic)} className="flex flex-wrap gap-2 pt-4 print:hidden">
       {chips.map(([id, label]) => (
         <Link
           key={id}

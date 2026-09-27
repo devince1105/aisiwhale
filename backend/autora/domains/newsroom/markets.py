@@ -68,7 +68,8 @@ PROJECT = "持股動態與科技產業"
 MISSION = (
     "用附原始出處的中英雙語報導，追蹤 AI 與半導體產業的動向、大型投資人的持股變化，"
     "台股、美股裡的 AI 科技公司，名人（如美國總統、國會議員）依法申報的持股與交易，"
-    "以及加密貨幣的監管、ETF 與市場動態；"
+    "加密貨幣的監管、ETF 與市場動態，"
+    "以及黃金、原物料（金屬、能源、農產品期貨）與外匯（臺灣銀行掛牌的外幣）的價格與供需；"
     "只報導事實與別人說的話，不提供投資建議。"
 )
 
@@ -191,6 +192,18 @@ INSTITUTIONS_A = institutions.domains("blackrock", "vanguard", "fidelity", "ubs"
 INSTITUTIONS_B = institutions.domains("jpmorgan", "goldman", "capital_group", "amundi", "bny")
 """J.P. Morgan, Goldman Sachs, Capital Group, Amundi (Crédit Agricole's asset manager) and BNY."""
 
+TW_NEWS = (
+    "cna.com.tw",
+    "cnyes.com",
+    "money.udn.com",
+    "ctee.com.tw",
+    "moneydj.com",
+    "ec.ltn.com.tw",
+)
+"""Taiwan's financial news: 中央社, 鉅亨, 經濟日報, 工商時報, MoneyDJ, 自由財經 (D-067)."""
+COMMODITY_NEWS = ("reuters.com", "kitco.com", "mining.com", "spglobal.com", "iea.org")
+"""Commodity news and data in English: Reuters, Kitco, Mining.com, S&P Global, the IEA."""
+
 SOURCES: tuple[MarketSource, ...] = (
     _investor("巴菲特", "Berkshire Hathaway", "0001067983"),
     # Pershing Square Capital Management (CIK 1336528) filed only a 13F-NT for 2026-06-30: its
@@ -238,7 +251,66 @@ SOURCES: tuple[MarketSource, ...] = (
         domains=INSTITUTIONS_B,
         name="機構觀點（摩根大通、高盛、資本集團、Amundi、紐約梅隆）",
     ),
+    # 黃金、原物料、外匯 (D-067). Gold twice a day, as the one most asked about; the rest once
+    # a day — a price moves every day, but a day's news of it is enough. Only on news sites: an
+    # open query for a price found quote pages, currency converters, Instagram and app listings
+    _search("黃金 金價 國際金價 央行購金 黃金ETF", "gold", domains=TW_NEWS, name="黃金"),
+    _search(
+        "銅價 鋁價 白銀 鎳 金屬 價格 供需", "commodities", domains=TW_NEWS, name="原物料：金屬"
+    ),
+    _search(
+        "copper aluminum demand AI data centers power grid",
+        "commodities",
+        "en",
+        every=DAY,
+        domains=COMMODITY_NEWS,
+        name="原物料：AI 資料中心帶動的金屬需求",
+    ),
+    _search(
+        "國際油價 原油 天然氣 OPEC",
+        "commodities",
+        every=DAY,
+        domains=TW_NEWS,
+        name="原物料：能源",
+    ),
+    _search(
+        "黃豆 玉米 小麥 農產品 期貨 價格",
+        "commodities",
+        every=DAY,
+        domains=TW_NEWS,
+        name="原物料：農產品",
+    ),
+    # the currencies Bank of Taiwan posts rates for (FX_CURRENCIES), in four searches
+    _search("新台幣 匯率 美元 央行", "fx", domains=TW_NEWS, name="外匯：新台幣與美元"),
+    _search(
+        "日圓 韓元 人民幣 港幣 匯率",
+        "fx",
+        every=DAY,
+        domains=TW_NEWS,
+        name="外匯：亞洲主要貨幣",
+    ),
+    _search(
+        "歐元 英鎊 瑞士法郎 澳幣 紐幣 加幣 南非幣 瑞典幣 匯率",
+        "fx",
+        every=DAY,
+        domains=TW_NEWS,
+        name="外匯：歐美與大洋洲貨幣",
+    ),
+    _search(
+        "新加坡幣 泰銖 馬來幣 印尼盾 越南盾 菲律賓披索 匯率",
+        "fx",
+        every=DAY,
+        domains=TW_NEWS,
+        name="外匯：東南亞貨幣",
+    ),
 )
+
+FX_CURRENCIES = (
+    "USD", "HKD", "GBP", "AUD", "CAD", "SGD", "CHF", "JPY", "ZAR", "SEK",
+    "NZD", "THB", "PHP", "IDR", "EUR", "KRW", "VND", "MYR", "CNY",
+)  # fmt: skip
+"""The foreign currencies Bank of Taiwan posts rates for (rate.bot.com.tw, 2026-09-27): what
+外匯 covers (D-067)."""
 
 RETIRED = (
     "搜尋：BlackRock Vanguard Fidelity UBS State Street market outlook commentary",

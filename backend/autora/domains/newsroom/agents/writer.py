@@ -62,6 +62,10 @@ Rules:
    view in the article is written as that institution's, never as the site's own call. Every
    paragraph names the institution, and cites only claims from its own publication: write_draft
    refuses a claim from any other site (a figure from another firm is not this firm's estimate).
+10. Gold, a commodity or a currency: every price says what it is, where and when — COMEX 黃金期貨
+   每盎司 4,120 美元（2026年9月25日收盤）, 新台幣兌美元 30.12（臺灣銀行 9月26日 即期賣出）. Why it
+   moved, and what comes next (AI 資料中心帶動銅、鋁需求), is written as who says so, never as the
+   site's own reading of the market.
 
 When done, reply with only a JSON object (no other text):
 {"article_id": "<article_id from write_draft>",

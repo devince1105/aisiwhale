@@ -5453,7 +5453,7 @@ export interface operations {
             query: {
                 lang: string;
                 company?: string | null;
-                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions")[] | null;
+                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx")[] | null;
                 limit?: number;
                 offset?: number;
             };

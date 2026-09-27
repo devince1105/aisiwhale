@@ -19,10 +19,21 @@ const WORDS = {
     revised: "更新於",
     allStories: "所有報導",
     all: "全部",
-    sections: { holdings: "大戶持股", figures: "名人持股", ai: "AI 科技", tw: "台股", us: "美股", crypto: "加密貨幣", institutions: "機構觀點" },
+    sections: {
+      holdings: "大戶持股",
+      figures: "名人持股",
+      ai: "AI 科技",
+      tw: "台股",
+      us: "美股",
+      crypto: "加密貨幣",
+      institutions: "機構觀點",
+      gold: "黃金",
+      commodities: "原物料",
+      fx: "外匯",
+    },
     sectionsLabel: "報導分類",
     topics: { watch: "持股觀察" } as Record<string, string>,
-    tagsLabel: "持股觀察的分類",
+    tagsLabel: (topic: string) => `${topic}的分類`,
     pagination: {
       label: "分頁",
       first: "第一頁",
@@ -264,10 +275,13 @@ const WORDS = {
       us: "US stocks",
       crypto: "Crypto",
       institutions: "Institutional views",
+      gold: "Gold",
+      commodities: "Commodities",
+      fx: "Currencies",
     },
     sectionsLabel: "Sections",
     topics: { watch: "Holdings watch" } as Record<string, string>,
-    tagsLabel: "Holdings watch, by kind",
+    tagsLabel: (topic: string) => `${topic}, by kind`,
     pagination: {
       label: "Pages",
       first: "First page",
@@ -475,16 +489,28 @@ const WORDS = {
 } as const;
 
 /** The site's sections (D-047), as the API names them. */
-export const SECTIONS = ["holdings", "figures", "ai", "tw", "us", "crypto", "institutions"] as const;
+export const SECTIONS = [
+  "holdings",
+  "figures",
+  "ai",
+  "tw",
+  "us",
+  "crypto",
+  "institutions",
+  "gold",
+  "commodities",
+  "fx",
+] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export function isSection(value: unknown): value is Section {
   return typeof value === "string" && (SECTIONS as readonly string[]).includes(value);
 }
 
-/** The site's tabs (D-050). Most are one section; 持股觀察 (``watch``) is two — the big investors'
- * filings and the public figures' — told apart inside it by tags. */
-export const TOPICS = ["ai", "tw", "us", "crypto", "institutions", "watch"] as const;
+/** The site's tabs (D-050). Most are one section — 黃金, 原物料 and 外匯 each a tab of their own
+ * (D-067); 持股觀察 (``watch``) is two — the big investors' filings and the public figures' —
+ * told apart inside it by tags. */
+export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "institutions", "watch"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
@@ -494,6 +520,9 @@ const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
   us: ["us"],
   crypto: ["crypto"],
   institutions: ["institutions"],
+  gold: ["gold"],
+  commodities: ["commodities"],
+  fx: ["fx"],
 };
 
 /** What ``?section=`` may say: a tab, or one of the sections inside a tab of several. */

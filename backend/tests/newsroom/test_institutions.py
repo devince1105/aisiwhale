@@ -74,5 +74,10 @@ def test_names_are_read_as_names():
 
 
 def test_the_searches_look_where_the_check_looks():
-    searched = {d for s in markets.SOURCES for d in s.config.get("domains", [])}
+    searched = {
+        d
+        for s in markets.SOURCES
+        if s.config.get("section") == "institutions"
+        for d in s.config.get("domains", [])
+    }
     assert searched == {d for i in institutions.INSTITUTIONS for d in i.domains}

@@ -52,6 +52,11 @@ How to work:
    that firm's own publication (its outlook or commentary page, on its own site) — that is the
    record of what it said and when. Do not capture other firms' views or news coverage for it:
    the article reports one firm's view, and a draft citing another site is refused.
+7. A lead about gold, a commodity or a currency: capture where the price comes from — the
+   exchange or benchmark (COMEX, LME, CBOT, ICE, the LBMA price), the central bank, or Bank of
+   Taiwan's posted rates for the New Taiwan dollar — alongside the news of why it moved. A
+   reason for a move (demand from AI data centres for copper, a central bank buying gold) is
+   somebody's account: capture who says it.
 
 When done, reply with only a JSON object (no other text):
 {"story_id": "<the story id>",

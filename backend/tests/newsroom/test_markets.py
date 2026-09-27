@@ -89,18 +89,44 @@ async def test_a_filer_that_moved_is_the_same_source_with_a_new_address(db_sessi
 
 def test_searches_stay_inside_the_free_plan():
     """D-038: 6 searches x 2 a day x 30 days = 360 of Tavily's 1,000 free credits a month; the
-    institutions' outlooks (D-057) are weekly, so their 2 run once a day: 60 more."""
+    institutions' outlooks (D-057) are weekly, so their 2 run once a day: 60 more. Gold, the
+    other commodities and foreign exchange (D-067): 3 twice a day, 6 once, 360 more — 780."""
     searches = [s for s in markets.SOURCES if s.kind == "search_query"]
     daily = [s for s in searches if s.config["section"] == "institutions"]
-    assert len(searches) == 8 and len(daily) == 2
-    assert {s.poll_interval_seconds for s in searches if s not in daily} == {12 * 3600}
+    assert len(searches) == 17 and len(daily) == 2
     assert {s.poll_interval_seconds for s in daily} == {24 * 3600}
     assert {s.config["recency_days"] for s in daily} == {7}
     # only on the firms' own sites: an open query for ten names found no outlook at all
     assert all(s.config["domains"] for s in daily)
     assert "blackrock.com" in daily[0].config["domains"]
     monthly = sum(30 * 24 * 3600 // s.poll_interval_seconds for s in searches)
-    assert monthly == 420
+    assert monthly == 780
+
+
+def test_gold_commodities_and_foreign_exchange_have_their_searches():
+    """D-067: gold on its own; metals (with the AI data centres' demand), energy and farm
+    futures; and the currencies Bank of Taiwan posts rates for."""
+    by_section: dict[str, list[str]] = {}
+    for s in markets.SOURCES:
+        if s.kind == "search_query":
+            by_section.setdefault(s.config["section"], []).append(s.config["query"])
+    assert len(by_section["gold"]) == 1 and "黃金" in by_section["gold"][0]
+    commodities = " ".join(by_section["commodities"])
+    for word in ("銅價", "鋁價", "原油", "黃豆", "玉米", "小麥", "copper", "data centers"):
+        assert word in commodities
+    fx = " ".join(by_section["fx"])
+    names = {
+        "USD": "美元", "HKD": "港幣", "GBP": "英鎊", "AUD": "澳幣", "CAD": "加幣",
+        "SGD": "新加坡幣", "CHF": "瑞士法郎", "JPY": "日圓", "ZAR": "南非幣", "SEK": "瑞典幣",
+        "NZD": "紐幣", "THB": "泰銖", "PHP": "菲律賓披索", "IDR": "印尼盾", "EUR": "歐元",
+        "KRW": "韓元", "VND": "越南盾", "MYR": "馬來幣", "CNY": "人民幣",
+    }  # fmt: skip
+    assert set(names) == set(markets.FX_CURRENCIES)
+    assert [code for code, name in names.items() if name not in fx] == []
+    # only on news sites: an open query found quote pages, converters and Instagram
+    ours = [s for s in markets.SOURCES if s.config.get("section") in ("gold", "commodities", "fx")]
+    assert all(s.config.get("domains") for s in ours)
+    assert "cna.com.tw" in ours[0].config["domains"]
 
 
 def test_every_source_says_which_section_of_the_site_it_feeds():
