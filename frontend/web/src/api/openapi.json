@@ -4054,6 +4054,15 @@
       "title": "Close Only",
       "type": "boolean"
      },
+     "interval": {
+      "default": "day",
+      "enum": [
+       "day",
+       "month"
+      ],
+      "title": "Interval",
+      "type": "string"
+     },
      "key": {
       "title": "Key",
       "type": "string"
@@ -4402,7 +4411,8 @@
        "close",
        "prev_close",
        "last",
-       "24h"
+       "24h",
+       "month"
       ],
       "title": "Basis",
       "type": "string"

@@ -45,3 +45,28 @@ async def test_gold_figures_and_currencies(public):
     finally:
         app.dependency_overrides.pop(forex_cache)
         app.dependency_overrides.pop(fred_history)
+
+
+async def test_a_grain_is_found_quoted_and_charted_by_the_month(public):
+    """D-080 through the API."""
+    from autora_api.routers.public import forex_cache, fred_history
+
+    async def fred(series: str) -> list[dict]:
+        return [
+            {"date": "2026-06-01", "value": "195.78"},
+            {"date": "2026-07-01", "value": "213.19"},
+        ]
+
+    app = public._transport.app
+    app.dependency_overrides[forex_cache] = lambda: TiingoFx(None)
+    app.dependency_overrides[fred_history] = lambda: FredHistory(fred)
+    try:
+        found = (await public.get("/api/public/securities", params={"q": "玉米"})).json()
+        assert found[0]["symbol"] == "MAIZE" and found[0]["kind"] == "commodity"
+        [quote] = (await public.get("/api/public/quotes", params={"keys": "maize"})).json()
+        assert (quote["value"], quote["basis"], quote["change_pct"]) == (213.19, "month", 8.89)
+        chart = (await public.get("/api/public/figures/maize")).json()
+        assert chart["interval"] == "month" and len(chart["bars"]) == 2
+    finally:
+        app.dependency_overrides.pop(forex_cache)
+        app.dependency_overrides.pop(fred_history)

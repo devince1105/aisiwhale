@@ -33,6 +33,7 @@ from autora.db.models import Company
 from autora.domains.newsroom import forex as currencies
 from autora.domains.newsroom import securities
 from autora.domains.newsroom.figures import (
+    GRAINS,
     Figures,
     FredHistory,
     PublicFigure,
@@ -365,13 +366,27 @@ def _currencies(query: str) -> list[PublicSecurity]:
     """Currencies with a chart against the New Taiwan dollar whose code or name has ``query``
     in it (D-072): 歐元, EUR or euro find ``EURTWD``."""
     q = query.strip().lower()
-    return [
+    found = [
         PublicSecurity(
             symbol=f"{code}TWD", market="market", name=zh, name_en=en, exchange="Tiingo", kind="fx"
         )
         for code, zh, en in currencies.CURRENCIES
         if code in currencies.CHARTED and (q in code.lower() or q in zh or q in en.lower())
     ]
+    # a grain (D-080): its world price, and the fund that holds its futures
+    for key, (_, zh, en, fund) in GRAINS.items():
+        if q in zh or q in en.lower() or q == fund.lower():
+            found.append(
+                PublicSecurity(
+                    symbol=key.upper(),
+                    market="market",
+                    name=zh,
+                    name_en=en,
+                    exchange="IMF",
+                    kind="commodity",
+                )  # fmt: skip
+            )
+    return found
 
 
 @router.get("/api/public/securities")
@@ -403,6 +418,7 @@ async def get_quotes(
     board: Annotated[QuoteBoard, Depends(market_board)],
     keys: Annotated[str, Query(max_length=2000, description="tw:2330,us:PLTR — at most 60")],
     forex: Annotated[TiingoFx, Depends(forex_cache)],
+    fred: Annotated[FredHistory, Depends(fred_history)],
 ) -> list[PublicQuote]:
     """Quotes for a watchlist (D-061): the strip's own for its stocks, the last stored close for
     any other. A key without a quote yet is left out."""
@@ -416,6 +432,21 @@ async def get_quotes(
         # a currency the reader added (D-072): its last close from the shared cache
         if (q := await forex_quote(forex, key)) is not None:
             out.append(q)
+            continue
+        # a grain's world price (D-080): its last month, against the month before
+        if key in GRAINS and (figure := await Figures(forex, fred).figure(key)) is not None:
+            out.append(
+                PublicQuote(
+                    key=key,
+                    value=figure.value,
+                    change=figure.change,
+                    change_pct=None if figure.change_pct is None else round(figure.change_pct, 2),
+                    as_of=figure.as_of,
+                    basis="month",
+                    source=figure.source,
+                    currency="USD",
+                )
+            )
             continue
         market, _, symbol = key.partition(":")
         if market in ("tw", "us") and symbol and (q := await bar_quote(session, market, symbol)):

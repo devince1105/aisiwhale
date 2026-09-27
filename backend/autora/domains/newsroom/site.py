@@ -172,7 +172,9 @@ def _named(version: ArticleVersion, section: str | None) -> list[PublicNamedStoc
     # and its figures: a stock story's index (the TAIEX, the Nasdaq, the yield), a crypto, gold,
     # futures or FX story's coins, gold, oil or currencies
     figures = [
-        PublicNamedStock(key=key, symbol=key.upper(), name=name_zh if zh else name_en)
+        PublicNamedStock(
+            key=key, symbol=key.split(":")[-1].upper(), name=name_zh if zh else name_en
+        )
         for key, name_zh, name_en in figures_named(said, section)
     ]
     return (stocks + figures)[:8]

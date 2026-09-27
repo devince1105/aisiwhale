@@ -33,10 +33,11 @@ if TYPE_CHECKING:  # the forex cache reads price_history, which reads this modul
 
 log = logging.getLogger(__name__)
 
-Basis = Literal["close", "prev_close", "last", "24h"]
+Basis = Literal["close", "prev_close", "last", "24h", "month"]
 """close: the exchange's close that day; prev_close: the last close FRED has (US: the day
 before); last: the latest trade, against the previous close (the close itself once the market
-has shut); 24h: now, against 24 hours ago (crypto has no close)."""
+has shut); 24h: now, against 24 hours ago (crypto has no close); month: a month's average,
+against the month before (the IMF's grain prices, D-080)."""
 
 TW_STOCKS = ("2330", "2317", "2454", "2382", "2308", "0050", "006208")
 """Taiwan stocks on the strip, the five that matter most to AI, by exchange code: TSMC, Hon Hai,

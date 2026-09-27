@@ -115,6 +115,7 @@ export function StockChart({
   volume = true,
   closeOnly = false,
   decimals,
+  monthly = false,
 }: {
   bars: Bar[];
   lang: Lang;
@@ -131,15 +132,20 @@ export function StockChart({
   /** Its prices' decimals, when not a stock's (``decimalsFor``): a currency as a bank posts it,
    * a yield's two. */
   decimals?: number;
+  /** A bar a month (the IMF's grain prices, D-080): its months only, no days or weeks. */
+  monthly?: boolean;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<View>("day");
+  const [view, setView] = useState<View>(monthly ? "month" : "day");
   const [intraday, setIntraday] = useState<Intraday>({ state: "idle" });
   // 15 minutes only when there are such bars to show: a US stock (Tiingo) or a Taiwan one (Fugle,
   // D-074) whose service answered with some
-  const views: View[] =
-    intraday.state === "ready" && intraday.bars.length ? ["intraday", "day", "week", "month"] : ["day", "week", "month"];
+  const views: View[] = monthly
+    ? ["month"]
+    : intraday.state === "ready" && intraday.bars.length
+      ? ["intraday", "day", "week", "month"]
+      : ["day", "week", "month"];
   const shown = useMemo(() => {
     if (view === "intraday") return intraday.state === "ready" ? intraday.bars : [];
     return group(bars, view);

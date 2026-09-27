@@ -23,6 +23,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
+from typing import Literal
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,15 @@ FRED = "https://api.stlouisfed.org/fred/series/observations"
 FRED_CHARTS = {"nasdaq": "NASDAQCOM", "us10y": "DGS10", "wti": "DCOILWTICO"}
 """The strip's FRED figures (``market_strip.FRED_SERIES``), by the strip's keys."""
 COINS = {"btc": "btcusd", "eth": "ethusd"}
+GRAINS = {
+    "maize": ("PMAIZMTUSDM", "玉米（IMF 月價）", "Corn (IMF monthly)", "CORN"),
+    "soybeans": ("PSOYBUSDM", "黃豆（IMF 月價）", "Soybeans (IMF monthly)", "SOYB"),
+    "wheat": ("PWHEAMTUSDM", "小麥（IMF 月價）", "Wheat (IMF monthly)", "WEAT"),
+}
+"""Corn, soybeans and wheat (D-080): the IMF's world price, US dollars a metric ton, a month at a
+time and about two months behind (FRED) — and each grain's Teucrium fund, a US ETF that holds
+CBOT futures, for the days between. No free source gives CBOT's own daily futures prices. Keyed
+``maize``: CORN is the fund's ticker."""
 YEARS = 5
 KEEP = timedelta(hours=6)
 """FRED publishes each of these once a day."""
@@ -75,6 +85,8 @@ class PublicFigure(BaseModel):
     source: str
     close_only: bool
     """Each day's close and no more (FRED, a currency cross): open, high and low are the close."""
+    interval: Literal["day", "month"] = "day"
+    """A bar a day, or a month (the IMF's grain prices, D-080): then a chart of months only."""
     bars: list[PublicBar]
     """Oldest first, about five years."""
 
@@ -141,6 +153,7 @@ class Figures:
     async def figure(self, key: str, session: AsyncSession | None = None) -> PublicFigure | None:
         key = key.lower()
         close_only = True
+        interval: Literal["day", "month"] = "day"
         if (code := currency_of(key)) is not None:
             bars, close_only = await self.forex.twd_bars(code)
             source = SOURCE
@@ -149,6 +162,8 @@ class Figures:
             source = "FRED"
         elif key in COINS:
             bars, close_only, source = await self.forex.crypto(COINS[key]), False, SOURCE
+        elif key in GRAINS:
+            bars, source, interval = await self.fred.bars(GRAINS[key][0]), "IMF (FRED)", "month"
         elif key == "taiex" and session is not None:
             stored = await history(session, "tw", INDEX)
             bars, close_only, source = stored.bars, False, "TWSE"
@@ -167,6 +182,7 @@ class Figures:
             change_pct=None if change is None or key == "us10y" else change / before * 100,
             source=source,
             close_only=close_only,
+            interval=interval,
             bars=bars,
         )
 
@@ -179,6 +195,21 @@ FIGURE_TERMS: dict[str, tuple[str, str, tuple[str, ...]]] = {
     "btc": ("比特幣", "Bitcoin", ("比特幣", "Bitcoin", "BTC")),
     "eth": ("以太幣", "Ether", ("以太幣", "以太坊", "Ether", "Ethereum", "ETH")),
     "taiex": ("加權指數", "TAIEX", ("加權指數", "台股大盤", "發行量加權", "TAIEX")),
+    # the grains (D-080): the IMF's monthly price, and the Teucrium fund that holds the futures
+    **{
+        key: (zh, en, terms)
+        for key, (_, zh, en, _), terms in (
+            (k, GRAINS[k], t)
+            for k, t in (
+                ("maize", ("玉米", "corn", "Corn")),
+                ("soybeans", ("黃豆", "大豆", "soybean", "Soybean", "soybeans", "Soybeans")),
+                ("wheat", ("小麥", "wheat", "Wheat")),
+            )
+        )
+    },
+    "us:CORN": ("玉米 ETF", "Corn ETF", ("玉米", "corn", "Corn")),
+    "us:SOYB": ("黃豆 ETF", "Soybean ETF", ("黃豆", "大豆", "soybean", "Soybean", "soybeans")),
+    "us:WEAT": ("小麥 ETF", "Wheat ETF", ("小麥", "wheat", "Wheat")),
     "nasdaq": ("那斯達克", "Nasdaq", ("那斯達克", "那指", "Nasdaq")),
     # not 殖利率 alone: in Taiwan that is most often a stock's dividend yield
     "us10y": (
@@ -202,7 +233,16 @@ SECTION_FIGURES = {
     "us": ("nasdaq", "us10y"),
     "crypto": ("btc", "eth"),
     "gold": ("xau",),
-    "commodities": ("wti", "xau"),
+    "commodities": (
+        "wti",
+        "xau",
+        "maize",
+        "us:CORN",
+        "soybeans",
+        "us:SOYB",
+        "wheat",
+        "us:WEAT",
+    ),  # fmt: skip
 }
 """Which figures a section's stories may link (D-079); 外匯 links its currencies."""
 

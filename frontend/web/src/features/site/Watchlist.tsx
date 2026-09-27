@@ -45,7 +45,7 @@ import {
 } from "./api";
 import { GoldBoard } from "./GoldBoard";
 import { StockChart } from "./StockChart";
-import { formatDate, words, type Lang } from "./i18n";
+import { formatDate, formatMonth, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
 import { ARROW, direction, formatChange, formatValue, isCurrency, label, stockCode, stockPage, TONE } from "./quote";
@@ -53,7 +53,10 @@ import { ARROW, direction, formatChange, formatValue, isCurrency, label, stockCo
 /** A watchlist figure that is not a stock (D-079): an index, the yield, oil, gold, a coin, a
  * currency in NT$ — what an article's link may open. */
 function isFigure(key: string): boolean {
-  return isCurrency(key) || ["taiex", "nasdaq", "us10y", "wti", "xau", "btc", "eth"].includes(key);
+  return (
+    isCurrency(key) ||
+    ["taiex", "nasdaq", "us10y", "wti", "xau", "btc", "eth", "maize", "soybeans", "wheat"].includes(key)
+  );
 }
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
@@ -395,8 +398,9 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
         found.length ? (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line" data-testid="search-results">
             {found.map((security) => {
-              // a currency (D-072) is a figure: keyed as the strip keys it, with no page of its own
-              const currency = security.kind === "fx";
+              // a currency (D-072) or a grain's world price (D-080) is a figure: keyed as the strip
+              // keys one, with no page of its own
+              const currency = security.kind === "fx" || security.kind === "commodity";
               const key = currency ? security.symbol.toLowerCase() : `${security.market}:${security.symbol}`;
               return (
                 <li key={key} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -404,7 +408,7 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
                     <span className="block truncate font-medium">{security.name}</span>
                     <span className="block text-xs text-muted">
                       {currency
-                        ? `${stockCode(key)}・${w.kinds.fx}`
+                        ? `${stockCode(key) ?? security.exchange}・${w.kinds[security.kind]}`
                         : `${stockCode(key, security.exchange)}・${security.exchange}・${w.kinds[security.kind] ?? security.kind}`}
                     </span>
                   </span>
@@ -719,7 +723,8 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
             </span>
           ) : null}
           <span className="text-xs text-muted">
-            {w.basis[quote.basis]} {formatDate(lang, quote.as_of)}・{w.sourceNames[quote.source] ?? quote.source}
+            {w.basis[quote.basis]} {quote.basis === "month" ? formatMonth(lang, quote.as_of) : formatDate(lang, quote.as_of)}・
+            {w.sourceNames[quote.source] ?? quote.source}
           </span>
         </div>
       ) : null}
@@ -752,6 +757,7 @@ function FigureChart({ item, lang }: { item: WatchedStock; lang: Lang }) {
         source={figure.source}
         volume={false}
         closeOnly={figure.close_only}
+        monthly={figure.interval === "month"}
         // a currency as a bank posts it (0.2017, 4.726); the Nasdaq, the yield and oil, two places
         decimals={isCurrency(item.key) ? (figure.value < 1 ? 4 : 3) : 2}
       />

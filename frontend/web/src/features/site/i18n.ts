@@ -90,10 +90,13 @@ const WORDS = {
       usdtwd: "美金",
       jpytwd: "日圓",
       cnytwd: "人民幣",
+      maize: "玉米（IMF 月價）",
+      soybeans: "黃豆（IMF 月價）",
+      wheat: "小麥（IMF 月價）",
       btc: "比特幣",
       eth: "以太幣",
     } as Record<string, string>,
-    basis: { close: "收盤", prev_close: "前一交易日收盤", last: "最新價", "24h": "24 小時漲跌" } as Record<
+    basis: { close: "收盤", prev_close: "前一交易日收盤", last: "最新價", "24h": "24 小時漲跌", month: "月均價" } as Record<
       string,
       string
     >,
@@ -105,6 +108,7 @@ const WORDS = {
       Finnhub: "Finnhub",
       CoinGecko: "CoinGecko",
       Tiingo: "Tiingo",
+      "IMF (FRED)": "IMF（FRED）",
     } as Record<
       string,
       string
@@ -263,7 +267,7 @@ const WORDS = {
       noResults: "找不到符合的股票。",
       view: "查看",
       addShort: "＋ 加入",
-      kinds: { stock: "股票", etf: "ETF", adr: "ADR", fx: "匯率" } as Record<string, string>,
+      kinds: { stock: "股票", etf: "ETF", adr: "ADR", fx: "匯率", commodity: "國際月價" } as Record<string, string>,
       failed: "觀察清單暫時讀不到。",
       note: "觀察清單只有你看得到；行情為收盤或延遲資料，僅供參考，不構成投資建議。",
     },
@@ -347,10 +351,13 @@ const WORDS = {
       usdtwd: "US dollar",
       jpytwd: "Japanese yen",
       cnytwd: "Chinese yuan",
+      maize: "Corn (IMF monthly)",
+      soybeans: "Soybeans (IMF monthly)",
+      wheat: "Wheat (IMF monthly)",
       btc: "Bitcoin",
       eth: "Ether",
     } as Record<string, string>,
-    basis: { close: "Close", prev_close: "Previous close", last: "Latest", "24h": "24-hour change" } as Record<
+    basis: { close: "Close", prev_close: "Previous close", last: "Latest", "24h": "24-hour change", month: "Monthly average" } as Record<
       string,
       string
     >,
@@ -514,7 +521,7 @@ const WORDS = {
       noResults: "No stock matches.",
       view: "View",
       addShort: "+ Add",
-      kinds: { stock: "Stock", etf: "ETF", adr: "ADR", fx: "Exchange rate" } as Record<string, string>,
+      kinds: { stock: "Stock", etf: "ETF", adr: "ADR", fx: "Exchange rate", commodity: "World monthly price" } as Record<string, string>,
       failed: "The watchlist could not be read just now.",
       note: "Only you can see your watchlist. Prices are closing or delayed, for reference only, not investment advice.",
     },
@@ -607,6 +614,11 @@ export function revisedOn(lang: Lang, published: string, revised: string | null 
   if (!revised) return null;
   const day = formatDate(lang, revised);
   return day === formatDate(lang, published) ? null : day;
+}
+
+/** A month as it reads: 2026年7月, July 2026 — a monthly average's date (D-080). */
+export function formatMonth(lang: Lang, iso: string): string {
+  return new Intl.DateTimeFormat(lang, { year: "numeric", month: "long", timeZone: "UTC" }).format(new Date(iso));
 }
 
 export function formatDate(lang: Lang, iso: string): string {

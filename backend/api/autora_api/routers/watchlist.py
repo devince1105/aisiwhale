@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from autora.accounts import SESSION_COOKIE, reader_for
 from autora.accounts import watchlist as reader_watchlist
 from autora.domains.newsroom import securities
+from autora.domains.newsroom.figures import GRAINS
 from autora.domains.newsroom.forex import CHARTED, NAMES
 from autora.domains.newsroom.holdings import Stock
 from autora.domains.newsroom.market_strip import ORDER
@@ -41,6 +42,8 @@ FIGURES = {
     # every currency with a chart against the New Taiwan dollar (D-072): the strip has three,
     # a reader may keep any of them
     **{f"{code}TWD": NAMES[code] for code in CHARTED},
+    # the grains' world prices, a month at a time (D-080)
+    **{key.upper(): (zh, en) for key, (_, zh, en, _) in GRAINS.items()},
 }
 """The figures that are not stocks, as a watchlist keeps them (market ``market``): the strip's,
 and the currencies; the strip keys them in lower case, ``taiex``, ``btc``, ``jpytwd``."""

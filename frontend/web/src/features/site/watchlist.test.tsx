@@ -334,3 +334,19 @@ describe("a figure from an article (D-079)", () => {
     expect((await screen.findByTestId("watch-pane")).textContent).toContain("輝達"); // unknown: the first
   });
 });
+
+describe("a grain's world price (D-080)", () => {
+  it("charts its months only, and is found by its name as a world monthly price", async () => {
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("/api/public/securities"))
+        return Response.json([{ symbol: "MAIZE", market: "market", name: "玉米（IMF 月價）", name_en: "Corn", exchange: "IMF", kind: "commodity" }]);
+      return Response.json([]);
+    });
+    render(<WatchlistPage lang="zh-TW" />);
+    fireEvent.change(await screen.findByRole("searchbox", { name: "搜尋股票" }), { target: { value: "玉米" } });
+    const results = await screen.findByTestId("search-results", {}, { timeout: 2000 });
+    expect(results.textContent).toContain("IMF・國際月價");
+    expect(results.querySelector("a[href*='/stocks/']")).toBeNull();
+  });
+});

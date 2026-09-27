@@ -2825,6 +2825,12 @@ export interface components {
             change_pct: number | null;
             /** Close Only */
             close_only: boolean;
+            /**
+             * Interval
+             * @default day
+             * @enum {string}
+             */
+            interval: "day" | "month";
             /** Key */
             key: string;
             /** Source */
@@ -2958,7 +2964,7 @@ export interface components {
              * Basis
              * @enum {string}
              */
-            basis: "close" | "prev_close" | "last" | "24h";
+            basis: "close" | "prev_close" | "last" | "24h" | "month";
             /** Change */
             change: number | null;
             /** Change Pct */

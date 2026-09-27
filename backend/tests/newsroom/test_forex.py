@@ -213,7 +213,7 @@ def test_the_figures_a_story_names_by_its_section():
     assert keys("比特幣 ETF 資金流入，以太幣走弱", "crypto") == ["btc", "eth"]
     assert keys("金價創高", "gold") == ["xau"]
     assert keys("國際油價下跌，黃金走高", "commodities") == ["wti", "xau"]
-    assert keys("CBOT 玉米期貨下跌", "commodities") == []  # no watchlist figure for grains
+    assert keys("CBOT 玉米期貨下跌", "commodities") == ["maize", "us:CORN"]  # D-080
     assert keys("新台幣兌美元收 31.716，日圓、人民幣走弱，歐元持平", "fx") == [
         "usdtwd",
         "jpytwd",
@@ -228,3 +228,37 @@ def test_the_figures_a_story_names_by_its_section():
     assert keys("加權指數收高", "tw") == ["taiex"]
     assert keys("台積電殖利率約1.5%", "tw") == []  # a dividend yield is not the Treasury's
     assert keys("比特幣", None) == []
+
+
+async def test_grains_the_imf_s_month_and_the_fund_that_holds_the_futures():
+    """D-080: corn, soybeans and wheat — the IMF's world price a month at a time (FRED), and
+    each grain's Teucrium fund (a US ETF of CBOT futures) for the days between."""
+    from autora.domains.newsroom.figures import GRAINS, figures_named
+
+    asked: list[str] = []
+
+    async def fred(series: str) -> list[dict]:
+        asked.append(series)
+        return [
+            {"date": "2026-06-01", "value": "195.78"},
+            {"date": "2026-07-01", "value": "213.19"},
+        ]
+
+    corn = await Figures(TiingoFx(None), FredHistory(fred)).figure("maize")
+    assert corn is not None and (corn.interval, corn.source, corn.value) == (
+        "month",
+        "IMF (FRED)",
+        213.19,
+    )
+    assert asked == [GRAINS["maize"][0]]
+    assert {fund for *_, fund in GRAINS.values()} == {"CORN", "SOYB", "WEAT"}
+    keys = lambda text: [k for k, _, _ in figures_named(text, "commodities")]  # noqa: E731
+    assert keys("CBOT玉米期貨跌0.47%，大豆、小麥同步走低") == [
+        "maize",
+        "us:CORN",
+        "soybeans",
+        "us:SOYB",
+        "wheat",
+        "us:WEAT",
+    ]
+    assert keys("玉米") == ["maize", "us:CORN"] and figures_named("玉米", "tw") == []
