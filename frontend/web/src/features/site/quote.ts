@@ -6,8 +6,9 @@ import type { Lang } from "./i18n";
 const DECIMALS: Record<string, number> = { btc: 0 };
 
 /** A stock's code as readers look it up: ``tw:2330`` is ``2330.TW``, ``us:NVDA`` is ``NVDA``. */
-export function stockCode(key: string): string | null {
-  if (key.startsWith("tw:")) return `${key.slice(3)}.TW`;
+export function stockCode(key: string, exchange?: string | null): string | null {
+  // a TPEx (over-the-counter) stock is 6488.TWO, as Taiwan's quote services write it
+  if (key.startsWith("tw:")) return `${key.slice(3)}.${exchange === "TPEx" ? "TWO" : "TW"}`;
   if (key.startsWith("us:")) return key.slice(3);
   return null;
 }

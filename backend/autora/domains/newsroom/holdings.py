@@ -57,6 +57,8 @@ class Stock:
     """Its US listings' CUSIPs, as 13F filings name them (none: no 13F holders to show)."""
     aliases: tuple[str, ...] = ()
     """Other ways an article may name it."""
+    exchange: str | None = None
+    """Where a listed stock off the strip trades (D-061): TPEx's codes read 3105.TWO, not .TW."""
 
     @property
     def key(self) -> str:

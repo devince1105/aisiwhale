@@ -165,6 +165,20 @@ describe("a stock's page", () => {
     expect(trade!.textContent).not.toContain("逾 30 天");
   });
 
+  it("an over-the-counter stock reads .TWO, and a page without 13F does not cite it", () => {
+    render(
+      <StockView
+        stock={{ ...NVDA, symbol: "6488", market: "tw", name: "環球晶", holders: [], us_listing: null, tracks_13f: false, exchange: "TPEx" }}
+        lang="zh-TW"
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("環球晶6488.TWO");
+    expect(document.body.textContent).not.toContain("持股來自 SEC 13F 申報");
+    cleanup();
+    render(<StockView stock={NVDA} lang="zh-TW" />);
+    expect(document.body.textContent).toContain("持股來自 SEC 13F 申報");
+  });
+
   it("a Taiwan stock with an ADR shows the ADR's holders; one without has no US sections", () => {
     render(
       <StockView stock={{ ...NVDA, symbol: "2330", market: "tw", name: "台積電", quote: null, us_listing: "TSM" }} lang="zh-TW" />,

@@ -77,7 +77,7 @@ export function WatchButton({ symbol, lang }: { symbol: string; lang: Lang }) {
 function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: PublicQuote; lang: Lang; current?: boolean }) {
   const way = quote ? direction(quote) : "flat";
   const change = quote ? formatChange(quote) : null;
-  const code = stockCode(item.key);
+  const code = stockCode(item.key, item.exchange);
   return (
     <a
       href={stockPage(item.key, lang) ?? "#"}
@@ -269,7 +269,7 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{security.name}</span>
                     <span className="block text-xs text-muted">
-                      {stockCode(key)}・{security.exchange}・{w.kinds[security.kind] ?? security.kind}
+                      {stockCode(key, security.exchange)}・{security.exchange}・{w.kinds[security.kind] ?? security.kind}
                     </span>
                   </span>
                   <a href={stockPage(key, lang) ?? "#"} className="text-xs text-accent underline">

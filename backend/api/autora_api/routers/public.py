@@ -139,6 +139,8 @@ class PublicStock(BaseModel):
     us_listing: str | None = None
     """Where it trades in the US: its own symbol, or a Taiwan stock's ADR (TSM for 2330). None:
     US filings (13F holders, officials' trades) can say nothing about it."""
+    exchange: str | None = None
+    """TPEx for an over-the-counter Taiwan stock (its code reads .TWO); None for the strip's."""
     tracks_13f: bool = False
     """Whether its 13F holders are looked for: the strip's stocks, whose CUSIPs are known. Any
     other stock (D-061) has no 13F section, rather than one saying nobody holds it."""
@@ -241,6 +243,7 @@ async def get_stock(
         ),
         us_listing=stock.tickers[0] if stock.tickers else None,
         tracks_13f=bool(stock.cusips),
+        exchange=stock.exchange,
     )
 
 

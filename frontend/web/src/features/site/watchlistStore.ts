@@ -12,6 +12,7 @@ export interface WatchedStock {
   market: string;
   key: string;
   name: string;
+  exchange?: string | null;
 }
 
 /** ``signedOut``: the API said 401 — the reader is not signed in, and the list is theirs to keep

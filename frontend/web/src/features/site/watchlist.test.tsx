@@ -101,7 +101,7 @@ describe("finding any stock", () => {
     fireEvent.change(await screen.findByRole("searchbox", { name: "搜尋股票" }), { target: { value: "環球" } });
     const results = await screen.findByTestId("search-results", {}, { timeout: 2000 });
     expect(results.textContent).toContain("環球晶");
-    expect(results.textContent).toContain("6488.TW・TPEx・股票");
+    expect(results.textContent).toContain("6488.TWO・TPEx・股票");
     expect(results.querySelector("a")!.getAttribute("href")).toBe("/news/zh-TW/stocks/6488");
     fireEvent.click(screen.getByRole("button", { name: "＋ 加入" }));
     await waitFor(() => expect(calls).toContain("POST /6488"));

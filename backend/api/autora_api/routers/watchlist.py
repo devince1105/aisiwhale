@@ -33,6 +33,8 @@ class WatchedStock(BaseModel):
     key: str
     """As the market strip keys its quotes: ``tw:2330``, ``us:NVDA``."""
     name: str
+    exchange: str | None = None
+    """TPEx for an over-the-counter Taiwan stock: its code reads .TWO."""
 
 
 async def _reader(session: Session, cookie: str | None):
@@ -69,6 +71,7 @@ async def get_watchlist(
                 market=stock.market,
                 key=stock.key,
                 name=stock.zh if lang.startswith("zh") else stock.en,
+                exchange=stock.exchange,
             )
         )
     await session.commit()  # last_seen_at

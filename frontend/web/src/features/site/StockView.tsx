@@ -128,7 +128,7 @@ export function StockView({
   const quote = stock.quote;
   const way = quote ? direction(quote) : "flat";
   const change = quote ? formatChange(quote) : null;
-  const code = stockCode(`${stock.market}:${stock.symbol}`);
+  const code = stockCode(`${stock.market}:${stock.symbol}`, stock.exchange);
   const period = stock.holders[0]?.period;
   const before = stock.holders[0]?.previous_period ?? null;
   return (
@@ -269,7 +269,7 @@ export function StockView({
         )}
       </section>
 
-      <p className="mt-10 rounded-lg bg-canvas p-4 text-xs leading-relaxed text-muted">{s.notice}</p>
+      <p className="mt-10 rounded-lg bg-canvas p-4 text-xs leading-relaxed text-muted">{stock.tracks_13f ? s.notice : s.noticeNo13f}</p>
       <p className="mt-6 text-sm">
         <Link href={`/news/${lang}`} className="text-accent hover:underline">
           {s.back}

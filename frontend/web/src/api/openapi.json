@@ -4406,6 +4406,17 @@
       "title": "Articles",
       "type": "array"
      },
+     "exchange": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange"
+     },
      "holders": {
       "items": {
        "$ref": "#/components/schemas/PublicHolder"
@@ -6042,6 +6053,17 @@
    },
    "WatchedStock": {
     "properties": {
+     "exchange": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange"
+     },
      "key": {
       "title": "Key",
       "type": "string"

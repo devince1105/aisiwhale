@@ -28,7 +28,13 @@ export function MemberBadge({ lang }: { lang: Lang }) {
   if (status === "loading") return <span className="text-sm text-muted" aria-hidden />;
 
   if (!me) {
+    // the watchlist page is open to everybody: its search works signed out, and it says why
+    // signing in is worth it (D-060)
     return (
+      <span className="flex items-center gap-3 text-sm">
+        <a href={`/news/${lang}/watchlist`} className="hover:text-accent" data-testid="watchlist-link">
+          {w.watch.link}
+        </a>
       <a
         href={`/news/${lang}/login`}
         className="rounded-full border border-line px-3 py-1 text-sm hover:border-accent hover:text-accent"
@@ -36,6 +42,7 @@ export function MemberBadge({ lang }: { lang: Lang }) {
       >
         {w.signIn}
       </a>
+      </span>
     );
   }
 

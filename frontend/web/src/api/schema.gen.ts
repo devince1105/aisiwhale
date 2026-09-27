@@ -2887,6 +2887,8 @@ export interface components {
         PublicStock: {
             /** Articles */
             articles: components["schemas"]["PublicArticleSummary"][];
+            /** Exchange */
+            exchange?: string | null;
             /** Holders */
             holders: components["schemas"]["PublicHolder"][];
             /** Market */
@@ -3522,6 +3524,8 @@ export interface components {
         };
         /** WatchedStock */
         WatchedStock: {
+            /** Exchange */
+            exchange?: string | null;
             /** Key */
             key: string;
             /** Market */

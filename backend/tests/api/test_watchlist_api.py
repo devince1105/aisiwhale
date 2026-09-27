@@ -35,8 +35,8 @@ async def test_a_reader_keeps_stocks_in_the_order_they_added_them(site, mailbox)
         assert (await site.post(f"{URL}/{symbol}")).status_code == 204
     listed = (await site.get(URL, params={"lang": "zh-TW"})).json()
     assert listed == [
-        {"symbol": "NVDA", "market": "us", "key": "us:NVDA", "name": "輝達"},
-        {"symbol": "2330", "market": "tw", "key": "tw:2330", "name": "台積電"},
+        {"symbol": "NVDA", "market": "us", "key": "us:NVDA", "name": "輝達", "exchange": None},
+        {"symbol": "2330", "market": "tw", "key": "tw:2330", "name": "台積電", "exchange": None},
     ]
     assert (await site.get(URL, params={"lang": "en"})).json()[1]["name"] == "TSMC"
     assert (await site.delete(f"{URL}/NVDA")).status_code == 204
@@ -85,7 +85,7 @@ async def test_any_listed_stock_can_be_kept_and_is_then_tracked(site, mailbox, d
     await _sign_in(site, mailbox, "wide@example.com")
     assert (await site.post(f"{URL}/6488")).status_code == 204
     assert (await site.get(URL)).json() == [
-        {"symbol": "6488", "market": "tw", "key": "tw:6488", "name": "環球晶"}
+        {"symbol": "6488", "market": "tw", "key": "tw:6488", "name": "環球晶", "exchange": "TPEx"}
     ]
     tracked = await db_session.scalar(
         select(TrackedSecurity).where(TrackedSecurity.symbol == "6488")

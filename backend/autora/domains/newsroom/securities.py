@@ -209,7 +209,9 @@ class SecuritiesKeeper:
 def as_stock(security: Security) -> Stock:
     """A listed security as a stock page reads one: no CUSIPs, so no 13F holders to show."""
     english = security.name_en or security.name
-    return Stock(security.symbol, security.market, security.name, english)
+    return Stock(
+        security.symbol, security.market, security.name, english, exchange=security.exchange
+    )
 
 
 async def find(session: AsyncSession, symbol: str) -> Stock | None:

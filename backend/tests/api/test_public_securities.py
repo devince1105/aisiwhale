@@ -47,6 +47,7 @@ async def test_any_listed_stock_has_a_page_without_a_13f_section(public, db_sess
     assert (body["name"], body["market"], body["tracks_13f"], body["quote"]) == (
         "環球晶", "tw", False, None
     )  # fmt: skip
+    assert body["exchange"] == "TPEx"  # its code reads 6488.TWO
     assert (
         await public.get("/api/public/stocks/9999", params={"lang": "zh-TW"})
     ).status_code == 404
