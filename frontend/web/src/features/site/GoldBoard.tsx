@@ -1,4 +1,4 @@
-// The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, its change on
+// Spot gold's price and chart (D-070), on the watchlist page when gold is picked (D-071): spot gold in US dollars an ounce, its change on
 // the day before, what it is in New Taiwan dollars a gram at the day's reference rate — not Bank
 // of Taiwan's gold passbook price, which it says and links to — and the stock pages' chart of
 // about five years of days, weeks and months (no volume: gold has none).
@@ -7,15 +7,20 @@ import { formatDate, words, type Lang } from "./i18n";
 import { ARROW, TONE } from "./quote";
 import { StockChart } from "./StockChart";
 
-export function GoldBoard({ gold, lang }: { gold: PublicGold; lang: Lang }) {
+export function GoldBoard({ gold, lang, bare = false }: { gold: PublicGold; lang: Lang; bare?: boolean }) {
   const w = words(lang).gold;
   const locale = lang === "en" ? "en-US" : "zh-TW";
   const money = (value: number, digits = 2) =>
     value.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const way = gold.change === null || gold.change === undefined || gold.change === 0 ? "flat" : gold.change > 0 ? "rise" : "fall";
   return (
-    <section aria-labelledby="gold-board" className="mt-6 rounded-lg border border-line p-4 sm:p-5" data-testid="gold-board">
-      <h2 id="gold-board" className="font-bold">
+    // bare: the watchlist's pane, where a stock is its page — no frame, a title its size
+    <section
+      aria-labelledby="gold-board"
+      className={bare ? "min-w-0" : "mt-6 rounded-lg border border-line p-4 sm:p-5"}
+      data-testid="gold-board"
+    >
+      <h2 id="gold-board" className={bare ? "text-2xl font-bold" : "font-bold"}>
         {w.title}
         <span className="ml-2 text-xs font-normal text-muted">{w.unit}</span>
       </h2>

@@ -47,6 +47,8 @@ beforeEach(() => {
       return Response.json(QUOTES.filter((q) => keys.includes(q.key)));
     }
     if (url.includes("/api/public/securities")) return Response.json(FOUND);
+    if (url.includes("/api/public/gold"))
+      return Response.json({ as_of: "2026-09-25", usd_per_oz: 4284.91, change: 19.82, change_pct: 0.46, twd_per_gram: 4375, source: "Tiingo", bars: [] });
     if (url.includes("/history")) return Response.json({ symbol: "NVDA", market: "us", source: "Tiingo", bars: [], preparing: false });
     if (url.includes("/api/public/stocks/")) return Response.json({ symbol: "NVDA", market: "us", name: "輝達", quote: QUOTES[0], holders: [], trades: [], articles: [] });
     calls.push(`${method} ${url.replace(/^.*\/api\/me\/watchlist/, "")}`);
@@ -246,5 +248,17 @@ describe("the watchlist page to watch (D-064)", () => {
     const edit = await screen.findByTestId("watchlist-edit-link");
     expect(edit.getAttribute("href")).toBe("/news/zh-TW/watchlist?edit=1");
     expect(screen.queryByRole("button", { name: /拖曳/ })).toBeNull();
+  });
+});
+
+describe("spot gold on the watchlist (D-071)", () => {
+  it("picked, it shows its price, a gram in NT$ and its chart, as a stock shows its page", async () => {
+    list = [{ symbol: "XAU", market: "market", key: "xau", name: "黃金" }];
+    params = new URLSearchParams("s=xau");
+    render(<WatchlistPage lang="zh-TW" />);
+    const gold = await screen.findByTestId("gold-board");
+    expect(gold.textContent).toContain("4,284.91");
+    expect(gold.textContent).toContain("約新台幣／公克 4,375");
+    expect(screen.queryByText(/沒有個股走勢圖/)).toBeNull();
   });
 });

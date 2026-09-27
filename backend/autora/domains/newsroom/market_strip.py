@@ -22,7 +22,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 import httpx
@@ -57,10 +57,12 @@ ORDER = (
     "nasdaq",
     "us10y",
     "wti",
+    "xau",
     "btc",
     "eth",
 )
-"""What the strip shows, in this order."""
+"""What the strip shows, in this order. ``xau`` is spot gold (D-071): not ``gold``, which is
+Barrick Gold's ticker on a reader's watchlist."""
 
 TWSE_INDEX = "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX"
 TWSE_STOCKS = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
@@ -71,6 +73,7 @@ DAY = 24 * 3600
 FRED = "https://api.stlouisfed.org/fred/series/observations"
 COINGECKO = "https://api.coingecko.com/api/v3/simple/price"
 FINNHUB = "https://finnhub.io/api/v1/quote"
+TIINGO_GOLD = "https://api.tiingo.com/tiingo/fx/xauusd/prices"
 
 FRED_SERIES = {"nasdaq": "NASDAQCOM", "us10y": "DGS10", "wti": "DCOILWTICO"}
 """No S&P 500 index: VOO, beside the Nasdaq 100's QQQ, stands for it."""
@@ -334,6 +337,44 @@ async def coingecko(client: httpx.AsyncClient) -> list[PublicQuote]:
     return out
 
 
+def tiingo_gold(api_key: str):
+    """Spot gold (D-071): the last day's close from Tiingo's forex prices, against the day
+    before — the 黃金 tab's figure (D-070), the same key, one request an hour."""
+    from autora.domains.newsroom.gold import bars_from
+
+    async def fetch(client: httpx.AsyncClient) -> list[PublicQuote]:
+        start = (datetime.now(UTC).date() - timedelta(days=10)).isoformat()
+        response = await client.get(
+            TIINGO_GOLD,
+            params={"startDate": start, "resampleFreq": "1day"},
+            headers={"Authorization": f"Token {api_key}"},
+        )
+        bars = bars_from(response.raise_for_status().json())
+        if not bars:
+            return []
+        last = bars[-1]
+        before = bars[-2].c if len(bars) > 1 else None
+        change = round(last.c - before, 2) if before else None
+        return [
+            PublicQuote(
+                key="xau",
+                value=last.c,
+                change=change,
+                change_pct=None if change is None else _pct(change, last.c),
+                as_of=last.d,
+                basis="close",
+                source="Tiingo",
+                open=last.o,
+                high=last.h,
+                low=last.l,
+                previous_close=before,
+                currency="USD",
+            )
+        ]
+
+    return fetch
+
+
 # --- the board -----------------------------------------------------------------------------
 
 
@@ -407,7 +448,12 @@ class QuoteBoard:
         feed.quotes.update({q.key: q for q in fresh})
 
 
-def build_board(*, fred_api_key: str | None, finnhub_api_key: str | None = None) -> QuoteBoard:
+def build_board(
+    *,
+    fred_api_key: str | None,
+    finnhub_api_key: str | None = None,
+    tiingo_api_key: str | None = None,
+) -> QuoteBoard:
     """The site's board. Without a key, that service's figures are left out, not faked."""
     feeds = [
         Feed("twse", twse(), every_seconds=30 * 60),
@@ -418,4 +464,6 @@ def build_board(*, fred_api_key: str | None, finnhub_api_key: str | None = None)
     if finnhub_api_key:
         # 13 symbols every 5 minutes: well inside the free plan's 60 calls a minute
         feeds.append(Feed("finnhub", finnhub(finnhub_api_key), every_seconds=5 * 60))
+    if tiingo_api_key:
+        feeds.append(Feed("tiingo", tiingo_gold(tiingo_api_key), every_seconds=3600))
     return QuoteBoard(feeds)

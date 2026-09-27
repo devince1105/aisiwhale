@@ -29,16 +29,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL } from "@/config";
 
 import {
+  fetchGold,
   fetchHistory,
   fetchMarkets,
   fetchQuotes,
   fetchStock,
   searchSecurities,
+  type PublicGold,
   type PublicHistory,
   type PublicQuote,
   type PublicSecurity,
   type PublicStock,
 } from "./api";
+import { GoldBoard } from "./GoldBoard";
 import { formatDate, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
@@ -642,6 +645,8 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
       </div>
     );
   }
+  // spot gold has a chart of its own (D-071): its price and five years, as a stock has its page
+  if (item.key === "xau") return <GoldPane lang={lang} />;
   const way = quote ? direction(quote) : "flat";
   const change = quote ? formatChange(quote) : null;
   return (
@@ -665,5 +670,28 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
       ) : null}
       <p className="mt-5 rounded-lg border border-line p-4 text-sm text-muted">{w.watch.noChart}</p>
     </section>
+  );
+}
+
+/** Spot gold on the watchlist page (D-071): the price, its change, a gram in NT$, the chart. */
+function GoldPane({ lang }: { lang: Lang }) {
+  const [gold, setGold] = useState<PublicGold | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void fetchGold(lang, { baseUrl: API_URL }).then((found) => live && setGold(found));
+    return () => {
+      live = false;
+    };
+  }, [lang]);
+  return (
+    <div className="min-w-0" data-testid="watch-pane">
+      {gold === undefined ? (
+        <p className="flex h-80 items-center justify-center text-sm text-muted">…</p>
+      ) : gold ? (
+        <GoldBoard gold={gold} lang={lang} bare />
+      ) : (
+        <p className="rounded-lg border border-line p-4 text-sm text-muted">{words(lang).stock.noQuote}</p>
+      )}
+    </div>
   );
 }

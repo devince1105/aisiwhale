@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage, fetchFx, fetchGold } from "@/features/site/api";
+import { fetchArticlePage, fetchFx } from "@/features/site/api";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -28,7 +28,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
   const { lang } = await params;
   if (!isLang(lang)) notFound();
   const { section, page } = await where(searchParams);
-  const [{ articles, total }, fx, gold] = await Promise.all([
+  const [{ articles, total }, fx] = await Promise.all([
     fetchArticlePage(lang, {
       company: process.env.SITE_COMPANY || undefined,
       section: section ? sectionsOf(section) : undefined,
@@ -37,8 +37,6 @@ export default async function Page({ params, searchParams }: { params: Params; s
     }),
     // the 外匯 tab's reference rates, on its first page (D-069)
     section === "fx" && page === 1 ? fetchFx(lang) : Promise.resolve(null),
-    // the 黃金 tab's reference price and chart (D-070)
-    section === "gold" && page === 1 ? fetchGold(lang) : Promise.resolve(null),
   ]);
   return (
     <ArticleList
@@ -48,7 +46,6 @@ export default async function Page({ params, searchParams }: { params: Params; s
       page={page}
       pages={Math.ceil(total / PAGE_SIZE)}
       fx={fx}
-      gold={gold}
     />
   );
 }

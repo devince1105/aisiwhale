@@ -119,6 +119,7 @@ def market_board() -> QuoteBoard:
     return build_board(
         fred_api_key=_secret(settings.fred_api_key),
         finnhub_api_key=_secret(settings.finnhub_api_key),
+        tiingo_api_key=_secret(settings.tiingo_api_key),
     )
 
 

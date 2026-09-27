@@ -4,7 +4,7 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicFxBoard, PublicGold } from "./api";
+import type { PublicArticleSummary, PublicFxBoard } from "./api";
 import {
   filterName,
   formatDate,
@@ -18,7 +18,6 @@ import {
   type Section,
 } from "./i18n";
 import { FxBoard } from "./FxBoard";
-import { GoldBoard } from "./GoldBoard";
 import { Pagination } from "./Pagination";
 
 export const PAGE_SIZE = 10;
@@ -115,7 +114,6 @@ export function ArticleList({
   page = 1,
   pages = 1,
   fx = null,
-  gold = null,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -126,8 +124,6 @@ export function ArticleList({
   pages?: number;
   /** The 外匯 tab's reference rates (D-069), above its stories on its first page. */
   fx?: PublicFxBoard | null;
-  /** The 黃金 tab's reference price and chart (D-070), likewise. */
-  gold?: PublicGold | null;
 }) {
   const w = words(lang);
   // only the first page leads with a story: an older page is a plain continuation of the list
@@ -141,7 +137,6 @@ export function ArticleList({
       </h1>
       {section ? <Tags lang={lang} filter={section} /> : null}
       {fx && page === 1 ? <FxBoard board={fx} lang={lang} /> : null}
-      {gold && page === 1 ? <GoldBoard gold={gold} lang={lang} /> : null}
       {articles.length === 0 ? (
         <p className="py-16 text-center text-muted">{w.empty}</p>
       ) : (

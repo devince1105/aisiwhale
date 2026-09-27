@@ -89,6 +89,7 @@ const WORDS = {
       nasdaq: "那斯達克",
       us10y: "美國10年期公債",
       wti: "西德州原油",
+      xau: "黃金",
       btc: "比特幣",
       eth: "以太幣",
     } as Record<string, string>,
@@ -103,6 +104,7 @@ const WORDS = {
       FRED: "FRED（聖路易聯邦準備銀行）",
       Finnhub: "Finnhub",
       CoinGecko: "CoinGecko",
+      Tiingo: "Tiingo",
     } as Record<
       string,
       string
@@ -341,6 +343,7 @@ const WORDS = {
       nasdaq: "Nasdaq",
       us10y: "US 10Y",
       wti: "WTI crude",
+      xau: "Gold",
       btc: "Bitcoin",
       eth: "Ether",
     } as Record<string, string>,
@@ -356,6 +359,7 @@ const WORDS = {
       FRED: "FRED (Federal Reserve Bank of St. Louis)",
       Finnhub: "Finnhub",
       CoinGecko: "CoinGecko",
+      Tiingo: "Tiingo",
     } as Record<string, string>,
     chart: {
       title: "Price",

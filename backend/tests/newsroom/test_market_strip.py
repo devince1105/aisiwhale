@@ -190,3 +190,54 @@ async def test_a_failure_is_logged_without_the_key(caplog):
     await board.quotes()
     assert "HTTP 503 from api.stlouisfed.org/fred/series/observations" in caplog.text
     assert "secret-key-123" not in caplog.text
+
+
+async def test_spot_gold_from_tiingo_after_oil_with_its_key_in_a_header():
+    """D-071: spot gold on the strip (so on a new watchlist), keyed xau: GOLD is Barrick's."""
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "date": "2026-09-24T00:00:00Z",
+                    "open": 4288,
+                    "high": 4303,
+                    "low": 4244,
+                    "close": 4265.09,
+                },
+                {
+                    "date": "2026-09-25T00:00:00Z",
+                    "open": 4265,
+                    "high": 4315,
+                    "low": 4254,
+                    "close": 4284.91,
+                },
+                {
+                    "date": "2026-09-27T00:00:00Z",
+                    "open": 4284.91,
+                    "high": 4284.91,
+                    "low": 4284.91,
+                    "close": 4284.91,
+                },
+            ],
+        )
+
+    board = QuoteBoard(
+        [Feed("tiingo", quotes.tiingo_gold("tk"), every_seconds=3600)],
+        client=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    [gold] = await board.quotes()
+    assert (gold.key, gold.value, gold.change, gold.as_of) == (
+        "xau",
+        4284.91,
+        19.82,
+        date(2026, 9, 25),
+    )
+    assert gold.change_pct == 0.46 and gold.basis == "close" and gold.source == "Tiingo"
+    assert seen[0].headers["Authorization"] == "Token tk" and "tk" not in str(seen[0].url)
+    assert quotes.ORDER.index("xau") == quotes.ORDER.index("wti") + 1
+    names = [f.name for f in build_board(fred_api_key=None, tiingo_api_key="tk").feeds]
+    assert names == ["twse", "coingecko", "tiingo"]

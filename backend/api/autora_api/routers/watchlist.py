@@ -34,6 +34,7 @@ FIGURES = {
     "NASDAQ": ("那斯達克", "Nasdaq"),
     "US10Y": ("美國10年期公債", "US 10Y"),
     "WTI": ("西德州原油", "WTI crude"),
+    "XAU": ("黃金", "Gold"),
     "BTC": ("比特幣", "Bitcoin"),
     "ETH": ("以太幣", "Ether"),
 }

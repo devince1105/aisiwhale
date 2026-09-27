@@ -4,7 +4,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fetchGold, type PublicGold } from "./api";
-import { ArticleList } from "./ArticleList";
+import { GoldBoard } from "./GoldBoard";
 
 const charted: Record<string, unknown>[] = [];
 vi.mock("./StockChart", () => ({
@@ -32,9 +32,9 @@ afterEach(() => {
   charted.length = 0;
 });
 
-describe("黃金's reference price and chart (D-070)", () => {
+describe("spot gold's price and chart (D-070, on the watchlist since D-071)", () => {
   it("shows the price, its change, a gram in NT$, and the chart without volume", () => {
-    render(<ArticleList articles={[]} lang="zh-TW" section="gold" gold={GOLD} />);
+    render(<GoldBoard gold={GOLD} lang="zh-TW" />);
     const board = within(screen.getByTestId("gold-board"));
     expect(board.getByText("4,805.12").className).toContain("text-rise");
     expect(board.getByText(/\+55\.12 \(1\.16%\)/)).toBeTruthy();
@@ -47,15 +47,10 @@ describe("黃金's reference price and chart (D-070)", () => {
     expect((charted[0].bars as unknown[]).length).toBe(2);
   });
 
-  it("a fall reads as one; without a rate, no NT$; an older page, no board", () => {
-    render(
-      <ArticleList articles={[]} lang="zh-TW" section="gold" gold={{ ...GOLD, change: -20, change_pct: -0.41, twd_per_gram: null }} />,
-    );
+  it("a fall reads as one; without a rate, no NT$", () => {
+    render(<GoldBoard gold={{ ...GOLD, change: -20, change_pct: -0.41, twd_per_gram: null }} lang="zh-TW" />);
     expect(screen.getByText(/−20\.00 \(0\.41%\)/).className).toContain("text-fall");
     expect(screen.queryByTestId("gold-twd")).toBeNull();
-    cleanup();
-    render(<ArticleList articles={[]} lang="zh-TW" section="gold" gold={GOLD} page={2} pages={2} />);
-    expect(screen.queryByTestId("gold-board")).toBeNull();
   });
 
   it("is asked of the API, and a failure is no board rather than no page", async () => {
