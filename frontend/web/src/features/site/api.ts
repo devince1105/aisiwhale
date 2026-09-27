@@ -19,6 +19,7 @@ export type PublicSecurity = Schemas["PublicSecurity"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
 export type PublicFxBoard = Schemas["PublicFxBoard"];
+export type PublicGold = Schemas["PublicGold"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -95,6 +96,16 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
 export async function fetchFx(lang: string, options: SiteClientOptions = {}): Promise<PublicFxBoard | null> {
   try {
     const { data } = await client(options).GET("/api/public/fx", { params: { query: { lang } } });
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The 黃金 tab's reference price and chart (D-070). Never throws: the tab has its stories without. */
+export async function fetchGold(lang: string, options: SiteClientOptions = {}): Promise<PublicGold | null> {
+  try {
+    const { data } = await client(options).GET("/api/public/gold", { params: { query: { lang } } });
     return data ?? null;
   } catch {
     return null;

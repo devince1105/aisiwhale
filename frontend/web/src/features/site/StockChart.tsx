@@ -105,6 +105,7 @@ export function StockChart({
   symbol,
   source,
   preparing = false,
+  volume = true,
 }: {
   bars: Bar[];
   lang: Lang;
@@ -113,6 +114,8 @@ export function StockChart({
   source: string | null;
   /** A Taiwan stock just asked for: its history is being fetched (D-061). */
   preparing?: boolean;
+  /** Gold has none (D-070): no volume pane, and none in the legend. */
+  volume?: boolean;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
@@ -212,19 +215,21 @@ export function StockChart({
         }),
       );
     }
-    const volume = chart.addSeries(
-      HistogramSeries,
-      { priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false },
-      1,
-    );
-    volume.setData(
-      shown.map((bar) => ({
-        time: timeOf(bar, view),
-        value: bar.v,
-        color: alpha(bar.c >= bar.o ? colours.rise : colours.fall, "b3"),
-      })),
-    );
-    chart.panes()[1]?.setHeight(90);
+    if (volume) {
+      const traded = chart.addSeries(
+        HistogramSeries,
+        { priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false },
+        1,
+      );
+      traded.setData(
+        shown.map((bar) => ({
+          time: timeOf(bar, view),
+          value: bar.v,
+          color: alpha(bar.c >= bar.o ? colours.rise : colours.fall, "b3"),
+        })),
+      );
+      chart.panes()[1]?.setHeight(90);
+    }
     const opens = OPENS_ON[view];
     if (shown.length > opens) {
       chart.timeScale().setVisibleLogicalRange({ from: shown.length - opens, to: shown.length - 0.5 });
@@ -241,7 +246,7 @@ export function StockChart({
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
     };
-  }, [shown, averages, view, lang, theme]);
+  }, [shown, averages, view, lang, theme, volume]);
 
   if (!bars.length) {
     return (
@@ -270,10 +275,12 @@ export function StockChart({
                   <span className="text-muted">{w.ohlc[k]}</span> <span className={tone(bar[k])}>{number(bar[k])}</span>
                 </span>
               ))}
-              <span>
-                <span className="text-muted">{w.volume}</span>{" "}
-                {market === "tw" ? `${number(Math.round(bar.v / 1000))} ${w.lots}` : number(bar.v)}
-              </span>
+              {volume ? (
+                <span>
+                  <span className="text-muted">{w.volume}</span>{" "}
+                  {market === "tw" ? `${number(Math.round(bar.v / 1000))} ${w.lots}` : number(bar.v)}
+                </span>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -309,7 +316,9 @@ export function StockChart({
       <div ref={box} className="mt-2 h-80 w-full" data-testid="stock-chart" />
       <p className="mt-2 text-xs text-muted">
         {view === "intraday" ? `${w.intradayNote} ` : ""}
-        {source ? w.source(view === "intraday" ? "Tiingo IEX" : source, source === "Tiingo" && view !== "intraday") : ""}
+        {source
+          ? w.source(view === "intraday" ? "Tiingo IEX" : source, market === "us" && source === "Tiingo" && view !== "intraday")
+          : ""}
       </p>
     </div>
   );

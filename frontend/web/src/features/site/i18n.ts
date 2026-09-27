@@ -34,6 +34,15 @@ const WORDS = {
     sectionsLabel: "報導分類",
     topics: { watch: "持股觀察" } as Record<string, string>,
     tagsLabel: (topic: string) => `${topic}的分類`,
+    gold: {
+      title: "國際金價",
+      unit: "XAU/USD・美元／盎司",
+      perGram: "約新台幣／公克",
+      asOf: (when: string) => `${when} 收盤`,
+      note: "國際現貨金價，僅供參考；新台幣價格以當日參考匯率換算，並非臺灣銀行黃金存摺牌價。",
+      bank: "臺灣銀行黃金牌價",
+      bankUrl: "https://rate.bot.com.tw/gold?Lang=zh-TW",
+    },
     fx: {
       title: "參考匯率",
       unit: "新台幣／1 單位外幣",
@@ -290,6 +299,15 @@ const WORDS = {
     sectionsLabel: "Sections",
     topics: { watch: "Holdings watch" } as Record<string, string>,
     tagsLabel: (topic: string) => `${topic}, by kind`,
+    gold: {
+      title: "Spot gold",
+      unit: "XAU/USD · US$ per ounce",
+      perGram: "About NT$ per gram",
+      asOf: (when: string) => `Close, ${when}`,
+      note: "Spot gold, for reference only; the NT$ figure is at the day's reference rate, not Bank of Taiwan's gold passbook price.",
+      bank: "Bank of Taiwan gold prices",
+      bankUrl: "https://rate.bot.com.tw/gold?Lang=en-US",
+    },
     fx: {
       title: "Reference rates",
       unit: "NT$ per unit",

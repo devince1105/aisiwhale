@@ -32,6 +32,7 @@ from autora.company import memberships
 from autora.db.models import Company
 from autora.domains.newsroom import fx_rates, securities
 from autora.domains.newsroom.fx_rates import FxBoard, PublicFxBoard
+from autora.domains.newsroom.gold import GoldBoard, PublicGold
 from autora.domains.newsroom.holdings import STOCKS, PublicHolder, holders
 from autora.domains.newsroom.market_strip import PublicQuote, QuoteBoard, build_board
 from autora.domains.newsroom.models import AnalyticsEventType
@@ -143,6 +144,28 @@ async def fx(
     rates, which the page links to. None when there are none to show."""
     response.headers["Cache-Control"] = "public, max-age=600"
     return await board.board(lang)
+
+
+@lru_cache
+def gold_board() -> GoldBoard:
+    """One per process (D-070): Tiingo is asked a few times a day, for every reader."""
+    settings = get_settings()
+    key = _secret(settings.tiingo_api_key)
+    live = settings.tools_profile == "live" and key is not None
+    return GoldBoard(tiingo_rows(key) if live else None, fx_board())
+
+
+@router.get("/api/public/gold")
+async def gold(
+    response: Response,
+    board: Annotated[GoldBoard, Depends(gold_board)],
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+) -> PublicGold | None:
+    """The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, each
+    day for about five years, and what that is in New Taiwan dollars a gram. None when there is
+    none to show."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return await board.gold(lang)
 
 
 @router.get("/api/public/markets")

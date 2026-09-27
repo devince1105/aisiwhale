@@ -28,3 +28,23 @@ async def test_the_api(public):
         assert (await public.get("/api/public/fx", params={"lang": "zh-TW"})).json() is None
     finally:
         public._transport.app.dependency_overrides.pop(fx_board)
+
+
+async def test_the_gold_api(public):
+    from autora.domains.newsroom.gold import GoldBoard
+    from autora_api.routers.public import gold_board
+    from tests.newsroom.test_gold import ROWS
+
+    async def get(url: str, params: dict) -> list[dict]:
+        return ROWS
+
+    public._transport.app.dependency_overrides[gold_board] = lambda: GoldBoard(get, FxBoard(None))
+    try:
+        body = (await public.get("/api/public/gold", params={"lang": "zh-TW"})).json()
+        assert (body["usd_per_oz"], len(body["bars"]), body["twd_per_gram"]) == (4805, 3, None)
+        public._transport.app.dependency_overrides[gold_board] = lambda: GoldBoard(
+            None, FxBoard(None)
+        )
+        assert (await public.get("/api/public/gold", params={"lang": "zh-TW"})).json() is None
+    finally:
+        public._transport.app.dependency_overrides.pop(gold_board)

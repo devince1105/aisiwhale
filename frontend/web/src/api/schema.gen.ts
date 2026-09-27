@@ -956,6 +956,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/gold": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Gold
+         * @description The 黃金 tab's reference price and chart (D-070): spot gold in US dollars an ounce, each
+         *     day for about five years, and what that is in New Taiwan dollars a gram. None when there is
+         *     none to show.
+         */
+        get: operations["gold_api_public_gold_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/markets": {
         parameters: {
             query?: never;
@@ -2801,6 +2823,26 @@ export interface components {
             name: string;
             /** Twd */
             twd: number;
+        };
+        /** PublicGold */
+        PublicGold: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /** Bars */
+            bars: components["schemas"]["PublicBar"][];
+            /** Change */
+            change: number | null;
+            /** Change Pct */
+            change_pct: number | null;
+            /** Source */
+            source: string;
+            /** Twd Per Gram */
+            twd_per_gram: number | null;
+            /** Usd Per Oz */
+            usd_per_oz: number;
         };
         /** PublicHistory */
         PublicHistory: {
@@ -5582,6 +5624,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicFxBoard"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gold_api_public_gold_get: {
+        parameters: {
+            query: {
+                lang: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicGold"] | null;
                 };
             };
             /** @description Validation Error */
