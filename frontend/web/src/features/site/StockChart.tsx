@@ -28,6 +28,9 @@ const MA_COLOURS: Record<number, string> = {
   250: "#94a3b8",
 };
 const INTERVALS: Interval[] = ["day", "week", "month"];
+/** How many of the latest bars each interval opens on: half a year of days, two years of weeks,
+ * every month. The rest is a drag away; all two years of days at once read like a monthly line. */
+const OPENS_ON: Record<Interval, number> = { day: 125, week: 104, month: Infinity };
 
 interface Palette {
   text: string;
@@ -146,7 +149,12 @@ export function StockChart({
       })),
     );
     chart.panes()[1]?.setHeight(90);
-    chart.timeScale().fitContent();
+    const opens = OPENS_ON[interval];
+    if (shown.length > opens) {
+      chart.timeScale().setVisibleLogicalRange({ from: shown.length - opens, to: shown.length - 0.5 });
+    } else {
+      chart.timeScale().fitContent();
+    }
 
     const index = new Map(shown.map((bar, i) => [bar.d, i]));
     const onMove = (param: MouseEventParams<Time>) => {
@@ -157,7 +165,7 @@ export function StockChart({
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
     };
-  }, [shown, averages, lang, theme]);
+  }, [shown, averages, interval, lang, theme]);
 
   if (!bars.length) {
     return <p className="text-sm text-muted">{w.none}</p>;
