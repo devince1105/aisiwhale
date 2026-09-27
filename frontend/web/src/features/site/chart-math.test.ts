@@ -1,7 +1,18 @@
 // The stock chart's arithmetic (D-059): weeks and months from days, and moving averages.
 import { describe, expect, it } from "vitest";
 
-import { axisLabel, eastern, fullLabel, group, movingAverage, partsOf, wallSeconds, type Bar } from "./chartMath";
+import {
+  AVERAGES,
+  axisLabel,
+  eastern,
+  fullLabel,
+  group,
+  movingAverage,
+  partsOf,
+  spanInDays,
+  wallSeconds,
+  type Bar,
+} from "./chartMath";
 
 const bar = (d: string, o: number, h: number, l: number, c: number, v: number): Bar => ({ d, o, h, l, c, v });
 
@@ -58,5 +69,15 @@ describe("time on the chart", () => {
     expect(fullLabel(at, "intraday")).toBe("9/24 13:45");
     expect(fullLabel(day, "day")).toBe("2026/9/24");
     expect(fullLabel(partsOf({ year: 2026, month: 9, day: 1 }), "month")).toBe("2026/9");
+  });
+});
+
+describe("each view's averages", () => {
+  it("span the same time under the same name: 月線, 季線, 年線 over days, weeks and months", () => {
+    const span = (view: "day" | "week" | "month", n: number) => spanInDays(view, n);
+    expect([span("day", 20), span("week", 4)]).toEqual([20, 20]); // 月線
+    expect([span("day", 60), span("week", 13), span("month", 3)]).toEqual([60, 65, 63]); // 季線
+    expect([span("day", 240), span("week", 52), span("month", 12)]).toEqual([240, 260, 252]); // 年線
+    expect(AVERAGES.intraday).toEqual([5, 10, 20, 60]);
   });
 });

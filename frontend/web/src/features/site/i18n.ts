@@ -76,6 +76,16 @@ const WORDS = {
       title: "走勢",
       intervals: { intraday: "15分", day: "日", week: "週", month: "月" },
       intradayNote: "15 分鐘線為美東時間，成交量僅含 IEX 交易所。",
+      average: (view: string, n: number) =>
+        (
+          {
+            day: { 5: "週線", 20: "月線", 60: "季線", 120: "半年線", 240: "年線" },
+            week: { 4: "月線", 13: "季線", 26: "半年線", 52: "年線" },
+            month: { 3: "季線", 6: "半年線", 12: "年線", 24: "兩年線", 60: "五年線" },
+          } as Record<string, Record<number, string>>
+        )[view]?.[n] ?? `MA${n}`,
+      averageTitle: (view: string, n: number) =>
+        `${n} ${({ intraday: "根 15 分鐘", day: "日", week: "週", month: "個月" } as Record<string, string>)[view]}均線`,
       ohlc: { o: "開", h: "高", l: "低", c: "收" },
       volume: "成交量",
       lots: "張",
@@ -251,6 +261,10 @@ const WORDS = {
       title: "Price",
       intervals: { intraday: "15m", day: "Day", week: "Week", month: "Month" },
       intradayNote: "15-minute bars in US Eastern time; volume is IEX's only.",
+      average: (view: string, n: number) =>
+        view === "intraday" ? `MA${n}` : `${n}${({ day: "D", week: "W", month: "M" } as Record<string, string>)[view]}`,
+      averageTitle: (view: string, n: number) =>
+        `${n}-${({ intraday: "bar", day: "day", week: "week", month: "month" } as Record<string, string>)[view]} moving average`,
       ohlc: { o: "O", h: "H", l: "L", c: "C" },
       volume: "Volume",
       lots: "lots",

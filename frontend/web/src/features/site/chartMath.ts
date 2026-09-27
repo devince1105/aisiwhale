@@ -12,7 +12,6 @@ export interface Bar {
 
 export type Interval = "day" | "week" | "month";
 
-export const AVERAGES = [5, 10, 20, 60, 250] as const;
 
 /** Monday of the week a day is in (ISO weeks), as YYYY-MM-DD. */
 function weekOf(day: string): string {
@@ -67,6 +66,16 @@ export function movingAverage(bars: readonly Bar[], n: number): (number | null)[
 
 /** What the chart shows: a US stock's 15-minute bars (intraday), or days grouped. */
 export type View = "intraday" | Interval;
+
+/** Each view's moving averages, in its own bars. Across the days, weeks and months the same
+ * names mean the same span, as a Taiwan reader knows them: 月線 is 20 days, 4 weeks; 季線 60 days,
+ * 13 weeks, 3 months; 年線 240 days, 52 weeks, 12 months. The 15-minute bars have plain counts. */
+export const AVERAGES: Record<View, readonly number[]> = {
+  intraday: [5, 10, 20, 60],
+  day: [5, 20, 60, 120, 240],
+  week: [4, 13, 26, 52],
+  month: [3, 6, 12, 24, 60],
+};
 
 /** A bar's start in US Eastern wall-clock time, "YYYY-MM-DD HH:mm": the market's own hours. */
 export function eastern(iso: string): string {
@@ -131,4 +140,9 @@ export function fullLabel(p: Parts, view: View): string {
   if (view === "intraday") return `${p.m}/${p.d} ${two(p.hh)}:${two(p.mm)}`;
   if (view === "month") return `${p.y}/${p.m}`;
   return `${p.y}/${p.m}/${p.d}`;
+}
+
+/** Roughly how many trading days an average spans: what its colour says, in every view. */
+export function spanInDays(view: View, n: number): number {
+  return view === "week" ? n * 5 : view === "month" ? n * 21 : n;
 }

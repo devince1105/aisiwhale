@@ -30,19 +30,31 @@ import {
   group,
   movingAverage,
   partsOf,
+  spanInDays,
   wallSeconds,
   type Bar,
   type View,
 } from "./chartMath";
 import { words, type Lang } from "./i18n";
 
-const MA_COLOURS: Record<number, string> = {
-  5: "#6d8dff",
-  10: "#a855f7",
-  20: "#f97316",
-  60: "#eab308",
-  250: "#94a3b8",
-};
+/** An average's colour is its span, so 月線 is the same purple over days, weeks and months:
+ * 週 blue, 月 purple, 季 orange, 半年 amber, 年 slate, and the monthly view's two and five years. */
+const SPAN_COLOURS: [number, string][] = [
+  [5, "#6d8dff"],
+  [21, "#a855f7"],
+  [65, "#f97316"],
+  [130, "#eab308"],
+  [260, "#94a3b8"],
+  [520, "#ec4899"],
+  [Infinity, "#06b6d4"],
+];
+const INTRADAY_COLOURS = ["#6d8dff", "#a855f7", "#f97316", "#eab308"];
+
+function colourOf(view: View, n: number, place: number): string {
+  if (view === "intraday") return INTRADAY_COLOURS[place] ?? "#94a3b8";
+  const days = spanInDays(view, n);
+  return SPAN_COLOURS.find(([upTo]) => days <= upTo)![1];
+}
 /** How many of the latest bars each view opens on: five days of 15 minutes, a year of days, five
  * years of weeks, every month. Earlier bars are a drag away. */
 const OPENS_ON: Record<View, number> = { intraday: Infinity, day: 250, week: 262, month: Infinity };
@@ -111,8 +123,9 @@ export function StockChart({
     return group(bars, view);
   }, [bars, view, intraday]);
   const averages = useMemo(
-    () => Object.fromEntries(AVERAGES.map((n) => [n, movingAverage(shown, n)])) as Record<number, (number | null)[]>,
-    [shown],
+    () =>
+      Object.fromEntries(AVERAGES[view].map((n) => [n, movingAverage(shown, n)])) as Record<number, (number | null)[]>,
+    [shown, view],
   );
   const [pointed, setPointed] = useState<number | null>(null);
   const [theme, setTheme] = useState(0);
@@ -181,9 +194,9 @@ export function StockChart({
       priceLineVisible: false,
     });
     price.setData(shown.map((bar) => ({ time: timeOf(bar, view), value: bar.c })));
-    for (const n of AVERAGES) {
+    for (const [place, n] of AVERAGES[view].entries()) {
       const line = chart.addSeries(LineSeries, {
-        color: MA_COLOURS[n],
+        color: colourOf(view, n, place),
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -276,11 +289,11 @@ export function StockChart({
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 text-xs tabular-nums">
         {bar
-          ? AVERAGES.map((n) => {
-              const value = averages[n][at];
+          ? AVERAGES[view].map((n, place) => {
+              const value = averages[n]?.[at];
               return (
-                <span key={n} style={{ color: MA_COLOURS[n] }}>
-                  MA{n} {value === null || value === undefined ? "--" : number(value)}
+                <span key={n} style={{ color: colourOf(view, n, place) }} title={w.averageTitle(view, n)}>
+                  {w.average(view, n)} {value === null || value === undefined ? "--" : number(value)}
                 </span>
               );
             })
