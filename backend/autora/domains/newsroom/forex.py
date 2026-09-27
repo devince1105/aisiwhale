@@ -26,6 +26,7 @@ from autora.domains.newsroom.price_history import GetRows, PublicBar
 log = logging.getLogger(__name__)
 
 TIINGO_FX = "https://api.tiingo.com/tiingo/fx/{pair}/prices"
+TIINGO_CRYPTO = "https://api.tiingo.com/tiingo/crypto/prices"
 SOURCE = "Tiingo"
 YEARS = 5
 KEEP = timedelta(hours=3)
@@ -112,6 +113,21 @@ def bars_from(rows: list[dict]) -> list[PublicBar]:
     return [out[d] for d in sorted(out)]
 
 
+def crypto_bars(answer: list) -> list[PublicBar]:
+    """Tiingo's crypto answer (one ticker's ``priceData``) as a bar a day, weekends included:
+    coins trade every day. Its volume is in coins across exchanges, not shown (``v`` 0)."""
+    out: dict[date, PublicBar] = {}
+    for row in (answer[0].get("priceData") or []) if answer else []:
+        try:
+            day = datetime.fromisoformat(str(row["date"]).replace("Z", "+00:00")).date()
+            bar = PublicBar(d=day, o=row["open"], h=row["high"], l=row["low"], c=row["close"], v=0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if bar.c > 0:
+            out[day] = bar
+    return [out[d] for d in sorted(out)]
+
+
 def crossed(twd: list[PublicBar], pair: list[PublicBar], per_usd: bool) -> list[PublicBar]:
     """New Taiwan dollars for one unit of a currency, each day both have a close: the dollar's
     NT$ over the currency a dollar buys, or times the dollars the currency buys. Closes only."""
@@ -144,26 +160,39 @@ class TiingoFx:
         self._lock = asyncio.Lock()
 
     async def bars(self, pair: str) -> list[PublicBar]:
+        """A forex pair's days (``usdtwd``, ``xauusd``)."""
+        return await self._cached(
+            pair, TIINGO_FX.format(pair=pair), {"resampleFreq": "1day"}, bars_from
+        )
+
+    async def crypto(self, ticker: str) -> list[PublicBar]:
+        """A coin's days in US dollars (``btcusd``, D-073): every day, weekends too."""
+        return await self._cached(
+            f"crypto:{ticker}",
+            TIINGO_CRYPTO,
+            {"tickers": ticker, "resampleFreq": "1day"},
+            crypto_bars,
+        )
+
+    async def _cached(
+        self, name: str, url: str, params: dict, parse: Callable[[list], list[PublicBar]]
+    ) -> list[PublicBar]:
         if self.get is None:
             return []
         async with self._lock:
             now = self.clock()
-            if now >= self._until.get(pair, datetime.min.replace(tzinfo=UTC)):
+            if now >= self._until.get(name, datetime.min.replace(tzinfo=UTC)):
                 try:
                     start = now.date() - timedelta(days=366 * YEARS)
-                    rows = await self.get(
-                        TIINGO_FX.format(pair=pair),
-                        {"startDate": start.isoformat(), "resampleFreq": "1day"},
-                    )
-                    fresh = bars_from(rows)
+                    fresh = parse(await self.get(url, {"startDate": start.isoformat(), **params}))
                     if not fresh:
                         raise ValueError("no bars")
-                    self._kept[pair] = fresh
-                    self._until[pair] = now + KEEP
+                    self._kept[name] = fresh
+                    self._until[name] = now + KEEP
                 except Exception as error:  # noqa: BLE001 — the last good answer stands
-                    log.warning("forex: %s not refreshed: %s", pair, type(error).__name__)
-                    self._until[pair] = now + RETRY
-        return self._kept.get(pair, [])
+                    log.warning("forex: %s not refreshed: %s", name, type(error).__name__)
+                    self._until[name] = now + RETRY
+        return self._kept.get(name, [])
 
     async def twd_bars(self, code: str) -> tuple[list[PublicBar], bool]:
         """New Taiwan dollars for one unit of ``code``, each day, and whether closes only."""

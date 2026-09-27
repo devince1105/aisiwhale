@@ -4034,6 +4034,10 @@
       ],
       "title": "Change Pct"
      },
+     "close_only": {
+      "title": "Close Only",
+      "type": "boolean"
+     },
      "key": {
       "title": "Key",
       "type": "string"
@@ -4054,6 +4058,7 @@
      "change",
      "change_pct",
      "source",
+     "close_only",
      "bars"
     ],
     "title": "PublicFigure",
@@ -10223,7 +10228,7 @@
   },
   "/api/public/figures/{key}": {
    "get": {
-    "description": "A watchlist figure's chart (D-072): a currency against the New Taiwan dollar\n(``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five\nyears. None for a figure without one (or offline).",
+    "description": "A watchlist figure's chart (D-072, D-073): a currency against the New Taiwan dollar\n(``jpytwd``), the Nasdaq, the 10-year yield, WTI crude, the Taiwan index, Bitcoin or Ether —\neach day for about five years. None for a figure without one (or offline).",
     "operationId": "figure_chart_api_public_figures__key__get",
     "parameters": [
      {

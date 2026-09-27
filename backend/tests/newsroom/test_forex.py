@@ -11,10 +11,12 @@ from autora.domains.newsroom.figures import Figures, FredHistory, closes, curren
 from autora.domains.newsroom.forex import (
     CHARTED,
     CURRENCIES,
+    TIINGO_CRYPTO,
     TIINGO_FX,
     TiingoFx,
     bars_from,
     crossed,
+    crypto_bars,
 )
 from autora.domains.newsroom.gold import GRAMS_PER_OUNCE, GoldBoard
 
@@ -76,11 +78,38 @@ def test_the_charted_currencies_are_bank_of_taiwan_s():
     assert currency_of("usd") is None and currency_of("nasdaq") is None
 
 
+BTC = [
+    {
+        "ticker": "btcusd",
+        "priceData": [
+            {
+                "date": "2026-09-26T00:00:00+00:00",
+                "open": 84000,
+                "high": 85500,
+                "low": 83900,
+                "close": 85000,
+                "volume": 1900.5,
+            },
+            {
+                "date": "2026-09-27T00:00:00+00:00",
+                "open": 85000,
+                "high": 85100,
+                "low": 84200,
+                "close": 84729.72,
+                "volume": 1864.4,
+            },
+        ],
+    }
+]
+
+
 def tiingo(asked: list[str], *, down: bool = False):
     async def get(url: str, params: dict) -> list[dict]:
         asked.append(url)
         if down:
             raise httpx.ConnectError("down")
+        if url == TIINGO_CRYPTO:
+            return BTC if params["tickers"] == "btcusd" else []
         pair = url.split("/fx/")[1].split("/")[0]
         return PAIRS[pair]
 
@@ -146,3 +175,30 @@ async def test_figures_a_currency_from_tiingo_and_the_rest_from_fred():
     assert await figures.figure("taiex") is None and await figures.figure("thbtwd") is None
     offline = Figures(TiingoFx(None), FredHistory(None))
     assert await offline.figure("wti") is None and await offline.figure("usdtwd") is None
+
+
+def test_a_coin_trades_every_day_so_its_weekend_stays():
+    bars = crypto_bars(BTC)
+    assert [(b.d.isoformat(), b.c) for b in bars] == [
+        ("2026-09-26", 85000),
+        ("2026-09-27", 84729.72),
+    ]
+    assert (bars[0].h, bars[0].l, bars[0].v) == (85500, 83900, 0)
+    assert crypto_bars([]) == [] and crypto_bars([{"ticker": "x", "priceData": None}]) == []
+
+
+async def test_bitcoin_and_the_taiwan_index_have_charts_with_their_open_high_and_low():
+    asked: list[str] = []
+    figures = Figures(TiingoFx(tiingo(asked)), FredHistory(None))
+    btc = await figures.figure("btc")
+    assert btc is not None and (btc.value, btc.source, btc.close_only) == (
+        84729.72,
+        "Tiingo",
+        False,
+    )
+    await figures.figure("btc")
+    assert asked == [TIINGO_CRYPTO], "a coin, too, once every few hours"
+    assert await figures.figure("eth") is None  # no Ether in the fixture
+    assert await figures.figure("taiex") is None  # without the database: nothing to read
+    yen = await figures.figure("jpytwd")
+    assert yen.close_only and not (await figures.figure("usdtwd")).close_only

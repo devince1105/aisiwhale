@@ -682,8 +682,8 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
   );
 }
 
-/** A figure's chart (D-072): a currency in NT$, the Nasdaq, the yield, oil — each day's close.
- * The TAIEX and the coins have none yet, and say so. */
+/** A figure's chart (D-072, D-073): a currency in NT$, the Nasdaq, the yield, oil, the TAIEX, a
+ * coin. One whose history is still being fetched (the TAIEX's first fill) says so. */
 function FigureChart({ item, lang }: { item: WatchedStock; lang: Lang }) {
   const w = words(lang);
   const [figure, setFigure] = useState<PublicFigure | null | undefined>(undefined);
@@ -705,7 +705,7 @@ function FigureChart({ item, lang }: { item: WatchedStock; lang: Lang }) {
         symbol={item.symbol}
         source={figure.source}
         volume={false}
-        closeOnly
+        closeOnly={figure.close_only}
         // a currency as a bank posts it (0.2017, 4.726); the Nasdaq, the yield and oil, two places
         decimals={isCurrency(item.key) ? (figure.value < 1 ? 4 : 3) : 2}
       />

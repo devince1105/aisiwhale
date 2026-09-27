@@ -185,14 +185,15 @@ def figure_charts(
 @router.get("/api/public/figures/{key}")
 async def figure_chart(
     key: Annotated[str, Path(pattern=r"^[a-z0-9]{2,10}$")],
+    session: Session,
     response: Response,
     figures: Annotated[Figures, Depends(figure_charts)],
 ) -> PublicFigure | None:
-    """A watchlist figure's chart (D-072): a currency against the New Taiwan dollar
-    (``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five
-    years. None for a figure without one (or offline)."""
+    """A watchlist figure's chart (D-072, D-073): a currency against the New Taiwan dollar
+    (``jpytwd``), the Nasdaq, the 10-year yield, WTI crude, the Taiwan index, Bitcoin or Ether —
+    each day for about five years. None for a figure without one (or offline)."""
     response.headers["Cache-Control"] = "public, max-age=600"
-    return await figures.figure(key)
+    return await figures.figure(key, session)
 
 
 @router.get("/api/public/markets")

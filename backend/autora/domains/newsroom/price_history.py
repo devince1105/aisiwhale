@@ -43,6 +43,10 @@ PRICES_CRON = "20 7,10 * * 1-5"
 
 TWSE_DAY = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
 TPEX_DAY = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
+TWSE_INDEX_DAY = "https://www.twse.com.tw/indicesReport/MI_5MINS_HIST"
+INDEX = "TAIEX"
+"""The Taiwan index, kept as one more Taiwan symbol (D-073): its days from TWSE's index history,
+a month a request, as a stock's are; no volume (the history gives none)."""
 FIRST_FILL_MONTHS = 12
 """A stock's first fill: its last year, so its chart is there within a minute of being asked
 for; the years before are added by the next refresh (D-061)."""
@@ -104,6 +108,38 @@ def parse_twse_month(payload: dict) -> list[Bar]:
             )
         except (InvalidOperation, ValueError, IndexError):
             continue  # "--": no trade that day
+    return bars
+
+
+INDEX_COLUMNS = ("日期", "開盤指數", "最高指數", "最低指數", "收盤指數")
+
+
+def parse_index_month(payload: dict) -> list[Bar]:
+    """One month of MI_5MINS_HIST: the index's open, high, low and close each day."""
+    if payload.get("stat") != "OK":
+        if "沒有符合條件" in str(payload.get("stat")):
+            return []
+        raise PriceError(f"TWSE answered {payload.get('stat')!r}")
+    fields = payload.get("fields") or []
+    try:
+        at = {name: fields.index(name) for name in INDEX_COLUMNS}
+    except ValueError as error:
+        raise PriceError(f"TWSE's index columns changed: {fields}") from error
+    bars = []
+    for row in payload.get("data") or []:
+        try:
+            bars.append(
+                Bar(
+                    day=_roc_day(row[at["日期"]]),
+                    open=_number(row[at["開盤指數"]]),
+                    high=_number(row[at["最高指數"]]),
+                    low=_number(row[at["最低指數"]]),
+                    close=_number(row[at["收盤指數"]]),
+                    volume=0,
+                )
+            )
+        except (InvalidOperation, ValueError, IndexError):
+            continue
     return bars
 
 
@@ -181,6 +217,11 @@ async def refresh_tw(
             await asyncio.sleep(pause)
         requests += 1
         try:
+            if symbol == INDEX:
+                payload = await get(
+                    TWSE_INDEX_DAY, {"response": "json", "date": month.strftime("%Y%m01")}
+                )
+                return parse_index_month(payload)
             if exchanges.get(symbol) == "TPEx":
                 payload = await get(
                     TPEX_DAY,
@@ -354,7 +395,10 @@ class PricesKeeper:
         self.us_pause = us_pause
 
     async def _tw(self, session: AsyncSession) -> tuple[tuple[str, ...], dict[str, str]]:
-        symbols = tuple(dict.fromkeys((*TW_STOCKS, *await securities.tracked(session, "tw"))))
+        # the index first (D-073): the watchlist's chart of it, then the stocks
+        symbols = tuple(
+            dict.fromkeys((INDEX, *TW_STOCKS, *await securities.tracked(session, "tw")))
+        )
         return symbols, await securities.exchange_of(session, list(symbols))
 
     def schedule_handler(self) -> Handler:
@@ -523,7 +567,8 @@ def split_factors(bars: list[PublicBar]) -> list[float]:
 
 
 async def history(session: AsyncSession, market: str, symbol: str) -> PublicHistory:
-    """Oldest first; a Taiwan stock's split-adjusted (Tiingo's already are)."""
+    """Oldest first; a Taiwan stock's split-adjusted (Tiingo's already are; an index has no
+    splits, and no price limit to find them by)."""
     rows = (
         await session.scalars(
             select(PriceBar)
@@ -542,7 +587,7 @@ async def history(session: AsyncSession, market: str, symbol: str) -> PublicHist
         )  # fmt: skip
         for r in rows
     ]
-    if market == "tw":
+    if market == "tw" and symbol != INDEX:
         bars = [
             PublicBar(
                 d=b.d,

@@ -943,9 +943,9 @@ export interface paths {
         };
         /**
          * Figure Chart
-         * @description A watchlist figure's chart (D-072): a currency against the New Taiwan dollar
-         *     (``jpytwd``), the Nasdaq, the 10-year yield or WTI crude — each day's close for about five
-         *     years. None for a figure without one (or offline).
+         * @description A watchlist figure's chart (D-072, D-073): a currency against the New Taiwan dollar
+         *     (``jpytwd``), the Nasdaq, the 10-year yield, WTI crude, the Taiwan index, Bitcoin or Ether —
+         *     each day for about five years. None for a figure without one (or offline).
          */
         get: operations["figure_chart_api_public_figures__key__get"];
         put?: never;
@@ -2813,6 +2813,8 @@ export interface components {
             change: number | null;
             /** Change Pct */
             change_pct: number | null;
+            /** Close Only */
+            close_only: boolean;
             /** Key */
             key: string;
             /** Source */

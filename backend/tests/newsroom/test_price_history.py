@@ -338,3 +338,71 @@ async def test_a_us_stock_asks_for_the_days_since_and_everything_again_after_a_s
     )
     assert asked == ["2026-09-14", "2021-10-01"]  # a week before the last bar; then five years
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+
+
+INDEX_SEPTEMBER = {  # as TWSE answered for 2026-09
+    "stat": "OK",
+    "fields": ["日期", "開盤指數", "最高指數", "最低指數", "收盤指數"],
+    "data": [
+        ["115/09/01", "46,177.11", "46,948.72", "46,081.11", "46,948.72"],
+        ["115/09/02", "46,901.32", "46,946.60", "46,164.72", "46,164.72"],
+    ],
+}
+
+
+def test_the_index_month_reads_as_bars_without_volume():
+    bars = price_history.parse_index_month(INDEX_SEPTEMBER)
+    assert [(b.day, b.close, b.volume) for b in bars] == [
+        (date(2026, 9, 1), Decimal("46948.72"), 0),
+        (date(2026, 9, 2), Decimal("46164.72"), 0),
+    ]
+    assert price_history.parse_index_month({"stat": "很抱歉，沒有符合條件的資料!"}) == []
+
+
+async def test_the_taiwan_index_is_one_more_taiwan_symbol_and_served_unadjusted(db_session):
+    """D-073: the TAIEX's days, asked of TWSE's index history a month at a time, stored with the
+    stocks'; a day's fall of more than a stock's 10% limit is not read as a split."""
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == price_history.INDEX))
+    asked = []
+
+    async def get(url, params):
+        asked.append((url, params))
+        if params["date"] == "20260901":
+            crash = {
+                **INDEX_SEPTEMBER,
+                "data": [
+                    *INDEX_SEPTEMBER["data"],
+                    ["115/09/03", "46,164.72", "46,164.72", "40,000.00", "40,000.00"],
+                ],
+            }
+            return crash
+        return {"stat": "很抱歉，沒有符合條件的資料!"}
+
+    written = await price_history.refresh_tw(
+        db_session, get, today=date(2026, 9, 27), symbols=(price_history.INDEX,), pause=0,
+        extend=False,
+    )  # fmt: skip
+    assert written == 3
+    assert {url for url, _ in asked} == {price_history.TWSE_INDEX_DAY}
+    assert all("stockNo" not in params for _, params in asked)
+    served = await price_history.history(db_session, "tw", price_history.INDEX)
+    assert [b.c for b in served.bars] == [46948.72, 46164.72, 40000.0]  # not "split"
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == price_history.INDEX))
+
+
+async def test_the_scheduled_refresh_asks_for_the_index_first():
+    keeper = price_history.PricesKeeper(price_history.no_prices)
+
+    class Session:
+        async def scalars(self, *_):
+            return []
+
+        async def execute(self, *_):
+            class Rows:
+                def all(self):
+                    return []
+
+            return Rows()
+
+    symbols, _ = await keeper._tw(Session())
+    assert symbols[0] == price_history.INDEX

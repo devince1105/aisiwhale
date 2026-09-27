@@ -8,9 +8,13 @@ five years, for the watchlist page to show when the figure is picked.
   series every six hours. FRED's key travels in the query string, so a failure is logged by its
   kind only.
 
-Every one of them is each day's close (FRED gives no more; a currency cross can have no more), so
-the chart draws the close and says no open, high or low. Spot gold has a page of its own
-(``gold``): its price a gram. The Taiwan index and the coins have no chart yet.
+- The Taiwan index (``taiex``, D-073): its days as TWSE's index history gives them, stored with the
+  Taiwan stocks' (``price_history.INDEX``) — five years is sixty requests, too many to ask again.
+- Bitcoin and Ether (``btc``, ``eth``, D-073): Tiingo's crypto prices, through the same cache.
+
+FRED's figures and a currency cross are each day's close and nothing more (``close_only``): the
+chart draws the close and gives no open, high or low. Spot gold has a page of its own (``gold``):
+its price a gram.
 """
 
 from __future__ import annotations
@@ -21,15 +25,17 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
 
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.domains.newsroom.forex import CHARTED, SOURCE, TiingoFx
-from autora.domains.newsroom.price_history import PublicBar
+from autora.domains.newsroom.price_history import INDEX, PublicBar, history
 
 log = logging.getLogger(__name__)
 
 FRED = "https://api.stlouisfed.org/fred/series/observations"
 FRED_CHARTS = {"nasdaq": "NASDAQCOM", "us10y": "DGS10", "wti": "DCOILWTICO"}
 """The strip's FRED figures (``market_strip.FRED_SERIES``), by the strip's keys."""
+COINS = {"btc": "btcusd", "eth": "ethusd"}
 YEARS = 5
 KEEP = timedelta(hours=6)
 """FRED publishes each of these once a day."""
@@ -67,8 +73,10 @@ class PublicFigure(BaseModel):
     change_pct: float | None
     """None for the yield: its change is in percentage points (``change``)."""
     source: str
+    close_only: bool
+    """Each day's close and no more (FRED, a currency cross): open, high and low are the close."""
     bars: list[PublicBar]
-    """Oldest first, about five years of closes (open, high and low are the close)."""
+    """Oldest first, about five years."""
 
 
 class FredHistory:
@@ -130,14 +138,20 @@ class Figures:
         self.forex = forex
         self.fred = fred
 
-    async def figure(self, key: str) -> PublicFigure | None:
+    async def figure(self, key: str, session: AsyncSession | None = None) -> PublicFigure | None:
         key = key.lower()
+        close_only = True
         if (code := currency_of(key)) is not None:
-            bars, _ = await self.forex.twd_bars(code)
+            bars, close_only = await self.forex.twd_bars(code)
             source = SOURCE
         elif key in FRED_CHARTS:
             bars = await self.fred.bars(FRED_CHARTS[key])
             source = "FRED"
+        elif key in COINS:
+            bars, close_only, source = await self.forex.crypto(COINS[key]), False, SOURCE
+        elif key == "taiex" and session is not None:
+            stored = await history(session, "tw", INDEX)
+            bars, close_only, source = stored.bars, False, "TWSE"
         else:
             return None
         if not bars:
@@ -152,5 +166,6 @@ class Figures:
             change=change,
             change_pct=None if change is None or key == "us10y" else change / before * 100,
             source=source,
+            close_only=close_only,
             bars=bars,
         )
