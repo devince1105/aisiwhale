@@ -6,7 +6,7 @@ company layer can read an address. The company's side of a reader is a customer 
 ``external_ref`` is ``reader:<id>``.
 """
 
-from autora.accounts.models import LoginToken, Reader, ReaderSession
+from autora.accounts.models import LoginToken, Reader, ReaderSession, WatchlistItem
 from autora.accounts.service import (
     SESSION_COOKIE,
     AccountError,
@@ -27,6 +27,7 @@ __all__ = [
     "LoginToken",
     "Reader",
     "ReaderSession",
+    "WatchlistItem",
     "by_email",
     "customer_ref",
     "normalise",

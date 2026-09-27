@@ -73,3 +73,21 @@ class ReaderSession(IdMixin, CreatedAtMixin, Base):
     expires_at: Mapped[datetime]
     revoked_at: Mapped[datetime | None]
     """Signing out. The row stays: when a session ended is worth knowing."""
+
+
+class WatchlistItem(IdMixin, CreatedAtMixin, Base):
+    """A stock a reader keeps an eye on (D-060). Theirs alone: kept with the reader, never with
+    the company's data, and gone with them."""
+
+    __tablename__ = "watchlist_items"
+    __table_args__ = (
+        UniqueConstraint("reader_id", "market", "symbol"),
+        CheckConstraint("market in ('tw', 'us')", name="market"),
+    )
+
+    reader_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("readers.id", ondelete="CASCADE"), index=True
+    )
+    market: Mapped[str]
+    symbol: Mapped[str]
+    """As the site's stock pages name it: ``NVDA``, ``2330``."""

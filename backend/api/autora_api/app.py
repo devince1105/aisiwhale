@@ -29,6 +29,7 @@ from autora_api.routers import (
     reporting,
     runs,
     tasks,
+    watchlist,
     workflows,
     ws,
 )
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_origins,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],  # DELETE: a reader's watchlist (D-060)
         allow_headers=["Authorization", "Content-Type"],
         # the reader's session is a cookie (D-025), and a cross-origin request only carries it
         # when both sides say so; the origins above are the only ones allowed to ask
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin_auth.router)
     app.include_router(payments.router)
+    app.include_router(watchlist.router)
     app.include_router(newsroom.router)
     app.include_router(meta.router)
     app.include_router(ws.router)

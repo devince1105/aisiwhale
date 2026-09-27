@@ -41,6 +41,9 @@ export function MemberBadge({ lang }: { lang: Lang }) {
 
   return (
     <span className="flex items-center gap-2 text-sm" data-testid="member-badge">
+      <a href={`/news/${lang}/watchlist`} className="hover:text-accent" data-testid="watchlist-link">
+        {w.watch.link}
+      </a>
       {isMember(me) ? (
         <span className="rounded-full border border-line px-2 py-0.5" title={`${w.memberUntil} ${formatDate(lang, me.member_until!)}`}>
           {w.member}・{formatDate(lang, me.member_until!)}

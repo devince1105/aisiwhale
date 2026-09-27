@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
 import { StockChart } from "./StockChart";
+import { WatchButton } from "./Watchlist";
 import { ARROW, direction, formatCap, formatChange, formatValue, stockCode, TONE } from "./quote";
 
 // the day's figures, after the watch cards the site's owner uses: the high in the rising colour,
@@ -133,10 +134,13 @@ export function StockView({
   return (
     <article className="mx-auto max-w-3xl px-4 pt-6 pb-10">
       <header>
-        <h1 className="flex flex-wrap items-baseline gap-x-3 text-3xl font-bold">
-          {stock.name}
-          {code && code !== stock.name ? <span className="text-lg font-medium text-muted">{code}</span> : null}
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="flex flex-wrap items-baseline gap-x-3 text-3xl font-bold">
+            {stock.name}
+            {code && code !== stock.name ? <span className="text-lg font-medium text-muted">{code}</span> : null}
+          </h1>
+          <WatchButton symbol={stock.symbol} lang={lang} />
+        </div>
         {quote ? (
           <div className="mt-3 flex flex-wrap items-end gap-x-3">
             <span className={`text-4xl leading-none font-semibold tabular-nums ${TONE[way]}`}>{formatValue(quote, lang)}</span>

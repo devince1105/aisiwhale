@@ -5,6 +5,7 @@ import { cache } from "react";
 import { fetchHistory, fetchStock } from "@/features/site/api";
 import { isLang, words } from "@/features/site/i18n";
 import { StockView } from "@/features/site/StockView";
+import { WatchlistSide } from "@/features/site/Watchlist";
 
 // its figure changes every few minutes, its holders a few times a year: a minute is fresh enough
 export const revalidate = 60;
@@ -32,5 +33,15 @@ export default async function Page({ params }: { params: Params }) {
     fetchHistory(symbol).catch(() => null),
   ]);
   if (!stock) notFound();
-  return <StockView stock={stock} lang={lang} history={history} />;
+  // the reader's watchlist beside the stock (D-060): a column on a wide screen, a row on a phone
+  return (
+    <div className="mx-auto max-w-6xl lg:flex lg:gap-6 lg:px-4">
+      <aside className="lg:w-56 lg:shrink-0 lg:pt-6">
+        <WatchlistSide lang={lang} current={`${stock.market}:${stock.symbol}`} />
+      </aside>
+      <div className="min-w-0 flex-1">
+        <StockView stock={stock} lang={lang} history={history} />
+      </div>
+    </div>
+  );
 }
