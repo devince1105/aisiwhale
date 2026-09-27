@@ -88,6 +88,13 @@ describe("the article page", () => {
     cleanup();
     render(<ArticleView article={ARTICLE} lang="zh-TW" />);
     expect(document.body.textContent).not.toContain("更新於");
+    cleanup();
+    // corrected the day it was published (Taipei's day): the date is already there, once is enough
+    render(<ArticleView article={{ ...ARTICLE, revised_at: "2026-09-19T15:30:00Z" }} lang="zh-TW" />);
+    expect(document.body.textContent).not.toContain("更新於");
+    cleanup();
+    render(<ArticleList articles={[{ ...ARTICLE, revised_at: "2026-09-19T09:00:00Z" } as never]} lang="zh-TW" />);
+    expect(document.body.textContent).not.toContain("更新於");
   });
 
   it("counts a view when it opens", () => {

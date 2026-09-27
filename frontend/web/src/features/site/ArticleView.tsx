@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { PublicArticle } from "./api";
 import { listHref } from "./ArticleList";
 import { Beacon } from "./Beacon";
-import { filterName, formatDate, isLang, isSection, LANG_NAMES, tagsOf, topicOf, words, type Lang } from "./i18n";
+import { filterName, formatDate, isLang, isSection, LANG_NAMES, revisedOn, tagsOf, topicOf, words, type Lang } from "./i18n";
 import { MembersOnly } from "./MembersOnly";
 import { ListenButton, PrintButton } from "./ReadingTools";
 
@@ -47,10 +47,11 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
           {/* the site's own name in the page's language, not the company's one spelling (D-043) */}
           <span>{w.site}・</span>
           {w.published} <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
-          {article.revised_at ? (
+          {/* revised the day it was published: that date is already there */}
+          {article.revised_at && revisedOn(lang, article.published_at, article.revised_at) ? (
             <>
               {" ・ "}
-              {w.revised} <time dateTime={article.revised_at}>{formatDate(lang, article.revised_at)}</time>
+              {w.revised} <time dateTime={article.revised_at}>{revisedOn(lang, article.published_at, article.revised_at)}</time>
             </>
           ) : null}
         </p>

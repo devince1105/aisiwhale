@@ -557,6 +557,14 @@ export function words(lang: Lang) {
   return WORDS[lang];
 }
 
+/** When an article was revised, if that is worth saying: on a later day than it was published
+ * (in Taipei, as the dates read). The same day says nothing the date beside it does not. */
+export function revisedOn(lang: Lang, published: string, revised: string | null | undefined): string | null {
+  if (!revised) return null;
+  const day = formatDate(lang, revised);
+  return day === formatDate(lang, published) ? null : day;
+}
+
 export function formatDate(lang: Lang, iso: string): string {
   return new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "Asia/Taipei" }).format(
     new Date(iso),

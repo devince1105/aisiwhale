@@ -8,6 +8,7 @@ import type { PublicArticleSummary } from "./api";
 import {
   filterName,
   formatDate,
+  revisedOn,
   isSection,
   tagsOf,
   topicOf,
@@ -40,9 +41,9 @@ function Meta({ article, lang }: { article: PublicArticleSummary; lang: Lang }) 
         </span>
       ) : null}
       <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
-      {article.revised_at ? (
+      {revisedOn(lang, article.published_at, article.revised_at) ? (
         <span>
-          ・{w.revised} {formatDate(lang, article.revised_at)}
+          ・{w.revised} {revisedOn(lang, article.published_at, article.revised_at)}
         </span>
       ) : null}
       {article.access === "members" ? (
