@@ -19,7 +19,7 @@ const WORDS = {
     revised: "更新於",
     allStories: "所有報導",
     all: "全部",
-    sections: { holdings: "大戶持股", figures: "名人持股", ai: "AI 科技", tw: "台股", us: "美股", crypto: "加密貨幣" },
+    sections: { holdings: "大戶持股", figures: "名人持股", ai: "AI 科技", tw: "台股", us: "美股", crypto: "加密貨幣", institutions: "機構觀點" },
     sectionsLabel: "報導分類",
     topics: { watch: "持股觀察" } as Record<string, string>,
     tagsLabel: "持股觀察的分類",
@@ -197,6 +197,7 @@ const WORDS = {
       tw: "Taiwan",
       us: "US stocks",
       crypto: "Crypto",
+      institutions: "Institutional views",
     },
     sectionsLabel: "Sections",
     topics: { watch: "Holdings watch" } as Record<string, string>,
@@ -348,7 +349,7 @@ const WORDS = {
 } as const;
 
 /** The site's sections (D-047), as the API names them. */
-export const SECTIONS = ["holdings", "figures", "ai", "tw", "us", "crypto"] as const;
+export const SECTIONS = ["holdings", "figures", "ai", "tw", "us", "crypto", "institutions"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export function isSection(value: unknown): value is Section {
@@ -357,7 +358,7 @@ export function isSection(value: unknown): value is Section {
 
 /** The site's tabs (D-050). Most are one section; 持股觀察 (``watch``) is two — the big investors'
  * filings and the public figures' — told apart inside it by tags. */
-export const TOPICS = ["watch", "ai", "tw", "us", "crypto"] as const;
+export const TOPICS = ["ai", "tw", "us", "crypto", "institutions", "watch"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
@@ -366,6 +367,7 @@ const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
   tw: ["tw"],
   us: ["us"],
   crypto: ["crypto"],
+  institutions: ["institutions"],
 };
 
 /** What ``?section=`` may say: a tab, or one of the sections inside a tab of several. */

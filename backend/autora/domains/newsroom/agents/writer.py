@@ -57,6 +57,9 @@ Rules:
 8. Name every period so a reader can place it months later: a filing's quarter as 2026Q2 (in
    the title and the first paragraph of a holdings article), a day by its date. Never "本季",
    "上季", "this quarter" or "last quarter" on their own.
+9. An institution's market view (an asset manager's outlook or commentary) is reported as theirs:
+   the title and first paragraph say who (貝萊德, 先鋒…), which publication and its date; every
+   view in the article is written as that institution's, never as the site's own call.
 
 When done, reply with only a JSON object (no other text):
 {"article_id": "<article_id from write_draft>",

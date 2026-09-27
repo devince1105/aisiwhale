@@ -20,6 +20,9 @@ Its sources, and why each is set up the way it is:
 - **Searches** for Taiwan's market and the AI supply chain, which have no feed a program may read.
   Each search costs a Tavily credit, so they run twice a day: three searches, about 180 credits
   a month of the free plan's 1,000, leaving the rest for the researcher's own searches.
+- **機構觀點** (D-057): what the ten largest asset managers publish about the markets — their own
+  free outlooks and commentaries, reported as theirs ("貝萊德表示…"), never as the site's advice.
+  Ten firms in two searches, once a day over a week of results: about 60 credits a month.
 
 Scion Asset Management (Michael Burry) is on the list the user chose, but its last 13F was filed
 on 2025-11-03: it may never produce another story. Kept, because a filing would be news.
@@ -69,6 +72,7 @@ MISSION = (
 )
 
 HALF_DAY = 12 * 3600
+DAY = 24 * 3600
 
 
 def edgar_13f(cik: str) -> str:
@@ -153,14 +157,21 @@ def _figure(name: str, cik: str) -> MarketSource:
     )
 
 
-def _search(query: str, section: str, language: str = "zh-TW") -> MarketSource:
+def _search(
+    query: str,
+    section: str,
+    language: str = "zh-TW",
+    *,
+    recency_days: int = 2,
+    every: int = HALF_DAY,
+) -> MarketSource:
     return MarketSource(
         name=f"搜尋：{query}",
         kind="search_query",
         trust_level=Decimal("0.5"),
         language=language,
-        config={"query": query, "k": 5, "recency_days": 2, SECTION: section},
-        poll_interval_seconds=HALF_DAY,
+        config={"query": query, "k": 5, "recency_days": recency_days, SECTION: section},
+        poll_interval_seconds=every,
     )
 
 
@@ -189,6 +200,22 @@ SOURCES: tuple[MarketSource, ...] = (
     _search("美股 科技股 財報", "us"),
     _press("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/", "crypto"),
     _search("比特幣 以太幣 ETF 監管", "crypto"),
+    # 機構觀點 (D-057): the ten largest asset managers' own published outlooks — a weekly
+    # commentary is news for a week, so a day's search over seven days of results is enough
+    _search(
+        "BlackRock Vanguard Fidelity UBS State Street market outlook commentary",
+        "institutions",
+        "en",
+        recency_days=7,
+        every=DAY,
+    ),  # fmt: skip
+    _search(
+        "J.P. Morgan Asset Management Goldman Sachs Capital Group Amundi BNY investment outlook",
+        "institutions",
+        "en",
+        recency_days=7,
+        every=DAY,
+    ),  # fmt: skip
 )
 
 

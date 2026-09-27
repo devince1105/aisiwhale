@@ -87,11 +87,17 @@ async def test_a_filer_that_moved_is_the_same_source_with_a_new_address(db_sessi
     assert again.added == [] and "CIK=0002026053" in ackman.url
 
 
-def test_searches_run_twice_a_day_to_stay_inside_the_free_plan():
-    """D-038: 6 searches x 2 a day x 30 days = 360 of Tavily's 1,000 free credits a month."""
+def test_searches_stay_inside_the_free_plan():
+    """D-038: 6 searches x 2 a day x 30 days = 360 of Tavily's 1,000 free credits a month; the
+    institutions' outlooks (D-057) are weekly, so their 2 run once a day: 60 more."""
     searches = [s for s in markets.SOURCES if s.kind == "search_query"]
-    assert len(searches) == 6
-    assert {s.poll_interval_seconds for s in searches} == {12 * 3600}
+    daily = [s for s in searches if s.config["section"] == "institutions"]
+    assert len(searches) == 8 and len(daily) == 2
+    assert {s.poll_interval_seconds for s in searches if s not in daily} == {12 * 3600}
+    assert {s.poll_interval_seconds for s in daily} == {24 * 3600}
+    assert {s.config["recency_days"] for s in daily} == {7}
+    monthly = sum(30 * 24 * 3600 // s.poll_interval_seconds for s in searches)
+    assert monthly == 420
 
 
 def test_every_source_says_which_section_of_the_site_it_feeds():

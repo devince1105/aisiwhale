@@ -46,7 +46,7 @@ from autora_api.deps import Session
 
 router = APIRouter(tags=["public"])
 
-Section = Literal["holdings", "figures", "ai", "tw", "us", "crypto"]
+Section = Literal["holdings", "figures", "ai", "tw", "us", "crypto", "institutions"]
 """The site's sections (``newsroom.sources.SECTIONS``), spelled out for the OpenAPI document."""
 
 SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]

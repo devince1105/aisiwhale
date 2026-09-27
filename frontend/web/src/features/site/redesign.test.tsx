@@ -68,11 +68,12 @@ describe("the front page", () => {
     const tabs = within(screen.getByRole("navigation", { name: "報導分類" })).getAllByRole("link");
     expect(tabs.map((t) => [t.textContent, t.getAttribute("href")])).toEqual([
       ["全部", "/news/zh-TW"],
-      ["持股觀察", "/news/zh-TW?section=watch"],
       ["AI 科技", "/news/zh-TW?section=ai"],
       ["台股", "/news/zh-TW?section=tw"],
       ["美股", "/news/zh-TW?section=us"],
       ["加密貨幣", "/news/zh-TW?section=crypto"],
+      ["機構觀點", "/news/zh-TW?section=institutions"],
+      ["持股觀察", "/news/zh-TW?section=watch"],
     ]);
     expect(tabs.filter((t) => t.getAttribute("aria-current") === "page").map((t) => t.textContent)).toEqual(["AI 科技"]);
   });

@@ -9448,7 +9448,8 @@
            "ai",
            "tw",
            "us",
-           "crypto"
+           "crypto",
+           "institutions"
           ],
           "type": "string"
          },
