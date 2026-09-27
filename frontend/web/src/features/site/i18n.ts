@@ -28,7 +28,7 @@ const WORDS = {
       crypto: "加密貨幣",
       institutions: "機構觀點",
       gold: "黃金",
-      commodities: "原物料",
+      commodities: "期貨",
       fx: "外匯",
     },
     sectionsLabel: "報導分類",
@@ -276,7 +276,7 @@ const WORDS = {
       crypto: "Crypto",
       institutions: "Institutional views",
       gold: "Gold",
-      commodities: "Commodities",
+      commodities: "Futures",
       fx: "Currencies",
     },
     sectionsLabel: "Sections",
@@ -507,7 +507,7 @@ export function isSection(value: unknown): value is Section {
   return typeof value === "string" && (SECTIONS as readonly string[]).includes(value);
 }
 
-/** The site's tabs (D-050). Most are one section — 黃金, 原物料 and 外匯 each a tab of their own
+/** The site's tabs (D-050). Most are one section — 黃金, 期貨 and 外匯 each a tab of their own
  * (D-067); 持股觀察 (``watch``) is two — the big investors' filings and the public figures' —
  * told apart inside it by tags. */
 export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "institutions", "watch"] as const;

@@ -74,7 +74,7 @@ describe("the front page", () => {
       ["美股", "/news/zh-TW?section=us"],
       ["加密貨幣", "/news/zh-TW?section=crypto"],
       ["黃金", "/news/zh-TW?section=gold"],
-      ["原物料", "/news/zh-TW?section=commodities"],
+      ["期貨", "/news/zh-TW?section=commodities"],
       ["外匯", "/news/zh-TW?section=fx"],
       ["機構觀點", "/news/zh-TW?section=institutions"],
       ["持股觀察", "/news/zh-TW?section=watch"],
@@ -294,7 +294,7 @@ describe("持股觀察: two sections under one tab, told apart by tags (D-050)",
     expect(screen.queryByRole("navigation", { name: "持股觀察的分類" })).toBeNull();
   });
 
-  it("黃金, 原物料 and 外匯 are tabs of their own, with no tags inside (D-067)", () => {
+  it("黃金, 期貨 and 外匯 are tabs of their own, with no tags inside (D-067)", () => {
     render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="gold" />);
     expect(screen.queryByRole("navigation", { name: /的分類$/ })).toBeNull();
     expect(sectionsOf("commodities")).toEqual(["commodities"]);
