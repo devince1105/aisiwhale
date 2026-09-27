@@ -76,10 +76,13 @@ describe("the watchlist", () => {
     expect(addable.textContent).toContain("加權指數"); // the strip's index can be kept too (D-062)
   });
 
-  it("asks a signed-out reader to sign in", async () => {
+  it("asks a signed-out reader to sign in, and shows the list a new one starts as", async () => {
     list = null;
     render(<WatchlistPage lang="zh-TW" />);
     expect(await screen.findByTestId("watchlist-signed-out")).toBeTruthy();
+    const sample = await screen.findByTestId("watchlist-sample");
+    expect(sample.textContent).toContain("加權指數");
+    expect(sample.textContent).toContain("台積電");
   });
 
   it("beside a stock, marks the one on show; nothing when the list is empty", async () => {
@@ -124,7 +127,8 @@ describe("the strip and the list together (D-062)", () => {
   it("signed out, the strip is the site's, and the list beside a stock is a sample of it", async () => {
     list = null;
     render(<MarketStrip quotes={QUOTES as never} lang="zh-TW" />);
-    expect(screen.getByTestId("market-strip").textContent).toContain("台積電");
+    expect(screen.getByTestId("market-strip-waiting")).toBeTruthy(); // not the site's first
+    expect((await screen.findByTestId("market-strip")).textContent).toContain("台積電");
     cleanup();
     render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
     const side = await screen.findByTestId("watchlist-side");

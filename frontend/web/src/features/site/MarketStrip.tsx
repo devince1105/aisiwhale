@@ -71,23 +71,28 @@ function Quote({ quote, lang, naming, copy = false }: { quote: PublicQuote; lang
 
 /** The strip's figures, or the signed-in reader's watchlist in its order: the site's quotes
  * for what the strip has, the last close for any other stock on the list. */
-function useShown(quotes: PublicQuote[], lang: Lang): [PublicQuote[], Naming] {
+function useShown(quotes: PublicQuote[], lang: Lang): [PublicQuote[] | null, Naming] {
   const w = words(lang);
   const watch = useWatchlist(lang);
   const items = watch.status === "ready" ? watch.items : null;
   const have = useMemo(() => new Map(quotes.map((q) => [q.key, q])), [quotes]);
   const missing = (items ?? []).map((i) => i.key).filter((key) => !have.has(key)).join(",");
-  const [extra, setExtra] = useState<PublicQuote[]>([]);
+  // the quotes of the stocks the site's strip does not have, and for which list they were asked
+  const [extra, setExtra] = useState<{ for: string; quotes: PublicQuote[] }>({ for: "", quotes: [] });
   useEffect(() => {
     let live = true;
-    void fetchQuotes(missing ? missing.split(",") : []).then((answer) => live && setExtra(answer));
+    if (missing) void fetchQuotes(missing.split(",")).then((answer) => live && setExtra({ for: missing, quotes: answer }));
     return () => {
       live = false;
     };
   }, [missing]);
   return useMemo(() => {
+    // nothing until it is known whose strip this is: the site's figures do not flash first
+    if (watch.status === "loading") return [null, { names: w.quoteNames, exchanges: {} }];
     if (!items) return [quotes, { names: w.quoteNames, exchanges: {} }];
-    const more = new Map(extra.map((q) => [q.key, q]));
+    if (missing && extra.for !== missing) return [null, { names: w.quoteNames, exchanges: {} }];
+    const extraQuotes = extra.quotes;
+    const more = new Map(extraQuotes.map((q) => [q.key, q]));
     const shown = items.flatMap((i) => {
       const quote = have.get(i.key) ?? more.get(i.key);
       return quote ? [quote] : []; // a stock whose prices are still being fetched: not yet
@@ -99,15 +104,20 @@ function useShown(quotes: PublicQuote[], lang: Lang): [PublicQuote[], Naming] {
         exchanges: Object.fromEntries(items.map((i) => [i.key, i.exchange])),
       },
     ];
-  }, [items, quotes, have, extra, w.quoteNames]);
+  }, [watch.status, items, quotes, have, missing, extra, w.quoteNames]);
 }
 
 export function MarketStrip({ quotes: site, lang }: { quotes: PublicQuote[]; lang: Lang }) {
   const w = words(lang);
   const list = useRef<HTMLUListElement>(null);
-  const [quotes, naming] = useShown(site, lang);
+  const [shown, naming] = useShown(site, lang);
+  const quotes = shown ?? [];
   // it drifts slowly and loops: the figures are drawn a second time, for the eye only
   const loops = useDrift(list, quotes.length);
+  // still finding out whose strip it is: its height kept, so the page does not jump
+  if (shown === null) {
+    return <div aria-hidden className="h-9 border-b border-line print:hidden" data-testid="market-strip-waiting" />;
+  }
   if (quotes.length === 0) return null;
   const scroll = (by: number) => {
     list.current?.dispatchEvent(new Event("drift:rest"));

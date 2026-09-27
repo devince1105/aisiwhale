@@ -7,6 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchMarkets, type PublicQuote } from "./api";
 import { advance } from "./drift";
 import { MarketStrip } from "./MarketStrip";
+
+// a visitor who is not signed in: the site's own strip (a reader's is their watchlist, D-062)
+vi.mock("./watchlistStore", () => ({ useWatchlist: () => ({ status: "signedOut" }) }));
 import { formatChange, formatValue } from "./quote";
 import { SiteFooter } from "./SiteFooter";
 

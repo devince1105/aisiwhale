@@ -9,6 +9,9 @@ import { MarketStrip } from "./MarketStrip";
 import { stockPage } from "./quote";
 import { StockView } from "./StockView";
 
+// not signed in: the site's own strip, and no list (D-060, D-062)
+vi.mock("./watchlistStore", () => ({ useWatchlist: () => ({ status: "signedOut" }), setWatched: vi.fn() }));
+
 afterEach(cleanup);
 
 const holder = (over: Partial<PublicHolder>): PublicHolder => ({

@@ -182,18 +182,34 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   if (list.status === "loading") return <p className="text-muted">…</p>;
   if (list.status === "failed") return <p className="text-muted">{w.failed}</p>;
   if (list.status === "signedOut") {
+    // not signed in: what a list starts as — the market strip — as a sample (D-062)
+    const sample = stripItems(quotes, names);
     return (
       <div className="grid gap-8">
         <Search lang={lang} watched={null} />
-      <div className="rounded-lg border border-line p-5" data-testid="watchlist-signed-out">
-        <p>{w.signInToWatch}</p>
-        <a
-          href={`/news/${lang}/login?next=${encodeURIComponent(`/news/${lang}/watchlist`)}`}
-          className="mt-3 inline-block rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-surface"
-        >
-          {words(lang).signIn}
-        </a>
-      </div>
+        <div className="rounded-lg border border-line p-5" data-testid="watchlist-signed-out">
+          <p>{w.signInToWatch}</p>
+          <a
+            href={`/news/${lang}/login?next=${encodeURIComponent(`/news/${lang}/watchlist`)}`}
+            className="mt-3 inline-block rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-surface"
+          >
+            {words(lang).signIn}
+          </a>
+        </div>
+        {sample.length ? (
+          <section aria-labelledby="sample">
+            <h2 id="sample" className="mb-2 text-sm text-muted">
+              {w.sample}
+            </h2>
+            <ul className="divide-y divide-line rounded-lg border border-line" data-testid="watchlist-sample">
+              {sample.map((item) => (
+                <li key={item.key}>
+                  <Row item={item} quote={quotes.find((q) => q.key === item.key)} lang={lang} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
     );
   }
