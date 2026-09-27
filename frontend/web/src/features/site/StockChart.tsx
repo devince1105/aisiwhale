@@ -185,7 +185,7 @@ export function StockChart({
             <span className="text-muted">{w.volume}</span> {shares}
           </span>
         </div>
-        <div className="flex rounded-md border border-line text-xs" role="group" aria-label={w.title}>
+        <div className="flex overflow-hidden rounded-md border border-line text-xs" role="group" aria-label={w.title}>
           {INTERVALS.map((value) => (
             <button
               key={value}
