@@ -1,15 +1,19 @@
 "use client";
 
-// A stock's price chart (D-059): the close as a line over day, week or month bars, its 5/10/20/
-// 60/250 moving averages, and volume beneath, coloured by the bar's direction (rise red, fall
-// green, as the rest of the site). The legend above follows the pointer and rests on the latest
-// bar. Colours come from the page's own tokens, read again when the theme changes.
+// A stock's price chart (D-059): the close as a line, its 5/10/20/60/250 moving averages, and
+// volume beneath, coloured by the bar's direction (rise red, fall green, as the rest of the site).
+// Four views, as the watch page this follows has them: a US stock's last five days in 15-minute
+// bars (Taiwan has no free intraday history), a year of days, five years of weeks, every month —
+// each with its own span and its own time axis (9/24 for days, 13:30 within a day, 2026/9 for
+// months). The legend above follows the pointer and rests on the latest bar. Colours come from the
+// page's own tokens, read again when the theme changes.
 import {
   AreaSeries,
   ColorType,
   CrosshairMode,
   HistogramSeries,
   LineSeries,
+  TickMarkType,
   createChart,
   type IChartApi,
   type MouseEventParams,
@@ -17,7 +21,19 @@ import {
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { AVERAGES, group, movingAverage, type Bar, type Interval } from "./chartMath";
+import { fetchIntraday } from "./api";
+import {
+  AVERAGES,
+  axisLabel,
+  eastern,
+  fullLabel,
+  group,
+  movingAverage,
+  partsOf,
+  wallSeconds,
+  type Bar,
+  type View,
+} from "./chartMath";
 import { words, type Lang } from "./i18n";
 
 const MA_COLOURS: Record<number, string> = {
@@ -27,10 +43,17 @@ const MA_COLOURS: Record<number, string> = {
   60: "#eab308",
   250: "#94a3b8",
 };
-const INTERVALS: Interval[] = ["day", "week", "month"];
-/** How many of the latest bars each interval opens on: half a year of days, two years of weeks,
- * every month. The rest is a drag away; all two years of days at once read like a monthly line. */
-const OPENS_ON: Record<Interval, number> = { day: 125, week: 104, month: Infinity };
+/** How many of the latest bars each view opens on: five days of 15 minutes, a year of days, five
+ * years of weeks, every month. Earlier bars are a drag away. */
+const OPENS_ON: Record<View, number> = { intraday: Infinity, day: 250, week: 262, month: Infinity };
+
+const TICK_KIND: Record<number, "year" | "month" | "day" | "time"> = {
+  [TickMarkType.Year]: "year",
+  [TickMarkType.Month]: "month",
+  [TickMarkType.DayOfMonth]: "day",
+  [TickMarkType.Time]: "time",
+  [TickMarkType.TimeWithSeconds]: "time",
+};
 
 interface Palette {
   text: string;
@@ -56,27 +79,57 @@ function alpha(colour: string, amount: string): string {
   return /^#[0-9a-f]{6}$/i.test(colour) ? `${colour}${amount}` : colour;
 }
 
+/** The chart's time for a bar: its day as it reads, or (15-minute bars) its wall-clock seconds. */
+function timeOf(bar: Bar, view: View): Time {
+  return (view === "intraday" ? wallSeconds(bar.d) : bar.d) as Time;
+}
+
+type Intraday = { state: "idle" | "loading" | "failed" } | { state: "ready"; bars: Bar[] };
+
 export function StockChart({
   bars,
   lang,
   market,
+  symbol,
   source,
 }: {
   bars: Bar[];
   lang: Lang;
   market: string;
+  symbol: string;
   source: string | null;
 }) {
   const w = words(lang).chart;
   const box = useRef<HTMLDivElement>(null);
-  const [interval, setInterval_] = useState<Interval>("day");
-  const shown = useMemo(() => group(bars, interval), [bars, interval]);
+  const [view, setView] = useState<View>("day");
+  const [intraday, setIntraday] = useState<Intraday>({ state: "idle" });
+  // 15 minutes only when there are such bars to show: a US stock, and Tiingo answered with some
+  const views: View[] =
+    intraday.state === "ready" && intraday.bars.length ? ["intraday", "day", "week", "month"] : ["day", "week", "month"];
+  const shown = useMemo(() => {
+    if (view === "intraday") return intraday.state === "ready" ? intraday.bars : [];
+    return group(bars, view);
+  }, [bars, view, intraday]);
   const averages = useMemo(
     () => Object.fromEntries(AVERAGES.map((n) => [n, movingAverage(shown, n)])) as Record<number, (number | null)[]>,
     [shown],
   );
   const [pointed, setPointed] = useState<number | null>(null);
   const [theme, setTheme] = useState(0);
+
+  // a US stock's 15-minute bars are asked for once, after the page: the button appears if any came
+  useEffect(() => {
+    if (market !== "us" || intraday.state !== "idle") return;
+    setIntraday({ state: "loading" });
+    fetchIntraday(symbol)
+      .then((answer) =>
+        setIntraday({
+          state: "ready",
+          bars: answer.bars.map((b) => ({ d: eastern(b.t), o: b.o, h: b.h, l: b.l, c: b.c, v: b.v })),
+        }),
+      )
+      .catch(() => setIntraday({ state: "failed" }));
+  }, [market, intraday.state, symbol]);
 
   // the site's theme: the reader's pick (data-theme on the site root, set when they choose) or
   // else the system's. Redraw in the new colours when either changes.
@@ -108,11 +161,18 @@ export function StockChart({
       },
       grid: { vertLines: { color: alpha(colours.line, "80") }, horzLines: { color: alpha(colours.line, "80") } },
       rightPriceScale: { borderColor: colours.line },
-      timeScale: { borderColor: colours.line },
+      timeScale: {
+        borderColor: colours.line,
+        timeVisible: view === "intraday",
+        tickMarkFormatter: (time: Time, type: TickMarkType) =>
+          axisLabel(partsOf(time), view, TICK_KIND[type] ?? "day"),
+      },
       crosshair: { mode: CrosshairMode.Magnet },
-      localization: { locale: lang === "en" ? "en-US" : "zh-TW" },
+      localization: {
+        locale: lang === "en" ? "en-US" : "zh-TW",
+        timeFormatter: (time: Time) => fullLabel(partsOf(time), view),
+      },
     });
-    const time = (bar: Bar) => bar.d as Time;
     const price = chart.addSeries(AreaSeries, {
       lineColor: colours.accent,
       topColor: alpha(colours.accent, "40"),
@@ -120,7 +180,7 @@ export function StockChart({
       lineWidth: 2,
       priceLineVisible: false,
     });
-    price.setData(shown.map((bar) => ({ time: time(bar), value: bar.c })));
+    price.setData(shown.map((bar) => ({ time: timeOf(bar, view), value: bar.c })));
     for (const n of AVERAGES) {
       const line = chart.addSeries(LineSeries, {
         color: MA_COLOURS[n],
@@ -132,7 +192,7 @@ export function StockChart({
       line.setData(
         shown.flatMap((bar, i) => {
           const value = averages[n][i];
-          return value === null ? [] : [{ time: time(bar), value }];
+          return value === null ? [] : [{ time: timeOf(bar, view), value }];
         }),
       );
     }
@@ -143,20 +203,20 @@ export function StockChart({
     );
     volume.setData(
       shown.map((bar) => ({
-        time: time(bar),
+        time: timeOf(bar, view),
         value: bar.v,
         color: alpha(bar.c >= bar.o ? colours.rise : colours.fall, "b3"),
       })),
     );
     chart.panes()[1]?.setHeight(90);
-    const opens = OPENS_ON[interval];
+    const opens = OPENS_ON[view];
     if (shown.length > opens) {
       chart.timeScale().setVisibleLogicalRange({ from: shown.length - opens, to: shown.length - 0.5 });
     } else {
       chart.timeScale().fitContent();
     }
 
-    const index = new Map(shown.map((bar, i) => [bar.d, i]));
+    const index = new Map(shown.map((bar, i) => [String(timeOf(bar, view)), i]));
     const onMove = (param: MouseEventParams<Time>) => {
       setPointed(param.time === undefined ? null : (index.get(String(param.time)) ?? null));
     };
@@ -165,45 +225,49 @@ export function StockChart({
       chart.unsubscribeCrosshairMove(onMove);
       chart.remove();
     };
-  }, [shown, averages, interval, lang, theme]);
+  }, [shown, averages, view, lang, theme]);
 
   if (!bars.length) {
     return <p className="text-sm text-muted">{w.none}</p>;
   }
-  const at = pointed ?? shown.length - 1;
+  const number = (value: number) =>
+    value.toLocaleString(lang === "en" ? "en-US" : "zh-TW", { maximumFractionDigits: 2 });
+  const at = Math.min(pointed ?? shown.length - 1, shown.length - 1);
   const bar = shown[at];
   const previous = at > 0 ? shown[at - 1].c : null;
   const tone = (value: number) =>
     previous === null || value === previous ? "" : value > previous ? "text-rise" : "text-fall";
-  const number = (value: number) =>
-    value.toLocaleString(lang === "en" ? "en-US" : "zh-TW", { maximumFractionDigits: 2 });
-  const shares = market === "tw" ? `${number(bar.v / 1000)} ${w.lots}` : number(bar.v);
 
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs tabular-nums" data-testid="chart-legend">
-          <span className="font-medium">{bar.d}</span>
-          {(["o", "h", "l", "c"] as const).map((k) => (
-            <span key={k}>
-              <span className="text-muted">{w.ohlc[k]}</span> <span className={tone(bar[k])}>{number(bar[k])}</span>
-            </span>
-          ))}
-          <span>
-            <span className="text-muted">{w.volume}</span> {shares}
-          </span>
+          {bar ? (
+            <>
+              <span className="font-medium">{fullLabel(partsOf(timeOf(bar, view)), view)}</span>
+              {(["o", "h", "l", "c"] as const).map((k) => (
+                <span key={k}>
+                  <span className="text-muted">{w.ohlc[k]}</span> <span className={tone(bar[k])}>{number(bar[k])}</span>
+                </span>
+              ))}
+              <span>
+                <span className="text-muted">{w.volume}</span>{" "}
+                {market === "tw" ? `${number(bar.v / 1000)} ${w.lots}` : number(bar.v)}
+              </span>
+            </>
+          ) : null}
         </div>
         <div className="flex overflow-hidden rounded-md border border-line text-xs" role="group" aria-label={w.title}>
-          {INTERVALS.map((value) => (
+          {views.map((value) => (
             <button
               key={value}
               type="button"
               onClick={() => {
-                setInterval_(value);
+                setView(value);
                 setPointed(null);
               }}
-              aria-pressed={interval === value}
-              className={`px-3 py-1 ${interval === value ? "bg-accent text-accent-ink" : "text-muted"}`}
+              aria-pressed={view === value}
+              className={`px-3 py-1 ${view === value ? "bg-accent text-accent-ink" : "text-muted"}`}
             >
               {w.intervals[value]}
             </button>
@@ -211,17 +275,22 @@ export function StockChart({
         </div>
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 text-xs tabular-nums">
-        {AVERAGES.map((n) => {
-          const value = averages[n][at];
-          return (
-            <span key={n} style={{ color: MA_COLOURS[n] }}>
-              MA{n} {value === null ? "--" : number(value)}
-            </span>
-          );
-        })}
+        {bar
+          ? AVERAGES.map((n) => {
+              const value = averages[n][at];
+              return (
+                <span key={n} style={{ color: MA_COLOURS[n] }}>
+                  MA{n} {value === null || value === undefined ? "--" : number(value)}
+                </span>
+              );
+            })
+          : null}
       </div>
       <div ref={box} className="mt-2 h-80 w-full" data-testid="stock-chart" />
-      {source ? <p className="mt-2 text-xs text-muted">{w.source(source, source === "Tiingo")}</p> : null}
+      <p className="mt-2 text-xs text-muted">
+        {view === "intraday" ? `${w.intradayNote} ` : ""}
+        {source ? w.source(view === "intraday" ? "Tiingo IEX" : source, source === "Tiingo" && view !== "intraday") : ""}
+      </p>
     </div>
   );
 }

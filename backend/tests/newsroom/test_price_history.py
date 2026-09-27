@@ -56,7 +56,7 @@ def test_months_run_from_first_to_last():
     assert months == [date(2025, 11, 1), date(2025, 12, 1), date(2026, 1, 1), date(2026, 2, 1)]
 
 
-async def test_a_first_fill_takes_two_years_and_a_later_one_only_the_months_since(db_session):
+async def test_a_first_fill_takes_five_years_and_a_later_one_only_the_months_since(db_session):
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
     asked: list[str] = []
 
@@ -71,13 +71,15 @@ async def test_a_first_fill_takes_two_years_and_a_later_one_only_the_months_sinc
     written = await price_history.refresh_tw(
         db_session, get, today=date(2026, 9, 27), symbols=("TEST",), pause=0
     )
-    assert written == 2 and len(asked) == 24 and asked[0] == "20241001" and asked[-1] == "20260901"
+    assert written == 2 and len(asked) == 60 and asked[0] == "20211001" and asked[-1] == "20260901"
 
     asked.clear()
     await price_history.refresh_tw(
         db_session, get, today=date(2026, 9, 28), symbols=("TEST",), pause=0
     )
-    assert asked == ["20260901"]  # from the last stored day's month on; stored again, not twice
+    # from the last stored day's month on (stored again, not twice); and one month before the
+    # first — empty: the stock was not trading, so nothing older is asked for
+    assert asked == ["20260901", "20260801"]
     days = (await db_session.scalars(select(PriceBar.day).where(PriceBar.symbol == "TEST"))).all()
     assert sorted(days) == [date(2026, 9, 1), date(2026, 9, 2)]
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
@@ -131,7 +133,7 @@ async def test_us_stocks_ask_for_two_years_every_time_and_one_failure_does_not_s
         db_session, get, today=date(2026, 9, 27), symbols=("TESTA", "TESTB"), pause=0
     )
     assert written == 1
-    assert asked == [("TESTA", "2024-10-01"), ("TESTB", "2024-10-01")]
+    assert asked == [("TESTA", "2021-10-01"), ("TESTB", "2021-10-01")]
     await db_session.execute(delete(PriceBar).where(PriceBar.symbol.in_(("TESTA", "TESTB"))))
 
 
@@ -141,3 +143,77 @@ def test_an_error_says_nothing_a_key_could_hide_in():
     request = httpx.Request("GET", "https://api.tiingo.com/x?token=secret")
     error = httpx.HTTPStatusError("401", request=request, response=httpx.Response(401))
     assert price_history._describe(error) == "HTTPStatusError (HTTP 401)"
+
+
+async def test_a_shorter_history_is_extended_back_to_five_years(db_session):
+    """Two years stored (as before), five wanted: the months before the first, newest first,
+    until a month had no trades."""
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+
+    def month(year, number):
+        return {"stat": "OK", "fields": FIELDS, "data": [
+            f"{year - 1911}/{number:02d}/02|1,000|1|10.00|11.00|9.00|10.50|0|1|".split("|")
+        ]}  # fmt: skip
+
+    listed_since = (2024, 3)
+
+    async def get(url, params):
+        year, number = int(params["date"][:4]), int(params["date"][4:6])
+        return (
+            month(year, number)
+            if (year, number) >= listed_since
+            else {"stat": "OK", "fields": FIELDS, "data": []}
+        )
+
+    await price_history._store(
+        db_session, "tw", "TEST", price_history.parse_twse_month(month(2024, 10)), source="TWSE"
+    )
+    asked = []
+
+    async def counting(url, params):
+        asked.append(params["date"][:6])
+        return await get(url, params)
+
+    await price_history.refresh_tw(
+        db_session, counting, today=date(2024, 10, 20), symbols=("TEST",), pause=0
+    )
+    assert asked == ["202410", "202409", "202408", "202407", "202406", "202405", "202404",
+                     "202403", "202402"]  # fmt: skip
+    days = (await db_session.scalars(select(PriceBar.day).where(PriceBar.symbol == "TEST"))).all()
+    assert min(days) == date(2024, 3, 2) and len(days) == 8
+    await db_session.execute(delete(PriceBar).where(PriceBar.symbol == "TEST"))
+
+
+def _iex(day: str, time: str, close: float) -> dict:
+    return {"date": f"{day}T{time}:00.000Z", "open": close, "high": close, "low": close,
+            "close": close, "volume": 100.0}  # fmt: skip
+
+
+def test_iex_bars_keep_the_last_five_trading_days():
+    days = ["2026-09-17", "2026-09-18", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"]
+    rows = [_iex(d, "13:30", 1.0) for d in days] + [_iex("2026-09-24", "13:45", 2.0), {"date": "x"}]
+    bars = price_history.parse_iex(rows)
+    assert sorted({b.t.date().isoformat() for b in bars}) == days[1:]
+    assert bars[-1].c == 2.0 and bars[-1].t.minute == 45
+
+
+async def test_intraday_asks_tiingo_at_most_every_ten_minutes_and_keeps_the_last_answer():
+    from datetime import UTC, datetime, timedelta
+
+    now = [datetime(2026, 9, 25, 15, 0, tzinfo=UTC)]
+    asked = []
+
+    async def get(url, params):
+        asked.append(params["resampleFreq"])
+        if len(asked) == 2:
+            raise TimeoutError("no answer")
+        return [_iex("2026-09-25", "13:30", 1.0)]
+
+    cache = price_history.IntradayCache(get, clock=lambda: now[0])
+    first = await cache.bars("NVDA")
+    assert first.source == "Tiingo IEX" and len(first.bars) == 1
+    now[0] += timedelta(minutes=5)
+    assert await cache.bars("NVDA") == first and asked == ["15min"]  # kept
+    now[0] += timedelta(minutes=6)
+    assert await cache.bars("NVDA") == first and len(asked) == 2  # asked; failed; the last kept
+    assert (await price_history.IntradayCache(None).bars("NVDA")).bars == []  # no key

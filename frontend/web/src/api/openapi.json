@@ -4103,6 +4103,78 @@
     "title": "PublicHolder",
     "type": "object"
    },
+   "PublicIntraday": {
+    "properties": {
+     "bars": {
+      "items": {
+       "$ref": "#/components/schemas/PublicIntradayBar"
+      },
+      "title": "Bars",
+      "type": "array"
+     },
+     "source": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "symbol",
+     "source",
+     "bars"
+    ],
+    "title": "PublicIntraday",
+    "type": "object"
+   },
+   "PublicIntradayBar": {
+    "properties": {
+     "c": {
+      "title": "C",
+      "type": "number"
+     },
+     "h": {
+      "title": "H",
+      "type": "number"
+     },
+     "l": {
+      "title": "L",
+      "type": "number"
+     },
+     "o": {
+      "title": "O",
+      "type": "number"
+     },
+     "t": {
+      "format": "date-time",
+      "title": "T",
+      "type": "string"
+     },
+     "v": {
+      "title": "V",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "t",
+     "o",
+     "h",
+     "l",
+     "c",
+     "v"
+    ],
+    "title": "PublicIntradayBar",
+    "type": "object"
+   },
    "PublicNeighbour": {
     "description": "The next article along, newer or older, in the same language and company.",
     "properties": {
@@ -9761,7 +9833,7 @@
   },
   "/api/public/stocks/{symbol}/history": {
    "get": {
-    "description": "A stock's daily bars for its chart (D-059): oldest first, about two years. Empty ``bars``\nwhen none are stored (a US stock, until Tiingo's key is set).",
+    "description": "A stock's daily bars for its chart (D-059): oldest first, about five years. Empty ``bars``\nwhen none are stored (a US stock, until Tiingo's key is set).",
     "operationId": "get_stock_history_api_public_stocks__symbol__history_get",
     "parameters": [
      {
@@ -9797,6 +9869,49 @@
      }
     },
     "summary": "Get Stock History",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/stocks/{symbol}/intraday": {
+   "get": {
+    "description": "A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.\nEmpty for a Taiwan stock (no free intraday history) or without Tiingo's key.",
+    "operationId": "get_stock_intraday_api_public_stocks__symbol__intraday_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicIntraday"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Stock Intraday",
     "tags": [
      "public"
     ]

@@ -62,3 +62,73 @@ export function movingAverage(bars: readonly Bar[], n: number): (number | null)[
   });
   return out;
 }
+
+// --- time on the chart ----------------------------------------------------------------------------
+
+/** What the chart shows: a US stock's 15-minute bars (intraday), or days grouped. */
+export type View = "intraday" | Interval;
+
+/** A bar's start in US Eastern wall-clock time, "YYYY-MM-DD HH:mm": the market's own hours. */
+export function eastern(iso: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+/** A wall-clock "YYYY-MM-DD HH:mm" as the chart's seconds: drawn as it reads, not shifted. */
+export function wallSeconds(d: string): number {
+  const [day, time = "00:00"] = d.split(" ");
+  const [y, m, dd] = day.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  return Date.UTC(y, m - 1, dd, hh, mm) / 1000;
+}
+
+export interface Parts {
+  y: number;
+  m: number;
+  d: number;
+  hh: number;
+  mm: number;
+}
+
+/** The chart's time back as parts: seconds (intraday), "YYYY-MM-DD", or {year, month, day}. */
+export function partsOf(time: unknown): Parts {
+  if (typeof time === "number") {
+    const t = new Date(time * 1000);
+    return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate(), hh: t.getUTCHours(), mm: t.getUTCMinutes() };
+  }
+  if (typeof time === "string") {
+    const [y, m, d] = time.slice(0, 10).split("-").map(Number);
+    return { y, m, d, hh: 0, mm: 0 };
+  }
+  const day = time as { year: number; month: number; day: number };
+  return { y: day.year, m: day.month, d: day.day, hh: 0, mm: 0 };
+}
+
+const two = (n: number) => String(n).padStart(2, "0");
+
+/** A tick on the time axis, as each view reads it: trading days as 9/24, a new day of 15-minute
+ * bars as its date and the rest as times, months as 2026/9; a new year as the year. */
+export function axisLabel(p: Parts, view: View, kind: "year" | "month" | "day" | "time"): string {
+  if (view === "intraday") return kind === "time" ? `${two(p.hh)}:${two(p.mm)}` : `${p.m}/${p.d}`;
+  if (view === "month") return kind === "year" ? `${p.y}` : `${p.y}/${p.m}`;
+  return kind === "year" ? `${p.y}` : `${p.m}/${p.d}`;
+}
+
+/** A bar's date in the legend and under the crosshair. */
+export function fullLabel(p: Parts, view: View): string {
+  if (view === "intraday") return `${p.m}/${p.d} ${two(p.hh)}:${two(p.mm)}`;
+  if (view === "month") return `${p.y}/${p.m}`;
+  return `${p.y}/${p.m}/${p.d}`;
+}

@@ -2,13 +2,15 @@
 
 TWSE's STOCK_DAY answers one stock's one month at a time, dates in the Republic of China
 calendar ("115/09/01" is 2026-09-01) and numbers with thousands separators; a day with no trade
-shows "--". The first refresh of a stock fills two years — enough for a 250-day average from the
-first day shown — and every later one only the months since its last stored day. TWSE refuses a
+shows "--". A stock's history reaches five years back (``HISTORY_MONTHS``): the first refresh
+fills it, every later one only the months since its last stored day — and, if the history is
+shorter than five years (it was two before D-059's follow-up), the months before its first,
+walking back until a month has no trades (the stock was not listed yet). TWSE refuses a
 client that asks too quickly, so requests are spaced (``pause``): a first fill of seven stocks is
 about 175 requests, some minutes of the worker's time, once.
 
 The United States comes from Tiingo (the user's choice; its key in a header, never in a URL).
-One request gives a stock's whole two years, split- and dividend-adjusted, so every refresh asks
+One request gives a stock's whole five years, split- and dividend-adjusted, so every refresh asks
 for all of it again: a split rewrites the past, and thirteen requests twice a day is well inside
 the free plan's 1,000 a day. Without the key a US page has no chart.
 """
@@ -19,7 +21,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel
@@ -39,7 +41,8 @@ PRICES_CRON = "20 7,10 * * 1-5"
 """15:20 and 18:20 in Taipei, weekdays: after TWSE publishes the day, and once more in case."""
 
 TWSE_DAY = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
-FIRST_FILL_MONTHS = 24
+HISTORY_MONTHS = 60
+"""Five years: a monthly chart with its 60-month average, and room for the yearly one."""
 PAUSE_SECONDS = 2.5
 """Between two TWSE requests: it answers a burst with a block, not with data."""
 
@@ -127,26 +130,42 @@ async def refresh_tw(
     pause: float = PAUSE_SECONDS,
 ) -> int:
     """Bring every Taiwan stock's bars up to ``today``. How many bars were written."""
-    written, first_request = 0, True
+    written, requests = 0, 0
+
+    async def month_of(symbol: str, month: date) -> list[Bar] | None:
+        """One month's bars; None when it could not be read (next time's)."""
+        nonlocal requests
+        if requests:
+            await asyncio.sleep(pause)
+        requests += 1
+        try:
+            payload = await get(
+                TWSE_DAY, {"response": "json", "date": month.strftime("%Y%m01"), "stockNo": symbol}
+            )
+            return parse_twse_month(payload)
+        except Exception as error:  # noqa: BLE001 — one month missing is next time's
+            log.warning("prices: %s %s not read: %s", symbol, f"{month:%Y-%m}", error)
+            return None
+
+    horizon = _months_back(today, HISTORY_MONTHS)
     for symbol in symbols:
-        last = await session.scalar(
-            select(func.max(PriceBar.day)).where(PriceBar.market == "tw", PriceBar.symbol == symbol)
-        )
-        start = last or _months_back(today, FIRST_FILL_MONTHS)
-        for month in months_between(start, today):
-            if not first_request:
-                await asyncio.sleep(pause)
-            first_request = False
-            try:
-                payload = await get(
-                    TWSE_DAY,
-                    {"response": "json", "date": month.strftime("%Y%m01"), "stockNo": symbol},
+        first, last = (
+            await session.execute(
+                select(func.min(PriceBar.day), func.max(PriceBar.day)).where(
+                    PriceBar.market == "tw", PriceBar.symbol == symbol
                 )
-                bars = parse_twse_month(payload)
-            except Exception as error:  # noqa: BLE001 — one month missing is next time's
-                log.warning("prices: %s %s not read: %s", symbol, f"{month:%Y-%m}", error)
-                continue
-            written += await _store(session, "tw", symbol, bars, source="TWSE")
+            )
+        ).one()
+        for month in months_between(last or horizon, today):
+            bars = await month_of(symbol, month)
+            written += await _store(session, "tw", symbol, bars or [], source="TWSE")
+        # the years before the first stored month, newest first, until the stock had no trades
+        if first is not None and first.replace(day=1) > horizon:
+            for month in reversed(months_between(horizon, first.replace(day=1))[:-1]):
+                bars = await month_of(symbol, month)
+                if bars == []:
+                    break  # not listed yet: nothing older either
+                written += await _store(session, "tw", symbol, bars or [], source="TWSE")
         await session.commit()  # a stock at a time: an interrupted first fill keeps its progress
     return written
 
@@ -185,8 +204,8 @@ async def refresh_us(
     symbols: tuple[str, ...] = US_STOCKS,
     pause: float = 1.0,
 ) -> int:
-    """Every US stock's last two years, again (a split rewrites them). Bars written."""
-    start = _months_back(today, FIRST_FILL_MONTHS)
+    """Every US stock's last five years, again (a split rewrites them). Bars written."""
+    start = _months_back(today, HISTORY_MONTHS)
     written = 0
     for number, symbol in enumerate(symbols):
         if number:
@@ -243,8 +262,12 @@ async def _store(
 
 
 class PricesKeeper:
-    def __init__(self, get: GetJson, us: GetRows | None = None) -> None:
+    def __init__(
+        self, get: GetJson, us: GetRows | None = None, *, pause: float = PAUSE_SECONDS
+    ) -> None:
         self.get = get
+        self.pause = pause
+        """Between two TWSE requests; 0 when nothing is asked of TWSE (offline)."""
         self.us = us
         """Tiingo's reader; None without its key, and the US pages have no chart."""
 
@@ -255,7 +278,7 @@ class PricesKeeper:
             session: AsyncSession, schedule: Schedule, scheduled_for: datetime
         ) -> None:
             today = datetime.now(UTC).date()
-            await refresh_tw(session, self.get, today=today)
+            await refresh_tw(session, self.get, today=today, pause=self.pause)
             if self.us is not None:
                 await refresh_us(session, self.us, today=today)
 
@@ -306,7 +329,7 @@ class PublicHistory(BaseModel):
     market: str
     source: str | None
     bars: list[PublicBar]
-    """Oldest first, every stored trading day (about two years)."""
+    """Oldest first, every stored trading day (about five years)."""
 
 
 async def history(session: AsyncSession, market: str, symbol: str) -> PublicHistory:
@@ -333,3 +356,89 @@ async def history(session: AsyncSession, market: str, symbol: str) -> PublicHist
             for r in rows
         ],
     )
+
+
+# --- a US stock's last days, in 15-minute bars (D-059) -------------------------------------------
+
+TIINGO_IEX = "https://api.tiingo.com/iex/{symbol}/prices"
+INTRADAY_DAYS = 5
+"""Trading days of 15-minute bars: a week's moves within the day, about 130 bars."""
+INTRADAY_TTL_SECONDS = 600.0
+"""Tiingo's free plan allows 50 requests an hour: a stock's bars are asked for at most every ten
+minutes, however many readers open its page."""
+
+
+class PublicIntradayBar(BaseModel):
+    t: datetime
+    """The bar's start, UTC."""
+    o: float
+    h: float
+    l: float  # noqa: E741
+    c: float
+    v: int
+    """IEX's volume only: a fraction of the whole market's."""
+
+
+class PublicIntraday(BaseModel):
+    symbol: str
+    source: str | None
+    bars: list[PublicIntradayBar]
+
+
+def parse_iex(rows: list[dict], days: int = INTRADAY_DAYS) -> list[PublicIntradayBar]:
+    """Tiingo's IEX bars, the last ``days`` trading days of them, oldest first."""
+    bars = []
+    for row in rows:
+        try:
+            bars.append(
+                PublicIntradayBar(
+                    t=datetime.fromisoformat(str(row["date"]).replace("Z", "+00:00")),
+                    o=float(row["open"]),
+                    h=float(row["high"]),
+                    l=float(row["low"]),
+                    c=float(row["close"]),
+                    v=int(row.get("volume") or 0),
+                )  # fmt: skip
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    bars.sort(key=lambda b: b.t)
+    kept = sorted({b.t.date() for b in bars})[-days:]
+    return [b for b in bars if b.t.date() in kept]
+
+
+class IntradayCache:
+    """Each US stock's 15-minute bars, kept ``ttl`` seconds (the free plan's hourly limit)."""
+
+    def __init__(self, get: GetRows | None, *, ttl: float = INTRADAY_TTL_SECONDS, clock=None):
+        self.get = get
+        self.ttl = ttl
+        self.clock = clock or (lambda: datetime.now(UTC))
+        self._kept: dict[str, tuple[datetime, PublicIntraday]] = {}
+        self._lock = asyncio.Lock()
+
+    async def bars(self, symbol: str) -> PublicIntraday:
+        if self.get is None:
+            return PublicIntraday(symbol=symbol, source=None, bars=[])
+        async with self._lock:  # one reader asks Tiingo; the others get what it got
+            now = self.clock()
+            kept = self._kept.get(symbol)
+            if kept and (now - kept[0]).total_seconds() < self.ttl:
+                return kept[1]
+            try:
+                rows = await self.get(
+                    TIINGO_IEX.format(symbol=symbol),
+                    {
+                        "startDate": (
+                            now.date() - timedelta(days=INTRADAY_DAYS * 2 + 4)
+                        ).isoformat(),
+                        "resampleFreq": "15min",
+                        "columns": "open,high,low,close,volume",
+                    },
+                )
+                answer = PublicIntraday(symbol=symbol, source="Tiingo IEX", bars=parse_iex(rows))
+            except Exception as error:  # noqa: BLE001 — a page without its intraday chart
+                log.warning("intraday: %s not read: %s", symbol, _describe(error))
+                return kept[1] if kept else PublicIntraday(symbol=symbol, source=None, bars=[])
+            self._kept[symbol] = (now, answer)
+            return answer

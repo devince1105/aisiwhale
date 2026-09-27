@@ -74,7 +74,8 @@ const WORDS = {
     >,
     chart: {
       title: "走勢",
-      intervals: { day: "日", week: "週", month: "月" },
+      intervals: { intraday: "15分", day: "日", week: "週", month: "月" },
+      intradayNote: "15 分鐘線為美東時間，成交量僅含 IEX 交易所。",
       ohlc: { o: "開", h: "高", l: "低", c: "收" },
       volume: "成交量",
       lots: "張",
@@ -248,7 +249,8 @@ const WORDS = {
     } as Record<string, string>,
     chart: {
       title: "Price",
-      intervals: { day: "Day", week: "Week", month: "Month" },
+      intervals: { intraday: "15m", day: "Day", week: "Week", month: "Month" },
+      intradayNote: "15-minute bars in US Eastern time; volume is IEX's only.",
       ohlc: { o: "O", h: "H", l: "L", c: "C" },
       volume: "Volume",
       lots: "lots",

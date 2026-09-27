@@ -174,6 +174,7 @@ def build_scheduler(
         OfficialTradesKeeper,
     )
     from autora.domains.newsroom.price_history import (
+        PAUSE_SECONDS,
         PRICES_SCHEDULE,
         PricesKeeper,
         http_json,
@@ -203,6 +204,7 @@ def build_scheduler(
     prices = PricesKeeper(
         http_json() if live else no_prices,
         tiingo_rows(tiingo.get_secret_value()) if tiingo else None,
+        pause=PAUSE_SECONDS if live else 0,  # waiting for an exchange nobody asks is only slow
     )
     scheduler.register(PRICES_SCHEDULE, prices.schedule_handler())
     # officials' scanned reports need a model that reads a PDF (Gemini's) and a person to check

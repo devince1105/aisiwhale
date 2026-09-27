@@ -1,7 +1,7 @@
 // The stock chart's arithmetic (D-059): weeks and months from days, and moving averages.
 import { describe, expect, it } from "vitest";
 
-import { group, movingAverage, type Bar } from "./chartMath";
+import { axisLabel, eastern, fullLabel, group, movingAverage, partsOf, wallSeconds, type Bar } from "./chartMath";
 
 const bar = (d: string, o: number, h: number, l: number, c: number, v: number): Bar => ({ d, o, h, l, c, v });
 
@@ -37,5 +37,26 @@ describe("moving averages", () => {
   it("average the last n closes, and say nothing before there are n", () => {
     expect(movingAverage(DAYS, 2)).toEqual([null, 11.5, 13, 11.5, 8.5]);
     expect(movingAverage(DAYS, 250).every((v) => v === null)).toBe(true);
+  });
+});
+
+describe("time on the chart", () => {
+  it("reads a bar's start in US Eastern time, summer and winter", () => {
+    expect(eastern("2026-09-24T13:30:00Z")).toBe("2026-09-24 09:30"); // EDT, UTC−4
+    expect(eastern("2026-12-01T14:30:00Z")).toBe("2026-12-01 09:30"); // EST, UTC−5
+  });
+
+  it("labels each view's axis its own way", () => {
+    const at = partsOf(wallSeconds("2026-09-24 13:45"));
+    expect(axisLabel(at, "intraday", "time")).toBe("13:45");
+    expect(axisLabel(at, "intraday", "day")).toBe("9/24");
+    const day = partsOf("2026-09-24");
+    expect(axisLabel(day, "day", "day")).toBe("9/24");
+    expect(axisLabel(day, "week", "month")).toBe("9/24");
+    expect(axisLabel(day, "month", "month")).toBe("2026/9");
+    expect(axisLabel(day, "day", "year")).toBe("2026");
+    expect(fullLabel(at, "intraday")).toBe("9/24 13:45");
+    expect(fullLabel(day, "day")).toBe("2026/9/24");
+    expect(fullLabel(partsOf({ year: 2026, month: 9, day: 1 }), "month")).toBe("2026/9");
   });
 });

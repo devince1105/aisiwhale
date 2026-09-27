@@ -14,6 +14,7 @@ export type PublicArticleSummary = Schemas["PublicArticleSummary"];
 export type PublicQuote = Schemas["PublicQuote"];
 export type PublicStock = Schemas["PublicStock"];
 export type PublicHistory = Schemas["PublicHistory"];
+export type PublicIntraday = Schemas["PublicIntraday"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
 
@@ -100,6 +101,15 @@ export async function fetchHistory(
     params: { path: { symbol } },
   });
   if (response.status === 404) return null;
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+/** A US stock's last five trading days in 15-minute bars (D-059); empty for a Taiwan stock. */
+export async function fetchIntraday(symbol: string, options: SiteClientOptions = {}): Promise<PublicIntraday> {
+  const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}/intraday", {
+    params: { path: { symbol } },
+  });
   if (error !== undefined || !data) throw ApiError.from(response, error);
   return data;
 }

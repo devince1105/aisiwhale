@@ -940,10 +940,31 @@ export interface paths {
         };
         /**
          * Get Stock History
-         * @description A stock's daily bars for its chart (D-059): oldest first, about two years. Empty ``bars``
+         * @description A stock's daily bars for its chart (D-059): oldest first, about five years. Empty ``bars``
          *     when none are stored (a US stock, until Tiingo's key is set).
          */
         get: operations["get_stock_history_api_public_stocks__symbol__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/stocks/{symbol}/intraday": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stock Intraday
+         * @description A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.
+         *     Empty for a Taiwan stock (no free intraday history) or without Tiingo's key.
+         */
+        get: operations["get_stock_intraday_api_public_stocks__symbol__intraday_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2681,6 +2702,33 @@ export interface components {
             title_of_class: string;
             /** Value Usd */
             value_usd: number;
+        };
+        /** PublicIntraday */
+        PublicIntraday: {
+            /** Bars */
+            bars: components["schemas"]["PublicIntradayBar"][];
+            /** Source */
+            source: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** PublicIntradayBar */
+        PublicIntradayBar: {
+            /** C */
+            c: number;
+            /** H */
+            h: number;
+            /** L */
+            l: number;
+            /** O */
+            o: number;
+            /**
+             * T
+             * Format: date-time
+             */
+            t: string;
+            /** V */
+            v: number;
         };
         /**
          * PublicNeighbour
@@ -5273,6 +5321,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stock_intraday_api_public_stocks__symbol__intraday_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicIntraday"];
                 };
             };
             /** @description Validation Error */

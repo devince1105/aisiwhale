@@ -12,6 +12,7 @@ nothing about the reader either way.
 - GET  /api/public/stocks/{symbol}?lang=zh-TW[&company=<slug>]: a stock's page — its figure, the
   tracked investors' 13F positions in it, our articles that name it (D-049)
 - GET  /api/public/stocks/{symbol}/history: its daily bars for the chart (D-059)
+- GET  /api/public/stocks/{symbol}/intraday: a US stock's last five days in 15-minute bars
 - POST /api/analytics/beacon: {article_id, lang, event_type, session_hash} -> 204
 """
 
@@ -32,7 +33,13 @@ from autora.domains.newsroom.holdings import STOCKS, PublicHolder, holders
 from autora.domains.newsroom.market_strip import PublicQuote, QuoteBoard, build_board
 from autora.domains.newsroom.models import AnalyticsEventType
 from autora.domains.newsroom.official_trades import PublicTrade, trades_for
-from autora.domains.newsroom.price_history import PublicHistory, history
+from autora.domains.newsroom.price_history import (
+    IntradayCache,
+    PublicHistory,
+    PublicIntraday,
+    history,
+    tiingo_rows,
+)
 from autora.domains.newsroom.site import (
     MAX_LIST,
     BeaconRejected,
@@ -127,9 +134,33 @@ class PublicStock(BaseModel):
     articles: list[PublicArticleSummary]
 
 
+@lru_cache
+def intraday_cache() -> IntradayCache:
+    """One per process, like the board: the ten-minute cache every reader shares."""
+    key = _secret(get_settings().tiingo_api_key)
+    return IntradayCache(tiingo_rows(key) if key else None)
+
+
+@router.get("/api/public/stocks/{symbol}/intraday")
+async def get_stock_intraday(
+    symbol: str,
+    response: Response,
+    cache: Annotated[IntradayCache, Depends(intraday_cache)],
+) -> PublicIntraday:
+    """A US stock's last five trading days in 15-minute bars (D-059), from Tiingo's IEX feed.
+    Empty for a Taiwan stock (no free intraday history) or without Tiingo's key."""
+    stock = STOCKS.get(symbol.upper())
+    if stock is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no page for {symbol}")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    if stock.market != "us":
+        return PublicIntraday(symbol=stock.symbol, source=None, bars=[])
+    return await cache.bars(stock.symbol)
+
+
 @router.get("/api/public/stocks/{symbol}/history")
 async def get_stock_history(symbol: str, session: Session, response: Response) -> PublicHistory:
-    """A stock's daily bars for its chart (D-059): oldest first, about two years. Empty ``bars``
+    """A stock's daily bars for its chart (D-059): oldest first, about five years. Empty ``bars``
     when none are stored (a US stock, until Tiingo's key is set)."""
     stock = STOCKS.get(symbol.upper())
     if stock is None:

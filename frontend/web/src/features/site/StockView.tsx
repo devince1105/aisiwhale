@@ -169,7 +169,7 @@ export function StockView({
           <h2 id="chart" className="sr-only">
             {w.chart.title}
           </h2>
-          <StockChart bars={history.bars} lang={lang} market={stock.market} source={history.source ?? null} />
+          <StockChart bars={history.bars} lang={lang} market={stock.market} symbol={stock.symbol} source={history.source ?? null} />
         </section>
       ) : null}
 
