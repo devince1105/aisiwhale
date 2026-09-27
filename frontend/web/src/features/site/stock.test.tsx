@@ -109,19 +109,15 @@ describe("a stock's page", () => {
     expect(burry!.querySelector(".text-rise")).toBeNull();
   });
 
-  it("gives the day's figures and the market value, as the watch cards do", () => {
+  it("gives the market value under the price; the day's figures are the chart's", () => {
     render(<StockView stock={NVDA} lang="zh-TW" />);
-    const card = document.querySelector("article header dl")!;
-    expect(card.textContent).toBe("開盤225.26最高226.94最低223.13前收224.58總市值US$5.4兆");
+    expect(screen.getByTestId("market-cap").textContent).toBe("總市值 US$5.4兆");
+    expect(document.querySelector("article header dl")).toBeNull(); // no open/high/low card
     cleanup();
-    // an ETF: its day, and no market value; an index or nothing at all: no card
+    // an ETF has no market value: no line
     const etf = { ...NVDA.quote!, key: "tw:0050", market_cap: null, currency: "TWD" };
     render(<StockView stock={{ ...NVDA, quote: etf }} lang="zh-TW" />);
-    expect(document.querySelector("article header dl")!.textContent).not.toContain("總市值");
-    cleanup();
-    const bare = { ...NVDA.quote!, open: null, high: null, low: null, previous_close: null, market_cap: null };
-    render(<StockView stock={{ ...NVDA, quote: bare }} lang="en" />);
-    expect(document.querySelector("article header dl")).toBeNull();
+    expect(screen.queryByTestId("market-cap")).toBeNull();
   });
 
   it("lists public figures' trades, as ranges, each with the page of its report", () => {
