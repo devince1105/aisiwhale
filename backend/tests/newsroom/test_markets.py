@@ -127,6 +127,8 @@ def test_gold_commodities_and_foreign_exchange_have_their_searches():
     ours = [s for s in markets.SOURCES if s.config.get("section") in ("gold", "commodities", "fx")]
     assert all(s.config.get("domains") for s in ours)
     assert "cna.com.tw" in ours[0].config["domains"]
+    # each day's price is its own story, not one taking in a month of closes
+    assert {s.config.get("match_hours") for s in ours} == {12}
 
 
 def test_every_source_says_which_section_of_the_site_it_feeds():

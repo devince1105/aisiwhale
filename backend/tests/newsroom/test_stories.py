@@ -472,6 +472,58 @@ async def test_a_filing_source_makes_every_item_its_own_story(db_session):
     assert outcome.new_story_ids == []
 
 
+async def test_a_price_beat_s_next_day_is_a_story_of_its_own(db_session):
+    """D-067: "新台幣收 31.78" and the next day's "收 31.716" read alike; a story taking in every
+    day's close for a month left the 外匯 tab with nothing new to write."""
+    company = await unique_company(db_session, "price-beat")
+    fx = Source(
+        company_id=company.id,
+        name="fx",
+        kind="search_query",
+        config={"query": "新台幣", "match_hours": 12},
+        status="paused",
+    )
+    db_session.add(fx)
+    await db_session.flush()
+    day = datetime(2026, 9, 24, 8, tzinfo=UTC)
+
+    def close(n, at):
+        return SourceItem(
+            company_id=company.id,
+            source_id=fx.id,
+            external_id=f"fx-{n}",
+            url=f"https://news.example/fx/{n}",
+            title="新台幣收盤 匯率 外資",
+            content_hash=f"fx-{n}",
+            published_at=at,
+        )
+
+    db_session.add(close(1, day))
+    await db_session.flush()
+    [first] = (await desk().cluster_pending(db_session, company.id)).new_story_ids
+    # the same day's other report joins; the next day's close, and the day before's, do not
+    db_session.add_all(
+        [
+            close(2, day + timedelta(hours=5)),
+            close(3, day + timedelta(days=1)),
+            close(4, day - timedelta(days=3)),
+        ]
+    )
+    await db_session.flush()
+    outcome = await desk().cluster_pending(db_session, company.id)
+    assert len(outcome.new_story_ids) == 2
+    assert list(outcome.joined.values()).count(first) == 1
+
+
+def test_match_hours_is_a_number_of_hours():
+    from autora.domains.newsroom.sources import SourceConfigError, SourceKind, _validate
+
+    _validate(SourceKind.SEARCH_QUERY, None, {"query": "q", "match_hours": 12})
+    for bad in (0, "12", True, 1.5):
+        with pytest.raises(SourceConfigError):
+            _validate(SourceKind.SEARCH_QUERY, None, {"query": "q", "match_hours": bad})
+
+
 async def test_a_story_whose_production_failed_goes_back_on_the_desk(db_session):
     """D-040: a workflow that failed (the model timed out every time) left its story
     IN_PRODUCTION for good, where the editor-in-chief never sees it again."""

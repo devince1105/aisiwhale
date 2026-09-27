@@ -47,7 +47,7 @@ from autora.domains.newsroom.models import (
     StoryItem,
     StoryState,
 )
-from autora.domains.newsroom.sources import OWN_STORY, PRIMARY
+from autora.domains.newsroom.sources import MATCH_HOURS, OWN_STORY, PRIMARY
 from autora.runtime.actor import Actor
 from autora.runtime.events.outbox import emit
 from autora.runtime.events.schema import EventPayload, new_event
@@ -149,13 +149,28 @@ class StoryDesk:
                 )
             )
         )
+        match_hours = {
+            source_id: hours
+            for source_id, hours in await session.execute(
+                select(Source.id, Source.config[MATCH_HOURS].as_integer()).where(
+                    Source.id.in_({i.source_id for i in items}),
+                    Source.config.has_key(MATCH_HOURS),
+                )
+            )
+        }
 
         new_stories: list[Story] = []
         touched: dict[uuid.UUID, Story] = {}
         joined: dict[uuid.UUID, uuid.UUID] = {}
         for item, vector in zip(items, vectors, strict=True):
             story, similarity = await self._match(
-                session, company_id, item, vector, now, by_meaning=item.source_id not in own_story
+                session,
+                company_id,
+                item,
+                vector,
+                now,
+                by_meaning=item.source_id not in own_story,
+                within_hours=match_hours.get(item.source_id),
             )
             if story is None:
                 story = Story(
@@ -211,6 +226,7 @@ class StoryDesk:
         now: datetime,
         *,
         by_meaning: bool = True,
+        within_hours: int | None = None,
     ) -> tuple[Story | None, float | None]:
         same_url = await session.scalar(
             select(Story)
@@ -229,18 +245,24 @@ class StoryDesk:
             return None, None
         query = bindparam("item_vector", vector, type_=HalfVector(EMBED_DIM))
         distance = Story.embedding.op("<=>", return_type=Float)(query)
-        row = (
-            await session.execute(
-                select(Story, (literal(1.0) - distance).label("similarity"))
-                .where(
-                    Story.company_id == company_id,
-                    Story.embedding_model == self.embedder.model_id,
-                    Story.last_item_at >= now - MATCH_WINDOW,
-                )
-                .order_by(distance)
-                .limit(1)
+        candidates = select(Story, (literal(1.0) - distance).label("similarity")).where(
+            Story.company_id == company_id,
+            Story.embedding_model == self.embedder.model_id,
+            Story.last_item_at >= now - MATCH_WINDOW,
+        )
+        if within_hours is not None:
+            # a price beat (D-067): only a story that began the same day, not one that has been
+            # taking in every day's close since
+            at = item.published_at or item.created_at or now
+            first = (
+                select(func.min(func.coalesce(SourceItem.published_at, SourceItem.created_at)))
+                .join(StoryItem, StoryItem.source_item_id == SourceItem.id)
+                .where(StoryItem.story_id == Story.id)
+                .scalar_subquery()
             )
-        ).first()
+            span = timedelta(hours=within_hours)
+            candidates = candidates.where(first >= at - span, first <= at + span)
+        row = (await session.execute(candidates.order_by(distance).limit(1))).first()
         if row is not None and row.similarity >= self.threshold:
             return row.Story, round(float(row.similarity), 4)
         return None, None

@@ -99,6 +99,14 @@ MAX_AGE_DAYS = "max_age_days"
 of it into stories on the first poll. Entries without a date are kept (D-036)."""
 
 
+MATCH_HOURS = "match_hours"
+"""``config.match_hours``: an item of this source joins a similar story only when that story's
+first report is within this many hours of it. A price beat — gold, a currency, a futures close —
+reads alike every day ("新台幣收 31.78" and, the next day, "收 31.716"), so a story that matched on
+meaning alone would take in each day's news for a month; with 12 the same day's reports still
+join, and the next day's is a story of its own (D-067)."""
+
+
 PRIMARY = "primary"
 """``config.primary``: the source *is* the record — a filing, not a report of one. A story from
 it needs no second source to be believed, so the story desk scores its corroboration as full
@@ -165,6 +173,9 @@ def _validate(kind: SourceKind, url: str | None, config: dict[str, Any]) -> None
     age = config.get(MAX_AGE_DAYS)
     if age is not None and (not isinstance(age, int) or isinstance(age, bool) or age < 1):
         raise SourceConfigError("config.max_age_days must be a whole number of days, 1 or more")
+    hours = config.get(MATCH_HOURS)
+    if hours is not None and (not isinstance(hours, int) or isinstance(hours, bool) or hours < 1):
+        raise SourceConfigError("config.match_hours must be a whole number of hours, 1 or more")
     section = config.get(SECTION)
     if section is not None and section not in SECTIONS:
         raise SourceConfigError(f"config.section must be one of {', '.join(SECTIONS)}")

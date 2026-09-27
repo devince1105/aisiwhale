@@ -49,6 +49,7 @@ from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source, SourceStatus
 from autora.domains.newsroom.sources import (
+    MATCH_HOURS,
     MAX_AGE_DAYS,
     OWN_STORY,
     PRIMARY,
@@ -159,6 +160,10 @@ def _figure(name: str, cik: str) -> MarketSource:
     )
 
 
+PRICE_BEATS = ("gold", "commodities", "fx")
+"""Sections whose news is a price, every day (D-067)."""
+
+
 def _search(
     query: str,
     section: str,
@@ -177,6 +182,8 @@ def _search(
     }
     if domains:
         config["domains"] = list(domains)
+    if section in PRICE_BEATS:
+        config[MATCH_HOURS] = 12  # each day's close is its own story
     return MarketSource(
         name=f"搜尋：{name or query}",
         kind="search_query",
