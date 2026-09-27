@@ -157,14 +157,40 @@ async def test_our_articles_that_name_it(newsroom_room):
 
 def test_the_stocks_an_article_names():
     """D-077: the strip's stocks an article names, for links to their charts — by the names a
-    stock page looks for, Taiwan's first; 台積電 is 2330, its ADR only where TSM is said."""
+    stock page looks for, Taiwan's first; 台積電 is both its listings, 2330 and the ADR (D-078)."""
     from autora.domains.newsroom.holdings import stocks_named
 
     keys = lambda text: [s.key for s in stocks_named(text)]  # noqa: E731
-    assert keys("輝達與台積電的 AI 伺服器訂單，鴻海受惠") == ["tw:2330", "tw:2317", "us:NVDA"]
+    assert keys("輝達與台積電的 AI 伺服器訂單，鴻海受惠") == [
+        "tw:2330",
+        "tw:2317",
+        "us:NVDA",
+        "us:TSM",
+    ]
     assert keys("TSMC's ADR (TSM) rose") == ["tw:2330", "us:TSM"]
-    assert keys("台積電法說會") == ["tw:2330"]
+    assert keys("台積電法說會") == ["tw:2330", "us:TSM"]
     # a Latin name as a whole word in its own case: not in MUST, metadata or NVDAX
     assert keys("You MUST read the metadata of NVDAX") == []
     assert keys("Micron (MU) and Meta") == ["us:META", "us:MU"]  # the strip's order
     assert len(stocks_named(" ".join(s.symbol for s in STOCKS.values()))) == 8  # a few at most
+
+
+def test_only_taiwan_and_us_stock_news_links_its_stocks():
+    """D-078: the lists and the page link the stocks a 台股 or 美股 story names; a 13F's list of
+    holdings, or an AI story that names Nvidia, is not a story about a stock."""
+    import uuid
+    from datetime import UTC, datetime
+
+    from autora.domains.newsroom import site
+    from autora.domains.newsroom.models import Article, ArticleVersion
+
+    article = Article(
+        id=uuid.uuid4(), slug="s", access="free", published_at=datetime(2026, 9, 27, tzinfo=UTC)
+    )
+    version = ArticleVersion(
+        lang="zh-TW", title="台積電法說會", summary="輝達訂單", body=[{"type": "p", "text": "鴻海"}]
+    )
+    keys = lambda section: [s.key for s in site._summary(article, version, section).stocks]  # noqa: E731
+    assert keys("tw") == ["tw:2330", "tw:2317", "us:NVDA", "us:TSM"]
+    assert keys("us") == keys("ai") == keys("tw")  # AI and tech news too (D-079)
+    assert keys("holdings") == keys("institutions") == keys(None) == []

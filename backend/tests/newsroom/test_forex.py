@@ -202,3 +202,29 @@ async def test_bitcoin_and_the_taiwan_index_have_charts_with_their_open_high_and
     assert await figures.figure("taiex") is None  # without the database: nothing to read
     yen = await figures.figure("jpytwd")
     assert yen.close_only and not (await figures.figure("usdtwd")).close_only
+
+
+def test_the_figures_a_story_names_by_its_section():
+    """D-079: a crypto, gold, futures or FX story links the watchlist figures it names — only
+    its own kind, so a stock story's 美元 or an FX story's 黃金 links nothing."""
+    from autora.domains.newsroom.figures import figures_named
+
+    keys = lambda text, section: [k for k, _, _ in figures_named(text, section)]  # noqa: E731
+    assert keys("比特幣 ETF 資金流入，以太幣走弱", "crypto") == ["btc", "eth"]
+    assert keys("金價創高", "gold") == ["xau"]
+    assert keys("國際油價下跌，黃金走高", "commodities") == ["wti", "xau"]
+    assert keys("CBOT 玉米期貨下跌", "commodities") == []  # no watchlist figure for grains
+    assert keys("新台幣兌美元收 31.716，日圓、人民幣走弱，歐元持平", "fx") == [
+        "usdtwd",
+        "jpytwd",
+        "eurtwd",
+        "cnytwd",
+    ]  # in Bank of Taiwan's order
+    assert keys("The yen won back its losses", "fx") == ["jpytwd"]  # "won" is not the won
+    assert keys("黃金與美元", "fx") == ["usdtwd"] and keys("美元走強", "tw") == []
+    # a stock story's index: the Nasdaq and the yield in US news, the TAIEX in Taiwan's
+    assert keys("那指跌1.13%，美債殖利率上升", "us") == ["nasdaq", "us10y"]
+    assert keys("Nasdaq fell as Treasury yields rose", "us") == ["nasdaq", "us10y"]
+    assert keys("加權指數收高", "tw") == ["taiex"]
+    assert keys("台積電殖利率約1.5%", "tw") == []  # a dividend yield is not the Treasury's
+    assert keys("比特幣", None) == []

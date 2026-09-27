@@ -120,17 +120,10 @@ def _said(term: str, text: str) -> bool:
 
 
 def stocks_named(text: str, *, limit: int = 8) -> list[Stock]:
-    """The strip's stocks an article names (D-077), Taiwan's first, in the strip's order. A
-    stock named only by what another named one is also called is left out: 台積電 is 2330, and
-    its ADR (TSM) only where "TSM" itself is said."""
-    claimed: set[str] = set()
-    out = []
-    for stock in sorted(STOCKS.values(), key=lambda s: s.market != "tw"):
-        said = {term for term in stock.terms if _said(term, text)}
-        if said and not said <= claimed:
-            out.append(stock)
-        claimed |= said
-    return out[:limit]
+    """The strip's stocks an article names (D-077), Taiwan's first, in the strip's order. 台積電
+    is both of its listings — 2330 and its ADR (TSM) — as a reader may follow either (D-078)."""
+    ordered = sorted(STOCKS.values(), key=lambda s: s.market != "tw")
+    return [s for s in ordered if any(_said(term, text) for term in s.terms)][:limit]
 
 
 def investor_name(source: Source) -> str:

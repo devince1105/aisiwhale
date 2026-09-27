@@ -2775,6 +2775,11 @@ export interface components {
             section?: string | null;
             /** Slug */
             slug: string;
+            /**
+             * Stocks
+             * @default []
+             */
+            stocks: components["schemas"]["PublicNamedStock"][];
             /** Summary */
             summary: string | null;
             /** Title */

@@ -49,6 +49,12 @@ import { formatDate, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
 import { ARROW, direction, formatChange, formatValue, isCurrency, label, stockCode, stockPage, TONE } from "./quote";
+
+/** A watchlist figure that is not a stock (D-079): an index, the yield, oil, gold, a coin, a
+ * currency in NT$ — what an article's link may open. */
+function isFigure(key: string): boolean {
+  return isCurrency(key) || ["taiex", "nasdaq", "us10y", "wti", "xau", "btc", "eth"].includes(key);
+}
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
 /** The strip's quotes: the popular stocks the watchlist page offers. */
@@ -538,15 +544,24 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   const strip = useStrip();
   const sample = list.status === "signedOut";
   const items = list.status === "ready" ? list.items : sample ? stripItems(strip, words(lang).quoteNames) : [];
-  const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
-  const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
+  // the list's quotes, and the one an article's link opened (D-079), on the list or not
+  const opened = params.get("s");
+  const listed = useQuotes([
+    ...(list.status === "ready" ? list.items.map((item) => item.key) : []),
+    ...(opened && list.status !== "loading" ? [opened] : []),
+  ]);
+  const byKey = sample ? new Map([...strip.map((q): [string, PublicQuote] => [q.key, q]), ...listed]) : listed;
   // a stock from an article's link (D-077) may not be on the list: shown all the same, with
   // 加入觀察 beside it
   const asked = params.get("s");
   const unlisted: WatchedStock | null =
-    asked && /^(tw|us):[A-Z0-9.\-]{1,12}$/.test(asked) && !items.some((item) => item.key === asked)
-      ? { key: asked, symbol: asked.split(":")[1], market: asked.split(":")[0], name: asked.split(":")[1] }
-      : null;
+    !asked || items.some((item) => item.key === asked)
+      ? null
+      : /^(tw|us):[A-Z0-9.\-]{1,12}$/.test(asked)
+        ? { key: asked, symbol: asked.split(":")[1], market: asked.split(":")[0], name: asked.split(":")[1] }
+        : isFigure(asked)
+          ? { key: asked, symbol: asked.toUpperCase(), market: "market", name: words(lang).quoteNames[asked] ?? stockCode(asked) ?? asked.toUpperCase() }
+          : null;
   const picked =
     (list.status === "loading" ? null : unlisted) ?? items.find((item) => item.key === asked) ?? items[0] ?? null;
   const [listOpen, setListOpen] = useSideOpen();

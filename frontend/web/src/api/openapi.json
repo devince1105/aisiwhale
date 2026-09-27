@@ -3921,6 +3921,14 @@
       "title": "Slug",
       "type": "string"
      },
+     "stocks": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/PublicNamedStock"
+      },
+      "title": "Stocks",
+      "type": "array"
+     },
      "summary": {
       "anyOf": [
        {

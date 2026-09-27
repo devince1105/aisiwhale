@@ -37,6 +37,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Company
+from autora.domains.newsroom.figures import figures_named
 from autora.domains.newsroom.holdings import stocks_named
 from autora.domains.newsroom.models import (
     AnalyticsEvent,
@@ -79,6 +80,14 @@ class PublicSource(BaseModel):
     url: str
 
 
+class PublicNamedStock(BaseModel):
+    """A stock an article names (D-077): its strip key, and its name in the article's language."""
+
+    key: str
+    symbol: str
+    name: str
+
+
 class PublicArticleSummary(BaseModel):
     article_id: uuid.UUID
     lang: str
@@ -93,6 +102,9 @@ class PublicArticleSummary(BaseModel):
     """``free`` or ``members`` (D-025). On a list, this is what draws the badge."""
     section: str | None = None
     """One of ``SECTIONS`` (D-047), or None when none of its story's sources names one."""
+    stocks: list[PublicNamedStock] = []
+    """What it names that has a chart, for quick links to it on the watchlist page: a 台股 or
+    美股 story's stocks (D-077, D-078), a crypto, gold, futures or FX story's figures (D-079)."""
 
 
 class PublicNeighbour(BaseModel):
@@ -100,14 +112,6 @@ class PublicNeighbour(BaseModel):
 
     title: str
     path: str
-
-
-class PublicNamedStock(BaseModel):
-    """A stock an article names (D-077): its strip key, and its name in the article's language."""
-
-    key: str
-    symbol: str
-    name: str
 
 
 class PublicArticle(PublicArticleSummary):
@@ -125,8 +129,6 @@ class PublicArticle(PublicArticleSummary):
     """The same company, as the public API names one. The paywall asks what a year costs here."""
     newer: PublicNeighbour | None = None
     older: PublicNeighbour | None = None
-    stocks: list[PublicNamedStock] = []
-    """The strip's stocks it names, for quick links to their charts (D-077)."""
 
 
 def _summary(
@@ -144,7 +146,36 @@ def _summary(
         published_at=article.published_at,
         revised_at=article.revised_at,
         section=section,
+        stocks=_named(version, section),
     )
+
+
+STOCK_SECTIONS = ("tw", "us", "ai")
+"""Where an article's stocks are linked (D-078): Taiwan and US stock news, and AI and tech news
+— Microsoft's Copilot is Microsoft's (D-079). A 13F's or an institution's list of names is what
+the article is, not a stock it is about."""
+
+
+def _named(version: ArticleVersion, section: str | None) -> list[PublicNamedStock]:
+    """What the version names that has a chart, in its language: a 台股 or 美股 story's stocks
+    (D-077, D-078); a crypto, gold, futures or FX story's figures (D-079)."""
+    said = " ".join([version.title, version.summary or "", *(b["text"] for b in version.body)])
+    zh = version.lang.startswith("zh")
+    stocks = (
+        [
+            PublicNamedStock(key=s.key, symbol=s.symbol, name=s.zh if zh else s.en)
+            for s in stocks_named(said)
+        ]
+        if section in STOCK_SECTIONS
+        else []
+    )
+    # and its figures: a stock story's index (the TAIEX, the Nasdaq, the yield), a crypto, gold,
+    # futures or FX story's coins, gold, oil or currencies
+    figures = [
+        PublicNamedStock(key=key, symbol=key.upper(), name=name_zh if zh else name_en)
+        for key, name_zh, name_en in figures_named(said, section)
+    ]
+    return (stocks + figures)[:8]
 
 
 def _section():
@@ -217,9 +248,6 @@ async def published_article(
                 site = urlsplit(url).hostname or url
                 sources[url] = PublicSource(title=title or site, site=site, url=url)
     locked = article.access == ArticleAccess.MEMBERS.value and not unlocked
-    # the stocks it names, each a link to its chart on the watchlist page (D-077)
-    said = " ".join([version.title, version.summary or "", *(b["text"] for b in version.body)])
-    zh = lang.startswith("zh")
     body = preview(version.body) if locked else version.body
     newer, older = await _neighbours(session, lang, article)
     return PublicArticle(
@@ -233,10 +261,6 @@ async def published_article(
         company_slug=company.slug if company else "",
         newer=newer,
         older=older,
-        stocks=[
-            PublicNamedStock(key=s.key, symbol=s.symbol, name=s.zh if zh else s.en)
-            for s in stocks_named(said)
-        ],
     )
 
 

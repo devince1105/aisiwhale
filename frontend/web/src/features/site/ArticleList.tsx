@@ -18,6 +18,7 @@ import {
   type Section,
 } from "./i18n";
 import { Pagination } from "./Pagination";
+import { StocksNamed } from "./StocksNamed";
 
 export const PAGE_SIZE = 10;
 
@@ -63,6 +64,7 @@ function Lead({ article, lang }: { article: PublicArticleSummary; lang: Lang }) 
         </Link>
       </h2>
       {article.summary ? <p className="mt-4 text-lg leading-relaxed text-muted">{article.summary}</p> : null}
+      <StocksNamed stocks={article.stocks} lang={lang} compact />
     </article>
   );
 }
@@ -77,6 +79,7 @@ function Row({ article, lang }: { article: PublicArticleSummary; lang: Lang }) {
         </Link>
       </h2>
       {article.summary ? <p className="mt-2 line-clamp-2 leading-relaxed text-muted">{article.summary}</p> : null}
+      <StocksNamed stocks={article.stocks} lang={lang} compact />
     </li>
   );
 }

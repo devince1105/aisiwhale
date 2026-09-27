@@ -169,3 +169,59 @@ class Figures:
             close_only=close_only,
             bars=bars,
         )
+
+
+# --- the figures an article names (D-079) --------------------------------------------------------
+
+FIGURE_TERMS: dict[str, tuple[str, str, tuple[str, ...]]] = {
+    "xau": ("黃金", "Gold", ("黃金", "金價", "XAU", "gold", "Gold")),
+    "wti": ("西德州原油", "WTI crude", ("原油", "油價", "WTI", "crude", "Crude")),
+    "btc": ("比特幣", "Bitcoin", ("比特幣", "Bitcoin", "BTC")),
+    "eth": ("以太幣", "Ether", ("以太幣", "以太坊", "Ether", "Ethereum", "ETH")),
+    "taiex": ("加權指數", "TAIEX", ("加權指數", "台股大盤", "發行量加權", "TAIEX")),
+    "nasdaq": ("那斯達克", "Nasdaq", ("那斯達克", "那指", "Nasdaq")),
+    # not 殖利率 alone: in Taiwan that is most often a stock's dividend yield
+    "us10y": (
+        "美國10年期公債",
+        "US 10Y",
+        ("公債殖利率", "美債殖利率", "10年期", "Treasury yield", "Treasury yields", "10-year"),
+    ),
+}
+"""A watchlist figure, its names (zh, en) and what an article that names it would say."""
+CURRENCY_ALIASES = {
+    "USD": ("美元", "美金", "US dollar", "U.S. dollar"),
+    "JPY": ("日圓", "日元", "日幣", "yen"),
+    "CNY": ("人民幣", "yuan", "renminbi"),
+    "EUR": ("歐元", "euro", "Euro"),
+    "HKD": ("港幣", "港元", "Hong Kong dollar"),
+    "KRW": ("韓元", "韓圜"),  # not "won": it is also what a currency did
+}
+"""Beyond Bank of Taiwan's name: how a story says the currency."""
+SECTION_FIGURES = {
+    "tw": ("taiex",),
+    "us": ("nasdaq", "us10y"),
+    "crypto": ("btc", "eth"),
+    "gold": ("xau",),
+    "commodities": ("wti", "xau"),
+}
+"""Which figures a section's stories may link (D-079); 外匯 links its currencies."""
+
+
+def figures_named(text: str, section: str | None) -> list[tuple[str, str, str]]:
+    """The watchlist figures a story in ``section`` names (D-079), as (key, zh, en): a coin in
+    crypto news, gold in gold news, oil and gold among futures, the currencies in FX news."""
+    from autora.domains.newsroom.forex import NAMES
+    from autora.domains.newsroom.holdings import _said
+
+    out = []
+    for key in SECTION_FIGURES.get(section or "", ()):
+        zh, en, terms = FIGURE_TERMS[key]
+        if any(_said(term, text) for term in terms):
+            out.append((key, zh, en))
+    if section == "fx":
+        for code in CHARTED:
+            zh, en = NAMES[code]
+            terms = (zh, *CURRENCY_ALIASES.get(code, ()))
+            if any(_said(term, text) for term in terms):
+                out.append((f"{code.lower()}twd", zh, en))
+    return out[:8]

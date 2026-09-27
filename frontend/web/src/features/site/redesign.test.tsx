@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fetchArticlePage, fetchArticles, fetchFigure, type PublicArticle, type PublicArticleSummary } from "./api";
 import { ArticleList, listHref } from "./ArticleList";
 import { ArticleView } from "./ArticleView";
+import { StocksNamed } from "./StocksNamed";
 import { slots } from "./Pagination";
 import { currentSection, SectionNav } from "./SectionNav";
 import { SiteName } from "./SiteName";
@@ -30,6 +31,7 @@ function summary(n: number, over: Partial<PublicArticleSummary> = {}): PublicArt
     article_id: `a${n}`,
     lang: "zh-TW",
     slug: `s${n}`,
+    stocks: [],
     path: `/news/zh-TW/articles/s${n}`,
     title: `第 ${n} 篇`,
     summary: `摘要 ${n}`,
@@ -123,6 +125,28 @@ describe("the front page", () => {
     cleanup();
     render(<ArticleList articles={[summary(1)]} lang="en" pages={1} />);
     expect(screen.queryByRole("navigation", { name: "Pages" })).toBeNull(); // one page: nothing to page through
+  });
+
+  it("under a story, the stocks it names, each to its chart on the watchlist page (D-078)", () => {
+    render(
+      <ArticleList
+        articles={[summary(1, { stocks: [{ key: "us:NVDA", symbol: "NVDA", name: "輝達" }] }), summary(2)]}
+        lang="zh-TW"
+      />,
+    );
+    const named = screen.getAllByTestId("stocks-named");
+    expect(named).toHaveLength(1); // the story that names none has no row
+    expect(within(named[0]).getByRole("link").getAttribute("href")).toBe("/news/zh-TW/watchlist?s=us%3ANVDA");
+    expect(named[0].textContent).toBe("輝達NVDA"); // in a list: no label before them
+  });
+
+  it("a crypto, gold, futures or FX story's figures are 相關行情 (D-079)", () => {
+    render(<StocksNamed stocks={[{ key: "btc", symbol: "BTC", name: "比特幣" }, { key: "jpytwd", symbol: "JPYTWD", name: "日圓" }]} lang="zh-TW" />);
+    const named = within(screen.getByRole("navigation", { name: "相關行情" }));
+    expect(named.getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["比特幣BTC", "/news/zh-TW/watchlist?s=btc"],
+      ["日圓JPY/TWD", "/news/zh-TW/watchlist?s=jpytwd"],
+    ]);
   });
 
   it("marks members-only stories, and knows its sections", () => {

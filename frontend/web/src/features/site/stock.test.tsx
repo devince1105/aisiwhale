@@ -87,6 +87,7 @@ const NVDA: PublicStock = {
       article_id: "a1",
       lang: "zh-TW",
       slug: "hh",
+      stocks: [],
       path: "/news/zh-TW/articles/hh",
       title: "段永平 H&H 最新 13F：減持輝達逾五成",
       summary: null,

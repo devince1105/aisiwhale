@@ -319,3 +319,18 @@ describe("a stock from an article (D-077)", () => {
     expect(screen.getByRole("button", { name: /加入觀察/ })).toBeTruthy();
   });
 });
+
+describe("a figure from an article (D-079)", () => {
+  it("opens though not on the list: its name, its chart, 加入觀察", async () => {
+    list = [NVDA];
+    params = new URLSearchParams("s=jpytwd");
+    render(<WatchlistPage lang="zh-TW" />);
+    const pane = await screen.findByTestId("watch-pane");
+    expect(pane.textContent).toContain("日圓");
+    expect(await within(pane).findByTestId("figure-chart")).toBeTruthy();
+    params = new URLSearchParams("s=nonsense");
+    cleanup();
+    render(<WatchlistPage lang="zh-TW" />);
+    expect((await screen.findByTestId("watch-pane")).textContent).toContain("輝達"); // unknown: the first
+  });
+});
