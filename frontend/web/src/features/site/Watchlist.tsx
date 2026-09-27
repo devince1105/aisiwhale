@@ -456,7 +456,8 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   const go = (query: Record<string, string>) => router.replace(`/news/${lang}/watchlist?${new URLSearchParams(query)}`, { scroll: false });
 
   return (
-    <div>
+    // the settings in the page's reading column, centred, as they were; the list to watch wider
+    <div className={editing ? "mx-auto max-w-3xl" : undefined} data-testid="watchlist-page">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{w.title}</h1>
         <button
@@ -470,9 +471,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         </button>
       </div>
       {editing ? (
-        <div className="max-w-3xl">
-          <WatchlistEditor lang={lang} />
-        </div>
+        <WatchlistEditor lang={lang} />
       ) : list.status === "loading" ? (
         <p className="text-muted">…</p>
       ) : list.status === "failed" ? (
@@ -480,8 +479,10 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
       ) : !items.length ? (
         <p className="text-muted">{w.emptyBoard}</p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]" data-testid="watch-board">
-          <nav aria-label={w.title}>
+        // grid-cols-1 and min-w-0: a phone's row of names scrolls within the screen, rather than
+        // widening its column — and the whole page with it — to the row's full length
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]" data-testid="watch-board">
+          <nav aria-label={w.title} className="min-w-0">
             {sample ? <p className="mb-2 px-3 text-xs text-muted">{w.sample}</p> : null}
             {/* a phone: a row to scroll; a wide screen: a column */}
             <ul className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible">

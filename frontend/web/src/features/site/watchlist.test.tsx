@@ -213,6 +213,8 @@ describe("the watchlist page to watch (D-064)", () => {
     rerender(<WatchlistPage lang="zh-TW" />);
     expect(await screen.findByTestId("watchlist")).toBeTruthy();
     expect(screen.getByTestId("watchlist-edit").textContent).toBe("完成");
+    // the settings in the centred reading column, as before (not the wide board's)
+    expect(screen.getByTestId("watchlist-page").className).toContain("mx-auto max-w-3xl");
   });
 
   it("beside a stock, the list is only to look at, with a way to its settings", async () => {
