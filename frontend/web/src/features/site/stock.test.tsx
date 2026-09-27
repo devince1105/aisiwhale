@@ -112,6 +112,7 @@ describe("a stock's page", () => {
   it("gives the market value under the price; the day's figures are the chart's", () => {
     render(<StockView stock={NVDA} lang="zh-TW" />);
     expect(screen.getByTestId("market-cap").textContent).toBe("總市值 US$5.4兆");
+    expect(screen.getByTestId("market-cap").parentElement!.textContent).toContain("Finnhub"); // above its source
     expect(document.querySelector("article header dl")).toBeNull(); // no open/high/low card
     cleanup();
     // an ETF has no market value: no line

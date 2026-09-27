@@ -132,36 +132,40 @@ export function StockView({
   const before = stock.holders[0]?.previous_period ?? null;
   return (
     <article className="mx-auto max-w-3xl px-4 pt-6 pb-10">
-      <header className="border-b border-line pb-6">
+      <header>
         <h1 className="flex flex-wrap items-baseline gap-x-3 text-3xl font-bold">
           {stock.name}
           {code && code !== stock.name ? <span className="text-lg font-medium text-muted">{code}</span> : null}
         </h1>
         {quote ? (
-          <p className="mt-3 flex flex-wrap items-baseline gap-x-3">
-            <span className={`text-4xl font-semibold tabular-nums ${TONE[way]}`}>{formatValue(quote, lang)}</span>
+          <div className="mt-3 flex flex-wrap items-end gap-x-3">
+            <span className={`text-4xl leading-none font-semibold tabular-nums ${TONE[way]}`}>{formatValue(quote, lang)}</span>
             {change ? (
-              <span className={`text-lg tabular-nums ${TONE[way]}`}>
+              <span className={`text-lg leading-none tabular-nums ${TONE[way]}`}>
                 {way === "rise" ? "+" : way === "fall" ? "−" : ""}
                 {change} {ARROW[way]}
               </span>
             ) : null}
-            <span className="text-xs text-muted">
-              {w.basis[quote.basis]} {formatDate(lang, quote.as_of)}・{w.sourceNames[quote.source] ?? quote.source}
+            {/* the market value above where the price comes from: one block beside the price */}
+            <span className="flex flex-col text-xs leading-snug text-muted">
+              {quote.market_cap ? (
+                <span data-testid="market-cap">
+                  {s.marketCap}{" "}
+                  <span className="font-medium text-ink tabular-nums">{formatCap(quote.market_cap, quote.currency, lang)}</span>
+                </span>
+              ) : null}
+              <span>
+                {w.basis[quote.basis]} {formatDate(lang, quote.as_of)}・{w.sourceNames[quote.source] ?? quote.source}
+              </span>
             </span>
-          </p>
+          </div>
         ) : (
           <p className="mt-3 text-muted">{s.noQuote}</p>
         )}
-        {quote?.market_cap ? (
-          <p className="mt-2 text-sm text-muted" data-testid="market-cap">
-            {s.marketCap} <span className="font-medium text-ink tabular-nums">{formatCap(quote.market_cap, quote.currency, lang)}</span>
-          </p>
-        ) : null}
       </header>
 
       {history ? (
-        <section className="mt-6" aria-labelledby="chart">
+        <section className="mt-5" aria-labelledby="chart">
           <h2 id="chart" className="sr-only">
             {w.chart.title}
           </h2>
