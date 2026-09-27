@@ -230,8 +230,14 @@ describe("the watchlist page to watch (D-064)", () => {
     const pane = await screen.findByTestId("watch-pane");
     expect(pane.textContent).toContain("加權指數");
     expect(await within(pane).findByText(/歷史資料還在準備中/)).toBeTruthy(); // no history yet
+    // the list is hidden until asked for (D-075): the one picked has the page
+    expect(screen.queryByRole("button", { name: /輝達/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "觀察清單" }));
     fireEvent.click(screen.getAllByRole("button", { name: /輝達/ })[0]);
     expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?s=us%3ANVDA", { scroll: false });
+    expect(screen.getByTestId("watch-board").className).toContain("lg:grid-cols-[16rem");
+    fireEvent.click(screen.getByRole("button", { name: "收起清單" }));
+    expect(screen.getByTestId("watch-board").className).not.toContain("lg:grid-cols-[16rem");
   });
 
   it("編輯清單 opens the settings, and 完成 closes them", async () => {

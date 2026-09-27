@@ -139,7 +139,6 @@ function Row({
 /** Beside a stock: the reader's list, the stock on show marked. Nothing when signed out or
  * empty — the page is the stock's, not a prompt. */
 export function WatchlistSide({ lang, current }: { lang: Lang; current: string }) {
-  const w = words(lang).watch;
   const list = useWatchlist(lang);
   const strip = useStrip();
   const sample = list.status === "signedOut";
@@ -150,7 +149,20 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
   const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
   const [open, setOpen] = useSideOpen();
   if (!items.length) return null;
-  const toggle = (
+  const toggle = <SideToggle open={open} setOpen={setOpen} lang={lang} />;
+  // hidden until asked for (D-066): the stock has the page; the list is a click away
+  return (
+    <aside className={`lg:shrink-0 lg:pt-6 ${open ? "lg:w-56" : ""}`} data-testid="watchlist-side">
+      <div className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-none lg:px-0 lg:pt-0 lg:pb-2">{toggle}</div>
+      {open ? <SideList id="watchlist-side-list" items={items} byKey={byKey} lang={lang} current={current} sample={sample} /> : null}
+    </aside>
+  );
+}
+
+/** The watchlist's own list, beside a stock or on its page: shown or hidden (D-066, D-075). */
+function SideToggle({ open, setOpen, lang }: { open: boolean; setOpen: (open: boolean) => void; lang: Lang }) {
+  const w = words(lang).watch;
+  return (
     <button
       type="button"
       onClick={() => setOpen(!open)}
@@ -164,13 +176,6 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
       </svg>
       {open ? w.hideSide : w.showSide}
     </button>
-  );
-  // hidden until asked for (D-066): the stock has the page; the list is a click away
-  return (
-    <aside className={`lg:shrink-0 lg:pt-6 ${open ? "lg:w-56" : ""}`} data-testid="watchlist-side">
-      <div className="mx-auto max-w-3xl px-4 pt-4 lg:max-w-none lg:px-0 lg:pt-0 lg:pb-2">{toggle}</div>
-      {open ? <SideList id="watchlist-side-list" items={items} byKey={byKey} lang={lang} current={current} sample={sample} /> : null}
-    </aside>
   );
 }
 
@@ -532,6 +537,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
   const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
   const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
   const picked = items.find((item) => item.key === params.get("s")) ?? items[0] ?? null;
+  const [listOpen, setListOpen] = useSideOpen();
   const go = (query: Record<string, string>) => router.replace(`/news/${lang}/watchlist?${new URLSearchParams(query)}`, { scroll: false });
 
   return (
@@ -563,9 +569,18 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         <p className="text-muted">{w.emptyBoard}</p>
       ) : (
         // grid-cols-1 and min-w-0: a phone's row of names scrolls within the screen, rather than
-        // widening its column — and the whole page with it — to the row's full length
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]" data-testid="watch-board">
-          <nav aria-label={w.title} className="min-w-0">
+        // widening its column — and the whole page with it — to the row's full length. The list is
+        // hidden until asked for (D-075), as beside a stock: the one picked has the page
+        <>
+        <div className="mb-4">
+          <SideToggle open={listOpen} setOpen={setListOpen} lang={lang} />
+        </div>
+        <div
+          className={`grid grid-cols-1 gap-6 ${listOpen ? "lg:grid-cols-[16rem_minmax(0,1fr)]" : ""}`}
+          data-testid="watch-board"
+        >
+          {listOpen ? (
+          <nav id="watchlist-side-list" aria-label={w.title} className="min-w-0">
             {sample ? <p className="mb-2 px-3 text-xs text-muted">{w.sample}</p> : null}
             {/* a phone: a row to scroll; a wide screen: a column */}
             <ul className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible">
@@ -590,8 +605,10 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
               ))}
             </ul>
           </nav>
+          ) : null}
           {picked ? <WatchPane key={picked.key} item={picked} quote={byKey.get(picked.key)} lang={lang} /> : null}
         </div>
+        </>
       )}
     </div>
   );
