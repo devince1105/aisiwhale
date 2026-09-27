@@ -618,24 +618,45 @@ class PriceBar(IdMixin, CreatedAtMixin, Base):
 
     Market data, not the company's: no ``company_id``. Written by ``price_history`` from the
     exchange's own daily figures (TWSE for Taiwan); a day already stored is overwritten, because
-    an exchange may correct a figure after the close."""
+    an exchange may correct a figure after the close. Since D-082 also a forex pair's day
+    (market ``fx``, symbol ``usdtwd``) and a coin's (``crypto``, ``btcusd``), kept by
+    ``forex.TiingoFx`` so a restart does not ask Tiingo again."""
 
     __tablename__ = "price_bars"
     __table_args__ = (
         UniqueConstraint("market", "symbol", "day"),
-        CheckConstraint("market in ('tw', 'us')", name="market"),
+        CheckConstraint("market in ('tw', 'us', 'fx', 'crypto')", name="market"),
     )
 
     market: Mapped[str]
     symbol: Mapped[str]
     day: Mapped[date] = mapped_column(Date)
-    open: Mapped[Decimal] = mapped_column(Numeric(18, 4))
-    high: Mapped[Decimal] = mapped_column(Numeric(18, 4))
-    low: Mapped[Decimal] = mapped_column(Numeric(18, 4))
-    close: Mapped[Decimal] = mapped_column(Numeric(18, 4))
+    open: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    high: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    low: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    close: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     volume: Mapped[int] = mapped_column(Numeric(20, 0))
     """Shares traded (a Taiwan page shows it in 張, a thousand shares)."""
     source: Mapped[str]
+
+
+class PriceFetch(IdMixin, Base):
+    """When one series of ``price_bars`` was last asked for, and when it may be asked again
+    (D-082): what ``forex.TiingoFx`` kept in memory only, so every restart asked Tiingo for every
+    pair at once and ran through its 50 requests an hour."""
+
+    __tablename__ = "price_fetches"
+    __table_args__ = (
+        UniqueConstraint("market", "symbol"),
+        CheckConstraint("market in ('fx', 'crypto')", name="market"),
+    )
+
+    market: Mapped[str]
+    symbol: Mapped[str]
+    fetched_at: Mapped[datetime | None]
+    """The last good answer (None: never had one)."""
+    next_at: Mapped[datetime]
+    """Not asked again before: ``KEEP`` after a good answer, ``RETRY`` after a failed one."""
 
 
 class Security(IdMixin, TimestampMixin, Base):

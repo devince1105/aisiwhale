@@ -30,6 +30,7 @@ from sqlalchemy import select
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
 from autora.db.models import Company
+from autora.db.session import get_sessionmaker
 from autora.domains.newsroom import forex as currencies
 from autora.domains.newsroom import securities
 from autora.domains.newsroom.figures import (
@@ -145,11 +146,13 @@ def _secret(value: SecretStr | None) -> str | None:
 @lru_cache
 def forex_cache() -> TiingoFx:
     """One per process (D-072): gold and currencies from Tiingo, each pair asked for once every
-    few hours for the strip, the watchlist's charts and gold's price a gram."""
+    few hours for the strip, the watchlist's charts and gold's price a gram — kept in the
+    database, so a restart does not ask again (D-082)."""
     settings = get_settings()
     key = _secret(settings.tiingo_api_key)
-    live = settings.tools_profile == "live" and key is not None
-    return TiingoFx(tiingo_rows(key) if live else None)
+    if settings.tools_profile != "live" or key is None:
+        return TiingoFx(None)
+    return TiingoFx(tiingo_rows(key), sessions=get_sessionmaker())
 
 
 def gold_board(forex: Annotated[TiingoFx, Depends(forex_cache)]) -> GoldBoard:

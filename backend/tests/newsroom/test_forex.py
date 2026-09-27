@@ -136,6 +136,52 @@ async def test_each_pair_asked_for_once_every_few_hours_whoever_wants_it():
     assert len(asked) == 4
 
 
+async def test_a_restart_reads_back_what_was_asked_for_and_asks_nobody(db_session):
+    """D-082: what one process was given is stored; a fresh one (the API restarted) serves it
+    without asking Tiingo until ``KEEP`` has run out — and a failure's ``RETRY`` holds too."""
+    from contextlib import asynccontextmanager
+
+    from sqlalchemy import delete
+
+    from autora.domains.newsroom.models import PriceBar, PriceFetch
+
+    @asynccontextmanager
+    async def sessions():
+        yield db_session  # the test's own, rolled back afterwards
+
+    for model in (PriceBar, PriceFetch):
+        await db_session.execute(delete(model).where(model.market.in_(("fx", "crypto"))))
+    now = [datetime(2026, 9, 27, 3, tzinfo=UTC)]
+    asked: list[str] = []
+    first = TiingoFx(tiingo(asked), sessions=sessions, clock=lambda: now[0])
+    assert (await first.bars("xauusd"))[-1].c == 4284.91
+    assert (await first.crypto("btcusd"))[-1].c == 84729.72
+    await first.twd_bars("EUR")
+    assert len(asked) == 4
+
+    now[0] += timedelta(hours=2)
+    restarted = TiingoFx(tiingo(asked), sessions=sessions, clock=lambda: now[0])
+    assert await restarted.bars("xauusd") == await first.bars("xauusd")
+    assert await restarted.crypto("btcusd") == await first.crypto("btcusd")
+    euro = await restarted.twd_bars("EUR")
+    assert euro == await first.twd_bars("EUR") and round(euro[0][-1].c, 4) == round(31.72 * 1.14, 4)
+    gold = await GoldBoard(restarted).gold("zh-TW")
+    assert gold is not None and gold.usd_per_oz == 4284.91
+    assert len(asked) == 4, "nobody asked Tiingo again"
+
+    # past KEEP the stored day is asked for again; a failure is remembered across a restart
+    now[0] += timedelta(hours=2)
+    restarted.get = tiingo(asked, down=True)
+    assert (await restarted.bars("xauusd"))[-1].c == 4284.91
+    assert len(asked) == 5
+    again = TiingoFx(tiingo(asked), sessions=sessions, clock=lambda: now[0])
+    assert (await again.bars("xauusd"))[-1].c == 4284.91
+    assert len(asked) == 5, "not before RETRY"
+    now[0] += timedelta(minutes=31)
+    await again.bars("xauusd")
+    assert len(asked) == 6
+
+
 async def test_offline_there_is_nothing_and_nobody_is_asked():
     forex = TiingoFx(None)
     assert await forex.bars("usdtwd") == [] and await GoldBoard(forex).gold("zh-TW") is None

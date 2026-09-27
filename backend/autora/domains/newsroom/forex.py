@@ -9,6 +9,11 @@ against most currencies, but no other currency against the New Taiwan dollar: ye
 worked out each day as ``usdtwd`` over ``usdjpy``. Only a day's close can be worked out that way
 — a cross rate's high and low are not the two pairs' — so such a chart is of closes.
 
+What it was given is kept in the database too (D-082): bars in ``price_bars`` (market ``fx`` or
+``crypto``), when each series was asked for in ``price_fetches``. A restart reads them back and
+asks Tiingo only for a series whose ``KEEP`` (or ``RETRY``) has run out — before, every restart
+asked for every pair at once, and a few in an hour ran through the allowance.
+
 Gold and currencies trade again from Sunday evening (UTC), Monday morning in Taipei; Tiingo gives
 that a Sunday bar, which is folded into the Monday after (a weekend with no trading yet is left
 out).
@@ -19,9 +24,16 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 
-from autora.domains.newsroom.price_history import GetRows, PublicBar
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from autora.domains.newsroom.models import PriceBar, PriceFetch
+from autora.domains.newsroom.price_history import Bar, GetRows, PublicBar, _store
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +44,9 @@ YEARS = 5
 KEEP = timedelta(hours=3)
 """How long one answer for a pair serves everybody: a day's bar moves until the day is done."""
 RETRY = timedelta(minutes=30)
+EARLIEST = datetime.min.replace(tzinfo=UTC)
+
+Sessions = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 CURRENCIES: tuple[tuple[str, str, str], ...] = (
     ("USD", "美金", "US dollar"),
@@ -142,21 +157,32 @@ def crossed(twd: list[PublicBar], pair: list[PublicBar], per_usd: bool) -> list[
     return out
 
 
+def _series(name: str) -> tuple[str, str]:
+    """A cached name as ``price_bars``' market and symbol: ``crypto:btcusd``, ``usdtwd``."""
+    market, _, ticker = name.rpartition(":")
+    return (market or "fx"), ticker
+
+
 class TiingoFx:
     """One per process: each pair asked for once per ``KEEP``, for everybody; the last good
     answer stands when Tiingo does not give one (asked again after ``RETRY``). ``get`` is None
-    offline (fixtures, tests) or without Tiingo's key: nothing."""
+    offline (fixtures, tests) or without Tiingo's key: nothing. With ``sessions`` (D-082) what
+    was asked for, and when, is kept in the database and read back by a fresh process; without,
+    in memory only."""
 
     def __init__(
         self,
         get: GetRows | None,
         *,
+        sessions: Sessions | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self.get = get
+        self.sessions = sessions
         self.clock = clock
         self._kept: dict[str, list[PublicBar]] = {}
         self._until: dict[str, datetime] = {}
+        self._read: set[str] = set()
         self._lock = asyncio.Lock()
 
     async def bars(self, pair: str) -> list[PublicBar]:
@@ -181,9 +207,13 @@ class TiingoFx:
             return []
         async with self._lock:
             now = self.clock()
-            if now >= self._until.get(name, datetime.min.replace(tzinfo=UTC)):
+            start = now.date() - timedelta(days=366 * YEARS)
+            if name not in self._read:
+                self._read.add(name)
+                await self._load(name, start)
+            if now >= self._until.get(name, EARLIEST):
+                fresh: list[PublicBar] = []
                 try:
-                    start = now.date() - timedelta(days=366 * YEARS)
                     fresh = parse(await self.get(url, {"startDate": start.isoformat(), **params}))
                     if not fresh:
                         raise ValueError("no bars")
@@ -192,7 +222,65 @@ class TiingoFx:
                 except Exception as error:  # noqa: BLE001 — the last good answer stands
                     log.warning("forex: %s not refreshed: %s", name, type(error).__name__)
                     self._until[name] = now + RETRY
+                await self._save(name, fresh, now)
         return self._kept.get(name, [])
+
+    async def _load(self, name: str, start: date) -> None:
+        """What an earlier process was given, and when it may ask again (D-082)."""
+        if self.sessions is None:
+            return
+        market, symbol = _series(name)
+        try:
+            async with self.sessions() as session:
+                fetch = await session.scalar(
+                    select(PriceFetch).where(
+                        PriceFetch.market == market, PriceFetch.symbol == symbol
+                    )
+                )
+                if fetch is None:
+                    return
+                rows = await session.scalars(
+                    select(PriceBar)
+                    .where(
+                        PriceBar.market == market, PriceBar.symbol == symbol, PriceBar.day >= start
+                    )
+                    .order_by(PriceBar.day)
+                )
+                bars = [
+                    PublicBar(d=r.day, o=r.open, h=r.high, l=r.low, c=r.close, v=0) for r in rows
+                ]
+        except Exception as error:  # noqa: BLE001 — without the database, Tiingo is asked
+            log.warning("forex: %s not read back: %s", name, type(error).__name__)
+            return
+        if bars:
+            self._kept[name] = bars
+        self._until[name] = fetch.next_at
+
+    async def _save(self, name: str, fresh: list[PublicBar], now: datetime) -> None:
+        """The bars just given (none after a failure), and when to ask again."""
+        if self.sessions is None:
+            return
+        market, symbol = _series(name)
+
+        def number(value: float) -> Decimal:
+            return Decimal(str(round(value, 6)))
+
+        bars = [
+            Bar(b.d, number(b.o), number(b.h), number(b.l), number(b.c), volume=0) for b in fresh
+        ]
+        values = {"next_at": self._until[name], **({"fetched_at": now} if fresh else {})}
+        try:
+            async with self.sessions() as session:
+                await _store(session, market, symbol, bars, source=SOURCE)
+                statement = insert(PriceFetch).values(market=market, symbol=symbol, **values)
+                await session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=["market", "symbol"], set_=values
+                    )
+                )
+                await session.commit()
+        except Exception as error:  # noqa: BLE001 — kept in memory all the same
+            log.warning("forex: %s not stored: %s", name, type(error).__name__)
 
     async def twd_bars(self, code: str) -> tuple[list[PublicBar], bool]:
         """New Taiwan dollars for one unit of ``code``, each day, and whether closes only."""
