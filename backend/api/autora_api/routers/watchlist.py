@@ -20,9 +20,13 @@ from autora.accounts import SESSION_COOKIE, reader_for
 from autora.accounts import watchlist as reader_watchlist
 from autora.domains.newsroom import securities
 from autora.domains.newsroom.holdings import Stock
+from autora.domains.newsroom.market_strip import TW_STOCKS, US_STOCKS
 from autora_api.deps import Session
 
 router = APIRouter(prefix="/api/me/watchlist", tags=["watchlist"])
+
+DEFAULTS = [("tw", s) for s in TW_STOCKS] + [("us", s) for s in US_STOCKS]
+"""Where a new watchlist starts: the market strip's twenty, Taiwan's then the US's (D-062)."""
 
 SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
 
@@ -60,6 +64,8 @@ async def get_watchlist(
     autora_reader: SessionCookie = None,
 ) -> list[WatchedStock]:
     reader = await _reader(session, autora_reader)
+    # a first look: the market strip's stocks, in its order, as a start to change (D-062)
+    await reader_watchlist.start(session, reader, DEFAULTS)
     out = []
     for market, symbol in await reader_watchlist.items(session, reader.id):
         stock = await securities.find(session, symbol)
@@ -82,6 +88,7 @@ async def get_watchlist(
 async def watch(symbol: str, session: Session, autora_reader: SessionCookie = None) -> Response:
     reader = await _reader(session, autora_reader)
     stock = await _stock(session, symbol)
+    await reader_watchlist.start(session, reader, DEFAULTS)  # the defaults first, as on a look
     try:
         await reader_watchlist.add(session, reader.id, stock.market, stock.symbol)
         await securities.track(session, stock)

@@ -28,26 +28,29 @@ async def _sign_in(client, mailbox, address):
     assert (await client.post("/api/auth/verify", json={"token": token})).status_code == 200
 
 
-async def test_a_reader_keeps_stocks_in_the_order_they_added_them(site, mailbox):
+async def test_a_new_list_starts_with_the_strip_s_stocks_once(site, mailbox):
+    """D-062: a first look fills it with the market strip's twenty; emptied, it stays empty."""
     await _sign_in(site, mailbox, "watcher@example.com")
-    assert (await site.get(URL)).json() == []
+    first = (await site.get(URL, params={"lang": "zh-TW"})).json()
+    assert len(first) == 20
+    assert first[0] == {"symbol": "2330", "market": "tw", "key": "tw:2330", "name": "台積電",
+                        "exchange": None}  # fmt: skip
+    assert [s["key"] for s in first][7:9] == ["us:NVDA", "us:AAPL"]  # Taiwan's, then the US's
+    for stock in first:
+        assert (await site.delete(f"{URL}/{stock['symbol']}")).status_code == 204
+    assert (await site.get(URL)).json() == []  # not filled again
     for symbol in ("nvda", "2330", "NVDA"):  # any case; the same stock twice is still once
         assert (await site.post(f"{URL}/{symbol}")).status_code == 204
-    listed = (await site.get(URL, params={"lang": "zh-TW"})).json()
-    assert listed == [
-        {"symbol": "NVDA", "market": "us", "key": "us:NVDA", "name": "輝達", "exchange": None},
-        {"symbol": "2330", "market": "tw", "key": "tw:2330", "name": "台積電", "exchange": None},
-    ]
+    assert [s["symbol"] for s in (await site.get(URL)).json()] == ["NVDA", "2330"]
     assert (await site.get(URL, params={"lang": "en"})).json()[1]["name"] == "TSMC"
-    assert (await site.delete(f"{URL}/NVDA")).status_code == 204
-    assert [s["symbol"] for s in (await site.get(URL)).json()] == ["2330"]
 
 
 async def test_one_reader_s_list_is_not_another_s(site, other, mailbox):
     await _sign_in(site, mailbox, "one@example.com")
     await _sign_in(other, mailbox, "two@example.com")
-    await site.post(f"{URL}/AAPL")
-    assert (await other.get(URL)).json() == []
+    await site.get(URL)
+    await site.delete(f"{URL}/2330")
+    assert "tw:2330" in [s["key"] for s in (await other.get(URL)).json()]
 
 
 async def test_only_stocks_with_a_page_and_only_when_signed_in(site, mailbox):
@@ -84,9 +87,9 @@ async def test_any_listed_stock_can_be_kept_and_is_then_tracked(site, mailbox, d
     )
     await _sign_in(site, mailbox, "wide@example.com")
     assert (await site.post(f"{URL}/6488")).status_code == 204
-    assert (await site.get(URL)).json() == [
-        {"symbol": "6488", "market": "tw", "key": "tw:6488", "name": "環球晶", "exchange": "TPEx"}
-    ]
+    assert (await site.get(URL)).json()[-1] == {
+        "symbol": "6488", "market": "tw", "key": "tw:6488", "name": "環球晶", "exchange": "TPEx"
+    }  # fmt: skip
     tracked = await db_session.scalar(
         select(TrackedSecurity).where(TrackedSecurity.symbol == "6488")
     )

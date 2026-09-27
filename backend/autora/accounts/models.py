@@ -40,6 +40,9 @@ class Reader(IdMixin, TimestampMixin, Base):
     email: Mapped[str]
     """Lowercased on the way in, so one person is one row however they typed it."""
     last_seen_at: Mapped[datetime | None]
+    watchlist_started_at: Mapped[datetime | None]
+    """When their watchlist was first filled with the site's defaults (D-062). Set once: a list
+    they empty stays empty."""
 
 
 class LoginToken(IdMixin, CreatedAtMixin, Base):
