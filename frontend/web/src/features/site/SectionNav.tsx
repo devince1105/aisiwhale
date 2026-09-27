@@ -10,17 +10,25 @@ import { Suspense } from "react";
 import { listHref } from "./ArticleList";
 import { filterName, isFilter, isSection, topicOf, TOPICS, type Lang, type Topic, words } from "./i18n";
 
+type Current = Topic | "all" | "watchlist" | null;
+
 /** Which tab is current: on the front page, its tab (a section's is the tab it is under) or
- * "all"; on any other page, none. */
-export function currentSection(lang: Lang, pathname: string, section: string | null): Topic | "all" | null {
+ * "all"; on the watchlist page, the watchlist's (D-063); on any other page, none. */
+export function currentSection(lang: Lang, pathname: string, section: string | null): Current {
+  if (pathname === `/news/${lang}/watchlist`) return "watchlist";
   if (pathname !== `/news/${lang}`) return null;
   if (!isFilter(section)) return "all";
   return isSection(section) ? topicOf(section) : section;
 }
 
-function Tabs({ lang, current }: { lang: Lang; current: Topic | "all" | null }) {
+function Tabs({ lang, current }: { lang: Lang; current: Current }) {
   const w = words(lang);
-  const tabs: [Topic | null, string][] = [[null, w.all], ...TOPICS.map((t): [Topic, string] => [t, filterName(lang, t)])];
+  const tabs: [Topic | "watchlist" | null, string][] = [
+    [null, w.all],
+    ...TOPICS.map((t): [Topic, string] => [t, filterName(lang, t)]),
+    // the reader's own list, last: not a section of the news, but where they go next (D-063)
+    ["watchlist", w.watch.link],
+  ];
   return (
     // px-1: with each tab's own px-3, the first label sits on the column's edge, under the masthead
     <ul className="mx-auto flex max-w-3xl gap-1 px-1">
@@ -29,7 +37,7 @@ function Tabs({ lang, current }: { lang: Lang; current: Topic | "all" | null }) 
         return (
           <li key={id ?? "all"} className="shrink-0">
             <Link
-              href={listHref(lang, id)}
+              href={id === "watchlist" ? `/news/${lang}/watchlist` : listHref(lang, id)}
               aria-current={here ? "page" : undefined}
               className={`block border-b-2 px-3 py-2.5 text-sm whitespace-nowrap ${
                 here ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:text-ink"

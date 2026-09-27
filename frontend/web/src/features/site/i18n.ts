@@ -193,6 +193,11 @@ const WORDS = {
     signOut: "登出",
     watch: {
       title: "我的觀察清單",
+      edit: "編輯清單",
+      done: "完成",
+      editLink: "編輯",
+      noChart: "指數、利率、原油與加密貨幣沒有個股走勢圖，這裡只顯示最新數字。",
+      emptyBoard: "清單是空的。按「編輯清單」搜尋並加入股票。",
       sample: "觀察清單範例・登入後自訂",
       link: "觀察清單",
       add: "☆ 加入觀察",
@@ -404,6 +409,11 @@ const WORDS = {
     signOut: "Sign out",
     watch: {
       title: "My watchlist",
+      edit: "Edit list",
+      done: "Done",
+      editLink: "Edit",
+      noChart: "Indices, rates, oil and coins have no chart here; the latest figure only.",
+      emptyBoard: "The list is empty. Press Edit list to search and add stocks.",
       sample: "Sample watchlist · sign in to make yours",
       link: "Watchlist",
       add: "☆ Watch",

@@ -4,8 +4,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// the page's address: ?s= the one picked, ?edit=1 its settings (D-064)
+let params = new URLSearchParams();
+const replace = vi.fn((href: string) => {
+  params = new URLSearchParams(href.split("?")[1] ?? "");
+});
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace }),
+  useSearchParams: () => params,
+}));
+
 import { MarketStrip } from "./MarketStrip";
-import { WatchButton, WatchlistPage, WatchlistSide } from "./Watchlist";
+import { WatchButton } from "./WatchButton";
+import { WatchlistPage, WatchlistSide } from "./Watchlist";
 import { loadWatchlist, reorderWatchlist, resetWatchlist, useWatchlist } from "./watchlistStore";
 
 const NVDA = { symbol: "NVDA", market: "us", key: "us:NVDA", name: "輝達" };
@@ -21,6 +32,8 @@ let list: (typeof NVDA)[] | null;
 const calls: string[] = [];
 
 beforeEach(() => {
+  params = new URLSearchParams("edit=1"); // most of these are about the settings
+  replace.mockClear();
   resetWatchlist();
   calls.length = 0;
   list = [];
@@ -33,6 +46,8 @@ beforeEach(() => {
       return Response.json(QUOTES.filter((q) => keys.includes(q.key)));
     }
     if (url.includes("/api/public/securities")) return Response.json(FOUND);
+    if (url.includes("/history")) return Response.json({ symbol: "NVDA", market: "us", source: "Tiingo", bars: [], preparing: false });
+    if (url.includes("/api/public/stocks/")) return Response.json({ symbol: "NVDA", market: "us", name: "輝達", quote: QUOTES[0], holders: [], trades: [], articles: [] });
     calls.push(`${method} ${url.replace(/^.*\/api\/me\/watchlist/, "")}`);
     if (list === null) return new Response(null, { status: 401 });
     if (method === "PUT") {
@@ -163,5 +178,48 @@ describe("the reader's own order (D-063)", () => {
     await waitFor(() => expect(screen.getByTestId("names").textContent).toBe("加權指數,輝達"));
     expect(await kept).toBe(true);
     expect(calls).toContain("PUT  taiex,us:NVDA");
+  });
+});
+
+describe("the watchlist page to watch (D-064)", () => {
+  it("opens on the list with the first one picked, its figure beside it", async () => {
+    params = new URLSearchParams();
+    list = [NVDA, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    render(<WatchlistPage lang="zh-TW" />);
+    const pane = await screen.findByTestId("watch-pane");
+    // the stock's whole page, not a link to it
+    await waitFor(() => expect(pane.querySelector("article h1")?.textContent).toContain("輝達"));
+    expect(pane.querySelector('a[href="/news/zh-TW/stocks/NVDA"]')).toBeNull();
+    expect(screen.queryByTestId("watchlist")).toBeNull(); // not the settings
+  });
+
+  it("an index has its figure and no chart; picking one goes in the address", async () => {
+    params = new URLSearchParams("s=taiex");
+    list = [NVDA, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    render(<WatchlistPage lang="zh-TW" />);
+    const pane = await screen.findByTestId("watch-pane");
+    expect(pane.textContent).toContain("加權指數");
+    expect(pane.textContent).toContain("沒有個股走勢圖");
+    fireEvent.click(screen.getAllByRole("button", { name: /輝達/ })[0]);
+    expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?s=us%3ANVDA", { scroll: false });
+  });
+
+  it("編輯清單 opens the settings, and 完成 closes them", async () => {
+    params = new URLSearchParams();
+    list = [NVDA];
+    const { rerender } = render(<WatchlistPage lang="zh-TW" />);
+    fireEvent.click(await screen.findByTestId("watchlist-edit"));
+    expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?edit=1", { scroll: false });
+    rerender(<WatchlistPage lang="zh-TW" />);
+    expect(await screen.findByTestId("watchlist")).toBeTruthy();
+    expect(screen.getByTestId("watchlist-edit").textContent).toBe("完成");
+  });
+
+  it("beside a stock, the list is only to look at, with a way to its settings", async () => {
+    list = [NVDA];
+    render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);
+    const edit = await screen.findByTestId("watchlist-edit-link");
+    expect(edit.getAttribute("href")).toBe("/news/zh-TW/watchlist?edit=1");
+    expect(screen.queryByRole("button", { name: /拖曳/ })).toBeNull();
   });
 });

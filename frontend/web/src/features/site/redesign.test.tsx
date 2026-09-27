@@ -74,6 +74,7 @@ describe("the front page", () => {
       ["加密貨幣", "/news/zh-TW?section=crypto"],
       ["機構觀點", "/news/zh-TW?section=institutions"],
       ["持股觀察", "/news/zh-TW?section=watch"],
+      ["觀察清單", "/news/zh-TW/watchlist"],
     ]);
     expect(tabs.filter((t) => t.getAttribute("aria-current") === "page").map((t) => t.textContent)).toEqual(["AI 科技"]);
   });

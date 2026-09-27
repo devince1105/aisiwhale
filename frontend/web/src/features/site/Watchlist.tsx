@@ -24,8 +24,23 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchMarkets, fetchQuotes, searchSecurities, type PublicQuote, type PublicSecurity } from "./api";
-import { words, type Lang } from "./i18n";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { API_URL } from "@/config";
+
+import {
+  fetchHistory,
+  fetchMarkets,
+  fetchQuotes,
+  fetchStock,
+  searchSecurities,
+  type PublicHistory,
+  type PublicQuote,
+  type PublicSecurity,
+  type PublicStock,
+} from "./api";
+import { formatDate, words, type Lang } from "./i18n";
+import { StockView } from "./StockView";
 import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
@@ -70,51 +85,30 @@ export function stripItems(quotes: PublicQuote[], names: Record<string, string>)
   }));
 }
 
-/** 加入觀察 / 已觀察 on a stock's page; signed out, a way to sign in and come back. */
-export function WatchButton({ symbol, lang }: { symbol: string; lang: Lang }) {
-  const w = words(lang).watch;
-  const list = useWatchlist(lang);
-  const [busy, setBusy] = useState(false);
-  const base = "rounded-full border px-3 py-1 text-sm whitespace-nowrap";
-  if (list.status === "loading" || list.status === "failed") return null;
-  if (list.status === "signedOut") {
-    const next = typeof window === "undefined" ? "" : `?next=${encodeURIComponent(window.location.pathname)}`;
-    return (
-      <a href={`/news/${lang}/login${next}`} className={`${base} border-line text-muted hover:border-accent hover:text-accent`}>
-        {w.add}
-      </a>
-    );
-  }
-  const watched = list.items.some((item) => item.symbol === symbol);
-  return (
-    <button
-      type="button"
-      disabled={busy}
-      aria-pressed={watched}
-      data-testid="watch-button"
-      onClick={async () => {
-        setBusy(true);
-        await setWatched(symbol, !watched).catch(() => false);
-        setBusy(false);
-      }}
-      className={`${base} disabled:opacity-50 ${watched ? "border-accent text-accent" : "border-line text-muted hover:border-accent hover:text-accent"}`}
-    >
-      {watched ? w.added : w.add}
-    </button>
-  );
-}
-
-function Row({ item, quote, lang, current }: { item: WatchedStock; quote?: PublicQuote; lang: Lang; current?: boolean }) {
+function Row({
+  item,
+  quote,
+  lang,
+  current,
+  plain = false,
+}: {
+  item: WatchedStock;
+  quote?: PublicQuote;
+  lang: Lang;
+  current?: boolean;
+  /** Not a link: inside a button that picks it. */
+  plain?: boolean;
+}) {
   const way = quote ? direction(quote) : "flat";
   const change = quote ? formatChange(quote) : null;
   const code = stockCode(item.key, item.exchange);
-  const page = stockPage(item.key, lang); // an index, a rate, oil or a coin has none
+  const page = plain ? null : stockPage(item.key, lang); // an index, a rate, oil or a coin has none
   const Tag = page ? "a" : "div";
   return (
     <Tag
       href={page ?? undefined}
       aria-current={current ? "page" : undefined}
-      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm ${page ? "hover:bg-canvas" : ""} ${current ? "bg-canvas ring-1 ring-accent" : ""}`}
+      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm ${page || plain ? "hover:bg-canvas" : ""} ${current ? "bg-canvas ring-1 ring-accent" : ""}`}
     >
       <span className="min-w-0">
         <span className="block truncate font-medium">{item.name}</span>
@@ -172,10 +166,16 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
       </div>
       {/* a wide screen: a column to the left */}
       <div className="hidden lg:block">
-        <p className="mb-2 px-3 text-xs tracking-wide text-muted">
+        <p className="mb-2 flex items-baseline justify-between px-3 text-xs tracking-wide text-muted">
           <a href={`/news/${lang}/watchlist`} className="hover:text-accent">
             {sample ? w.sample : w.title}
           </a>
+          {/* the list is set on its own page, not here (D-064) */}
+          {sample ? null : (
+            <a href={`/news/${lang}/watchlist?edit=1`} className="text-accent hover:underline" data-testid="watchlist-edit-link">
+              {w.editLink}
+            </a>
+          )}
         </p>
         <ul className="grid gap-1">
           {items.map((item) => (
@@ -189,8 +189,9 @@ export function WatchlistSide({ lang, current }: { lang: Lang; current: string }
   );
 }
 
-/** The watchlist page: the list with a way to take stocks off, and the stocks that can go on. */
-export function WatchlistPage({ lang }: { lang: Lang }) {
+/** The watchlist's settings (D-064: behind 編輯清單 on its page): search to add, drag to order,
+ * take off, and the strip's figures to add back. */
+function WatchlistEditor({ lang }: { lang: Lang }) {
   const w = words(lang).watch;
   const names = words(lang).quoteNames;
   const list = useWatchlist(lang);
@@ -426,13 +427,146 @@ function SortableRow({ item, quote, lang }: { item: WatchedStock; quote?: Public
       <div className="min-w-0 flex-1">
         <Row item={item} quote={quote} lang={lang} />
       </div>
-      <button
-        type="button"
-        onClick={() => void setWatched(item.symbol, false)}
-        className="text-xs text-muted hover:text-accent"
-      >
-        {w.remove}
-      </button>
+        <button
+          type="button"
+          onClick={() => void setWatched(item.symbol, false)}
+          className="text-xs text-muted hover:text-accent"
+        >
+          {w.remove}
+        </button>
     </li>
+  );
+}
+
+/** The watchlist page (D-064): the list to watch — each figure, and the one picked with its
+ * chart beside it, as a trading screen has it — and, behind 編輯清單, its settings. ``?s=`` is
+ * the one picked, ``?edit=1`` opens the settings. */
+export function WatchlistPage({ lang }: { lang: Lang }) {
+  const w = words(lang).watch;
+  const router = useRouter();
+  const params = useSearchParams();
+  const editing = params.get("edit") === "1";
+  const list = useWatchlist(lang);
+  const strip = useStrip();
+  const sample = list.status === "signedOut";
+  const items = list.status === "ready" ? list.items : sample ? stripItems(strip, words(lang).quoteNames) : [];
+  const listed = useQuotes(list.status === "ready" ? list.items.map((item) => item.key) : []);
+  const byKey = sample ? new Map(strip.map((q) => [q.key, q])) : listed;
+  const picked = items.find((item) => item.key === params.get("s")) ?? items[0] ?? null;
+  const go = (query: Record<string, string>) => router.replace(`/news/${lang}/watchlist?${new URLSearchParams(query)}`, { scroll: false });
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">{w.title}</h1>
+        <button
+          type="button"
+          onClick={() => go(editing ? (picked ? { s: picked.key } : {}) : { edit: "1" })}
+          aria-pressed={editing}
+          className={`rounded-full border px-4 py-1.5 text-sm ${editing ? "border-accent bg-accent text-accent-ink" : "border-line hover:border-accent hover:text-accent"}`}
+          data-testid="watchlist-edit"
+        >
+          {editing ? w.done : w.edit}
+        </button>
+      </div>
+      {editing ? (
+        <div className="max-w-3xl">
+          <WatchlistEditor lang={lang} />
+        </div>
+      ) : list.status === "loading" ? (
+        <p className="text-muted">…</p>
+      ) : list.status === "failed" ? (
+        <p className="text-muted">{w.failed}</p>
+      ) : !items.length ? (
+        <p className="text-muted">{w.emptyBoard}</p>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]" data-testid="watch-board">
+          <nav aria-label={w.title}>
+            {sample ? <p className="mb-2 px-3 text-xs text-muted">{w.sample}</p> : null}
+            {/* a phone: a row to scroll; a wide screen: a column */}
+            <ul className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible">
+              {items.map((item) => (
+                <li key={item.key} className="shrink-0 lg:shrink">
+                  <button
+                    type="button"
+                    onClick={() => go({ s: item.key })}
+                    aria-current={item.key === picked?.key ? "true" : undefined}
+                    className="block w-full text-left"
+                  >
+                    <span className="lg:hidden">
+                      <span className={`block rounded-full border px-3 py-1 text-sm ${item.key === picked?.key ? "border-accent text-accent" : "border-line"}`}>
+                        {item.name}
+                      </span>
+                    </span>
+                    <span className="hidden lg:block">
+                      <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === picked?.key} plain />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          {picked ? <WatchPane key={picked.key} item={picked} quote={byKey.get(picked.key)} lang={lang} /> : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The one picked (D-064): a stock as its whole page — figure, chart, holders, coverage — and an
+ * index, a rate, oil or a coin as its figure, which is all it has. */
+function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQuote; lang: Lang }) {
+  const w = words(lang);
+  const page = stockPage(item.key, lang);
+  const [detail, setDetail] = useState<{ stock: PublicStock | null; history: PublicHistory | null } | null>(null);
+  useEffect(() => {
+    if (!page) return;
+    let live = true;
+    const symbol = symbolOf(item.key);
+    void Promise.all([
+      fetchStock(symbol, lang, { baseUrl: API_URL }).catch(() => null),
+      fetchHistory(symbol, { baseUrl: API_URL }).catch(() => null),
+    ]).then(([stock, history]) => live && setDetail({ stock, history }));
+    return () => {
+      live = false;
+    };
+  }, [item.key, lang, page]);
+
+  if (page) {
+    return (
+      <div className="min-w-0 [&>article]:max-w-none [&>article]:px-0 [&>article]:pt-0" data-testid="watch-pane">
+        {detail === null ? (
+          <p className="flex h-80 items-center justify-center text-sm text-muted">…</p>
+        ) : detail.stock ? (
+          <StockView stock={detail.stock} lang={lang} history={detail.history} />
+        ) : (
+          <p className="rounded-lg border border-line p-4 text-sm text-muted">{w.stock.noQuote}</p>
+        )}
+      </div>
+    );
+  }
+  const way = quote ? direction(quote) : "flat";
+  const change = quote ? formatChange(quote) : null;
+  return (
+    <section aria-labelledby="watch-pane" className="min-w-0" data-testid="watch-pane">
+      <h2 id="watch-pane" className="text-2xl font-bold">
+        {item.name}
+      </h2>
+      {quote ? (
+        <div className="mt-2 flex flex-wrap items-end gap-x-3">
+          <span className={`text-3xl leading-none font-semibold tabular-nums ${TONE[way]}`}>{formatValue(quote, lang)}</span>
+          {change ? (
+            <span className={`text-base leading-none tabular-nums ${TONE[way]}`}>
+              {way === "rise" ? "+" : way === "fall" ? "−" : ""}
+              {change} {ARROW[way]}
+            </span>
+          ) : null}
+          <span className="text-xs text-muted">
+            {w.basis[quote.basis]} {formatDate(lang, quote.as_of)}・{w.sourceNames[quote.source] ?? quote.source}
+          </span>
+        </div>
+      ) : null}
+      <p className="mt-5 rounded-lg border border-line p-4 text-sm text-muted">{w.watch.noChart}</p>
+    </section>
   );
 }

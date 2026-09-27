@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
 import { StockChart } from "./StockChart";
-import { WatchButton } from "./Watchlist";
+import { WatchButton } from "./WatchButton";
 import { ARROW, direction, formatCap, formatChange, formatValue, stockCode, TONE } from "./quote";
 
 // the day's figures, after the watch cards the site's owner uses: the high in the rising colour,
