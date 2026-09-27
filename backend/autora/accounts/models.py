@@ -95,3 +95,5 @@ class WatchlistItem(IdMixin, CreatedAtMixin, Base):
     symbol: Mapped[str]
     """As the site's stock pages name it: ``NVDA``, ``2330``; one of the strip's other figures
     (``market``) by its key: ``TAIEX``, ``BTC`` (D-062)."""
+    position: Mapped[int] = mapped_column(server_default="0")
+    """Where the reader put it (D-063): smallest first; a new one goes last."""

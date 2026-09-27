@@ -841,7 +841,12 @@ export interface paths {
         };
         /** Get Watchlist */
         get: operations["get_watchlist_api_me_watchlist_get"];
-        put?: never;
+        /**
+         * Reorder
+         * @description The reader's own order (D-063). Keys not on the list are ignored; what the order leaves
+         *     out keeps its place after it.
+         */
+        put: operations["reorder_api_me_watchlist_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2521,6 +2526,11 @@ export interface components {
             thesis?: string | null;
             /** Title */
             title: string;
+        };
+        /** Order */
+        Order: {
+            /** Keys */
+            keys: string[];
         };
         /**
          * OrgOut
@@ -5302,6 +5312,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WatchedStock"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_api_me_watchlist_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

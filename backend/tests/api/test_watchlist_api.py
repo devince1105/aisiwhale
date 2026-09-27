@@ -109,3 +109,21 @@ async def test_the_strip_s_other_figures_come_and_go_like_stocks(site, mailbox):
     assert listed[-1] == {"symbol": "BTC", "market": "market", "key": "btc", "name": "Bitcoin",
                           "exchange": None}  # fmt: skip
     assert (await site.post(f"{URL}/DOGE")).status_code == 404  # not on the strip
+
+
+async def test_a_reader_puts_the_list_in_their_own_order(site, mailbox):
+    """D-063: dragged into place; the order is kept, and what is added later goes last."""
+    await _sign_in(site, mailbox, "order2@example.com")
+    first = [s["key"] for s in (await site.get(URL)).json()]
+    wanted = ["btc", "us:NVDA", "tw:2330"]
+    assert (await site.put(URL, json={"keys": [*wanted, "us:NOPE"]})).status_code == 204
+    after = [s["key"] for s in (await site.get(URL)).json()]
+    assert after[:3] == wanted  # the ones named first, in that order (the unknown ignored)
+    assert after[3:] == [k for k in first if k not in wanted]  # the rest after, as they were
+    await site.delete(f"{URL}/ETH")
+    await site.post(f"{URL}/ETH")
+    assert [s["key"] for s in (await site.get(URL)).json()][-1] == "eth"  # re-added: last
+
+
+async def test_only_a_signed_in_reader_orders_a_list(other):
+    assert (await other.put(URL, json={"keys": ["btc"]})).status_code == 401

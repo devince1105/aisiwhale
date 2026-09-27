@@ -4,12 +4,30 @@
 // it (a column on a wide screen, a row to scroll on a phone), and the watchlist page with a search
 // for any listed Taiwan or US stock. Prices: the strip's own for its stocks, the last stored close
 // for any other (a stock just added has none until its prices are fetched).
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState } from "react";
 
 import { fetchMarkets, fetchQuotes, searchSecurities, type PublicQuote, type PublicSecurity } from "./api";
 import { words, type Lang } from "./i18n";
 import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
-import { setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
+import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
 /** The strip's quotes: the popular stocks the watchlist page offers. */
 function useStrip(): PublicQuote[] {
@@ -219,22 +237,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
     <div className="grid gap-8">
       <Search lang={lang} watched={watched} />
       {list.items.length ? (
-        <ul className="divide-y divide-line rounded-lg border border-line" data-testid="watchlist">
-          {list.items.map((item) => (
-            <li key={item.key} className="flex items-center gap-2 pr-3">
-              <div className="min-w-0 flex-1">
-                <Row item={item} quote={byKey.get(item.key)} lang={lang} />
-              </div>
-              <button
-                type="button"
-                onClick={() => void setWatched(item.symbol, false)}
-                className="text-xs text-muted hover:text-accent"
-              >
-                {w.remove}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SortableList items={list.items} byKey={byKey} lang={lang} />
       ) : (
         <p className="text-muted">{w.empty}</p>
       )}
@@ -342,5 +345,94 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
         )
       ) : null}
     </div>
+  );
+}
+
+/** The list on the watchlist page, in the reader's order, dragged by its handle (D-063): with a
+ * mouse, a finger (after a short hold, so the page still scrolls) or the keyboard (space, the
+ * arrows, space). */
+function SortableList({
+  items,
+  byKey,
+  lang,
+}: {
+  items: WatchedStock[];
+  byKey: Map<string, PublicQuote>;
+  lang: Lang;
+}) {
+  const w = words(lang).watch;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const keys = items.map((item) => item.key);
+  const nameOf = (id: string | number) => items.find((item) => item.key === String(id))?.name ?? String(id);
+  const placeOf = (id: string | number) => keys.indexOf(String(id)) + 1;
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const moved = arrayMove(keys, keys.indexOf(String(active.id)), keys.indexOf(String(over.id)));
+    void reorderWatchlist(moved);
+  };
+  return (
+    <div>
+      <p className="mb-2 text-xs text-muted">{w.reorderHint}</p>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+        accessibility={{
+          screenReaderInstructions: { draggable: w.dnd.instructions },
+          announcements: {
+            onDragStart: ({ active }) => w.dnd.start(nameOf(active.id)),
+            onDragOver: ({ active, over }) => (over ? w.dnd.over(nameOf(active.id), placeOf(over.id)) : undefined),
+            onDragEnd: ({ active, over }) => (over ? w.dnd.end(nameOf(active.id), placeOf(over.id)) : undefined),
+            onDragCancel: ({ active }) => w.dnd.cancel(nameOf(active.id)),
+          },
+        }}
+      >
+        <SortableContext items={keys} strategy={verticalListSortingStrategy}>
+          <ul className="divide-y divide-line rounded-lg border border-line" data-testid="watchlist">
+            {items.map((item) => (
+              <SortableRow key={item.key} item={item} quote={byKey.get(item.key)} lang={lang} />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
+
+function SortableRow({ item, quote, lang }: { item: WatchedStock; quote?: PublicQuote; lang: Lang }) {
+  const w = words(lang).watch;
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.key });
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex items-center gap-1 bg-surface pr-3 ${isDragging ? "relative z-10 shadow-lg" : ""}`}
+    >
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={w.drag(item.name)}
+        className="cursor-grab touch-none self-stretch px-2 text-muted hover:text-ink active:cursor-grabbing"
+      >
+        ⋮⋮
+      </button>
+      <div className="min-w-0 flex-1">
+        <Row item={item} quote={quote} lang={lang} />
+      </div>
+      <button
+        type="button"
+        onClick={() => void setWatched(item.symbol, false)}
+        className="text-xs text-muted hover:text-accent"
+      >
+        {w.remove}
+      </button>
+    </li>
   );
 }

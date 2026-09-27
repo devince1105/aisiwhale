@@ -56,6 +56,27 @@ export async function setWatched(symbol: string, watched: boolean): Promise<bool
   return response.ok;
 }
 
+/** Put the list in the reader's order (D-063): shown at once, then kept; if keeping fails, the
+ * list is read again, so the page never shows an order the API does not have. */
+export async function reorderWatchlist(keys: string[]): Promise<boolean> {
+  if (state.status === "ready") {
+    const byKey = new Map(state.items.map((item) => [item.key, item]));
+    set({ status: "ready", items: keys.flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : [])) });
+  }
+  try {
+    const response = await call("", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keys }),
+    });
+    if (response.ok) return true;
+  } catch {
+    // read it again below
+  }
+  await loadWatchlist(loadedFor ?? "zh-TW");
+  return false;
+}
+
 /** The watchlist, loaded once per page for the language it is in. */
 export function useWatchlist(lang: string): WatchlistState {
   const current = useSyncExternalStore(

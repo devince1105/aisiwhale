@@ -57,7 +57,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_origins,
-        allow_methods=["GET", "POST", "DELETE"],  # DELETE: a reader's watchlist (D-060)
+        allow_methods=["GET", "POST", "PUT", "DELETE"],  # PUT, DELETE: a reader's watchlist
         allow_headers=["Authorization", "Content-Type"],
         # the reader's session is a cookie (D-025), and a cross-origin request only carries it
         # when both sides say so; the origins above are the only ones allowed to ask

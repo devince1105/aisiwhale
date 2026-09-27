@@ -3,6 +3,7 @@
 - GET    /api/me/watchlist?lang=         -> what is on it, oldest first, with names
 - POST   /api/me/watchlist/{symbol}      -> 204, on it (again: no change)
 - DELETE /api/me/watchlist/{symbol}      -> 204, off it
+- PUT    /api/me/watchlist {keys}        -> 204, in the order the reader dragged it into (D-063)
 
 The reader is whoever the site's cookie says, and nobody else: no reader id in any address.
 Any listed Taiwan or US stock may be kept (D-061); keeping one tracks it, so its prices are
@@ -17,7 +18,7 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from autora.accounts import SESSION_COOKIE, reader_for
 from autora.accounts import watchlist as reader_watchlist
@@ -125,6 +126,26 @@ async def get_watchlist(
         )
     await session.commit()  # last_seen_at
     return out
+
+
+class Order(BaseModel):
+    keys: list[str] = Field(max_length=reader_watchlist.MAX_ITEMS * 2)
+    """The list's keys as ``GET`` gives them (``tw:2330``, ``taiex``), in the new order."""
+
+
+def _market_symbol(key: str) -> tuple[str, str]:
+    market, _, symbol = key.partition(":")
+    return (market, symbol) if symbol else ("market", key.upper())
+
+
+@router.put("", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder(body: Order, session: Session, autora_reader: SessionCookie = None) -> Response:
+    """The reader's own order (D-063). Keys not on the list are ignored; what the order leaves
+    out keeps its place after it."""
+    reader = await _reader(session, autora_reader)
+    await reader_watchlist.reorder(session, reader.id, [_market_symbol(k) for k in body.keys])
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/{symbol}", status_code=status.HTTP_204_NO_CONTENT)

@@ -3419,6 +3419,23 @@
     "title": "OpportunityLine",
     "type": "object"
    },
+   "Order": {
+    "properties": {
+     "keys": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Keys",
+      "type": "array"
+     }
+    },
+    "required": [
+     "keys"
+    ],
+    "title": "Order",
+    "type": "object"
+   },
    "OrgOut": {
     "description": "The company's organisation: what it is in, how it is arranged, and who is where.",
     "properties": {
@@ -9706,6 +9723,57 @@
      }
     },
     "summary": "Get Watchlist",
+    "tags": [
+     "watchlist"
+    ]
+   },
+   "put": {
+    "description": "The reader's own order (D-063). Keys not on the list are ignored; what the order leaves\nout keeps its place after it.",
+    "operationId": "reorder_api_me_watchlist_put",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Order"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Reorder",
     "tags": [
      "watchlist"
     ]

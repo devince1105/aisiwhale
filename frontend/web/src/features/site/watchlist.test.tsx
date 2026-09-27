@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarketStrip } from "./MarketStrip";
 import { WatchButton, WatchlistPage, WatchlistSide } from "./Watchlist";
-import { resetWatchlist } from "./watchlistStore";
+import { loadWatchlist, reorderWatchlist, resetWatchlist, useWatchlist } from "./watchlistStore";
 
 const NVDA = { symbol: "NVDA", market: "us", key: "us:NVDA", name: "輝達" };
 const QUOTES = [
@@ -35,6 +35,11 @@ beforeEach(() => {
     if (url.includes("/api/public/securities")) return Response.json(FOUND);
     calls.push(`${method} ${url.replace(/^.*\/api\/me\/watchlist/, "")}`);
     if (list === null) return new Response(null, { status: 401 });
+    if (method === "PUT") {
+      const keys: string[] = JSON.parse(String(init?.body)).keys;
+      calls[calls.length - 1] += ` ${keys.join(",")}`;
+      list = keys.map((key) => list!.find((item) => item.key === key)!).filter(Boolean);
+    }
     if (method === "POST") list.push(NVDA);
     if (method === "DELETE") list = list.filter((s) => !url.endsWith(`/${s.symbol}`));
     return method === "GET" ? Response.json(list) : new Response(null, { status: 204 });
@@ -134,5 +139,29 @@ describe("the strip and the list together (D-062)", () => {
     const side = await screen.findByTestId("watchlist-side");
     await waitFor(() => expect(side.textContent).toContain("觀察清單範例"));
     expect(side.textContent).toContain("加權指數");
+  });
+});
+
+describe("the reader's own order (D-063)", () => {
+  it("each stock has a handle to drag it by, named for it", async () => {
+    list = [NVDA, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    render(<WatchlistPage lang="zh-TW" />);
+    expect(await screen.findByRole("button", { name: "拖曳調整「輝達」的順序" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "拖曳調整「加權指數」的順序" })).toBeTruthy();
+  });
+
+  it("a new order shows at once and is kept", async () => {
+    list = [NVDA, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    await loadWatchlist("zh-TW");
+    function Names() {
+      const state = useWatchlist("zh-TW");
+      return <p data-testid="names">{state.status === "ready" ? state.items.map((i) => i.name).join(",") : ""}</p>;
+    }
+    render(<Names />);
+    expect(screen.getByTestId("names").textContent).toBe("輝達,加權指數");
+    const kept = reorderWatchlist(["taiex", "us:NVDA"]);
+    await waitFor(() => expect(screen.getByTestId("names").textContent).toBe("加權指數,輝達"));
+    expect(await kept).toBe(true);
+    expect(calls).toContain("PUT  taiex,us:NVDA");
   });
 });
