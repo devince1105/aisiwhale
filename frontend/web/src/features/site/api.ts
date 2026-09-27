@@ -18,6 +18,7 @@ export type PublicIntraday = Schemas["PublicIntraday"];
 export type PublicSecurity = Schemas["PublicSecurity"];
 export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
+export type PublicFxBoard = Schemas["PublicFxBoard"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -87,6 +88,16 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
     return data ?? [];
   } catch {
     return [];
+  }
+}
+
+/** The 外匯 tab's reference rates (D-069). Never throws: the tab has its stories without them. */
+export async function fetchFx(lang: string, options: SiteClientOptions = {}): Promise<PublicFxBoard | null> {
+  try {
+    const { data } = await client(options).GET("/api/public/fx", { params: { query: { lang } } });
+    return data ?? null;
+  } catch {
+    return null;
   }
 }
 

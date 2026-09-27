@@ -3998,6 +3998,66 @@
     "title": "PublicBlock",
     "type": "object"
    },
+   "PublicFxBoard": {
+    "properties": {
+     "as_of": {
+      "format": "date-time",
+      "title": "As Of",
+      "type": "string"
+     },
+     "bank_url": {
+      "title": "Bank Url",
+      "type": "string"
+     },
+     "rates": {
+      "items": {
+       "$ref": "#/components/schemas/PublicFxRate"
+      },
+      "title": "Rates",
+      "type": "array"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "source_url": {
+      "title": "Source Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "as_of",
+     "source",
+     "source_url",
+     "bank_url",
+     "rates"
+    ],
+    "title": "PublicFxBoard",
+    "type": "object"
+   },
+   "PublicFxRate": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "twd": {
+      "title": "Twd",
+      "type": "number"
+     }
+    },
+    "required": [
+     "code",
+     "name",
+     "twd"
+    ],
+    "title": "PublicFxRate",
+    "type": "object"
+   },
    "PublicHistory": {
     "properties": {
      "bars": {
@@ -10087,6 +10147,59 @@
      }
     },
     "summary": "Get Article",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/fx": {
+   "get": {
+    "description": "The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency\nBank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling\nrates, which the page links to. None when there are none to show.",
+    "operationId": "fx_api_public_fx_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/PublicFxBoard"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Fx Api Public Fx Get"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Fx",
     "tags": [
      "public"
     ]

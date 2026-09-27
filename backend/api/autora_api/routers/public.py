@@ -30,7 +30,8 @@ from sqlalchemy import select
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
 from autora.db.models import Company
-from autora.domains.newsroom import securities
+from autora.domains.newsroom import fx_rates, securities
+from autora.domains.newsroom.fx_rates import FxBoard, PublicFxBoard
 from autora.domains.newsroom.holdings import STOCKS, PublicHolder, holders
 from autora.domains.newsroom.market_strip import PublicQuote, QuoteBoard, build_board
 from autora.domains.newsroom.models import AnalyticsEventType
@@ -122,6 +123,26 @@ def market_board() -> QuoteBoard:
 
 def _secret(value: SecretStr | None) -> str | None:
     return value.get_secret_value() if value else None
+
+
+@lru_cache
+def fx_board() -> FxBoard:
+    """One per process, like the market board: the provider is asked once per update (D-069)."""
+    live = get_settings().tools_profile == "live"
+    return FxBoard(fx_rates.http_json() if live else None)
+
+
+@router.get("/api/public/fx")
+async def fx(
+    response: Response,
+    board: Annotated[FxBoard, Depends(fx_board)],
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+) -> PublicFxBoard | None:
+    """The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency
+    Bank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling
+    rates, which the page links to. None when there are none to show."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return await board.board(lang)
 
 
 @router.get("/api/public/markets")

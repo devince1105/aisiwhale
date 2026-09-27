@@ -34,6 +34,14 @@ const WORDS = {
     sectionsLabel: "報導分類",
     topics: { watch: "持股觀察" } as Record<string, string>,
     tagsLabel: (topic: string) => `${topic}的分類`,
+    fx: {
+      title: "參考匯率",
+      unit: "新台幣／1 單位外幣",
+      asOf: (when: string) => `${when} 更新`,
+      note: "市場中價，每日更新一次，僅供參考；並非臺灣銀行牌告匯率，實際買賣價以銀行公告為準。",
+      bank: "臺灣銀行牌告匯率",
+      source: "匯率來源：",
+    },
     pagination: {
       label: "分頁",
       first: "第一頁",
@@ -282,6 +290,14 @@ const WORDS = {
     sectionsLabel: "Sections",
     topics: { watch: "Holdings watch" } as Record<string, string>,
     tagsLabel: (topic: string) => `${topic}, by kind`,
+    fx: {
+      title: "Reference rates",
+      unit: "NT$ per unit",
+      asOf: (when: string) => `Updated ${when}`,
+      note: "Market mid rates, updated once a day, for reference only; not Bank of Taiwan's posted rates, which are what a bank buys and sells at.",
+      bank: "Bank of Taiwan posted rates",
+      source: "Rates: ",
+    },
     pagination: {
       label: "Pages",
       first: "First page",

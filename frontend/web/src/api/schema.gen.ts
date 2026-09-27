@@ -934,6 +934,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/fx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fx
+         * @description The 外匯 tab's reference rates (D-069): New Taiwan dollars for one unit of each currency
+         *     Bank of Taiwan posts — a market mid rate, once a day; not the bank's own buying and selling
+         *     rates, which the page links to. None when there are none to show.
+         */
+        get: operations["fx_api_public_fx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/markets": {
         parameters: {
             query?: never;
@@ -2754,6 +2776,31 @@ export interface components {
             text: string;
             /** Type */
             type: string;
+        };
+        /** PublicFxBoard */
+        PublicFxBoard: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Bank Url */
+            bank_url: string;
+            /** Rates */
+            rates: components["schemas"]["PublicFxRate"][];
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url: string;
+        };
+        /** PublicFxRate */
+        PublicFxRate: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Twd */
+            twd: number;
         };
         /** PublicHistory */
         PublicHistory: {
@@ -5504,6 +5551,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicArticle"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fx_api_public_fx_get: {
+        parameters: {
+            query: {
+                lang: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFxBoard"] | null;
                 };
             };
             /** @description Validation Error */
