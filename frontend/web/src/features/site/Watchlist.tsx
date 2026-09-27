@@ -41,6 +41,7 @@ import {
 } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
 import { StockView } from "./StockView";
+import { WatchButton } from "./WatchButton";
 import { ARROW, direction, formatChange, formatValue, label, stockCode, stockPage, TONE } from "./quote";
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";
 
@@ -460,6 +461,9 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
     <div className={editing ? "mx-auto max-w-3xl" : undefined} data-testid="watchlist-page">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{w.title}</h1>
+        {/* the picked one's 已觀察 and the list's 編輯清單, side by side */}
+        <div className="flex items-center gap-2">
+          {!editing && picked ? <WatchButton symbol={picked.symbol} lang={lang} /> : null}
         <button
           type="button"
           onClick={() => go(editing ? (picked ? { s: picked.key } : {}) : { edit: "1" })}
@@ -469,6 +473,7 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         >
           {editing ? w.done : w.edit}
         </button>
+        </div>
       </div>
       {editing ? (
         <WatchlistEditor lang={lang} />
@@ -539,7 +544,7 @@ function WatchPane({ item, quote, lang }: { item: WatchedStock; quote?: PublicQu
         {detail === null ? (
           <p className="flex h-80 items-center justify-center text-sm text-muted">…</p>
         ) : detail.stock ? (
-          <StockView stock={detail.stock} lang={lang} history={detail.history} />
+          <StockView stock={detail.stock} lang={lang} history={detail.history} watch={false} />
         ) : (
           <p className="rounded-lg border border-line p-4 text-sm text-muted">{w.stock.noQuote}</p>
         )}

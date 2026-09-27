@@ -190,6 +190,9 @@ describe("the watchlist page to watch (D-064)", () => {
     // the stock's whole page, not a link to it
     await waitFor(() => expect(pane.querySelector("article h1")?.textContent).toContain("輝達"));
     expect(pane.querySelector('a[href="/news/zh-TW/stocks/NVDA"]')).toBeNull();
+    // 已觀察 once, in the title row beside 編輯清單, not again in the stock's own header
+    expect(pane.querySelector("[data-testid=watch-button]")).toBeNull();
+    expect(await screen.findByRole("button", { name: "★ 已觀察" })).toBeTruthy();
     expect(screen.queryByTestId("watchlist")).toBeNull(); // not the settings
   });
 

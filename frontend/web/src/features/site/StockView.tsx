@@ -118,10 +118,13 @@ export function StockView({
   stock,
   lang,
   history = null,
+  watch = true,
 }: {
   stock: PublicStock;
   lang: Lang;
   history?: PublicHistory | null;
+  /** Its own 加入觀察 button; the watchlist page puts it in its own title row instead (D-064). */
+  watch?: boolean;
 }) {
   const w = words(lang);
   const s = w.stock;
@@ -139,7 +142,7 @@ export function StockView({
             {stock.name}
             {code && code !== stock.name ? <span className="text-lg font-medium text-muted">{code}</span> : null}
           </h1>
-          <WatchButton symbol={stock.symbol} lang={lang} />
+          {watch ? <WatchButton symbol={stock.symbol} lang={lang} /> : null}
         </div>
         {quote ? (
           <div className="mt-3 flex flex-wrap items-end gap-x-3">
