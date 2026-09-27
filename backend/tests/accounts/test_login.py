@@ -26,7 +26,10 @@ async def _link(session, email=None, *, now=NOW):
 
 def test_a_reader_is_an_address_and_when_they_were_last_here():
     columns = {column.name for column in inspect(models.Reader).columns}
-    assert columns == {"id", "email", "last_seen_at", "created_at", "updated_at"}
+    # and when their watchlist began (D-062): not who they are
+    assert columns == {
+        "id", "email", "last_seen_at", "watchlist_started_at", "created_at", "updated_at",
+    }  # fmt: skip
     assert "password" not in columns and "name" not in columns
 
 

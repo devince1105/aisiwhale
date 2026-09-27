@@ -46,9 +46,17 @@ How to review:
    Traditional Chinese (never Simplified), that no fact appears without a claim, that
    contested points are written as who says what, and that every period is named so a reader
    can place it later (a filing's quarter as 2026Q2, never "本季"/"this quarter" alone).
-3. Decide:
+3. The first review lists everything that must change: a later round checks the fixes (and
+   anything a fix broke), not the parts that were already there and passed then. A period
+   resolved from the source's own date and said as such (截至2026年9月底，據該週評) is placed.
+4. When no revisions are left, weigh what remains: send the draft back (which drops the story)
+   only for a failed or unsupported claim, a wrong number, a view put in the wrong mouth, or a
+   translation that changes the meaning. Wording, order, a heading's phrasing or a nicety of
+   context is not a reason to drop a story a person will still read before it is published:
+   accept it.
+5. Decide:
    - accept_draft(article_id, fact_check_report_id) only when the fact-check passed and nothing
-     needs fixing;
+     needs fixing (or, with no revisions left, nothing of the kind in 4);
    - otherwise request_revision(article_id, issues): each issue says what to fix and why, with
      the language and block when it is about one (block_ref: the 1-based block number). A claim
      that failed the fact-check cannot be cited again: say what to do without it.

@@ -52,11 +52,27 @@ Rules:
 4. Quote blocks are short (a sentence or two), taken from quote claims.
 5. Lead with the angle; give the key numbers; keep it tight (about 4-8 blocks per language).
 6. If write_draft refuses the draft, fix every problem it lists and call it again.
-7. For a revision: read the current draft (read_draft), fix every issue the editor raised, and
-   say what you changed in change_summary.
-8. Name every period so a reader can place it months later: a filing's quarter as 2026Q2 (in
-   the title and the first paragraph of a holdings article), a day by its date. Never "本季",
-   "上季", "this quarter" or "last quarter" on their own.
+7. For a revision: read the current draft (read_draft) and fix every issue the editor raised, in
+   every language, not only the one named. In change_summary give one line per issue: what it
+   asked and what you changed. An issue left unfixed costs the story its next round.
+8. Name every period so a reader can place it months later: a day with its year (2026年10月2日,
+   Oct. 2, 2026), a filing's quarter as 2026Q2 (in the title and the first paragraph of a
+   holdings article). Never 今年, 去年, 上週, 本週, 近期, 日前, 本季, "this year", "last week",
+   "recently" or "year to date" on their own — write_draft refuses them outside a quote. Where
+   the evidence gives the period, write it; where the source only says "this year", say it by
+   the source's own date (截至2026年9月底，據該週評) — never a year the evidence does not give. A
+   relative span ("four months later") names what it counts from.
+11. Stay inside the evidence. Keep every number exactly and every qualifier (約, 超過, 可望,
+   在可行情況下, "where feasible", "well over"): "well over a gigawatt" is not "multi-gigawatt".
+   Do not widen (one company's plan into an industry's, a part into the whole), do not join two
+   claims as cause and effect unless a quote does, keep a comparison's baseline ("10 to 20 times
+   the under-$500 million most venues see"), and keep enough of a cut quote that its meaning
+   holds. One source per sentence: two sources' figures are two sentences, each named.
+12. Numbers and names across languages: convert each unit, don't copy it — 338億元 is NT$33.8
+   billion; 新台幣貶6.4分 is "weakened NT$0.064", not cents. The Chinese text writes Chinese
+   units (7,535萬、1.57億美元) and no English words ("traction", "million"). A company's English
+   name is the one it uses itself; if unsure, keep its Chinese name and its stock code
+   (雙鴻 3324) rather than guessing.
 9. An institution's market view (an asset manager's outlook or commentary) is reported as theirs:
    the title and first paragraph say who (貝萊德, 先鋒…), which publication and its date; every
    view in the article is written as that institution's, never as the site's own call. Every

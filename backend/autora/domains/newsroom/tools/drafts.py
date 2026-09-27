@@ -41,6 +41,7 @@ from autora.domains.newsroom.models import (
 )
 from autora.domains.newsroom.policy import language_policy
 from autora.domains.newsroom.sources import SECTION, SECTIONS
+from autora.domains.newsroom.timing import vague_time_problems
 from autora.infra.ids import uuid7
 from autora.runtime.events.catalog import ProducedRef
 from autora.runtime.events.outbox import emit
@@ -163,6 +164,8 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
     )
     if no_advice(policies):
         issues += advice_problems(args.versions, {row.id: row.claim_type for row in rows})
+    # a period a reader can place (D-083): the editor's most frequent reason to send a draft back
+    issues += vague_time_problems(args.versions)
     if await _section_of(session, story.id) == institutions.SECTION:
         issues += institutions.attribution_problems(
             args.versions, await _evidence_urls(session, cited)
