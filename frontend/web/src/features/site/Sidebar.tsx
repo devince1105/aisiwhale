@@ -156,7 +156,9 @@ function Popular({ articles, lang }: { articles: PublicArticleSummary[]; lang: L
             </Link>
             <span className="mt-1 block text-xs text-muted">
               {article.section ? `${w.sections[article.section as Section]}・` : ""}
-              {formatDate(lang, article.published_at)}
+              <time dateTime={article.published_at} className="text-date">
+                {formatDate(lang, article.published_at)}
+              </time>
             </span>
           </span>
         </li>

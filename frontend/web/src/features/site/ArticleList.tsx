@@ -38,10 +38,11 @@ function Meta({ article, lang }: { article: PublicArticleSummary; lang: Lang }) 
           {w.sections[section]}
         </span>
       ) : null}
-      <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
+      {/* an article's dates in the site's date colour (D-090) */}
+      <time dateTime={article.published_at} className="text-date">{formatDate(lang, article.published_at)}</time>
       {revisedOn(lang, article.published_at, article.revised_at) ? (
         <span>
-          ・{w.revised} {revisedOn(lang, article.published_at, article.revised_at)}
+          ・{w.revised} <span className="text-date">{revisedOn(lang, article.published_at, article.revised_at)}</span>
         </span>
       ) : null}
       {article.access === "members" ? (

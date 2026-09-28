@@ -47,12 +47,15 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
         <p className="mt-5 text-sm text-muted">
           {/* the site's own name in the page's language, not the company's one spelling (D-043) */}
           <span>{w.site}・</span>
-          {w.published} <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
+          {w.published} <time dateTime={article.published_at} className="text-date">{formatDate(lang, article.published_at)}</time>
           {/* revised the day it was published: that date is already there */}
           {article.revised_at && revisedOn(lang, article.published_at, article.revised_at) ? (
             <>
               {" ・ "}
-              {w.revised} <time dateTime={article.revised_at}>{revisedOn(lang, article.published_at, article.revised_at)}</time>
+              {w.revised}{" "}
+              <time dateTime={article.revised_at} className="text-date">
+                {revisedOn(lang, article.published_at, article.revised_at)}
+              </time>
             </>
           ) : null}
         </p>

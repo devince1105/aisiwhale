@@ -271,7 +271,7 @@ export function StockView({
                     {article.title}
                   </Link>
                   <p className="mt-1 text-xs text-muted">
-                    <time dateTime={article.published_at}>{formatDate(lang, article.published_at)}</time>
+                    <time dateTime={article.published_at} className="text-date">{formatDate(lang, article.published_at)}</time>
                   </p>
                 </li>
               ))}
