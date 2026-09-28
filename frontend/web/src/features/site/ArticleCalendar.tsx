@@ -198,14 +198,14 @@ export function ArticleCalendar({
             })}
           </div>
 
-          <div className="mt-3 flex items-center justify-between border-t border-line pt-2 text-xs">
-            <span className="text-muted">{w.hint}</span>
-            {selected ? (
+          {/* the day shown can be let go of; nothing else under the month */}
+          {selected ? (
+            <div className="mt-3 flex justify-end border-t border-line pt-2 text-xs">
               <Link href={listHref(lang, section)} onClick={() => setOpen(false)} className="text-accent hover:underline">
                 {w.clear}
               </Link>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

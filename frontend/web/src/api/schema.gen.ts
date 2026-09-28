@@ -938,6 +938,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/articles/popular": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Popular
+         * @description 熱門文章 (D-086): the most read over the last week, the front page's sidebar.
+         */
+        get: operations["popular_api_public_articles_popular_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/articles/{lang}/{slug}": {
         parameters: {
             query?: never;
@@ -5653,6 +5673,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicDay"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    popular_api_public_articles_popular_get: {
+        parameters: {
+            query: {
+                lang: string;
+                company?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicArticleSummary"][];
                 };
             };
             /** @description Validation Error */

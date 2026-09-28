@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage, fetchCalendar } from "@/features/site/api";
+import { fetchArticlePage, fetchCalendar, fetchPopular } from "@/features/site/api";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -41,9 +41,11 @@ export default async function Page({ params, searchParams }: { params: Params; s
   const sections = section ? sectionsOf(section) : undefined;
   // the calendar opens on the day's month, else this one, its days already marked (D-084)
   const month = (day ?? taipeiToday()).slice(0, 7);
-  const [{ articles, total }, days] = await Promise.all([
+  const [{ articles, total }, days, popular] = await Promise.all([
     fetchArticlePage(lang, { company, section: sections, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, day: day ?? undefined }),
     fetchCalendar(lang, month, { company, section: sections }),
+    // 熱門文章 for the sidebar: the whole site's, whatever the tab (D-086)
+    fetchPopular(lang, { company }),
   ]);
   return (
     <ArticleList
@@ -54,6 +56,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
       pages={Math.ceil(total / PAGE_SIZE)}
       day={day}
       calendar={{ month, days }}
+      popular={popular}
     />
   );
 }

@@ -10356,6 +10356,84 @@
     ]
    }
   },
+  "/api/public/articles/popular": {
+   "get": {
+    "description": "熱門文章 (D-086): the most read over the last week, the front page's sidebar.",
+    "operationId": "popular_api_public_articles_popular_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "maximum": 10,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PublicArticleSummary"
+         },
+         "title": "Response Popular Api Public Articles Popular Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Popular",
+    "tags": [
+     "public"
+    ]
+   }
+  },
   "/api/public/articles/{lang}/{slug}": {
    "get": {
     "operationId": "get_article_api_public_articles__lang___slug__get",

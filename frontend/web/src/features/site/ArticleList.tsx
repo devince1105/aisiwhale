@@ -131,6 +131,7 @@ export function ArticleList({
   pages = 1,
   day = null,
   calendar,
+  popular = [],
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -143,6 +144,8 @@ export function ArticleList({
   day?: string | null;
   /** The calendar's first month and its days with stories; no calendar without it. */
   calendar?: { month: string; days: PublicDay[] };
+  /** 熱門文章, the week's most read (D-086), for the sidebar. */
+  popular?: PublicArticleSummary[];
 
 }) {
   const w = words(lang);
@@ -186,8 +189,9 @@ export function ArticleList({
       </div>
       {calendar ? (
         <aside aria-label={w.sidebar} className="hidden lg:block" data-testid="front-sidebar">
-          <div className="sticky top-6 grid gap-8 border-l border-line pt-6 pl-8">
-            <SidebarBlock title={w.calendar.label}>
+          <div className="sticky top-6 grid gap-10 pt-6">
+            {/* the calendar needs no title: its month is one */}
+            <SidebarBlock label={w.calendar.label}>
               <ArticleCalendar
                 lang={lang}
                 section={section}
@@ -197,6 +201,11 @@ export function ArticleList({
                 inline
               />
             </SidebarBlock>
+            {popular.length ? (
+              <SidebarBlock label={w.popular} title={w.popular}>
+                <Popular articles={popular} lang={lang} />
+              </SidebarBlock>
+            ) : null}
           </div>
         </aside>
       ) : null}
@@ -204,13 +213,36 @@ export function ArticleList({
   );
 }
 
-/** A block of the front page's sidebar (D-085), headed as a newspaper heads one: a heavy rule and
- * a small label above what it holds. */
-function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
+/** A block of the front page's sidebar (D-085): what it holds, under a plain title when it
+ * needs one (D-086: no rule above, no line beside). */
+function SidebarBlock({ label, title, children }: { label: string; title?: string; children: React.ReactNode }) {
   return (
-    <section aria-label={title}>
-      <h2 className="border-t-2 border-ink pt-2 pb-3 text-xs font-bold tracking-widest text-ink">{title}</h2>
+    <section aria-label={label}>
+      {title ? <h2 className="pb-3 text-sm font-bold text-ink">{title}</h2> : null}
       {children}
     </section>
+  );
+}
+
+/** 熱門文章 (D-086): the week's most read, numbered as a newspaper's "most read" is. */
+function Popular({ articles, lang }: { articles: PublicArticleSummary[]; lang: Lang }) {
+  const w = words(lang);
+  return (
+    <ol className="grid gap-4" data-testid="popular">
+      {articles.map((article, i) => (
+        <li key={article.article_id} className="flex gap-3">
+          <span className="w-5 shrink-0 font-display text-xl leading-none font-bold text-accent tabular-nums">{i + 1}</span>
+          <span className="min-w-0">
+            <Link href={article.path} className="line-clamp-3 text-sm leading-snug font-semibold hover:text-accent">
+              {article.title}
+            </Link>
+            <span className="mt-1 block text-xs text-muted">
+              {article.section ? `${w.sections[article.section as Section]}・` : ""}
+              {formatDate(lang, article.published_at)}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

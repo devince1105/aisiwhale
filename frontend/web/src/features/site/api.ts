@@ -67,6 +67,21 @@ export async function fetchArticles(lang: string, options: ListOptions = {}): Pr
   return (await fetchArticlePage(lang, options)).articles;
 }
 
+/** 熱門文章, the week's most read (D-086). Never throws: no block, not no page. */
+export async function fetchPopular(
+  lang: string,
+  options: SiteClientOptions & { company?: string; limit?: number } = {},
+): Promise<PublicArticleSummary[]> {
+  try {
+    const { data } = await client(options).GET("/api/public/articles/popular", {
+      params: { query: { lang, company: options.company, limit: options.limit } },
+    });
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** A month's days with stories (D-084), for the calendar. Never throws: no marks, not no page. */
 export async function fetchCalendar(
   lang: string,

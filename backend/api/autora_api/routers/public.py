@@ -70,6 +70,7 @@ from autora.domains.newsroom.site import (
     PublicDay,
     count_articles_mentioning,
     count_published_articles,
+    popular_articles,
     published_article,
     published_articles,
     published_articles_mentioning,
@@ -111,6 +112,19 @@ async def list_articles(
     return await published_articles(
         session, lang, company_slug=company, section=section, limit=limit, offset=offset, day=day
     )
+
+
+@router.get("/api/public/articles/popular")
+async def popular(
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+    company: Annotated[str | None, Query(max_length=100)] = None,
+    limit: Annotated[int, Query(ge=1, le=10)] = 5,
+) -> list[PublicArticleSummary]:
+    """熱門文章 (D-086): the most read over the last week, the front page's sidebar."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return await popular_articles(session, lang, company_slug=company, limit=limit)
 
 
 @router.get("/api/public/articles/calendar")

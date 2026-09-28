@@ -91,3 +91,34 @@ describe("the calendar (D-084)", () => {
     expect(await fetchCalendar("zh-TW", "2026-09", { baseUrl: "http://api", fetch: down })).toEqual([]);
   });
 });
+
+describe("the front page's sidebar (D-085, D-086)", () => {
+  const story = (n: number, section: string): PublicArticleSummary =>
+    ({ article_id: `a${n}`, lang: "zh-TW", slug: `s${n}`, path: `/news/zh-TW/articles/s${n}`, title: `第 ${n} 篇`, summary: null, published_at: "2026-09-27T01:00:00Z", access: "free", section, stocks: [] }) as PublicArticleSummary;
+
+  it("the calendar without a title or a hint; 熱門文章 numbered, each to its story", () => {
+    render(
+      <ArticleList
+        articles={[story(1, "tw")]}
+        lang="zh-TW"
+        calendar={{ month: "2026-09", days: DAYS }}
+        popular={[story(7, "us"), story(3, "gold")]}
+      />,
+    );
+    const side = within(screen.getByTestId("front-sidebar"));
+    expect(side.queryByRole("heading", { name: "報導日曆" })).toBeNull();
+    expect(side.queryByText(/有圓點的日子/)).toBeNull();
+    expect(side.getByRole("heading", { name: "熱門文章" })).toBeTruthy();
+    const popular = within(side.getByTestId("popular"));
+    expect(popular.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "1第 7 篇美股・2026年9月27日",
+      "2第 3 篇黃金・2026年9月27日",
+    ]);
+    expect(popular.getByRole("link", { name: "第 7 篇" }).getAttribute("href")).toBe("/news/zh-TW/articles/s7");
+  });
+
+  it("nothing read yet: no 熱門文章 block", () => {
+    render(<ArticleList articles={[story(1, "tw")]} lang="zh-TW" calendar={{ month: "2026-09", days: DAYS }} />);
+    expect(screen.queryByTestId("popular")).toBeNull();
+  });
+});

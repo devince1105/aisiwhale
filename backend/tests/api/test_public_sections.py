@@ -179,3 +179,48 @@ async def test_a_day_s_stories_and_a_month_s_calendar_in_taipei(public, newsroom
     assert (
         await public.get("/api/public/articles/calendar", params=list_ | {"month": "2026-13"})
     ).status_code == 422
+
+
+async def test_the_most_read_of_the_last_week(public, newsroom_room):
+    """D-086: 熱門文章 — the week's opened pages, most first, the newer on a tie; older reads and
+    another language's do not count."""
+    from datetime import UTC, datetime
+
+    from autora.domains.newsroom.models import AnalyticsEvent
+
+    room = newsroom_room
+    list_ = {"lang": "zh-TW", "company": room.company.slug}
+    assert (await public.get("/api/public/articles/popular", params=list_)).json() == []
+    first_id = uuid.UUID(await room.publish())
+    async with room.committed() as session:
+        first = await session.get(Article, first_id)
+        newer = await _another(session, first, later=timedelta(hours=1))
+        older = await _another(session, first, later=-timedelta(hours=1))
+        now = datetime.now(UTC)
+
+        def read(article, n, *, ago=timedelta(0), lang="zh-TW"):
+            for _ in range(n):
+                session.add(
+                    AnalyticsEvent(
+                        company_id=article.company_id,
+                        article_id=article.id,
+                        lang=lang,
+                        event_type="view",
+                        session_hash=f"{uuid.uuid4().hex}",
+                        day=(now - ago).date(),
+                        created_at=now - ago,
+                    )  # fmt: skip
+                )
+
+        read(first, 3)
+        read(newer, 1)
+        read(older, 1)
+        read(older, 9, ago=timedelta(days=10))  # last month's hit
+        read(newer, 9, lang="en")  # another language's reads
+        await session.commit()
+        expected = [first.slug, newer.slug, older.slug]
+
+    popular = (await public.get("/api/public/articles/popular", params=list_)).json()
+    assert [a["slug"] for a in popular] == expected  # 3 reads, then a tie: the newer first
+    two = (await public.get("/api/public/articles/popular", params=list_ | {"limit": 2})).json()
+    assert len(two) == 2

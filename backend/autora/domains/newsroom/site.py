@@ -352,6 +352,42 @@ def _listed(
     return query
 
 
+POPULAR_DAYS = 7
+"""How far back 熱門文章 counts (D-086): a week's reads, so last month's hit makes way."""
+
+
+async def popular_articles(
+    session: AsyncSession,
+    lang: str,
+    *,
+    company_slug: str | None = None,
+    limit: int = 5,
+    now: datetime | None = None,
+) -> list[PublicArticleSummary]:
+    """The most read of the site's published articles in ``lang`` over the last ``POPULAR_DAYS``
+    (D-086): opened pages, one a reader a day (the beacon's own dedup), the newer first on a tie.
+    None read yet: none."""
+    since = (now or datetime.now(UTC)) - timedelta(days=POPULAR_DAYS)
+    views = (
+        select(AnalyticsEvent.article_id, func.count().label("views"))
+        .where(
+            AnalyticsEvent.event_type == AnalyticsEventType.VIEW.value,
+            AnalyticsEvent.lang == lang,
+            AnalyticsEvent.created_at >= since,
+        )
+        .group_by(AnalyticsEvent.article_id)
+        .subquery()
+    )
+    query = (
+        _listed(lang, company_slug, None)
+        .join(views, views.c.article_id == Article.id)
+        .order_by(views.c.views.desc(), Article.published_at.desc())
+        .limit(min(max(limit, 1), 10))
+    )
+    rows = (await session.execute(query)).all()
+    return [_summary(article, version, named) for article, version, named in rows]
+
+
 class PublicDay(BaseModel):
     day: date
     count: int
