@@ -1,8 +1,8 @@
 "use client";
 
-// The watchlist in drawers (D-094): 台股, 美股, 指數・利率, 黃金・期貨, 外匯, 加密貨幣 — each with
-// its count, folded or not with a click, and remembered in this browser. The reader's own order
-// within each drawer; a drawer with nothing in it is not shown.
+// The watchlist in drawers (D-094): 台股, 美股, 指數・利率, 黃金・期貨, 外匯, 加密貨幣 — folded or
+// not with a click, and remembered in this browser. The reader's own order within each drawer; a
+// drawer with nothing in it is not shown. How many are in each only where the list is set (D-095).
 import { useEffect, useState, type ReactNode } from "react";
 
 import { words, type Lang } from "./i18n";
@@ -39,15 +39,23 @@ export function GroupedList({
   items,
   lang,
   row,
+  body,
+  counted = false,
+  testId = "watchlist-groups",
 }: {
   items: WatchedStock[];
   lang: Lang;
-  row: (item: WatchedStock) => ReactNode;
+  /** Each item, in a list of its drawer's; or the drawer's whole ``body``. */
+  row?: (item: WatchedStock) => ReactNode;
+  body?: (inside: WatchedStock[]) => ReactNode;
+  /** 台股 6: on the settings, not the list to watch. */
+  counted?: boolean;
+  testId?: string;
 }) {
   const names = words(lang).watch.groups;
   const [folded, toggle] = useFolded();
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-1" data-testid="watchlist-groups">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-1" data-testid={testId}>
       {GROUPS.map((group) => {
         const inside = items.filter((item) => groupOf(item.key) === group);
         if (!inside.length) return null;
@@ -64,17 +72,19 @@ export function GroupedList({
                 <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               {names[group]}
-              <span className="tabular-nums">{inside.length}</span>
+              {counted ? <span className="tabular-nums">{inside.length}</span> : null}
             </button>
-            {open ? (
+            {!open ? null : body ? (
+              body(inside)
+            ) : (
               <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
                 {inside.map((item) => (
                   <li key={item.key} className="min-w-0">
-                    {row(item)}
+                    {row?.(item)}
                   </li>
                 ))}
               </ul>
-            ) : null}
+            )}
           </section>
         );
       })}

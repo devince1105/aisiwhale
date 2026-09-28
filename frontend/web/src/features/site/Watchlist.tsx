@@ -50,7 +50,7 @@ import { StockChart } from "./StockChart";
 import { formatDate, formatMonth, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
 import { WatchButton } from "./WatchButton";
-import { ARROW, direction, formatChange, formatValue, isCurrency, label, stockCode, stockPage, TONE } from "./quote";
+import { ARROW, direction, formatChange, formatValue, GROUPS, groupOf, isCurrency, label, stockCode, stockPage, TONE } from "./quote";
 
 /** A watchlist figure that is not a stock (D-079): an index, the yield, oil, gold, a coin, a
  * currency in NT$ — what an article's link may open. */
@@ -325,7 +325,17 @@ function WatchlistEditor({ lang }: { lang: Lang }) {
     <div className="grid gap-8">
       <Search lang={lang} watched={watched} />
       {list.items.length ? (
-        <SortableList items={list.items} byKey={byKey} lang={lang} />
+        // in drawers, each counted (D-095); dragged within its own
+        <div>
+          <p className="mb-2 text-xs text-muted">{w.reorderHint}</p>
+          <GroupedList
+            items={list.items}
+            lang={lang}
+            counted
+            testId="watchlist"
+            body={(inside) => <SortableList items={inside} all={list.items} byKey={byKey} lang={lang} />}
+          />
+        </div>
       ) : (
         <p className="text-muted">{w.empty}</p>
       )}
@@ -443,15 +453,17 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
   );
 }
 
-/** The list on the watchlist page, in the reader's order, dragged by its handle (D-063): with a
+/** A drawer of the list being set, in the reader's order, dragged by its handle (D-063): with a
  * mouse, a finger (after a short hold, so the page still scrolls) or the keyboard (space, the
- * arrows, space). */
+ * arrows, space). Within the drawer only (D-095): the whole list is kept drawer by drawer. */
 function SortableList({
   items,
+  all,
   byKey,
   lang,
 }: {
   items: WatchedStock[];
+  all: WatchedStock[];
   byKey: Map<string, PublicQuote>;
   lang: Lang;
 }) {
@@ -467,11 +479,13 @@ function SortableList({
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
     const moved = arrayMove(keys, keys.indexOf(String(active.id)), keys.indexOf(String(over.id)));
-    void reorderWatchlist(moved);
+    const group = groupOf(keys[0]);
+    void reorderWatchlist(
+      GROUPS.flatMap((g) => (g === group ? moved : all.filter((item) => groupOf(item.key) === g).map((item) => item.key))),
+    );
   };
   return (
     <div>
-      <p className="mb-2 text-xs text-muted">{w.reorderHint}</p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -487,7 +501,7 @@ function SortableList({
         }}
       >
         <SortableContext items={keys} strategy={verticalListSortingStrategy}>
-          <ul className="divide-y divide-line rounded-lg border border-line" data-testid="watchlist">
+          <ul className="divide-y divide-line rounded-lg border border-line">
             {items.map((item) => (
               <SortableRow key={item.key} item={item} quote={byKey.get(item.key)} lang={lang} />
             ))}
@@ -521,13 +535,10 @@ function SortableRow({ item, quote, lang }: { item: WatchedStock; quote?: Public
       <div className="min-w-0 flex-1">
         <Row item={item} quote={quote} lang={lang} />
       </div>
-        <button
-          type="button"
-          onClick={() => void setWatched(item.symbol, false)}
-          className="text-xs text-muted hover:text-accent"
-        >
-          {w.remove}
-        </button>
+      {/* a trash can, 移除 on hover (D-095) */}
+      <IconButton label={w.removeOne(item.name)} quiet onClick={() => void setWatched(item.symbol, false)} testId="watchlist-remove">
+        {ICONS.trash}
+      </IconButton>
     </li>
   );
 }

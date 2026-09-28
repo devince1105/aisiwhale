@@ -262,6 +262,19 @@ describe("the watchlist page to watch (D-064)", () => {
     expect(screen.getByTestId("watchlist-page").className).toContain("mx-auto max-w-[46rem]");
   });
 
+  it("the settings in drawers, each counted; 移除 is a trash can", async () => {
+    params = new URLSearchParams("edit=1");
+    list = [NVDA, { symbol: "TAIEX", market: "market", key: "taiex", name: "加權指數" }];
+    render(<WatchlistPage lang="zh-TW" />);
+    const drawers = within(await screen.findByTestId("watchlist"));
+    expect(drawers.getByRole("button", { name: "美股1" }).getAttribute("aria-expanded")).toBe("true");
+    expect(drawers.getByRole("button", { name: "指數・利率1" })).toBeTruthy();
+    const remove = drawers.getByRole("button", { name: "移除「輝達」" });
+    expect(remove.querySelector("svg")).toBeTruthy();
+    fireEvent.click(remove);
+    await waitFor(() => expect(calls).toContain("DELETE /NVDA"));
+  });
+
   it("beside a stock, the list is only to look at, with a way to its settings", async () => {
     list = [NVDA];
     render(<WatchlistSide lang="zh-TW" current="us:NVDA" />);

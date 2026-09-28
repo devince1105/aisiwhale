@@ -31,12 +31,12 @@ describe("觀察清單分類 (D-094)", () => {
     expect(groupOf("us:USO")).toBe("commodity");
   });
 
-  it("drawers in a fixed order, the reader's order inside, counted; one folds and stays folded", () => {
+  it("drawers in a fixed order, the reader's order inside, not counted; one folds and stays folded", () => {
     render(<GroupedList items={ITEMS} lang="zh-TW" row={(i) => <span>{i.name}</span>} />);
     const drawers = screen.getByTestId("watchlist-groups").querySelectorAll("section");
     expect([...drawers].map((d) => d.getAttribute("data-group"))).toEqual(["tw", "us", "index", "commodity", "fx", "crypto"]);
     const us = within(drawers[1] as HTMLElement);
-    expect(us.getByRole("button").textContent).toBe("美股2");
+    expect(us.getByRole("button").textContent).toBe("美股"); // no count on the list to watch (D-095)
     expect(us.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["輝達", "蘋果"]);
 
     fireEvent.click(us.getByRole("button", { name: /美股/ }));
@@ -46,5 +46,13 @@ describe("觀察清單分類 (D-094)", () => {
     render(<GroupedList items={ITEMS} lang="zh-TW" row={(i) => <span>{i.name}</span>} />);
     expect(screen.queryByText("輝達")).toBeNull(); // remembered
     expect(screen.getByText("台積電")).toBeTruthy();
+  });
+});
+
+describe("編輯清單 (D-095)", () => {
+  it("counted in its drawers", () => {
+    render(<GroupedList items={ITEMS} lang="zh-TW" counted row={(i) => <span>{i.name}</span>} />);
+    const buttons = screen.getAllByRole("button").map((b) => b.textContent);
+    expect(buttons).toEqual(["台股1", "美股2", "指數・利率1", "黃金・期貨2", "外匯1", "加密貨幣1"]);
   });
 });

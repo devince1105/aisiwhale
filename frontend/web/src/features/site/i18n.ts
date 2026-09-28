@@ -291,6 +291,7 @@ const WORDS = {
       add: "☆ 加入觀察",
       added: "★ 已觀察",
       remove: "移除",
+      removeOne: (name: string) => `移除「${name}」`,
       drag: (name: string) => `拖曳調整「${name}」的順序`,
       dnd: {
         instructions: "按空白鍵拿起，用上下方向鍵移動，再按空白鍵放下；按 Esc 取消。",
@@ -586,6 +587,7 @@ const WORDS = {
       add: "☆ Watch",
       added: "★ Watching",
       remove: "Remove",
+      removeOne: (name: string) => `Remove ${name}`,
       drag: (name: string) => `Drag to move ${name}`,
       dnd: {
         instructions: "Press space to pick up, the arrow keys to move, space to drop; Escape cancels.",
