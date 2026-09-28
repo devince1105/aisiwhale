@@ -65,8 +65,8 @@ export function SiteFooter({
         ) : null}
       </div>
       {/* one statement for the whole site, not one per section (D-097): the footer's last row,
-          the whole width, as a warning strip (D-099) */}
-      <div role="note" className="border-t border-alert-line bg-alert text-alert-ink" data-testid="site-disclaimer">
+          the whole width, as a warning strip, no line above it (D-099, D-103) */}
+      <div role="note" className="bg-alert text-alert-ink" data-testid="site-disclaimer">
         <p className="mx-auto flex max-w-6xl gap-2.5 px-4 py-3 text-xs leading-relaxed">
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" className="mt-px shrink-0">
             <path d="M8 1.8l6.6 11.7H1.4z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />

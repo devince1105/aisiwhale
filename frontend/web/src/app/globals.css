@@ -17,10 +17,9 @@
   --color-danger: #d64545;
   --color-danger-soft: #fdf0f0;
   --color-danger-line: #f3c6c6;
-  /* the footer's disclaimer, a warning strip (D-099): light red, dark red words */
-  --color-alert: #fdeeee;
-  --color-alert-ink: #7a1f1f;
-  --color-alert-line: #f3caca;
+  /* the footer's disclaimer, a warning strip (D-099, D-103): a diff's removed line, light */
+  --color-alert: #ffebe9;
+  --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
   /* prices, the Taiwanese way: red is up, green is down (D-048) */
   --color-rise: #d64545;
@@ -46,7 +45,6 @@
        would not be read (D-099) */
     --color-alert: #4b2224;
     --color-alert-ink: #ef8a85;
-    --color-alert-line: #66302f;
     --color-neutral: #5f6875;
   }
 }
@@ -74,10 +72,9 @@ body {
   --color-accent-ink: #ffffff;
   --color-danger-soft: #fdf0f0;
   --color-danger-line: #f3c6c6;
-  /* the footer's disclaimer, a warning strip (D-099): light red, dark red words */
-  --color-alert: #fdeeee;
-  --color-alert-ink: #7a1f1f;
-  --color-alert-line: #f3caca;
+  /* the footer's disclaimer, a warning strip (D-099, D-103): a diff's removed line, light */
+  --color-alert: #ffebe9;
+  --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
 }
 
@@ -97,7 +94,6 @@ body {
        would not be read (D-099) */
   --color-alert: #4b2224;
   --color-alert-ink: #ef8a85;
-  --color-alert-line: #66302f;
   --color-neutral: #5f6875;
 }
 
