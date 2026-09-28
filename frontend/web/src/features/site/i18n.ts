@@ -249,7 +249,7 @@ const WORDS = {
     readIn: "閱讀其他語言：",
     // the site's one statement of what its pages are and are not, in the footer of every page (D-097)
     disclaimer:
-      "本站報導由 AI 新聞室撰寫、事實查核，並經人核准後發布，內容整理自公開資料。行情為收盤或延遲資料；持股來自 SEC 13F 等公開申報；分析師評等取自 Finnhub，照原樣列出；新聞情緒由 AI 依近 7 天新聞標題判讀，可能有誤；技術指標依日線收盤價計算，只列數值。本站不做買賣判斷，以上皆不是股價預測，也不構成投資建議；投資有風險，請自行判斷。",
+      "本站報導由 AI 新聞室撰寫、事實查核並核准後發布，內容整理自公開資料。行情為收盤或延遲資料；持股取自 SEC 13F 等公開申報，分析師評等取自 Finnhub；新聞情緒由 AI 判讀標題語氣，可能有誤；技術指標為依收盤價計算的數值。本站不做買賣判斷或股價預測，內容不構成投資建議；投資有風險，請審慎評估。",
     disclaimerTitle: "免責聲明",
     membersOnly: "這篇報導是會員專屬",
     membersOnlyWhy: "成為會員，就能閱讀全部會員專屬報導。",
@@ -561,7 +561,7 @@ const WORDS = {
     figuresNamed: "Related markets",
     readIn: "Read in:",
     disclaimer:
-      "Stories are written and fact-checked by an AI newsroom and approved by a person before they are published, from public information. Prices are closing or delayed; holdings are from SEC 13F and other public filings; analyst ratings are Finnhub's, listed as they are; news sentiment is an AI's reading of the last 7 days' headlines and may be wrong; technicals are figures computed from daily closes. The site makes no buy or sell calls: none of this is a price forecast or investment advice, and investing carries risk.",
+      "Stories are written, fact-checked and approved by an AI newsroom before they are published, from public information. Prices are closing or delayed; holdings come from SEC 13F and other public filings, and analyst ratings from Finnhub; news sentiment is an AI's reading of headlines and may be wrong; technicals are figures computed from closing prices. The site makes no buy or sell calls and no price forecasts, and nothing here is investment advice; investing carries risk.",
     disclaimerTitle: "Disclaimer",
     membersOnly: "This story is for members",
     membersOnlyWhy: "Members can read every members-only story.",
