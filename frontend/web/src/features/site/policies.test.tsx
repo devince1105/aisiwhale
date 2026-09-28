@@ -58,7 +58,7 @@ describe("who runs the site", () => {
     render(<SiteFooter lang="zh-TW" operator={PERSON} />);
     const said = screen.getByTestId("site-disclaimer").textContent!;
     expect(said.startsWith("免責聲明：")).toBe(true);
-    for (const part of ["AI 新聞室", "13F", "Finnhub", "新聞情緒", "技術指標", "不構成投資建議"]) expect(said).toContain(part);
+    for (const part of ["AI 新聞室", "公開申報", "Finnhub", "AI 判讀", "不構成投資建議"]) expect(said).toContain(part);
     // the footer's last row, a warning strip across it (D-099)
     const strip = screen.getByTestId("site-disclaimer");
     expect(screen.getByTestId("site-footer").lastElementChild).toBe(strip);
