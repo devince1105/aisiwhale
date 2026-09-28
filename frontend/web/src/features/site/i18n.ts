@@ -156,7 +156,7 @@ const WORDS = {
       string
     >,
     marketsNote: "收盤或延遲資料，僅供參考",
-    marketsCredit: (sources: string[]) => `市場資料：${sources.join("、")}。收盤或延遲資料，僅供參考。`,
+    marketsCredit: (sources: string[]) => `市場資料：${sources.join("、")}。`,
     sourceNames: {
       TWSE: "臺灣證券交易所",
       FRED: "FRED（聖路易聯邦準備銀行）",
@@ -478,7 +478,7 @@ const WORDS = {
     >,
     marketsNote: "Closing or delayed figures, for reference only",
     marketsCredit: (sources: string[]) =>
-      `Market data: ${sources.join(", ")}. Closing or delayed figures, for reference only.`,
+      `Market data: ${sources.join(", ")}.`,
     sourceNames: {
       TWSE: "Taiwan Stock Exchange",
       FRED: "FRED (Federal Reserve Bank of St. Louis)",

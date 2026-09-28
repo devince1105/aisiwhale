@@ -59,6 +59,11 @@ describe("who runs the site", () => {
     const said = screen.getByTestId("site-disclaimer").textContent!;
     expect(said.startsWith("免責聲明：")).toBe(true);
     for (const part of ["AI 新聞室", "13F", "Finnhub", "新聞情緒", "技術指標", "不構成投資建議"]) expect(said).toContain(part);
+    // the footer's last row, a warning strip across it (D-099)
+    const strip = screen.getByTestId("site-disclaimer");
+    expect(screen.getByTestId("site-footer").lastElementChild).toBe(strip);
+    expect(strip.className).toContain("bg-alert");
+    expect(strip.getAttribute("role")).toBe("note");
   });
 
   it("is free until somebody says otherwise", () => {

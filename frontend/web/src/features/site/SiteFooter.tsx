@@ -60,15 +60,25 @@ export function SiteFooter({
             </>
           ) : null}
         </p>
-        {/* one statement for the whole site, not one per section (D-097) */}
-        <p className="mt-4 max-w-4xl text-xs leading-relaxed" data-testid="site-disclaimer">
-          <span className="font-semibold text-ink">{w.disclaimerTitle}</span>
-          {w.sep}
-          {w.disclaimer}
-        </p>
         {marketSources.length ? (
           <p className="mt-3 text-xs">{w.marketsCredit(marketSources.map((s) => w.sourceNames[s] ?? s))}</p>
         ) : null}
+      </div>
+      {/* one statement for the whole site, not one per section (D-097): the footer's last row,
+          the whole width, as a warning strip (D-099) */}
+      <div role="note" className="border-t border-alert-line bg-alert text-alert-ink" data-testid="site-disclaimer">
+        <p className="mx-auto flex max-w-6xl gap-2.5 px-4 py-3 text-xs leading-relaxed">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" className="mt-px shrink-0">
+            <path d="M8 1.8l6.6 11.7H1.4z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            <path d="M8 6.2v3.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <circle cx="8" cy="11.6" r="0.8" fill="currentColor" />
+          </svg>
+          <span>
+            <strong className="font-semibold">{w.disclaimerTitle}</strong>
+            {w.sep}
+            {w.disclaimer}
+          </span>
+        </p>
       </div>
     </footer>
   );
