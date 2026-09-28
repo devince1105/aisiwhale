@@ -53,6 +53,18 @@ const WORDS = {
     sidebar: "側欄",
     languageLabel: "語言",
     marketOverview: "市場概況",
+    sentiment: {
+      title: "新聞情緒",
+      positive: "正面",
+      neutral: "中立",
+      negative: "負面",
+      heat: "新聞熱度",
+      heatValue: (count: number, heat: number | null) =>
+        heat === null ? `本週 ${count} 則` : `本週 ${count} 則・為平常的 ${heat.toFixed(1)} 倍`,
+      notice: "依過去 7 天新聞標題對該公司的語氣統計，由 AI 判讀，可能有誤；只描述報導內容，不是股價預測，也不構成投資建議。",
+      stocks: "則數",
+      positiveShare: "正面",
+    },
     events: {
       title: "財經行事曆",
       day: (day: string) => {
@@ -352,6 +364,18 @@ const WORDS = {
     sidebar: "Sidebar",
     languageLabel: "Language",
     marketOverview: "Markets",
+    sentiment: {
+      title: "News sentiment",
+      positive: "Positive",
+      neutral: "Neutral",
+      negative: "Negative",
+      heat: "Coverage",
+      heatValue: (count: number, heat: number | null) =>
+        heat === null ? `${count} this week` : `${count} this week, ${heat.toFixed(1)}× usual`,
+      notice: "How the last 7 days' headlines read toward the company, as an AI reads them; it may be wrong. It describes the coverage — not a price forecast, and not investment advice.",
+      stocks: "Stories",
+      positiveShare: "Positive",
+    },
     events: {
       title: "Economic calendar",
       day: (day: string) =>

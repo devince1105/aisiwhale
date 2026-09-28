@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from autora.runtime.behaviors import BehaviorRegistry
     from autora.runtime.dag import TemplateRegistry, WorkflowEngine
     from autora.runtime.models.embeddings import Embedder
+    from autora.runtime.models.gateway import ModelGateway
     from autora.runtime.models.providers.fake import FakeTurn
     from autora.runtime.models.types import ModelRequest
     from autora.runtime.policy import PolicyEngine
@@ -160,6 +161,7 @@ def build_scheduler(
     worker_id: str,
     cycles: CycleRunner | None = None,
     approvals: ApprovalService | None = None,
+    gateway: ModelGateway | None = None,
 ) -> Scheduler:
     """The scheduler with the company's daily cycle (T-601) and every domain's handlers
     (newsroom: the source poller T-501, story clustering T-504, the analytics collector
@@ -235,6 +237,21 @@ def build_scheduler(
         HttpFetch(settings.fetch_contact_email if settings else None), transcriber, approvals
     )
     scheduler.register(OFFICIAL_SCHEDULE, officials.schedule_handler())
+    # 新聞情緒: headlines' tone, read by the gateway's model on the newsroom's budget (D-091)
+    from autora.domains.newsroom.economic_calendar import finnhub_json
+    from autora.domains.newsroom.sentiment import (
+        SENTIMENT_SCHEDULE,
+        SentimentKeeper,
+        feed_reader,
+        no_feed,
+    )
+
+    sentiment = SentimentKeeper(
+        gateway if live else None,
+        finnhub_json(finnhub.get_secret_value()) if finnhub else None,
+        feed_reader() if live else no_feed,
+    )
+    scheduler.register(SENTIMENT_SCHEDULE, sentiment.schedule_handler())
     if cycles is not None:
         scheduler.register(CYCLE_START_SCHEDULE, cycles.schedule_handler())
     return scheduler
@@ -475,7 +492,12 @@ def build_worker(
         runner=runner,
         approvals=runtime.approvals,
         scheduler=build_scheduler(
-            settings, session_factory, settings.worker_id, runtime.cycles, runtime.approvals
+            settings,
+            session_factory,
+            settings.worker_id,
+            runtime.cycles,
+            runtime.approvals,
+            gateway=gateway,
         ),
         services=ServiceDispatcher(
             session_factory=session_factory,

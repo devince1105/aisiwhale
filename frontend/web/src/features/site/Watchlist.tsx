@@ -605,17 +605,22 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         // widening its column — and the whole page with it — to the row's full length. The list is
         // hidden until asked for (D-075), as beside a stock: the one picked has the page
         <>
-        <div className="mb-4">
+        {/* on a wide screen the list is a column on the right (D-092), its button above it */}
+        <div className="mb-4 lg:flex lg:justify-end">
           <SideToggle open={listOpen} setOpen={setListOpen} lang={lang} />
         </div>
         <div
-          className={`grid grid-cols-1 gap-6 ${listOpen ? "lg:grid-cols-[16rem_minmax(0,1fr)]" : ""}`}
+          className={`grid grid-cols-1 gap-6 ${listOpen ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}
           data-testid="watch-board"
         >
           {listOpen ? (
-          <nav id="watchlist-side-list" aria-label={w.title} className="min-w-0">
+          <nav
+            id="watchlist-side-list"
+            aria-label={w.title}
+            className="min-w-0 lg:order-last lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:scroll-column lg:pr-1"
+          >
             {sample ? <p className="mb-2 px-3 text-xs text-muted">{w.sample}</p> : null}
-            {/* a phone: a row to scroll; a wide screen: a column */}
+            {/* a phone: a row to scroll; a wide screen: a column on the right, scrolled on its own */}
             <ul className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible">
               {items.map((item) => (
                 <li key={item.key} className="shrink-0 lg:shrink">

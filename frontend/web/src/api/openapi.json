@@ -4220,6 +4220,57 @@
     "title": "PublicGold",
     "type": "object"
    },
+   "PublicHeadline": {
+    "properties": {
+     "published_at": {
+      "format": "date-time",
+      "title": "Published At",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "sentiment": {
+      "enum": [
+       "positive",
+       "neutral",
+       "negative"
+      ],
+      "title": "Sentiment",
+      "type": "string"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title",
+     "url",
+     "source",
+     "published_at",
+     "sentiment",
+     "reason"
+    ],
+    "title": "PublicHeadline",
+    "type": "object"
+   },
    "PublicHistory": {
     "properties": {
      "bars": {
@@ -4636,6 +4687,65 @@
      "kind"
     ],
     "title": "PublicSecurity",
+    "type": "object"
+   },
+   "PublicSentiment": {
+    "properties": {
+     "headlines": {
+      "items": {
+       "$ref": "#/components/schemas/PublicHeadline"
+      },
+      "title": "Headlines",
+      "type": "array"
+     },
+     "heat": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Heat"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "negative": {
+      "title": "Negative",
+      "type": "integer"
+     },
+     "neutral": {
+      "title": "Neutral",
+      "type": "integer"
+     },
+     "positive": {
+      "title": "Positive",
+      "type": "integer"
+     },
+     "total": {
+      "readOnly": true,
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "key",
+     "name",
+     "positive",
+     "neutral",
+     "negative",
+     "heat",
+     "headlines",
+     "total"
+    ],
+    "title": "PublicSentiment",
     "type": "object"
    },
    "PublicSource": {
@@ -10848,6 +10958,55 @@
     ]
    }
   },
+  "/api/public/sentiment": {
+   "get": {
+    "description": "新聞情緒 for every stock on the strip with a week's headlines, the most covered first (for\nthe sidebar); each without its headlines.",
+    "operationId": "sentiment_overview_api_public_sentiment_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PublicSentiment"
+         },
+         "title": "Response Sentiment Overview Api Public Sentiment Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Sentiment Overview",
+    "tags": [
+     "public"
+    ]
+   }
+  },
   "/api/public/stocks/{symbol}": {
    "get": {
     "description": "``articles_offset`` pages through our stories that name it, ten at a time (D-066).",
@@ -11012,6 +11171,68 @@
      }
     },
     "summary": "Get Stock Intraday",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/stocks/{symbol}/sentiment": {
+   "get": {
+    "description": "新聞情緒 (D-091): how the week's headlines about one of the strip's stocks read toward it,\ncounted, with the latest few and why. None for a stock off the strip (its news is not read).",
+    "operationId": "get_stock_sentiment_api_public_stocks__symbol__sentiment_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "title": "Symbol",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/PublicSentiment"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Get Stock Sentiment Api Public Stocks  Symbol  Sentiment Get"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Stock Sentiment",
     "tags": [
      "public"
     ]

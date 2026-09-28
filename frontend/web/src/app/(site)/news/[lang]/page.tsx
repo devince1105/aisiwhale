@@ -58,6 +58,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
       popular={sidebar.popular}
       markets={sidebar.markets}
       events={sidebar.events}
+      sentiment={sidebar.sentiment}
     />
   );
 }

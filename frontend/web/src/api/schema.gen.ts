@@ -1103,6 +1103,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/sentiment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sentiment Overview
+         * @description 新聞情緒 for every stock on the strip with a week's headlines, the most covered first (for
+         *     the sidebar); each without its headlines.
+         */
+        get: operations["sentiment_overview_api_public_sentiment_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/stocks/{symbol}": {
         parameters: {
             query?: never;
@@ -1160,6 +1181,27 @@ export interface paths {
          *     (D-059), a Taiwan stock's from Fugle (D-074). Empty without that service's key.
          */
         get: operations["get_stock_intraday_api_public_stocks__symbol__intraday_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/stocks/{symbol}/sentiment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stock Sentiment
+         * @description 新聞情緒 (D-091): how the week's headlines about one of the strip's stocks read toward it,
+         *     counted, with the latest few and why. None for a stock off the strip (its news is not read).
+         */
+        get: operations["get_stock_sentiment_api_public_stocks__symbol__sentiment_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2949,6 +2991,27 @@ export interface components {
             /** Usd Per Oz */
             usd_per_oz: number;
         };
+        /** PublicHeadline */
+        PublicHeadline: {
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Sentiment
+             * @enum {string}
+             */
+            sentiment: "positive" | "neutral" | "negative";
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
         /** PublicHistory */
         PublicHistory: {
             /** Bars */
@@ -3093,6 +3156,25 @@ export interface components {
             name_en: string | null;
             /** Symbol */
             symbol: string;
+        };
+        /** PublicSentiment */
+        PublicSentiment: {
+            /** Headlines */
+            headlines: components["schemas"]["PublicHeadline"][];
+            /** Heat */
+            heat: number | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Negative */
+            negative: number;
+            /** Neutral */
+            neutral: number;
+            /** Positive */
+            positive: number;
+            /** Total */
+            readonly total: number;
         };
         /** PublicSource */
         PublicSource: {
@@ -5971,6 +6053,37 @@ export interface operations {
             };
         };
     };
+    sentiment_overview_api_public_sentiment_get: {
+        parameters: {
+            query: {
+                lang: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSentiment"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_stock_api_public_stocks__symbol__get: {
         parameters: {
             query: {
@@ -6055,6 +6168,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicIntraday"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stock_sentiment_api_public_stocks__symbol__sentiment_get: {
+        parameters: {
+            query: {
+                lang: string;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSentiment"] | null;
                 };
             };
             /** @description Validation Error */

@@ -697,3 +697,38 @@ class TrackedSecurity(IdMixin, CreatedAtMixin, Base):
     market: Mapped[str]
     symbol: Mapped[str]
     last_requested_at: Mapped[datetime]
+
+
+class Sentiment(StrEnum):
+    POSITIVE = "positive"
+    NEUTRAL = "neutral"
+    NEGATIVE = "negative"
+
+
+class StockHeadline(IdMixin, CreatedAtMixin, Base):
+    """A news headline about one of the strip's stocks, and its tone toward the company (D-091):
+    for 新聞情緒, a count of how the week's news reads, never a forecast.
+
+    Market data, not the company's: no ``company_id``. Found in Finnhub's company news (a US
+    stock) or in Yahoo 股市's and 中央社's feeds (a Taiwan one), kept only when it names the
+    stock; classified by a model, which says why in a line in each language. A headline is one
+    row a stock (the same story can be about two)."""
+
+    __tablename__ = "stock_headlines"
+    __table_args__ = (
+        UniqueConstraint("stock_key", "url"),
+        check_in("sentiment", Sentiment),
+        Index("ix_stock_headlines_stock_published", "stock_key", "published_at"),
+    )
+
+    stock_key: Mapped[str]
+    """As the strip keys it: ``tw:2330``, ``us:NVDA``."""
+    url: Mapped[str]
+    title: Mapped[str]
+    source: Mapped[str]
+    published_at: Mapped[datetime]
+    sentiment: Mapped[str | None]
+    """None until classified."""
+    reason_zh: Mapped[str | None]
+    reason_en: Mapped[str | None]
+    classified_at: Mapped[datetime | None]

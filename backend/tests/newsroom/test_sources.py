@@ -196,6 +196,7 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
             ("newsroom.refresh_prices", "newsroom.refresh_prices", "20 7,10 * * 1-5"),  # D-059
             ("newsroom.fill_prices", "newsroom.fill_prices", "*/5 * * * *"),  # D-061
             ("newsroom.refresh_securities", "newsroom.refresh_securities", "10 23 * * *"),
+            ("newsroom.stock_sentiment", "newsroom.stock_sentiment", "0 0,9 * * *"),  # D-091
         ]
     )
 

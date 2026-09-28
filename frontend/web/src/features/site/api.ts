@@ -22,6 +22,7 @@ export type PublicFigure = Schemas["PublicFigure"];
 export type PublicGold = Schemas["PublicGold"];
 export type PublicDay = Schemas["PublicDay"];
 export type PublicEvent = Schemas["PublicEvent"];
+export type PublicSentiment = Schemas["PublicSentiment"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -66,6 +67,32 @@ export interface ListOptions extends SiteClientOptions {
 /** Newest first. A page that comes back shorter than ``limit`` is the last. */
 export async function fetchArticles(lang: string, options: ListOptions = {}): Promise<PublicArticleSummary[]> {
   return (await fetchArticlePage(lang, options)).articles;
+}
+
+/** 新聞情緒 of one of the strip's stocks (D-091). Never throws: null is no section. */
+export async function fetchSentiment(
+  symbol: string,
+  lang: string,
+  options: SiteClientOptions = {},
+): Promise<PublicSentiment | null> {
+  try {
+    const { data } = await client(options).GET("/api/public/stocks/{symbol}/sentiment", {
+      params: { path: { symbol }, query: { lang } },
+    });
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 新聞情緒 of every strip stock with a week's headlines, most covered first (D-091). */
+export async function fetchSentimentOverview(lang: string, options: SiteClientOptions = {}): Promise<PublicSentiment[]> {
+  try {
+    const { data } = await client(options).GET("/api/public/sentiment", { params: { query: { lang } } });
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** 財經行事曆 (D-088). Never throws: no block, not no page. */

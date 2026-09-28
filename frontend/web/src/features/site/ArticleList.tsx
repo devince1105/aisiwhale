@@ -4,7 +4,7 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote } from "./api";
+import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote, PublicSentiment } from "./api";
 import { ArticleCalendar } from "./ArticleCalendar";
 import {
   filterName,
@@ -136,6 +136,7 @@ export function ArticleList({
   popular = [],
   markets = [],
   events = [],
+  sentiment = [],
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -154,6 +155,8 @@ export function ArticleList({
   markets?: PublicQuote[];
   /** 財經行事曆, the coming weeks' releases and earnings (D-088). */
   events?: PublicEvent[];
+  /** 新聞情緒 of the strip's stocks (D-091), for the sidebar. */
+  sentiment?: PublicSentiment[];
 
 }) {
   const w = words(lang);
@@ -204,6 +207,7 @@ export function ArticleList({
           markets={markets}
           popular={popular}
           events={events}
+          sentiment={sentiment}
         />
       ) : null}
     </section>

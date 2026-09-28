@@ -3,7 +3,7 @@
 // keeps its calendar button and an article is the page.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote } from "./api";
+import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote, PublicSentiment } from "./api";
 import { ArticleCalendar } from "./ArticleCalendar";
 import { formatDate, words, type Filter, type Lang, type Section } from "./i18n";
 import { direction, formatChange, formatValue, TONE } from "./quote";
@@ -16,6 +16,7 @@ export function Sidebar({
   markets = [],
   popular = [],
   events = [],
+  sentiment = [],
 }: {
   lang: Lang;
   section?: Filter | null;
@@ -24,6 +25,7 @@ export function Sidebar({
   markets?: PublicQuote[];
   popular?: PublicArticleSummary[];
   events?: PublicEvent[];
+  sentiment?: PublicSentiment[];
 }) {
   const w = words(lang);
   return (
@@ -51,6 +53,11 @@ export function Sidebar({
             <Events events={events} lang={lang} />
           </SidebarBlock>
         ) : null}
+        {sentiment.length ? (
+          <SidebarBlock label={w.sentiment.title} title={w.sentiment.title}>
+            <SentimentTable rows={sentiment.slice(0, 8)} lang={lang} />
+          </SidebarBlock>
+        ) : null}
         {popular.length ? (
           <SidebarBlock label={w.popular} title={w.popular}>
             <Popular articles={popular} lang={lang} />
@@ -58,6 +65,47 @@ export function Sidebar({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+/** 新聞情緒 (D-091): the most covered of the strip's stocks this week, how many stories and how
+ * many of them read well for the company — each to its page on the watchlist, where the
+ * headlines are. No arrows: a count, not a call. */
+function SentimentTable({ rows, lang }: { rows: PublicSentiment[]; lang: Lang }) {
+  const w = words(lang).sentiment;
+  return (
+    <table className="w-full text-sm" data-testid="sentiment-table">
+      <thead>
+        <tr className="text-xs text-muted">
+          <th className="pb-1 text-left font-normal" />
+          <th className="pb-1 text-right font-normal">{w.stocks}</th>
+          <th className="pb-1 text-right font-normal">{w.positiveShare}</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-line">
+        {rows.map((row) => {
+          const share = Math.round((row.positive / row.total) * 100);
+          return (
+            <tr key={row.key}>
+              <td className="py-1.5">
+                <Link href={`/news/${lang}/watchlist?${new URLSearchParams({ s: row.key })}`} className="hover:text-accent">
+                  {row.name}
+                </Link>
+              </td>
+              <td className="py-1.5 text-right text-muted tabular-nums">{row.total}</td>
+              <td className="py-1.5 pl-3 text-right tabular-nums">
+                <span className="inline-flex items-center gap-2">
+                  <span aria-hidden="true" className="h-1.5 w-10 overflow-hidden rounded-full bg-line">
+                    <span className="block h-full bg-rise" style={{ width: `${share}%` }} />
+                  </span>
+                  {share}%
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 

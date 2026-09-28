@@ -105,3 +105,20 @@ body {
     --color-accent: #000000;
   }
 }
+
+/* A column that scrolls on its own (the watchlist's list, D-092): its scrollbar always shows, thin,
+   in the line colour — macOS would otherwise hide it until the column is scrolled. */
+@utility scroll-column {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: var(--color-line);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+}

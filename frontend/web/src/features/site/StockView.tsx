@@ -7,6 +7,7 @@ import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./ap
 import { formatDate, words, type Lang } from "./i18n";
 import { StockChart } from "./StockChart";
 import { WatchButton } from "./WatchButton";
+import { NewsSentiment } from "./NewsSentiment";
 import { Pagination } from "./Pagination";
 import { ARROW, direction, formatCap, formatChange, formatValue, stockCode, TONE } from "./quote";
 
@@ -257,6 +258,9 @@ export function StockView({
         </section>
         </>
       ) : null}
+
+      {/* how the week's news about it reads (D-091): the strip's stocks, above our own stories */}
+      <NewsSentiment symbol={stock.symbol} lang={lang} />
 
       <section id="coverage" className="mt-10 scroll-mt-24" aria-labelledby="coverage-title">
         <h2 id="coverage-title" className="text-xl font-bold">

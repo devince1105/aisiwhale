@@ -68,6 +68,7 @@ from autora.domains.newsroom.price_history import (
     refresh_us,
     tiingo_rows,
 )
+from autora.domains.newsroom.sentiment import PublicSentiment, stock_sentiment
 from autora.domains.newsroom.site import (
     MAX_LIST,
     BeaconRejected,
@@ -348,6 +349,33 @@ async def _first_us_bars(session, stock) -> bool:
         pause=0,
     )  # fmt: skip
     return written > 0
+
+
+@router.get("/api/public/stocks/{symbol}/sentiment")
+async def get_stock_sentiment(
+    symbol: str,
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+) -> PublicSentiment | None:
+    """新聞情緒 (D-091): how the week's headlines about one of the strip's stocks read toward it,
+    counted, with the latest few and why. None for a stock off the strip (its news is not read)."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    stock = STOCKS.get(symbol.upper())
+    return await stock_sentiment(session, stock, lang) if stock else None
+
+
+@router.get("/api/public/sentiment")
+async def sentiment_overview(
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+) -> list[PublicSentiment]:
+    """新聞情緒 for every stock on the strip with a week's headlines, the most covered first (for
+    the sidebar); each without its headlines."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    out = [await stock_sentiment(session, stock, lang, headlines=0) for stock in STOCKS.values()]
+    return sorted((s for s in out if s.total), key=lambda s: -s.total)
 
 
 @router.get("/api/public/stocks/{symbol}/history")

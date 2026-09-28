@@ -235,10 +235,12 @@ describe("the watchlist page to watch (D-064)", () => {
     fireEvent.click(screen.getByRole("button", { name: "觀察清單" }));
     fireEvent.click(screen.getAllByRole("button", { name: /輝達/ })[0]);
     expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?s=us%3ANVDA", { scroll: false });
-    expect(screen.getByTestId("watch-board").className).toContain("lg:grid-cols-[16rem");
+    // open: a column on the right, scrolled on its own (D-092)
+    expect(screen.getByTestId("watch-board").className).toContain("lg:grid-cols-[minmax(0,1fr)_16rem]");
+    expect(document.getElementById("watchlist-side-list")!.className).toContain("lg:scroll-column");
     expect(screen.getByTestId("watchlist-page").className).not.toContain("max-w-[46rem]"); // wide
     fireEvent.click(screen.getByRole("button", { name: "收起清單" }));
-    expect(screen.getByTestId("watch-board").className).not.toContain("lg:grid-cols-[16rem");
+    expect(screen.getByTestId("watch-board").className).not.toContain("16rem]");
     // hidden: the same reading column as every other page (D-076)
     expect(screen.getByTestId("watchlist-page").className).toContain("mx-auto max-w-[46rem]");
   });
