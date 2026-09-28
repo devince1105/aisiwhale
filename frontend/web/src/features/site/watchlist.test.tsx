@@ -219,7 +219,10 @@ describe("the watchlist page to watch (D-064)", () => {
     expect(pane.querySelector('a[href="/news/zh-TW/stocks/NVDA"]')).toBeNull();
     // 已觀察 once, in the title row beside 編輯清單, not again in the stock's own header
     expect(pane.querySelector("[data-testid=watch-button]")).toBeNull();
-    expect(await screen.findByRole("button", { name: "★ 已觀察" })).toBeTruthy();
+    // an icon, its words the name and the hover label (D-093)
+    const watched = await screen.findByRole("button", { name: "已觀察" });
+    expect(watched.querySelector("svg")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "編輯清單" }).getAttribute("aria-pressed")).toBe("false");
     expect(screen.queryByTestId("watchlist")).toBeNull(); // not the settings
   });
 
@@ -232,7 +235,8 @@ describe("the watchlist page to watch (D-064)", () => {
     expect(await within(pane).findByText(/歷史資料還在準備中/)).toBeTruthy(); // no history yet
     // the list is hidden until asked for (D-075): the one picked has the page
     expect(screen.queryByRole("button", { name: /輝達/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "觀察清單" }));
+    // the list's button is an icon in the title row (D-093)
+    fireEvent.click(screen.getByRole("button", { name: "展開清單" }));
     fireEvent.click(screen.getAllByRole("button", { name: /輝達/ })[0]);
     expect(replace).toHaveBeenCalledWith("/news/zh-TW/watchlist?s=us%3ANVDA", { scroll: false });
     // open: a column on the right, scrolled on its own (D-092)

@@ -44,6 +44,8 @@ import {
   type PublicStock,
 } from "./api";
 import { GoldBoard } from "./GoldBoard";
+import { GroupedList } from "./GroupedList";
+import { ICONS, IconButton } from "./IconButton";
 import { StockChart } from "./StockChart";
 import { formatDate, formatMonth, words, type Lang } from "./i18n";
 import { COVERAGE_PAGE, StockView } from "./StockView";
@@ -124,14 +126,14 @@ function Row({
     <Tag
       href={page ?? undefined}
       aria-current={current ? "page" : undefined}
-      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm ${page || plain ? "hover:bg-canvas" : ""} ${current ? "bg-canvas ring-1 ring-accent" : ""}`}
+      className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm ${page || plain ? "hover:bg-canvas" : ""} ${current ? "bg-canvas" : ""}`}
     >
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{item.name}</span>
         <span className="block text-xs text-muted">{code}</span>
       </span>
       {quote ? (
-        <span className={`text-right tabular-nums ${TONE[way]}`}>
+        <span className={`shrink-0 text-right tabular-nums ${TONE[way]}`}>
           <span className="block">{formatValue(quote, lang)}</span>
           {change ? (
             <span className="block text-xs">
@@ -268,13 +270,7 @@ function SideList({
             </a>
           )}
         </p>
-        <ul className="grid gap-1">
-          {items.map((item) => (
-            <li key={item.key}>
-              <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === current} />
-            </li>
-          ))}
-        </ul>
+        <GroupedList items={items} lang={lang} row={(item) => <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === current} />} />
       </div>
     </nav>
   );
@@ -578,18 +574,31 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
     <div className={editing || !listOpen ? "mx-auto max-w-[46rem]" : undefined} data-testid="watchlist-page">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{w.title}</h1>
-        {/* the picked one's 已觀察 and the list's 編輯清單, side by side */}
+        {/* the picked one's 已觀察, the list beside it, and 編輯清單: icons, their words on hover
+            (D-093) */}
         <div className="flex items-center gap-2">
-          {!editing && picked ? <WatchButton symbol={picked.symbol} lang={lang} /> : null}
-        <button
-          type="button"
-          onClick={() => go(editing ? (picked ? { s: picked.key } : {}) : { edit: "1" })}
-          aria-pressed={editing}
-          className={`rounded-full border px-4 py-1.5 text-sm ${editing ? "border-accent bg-accent text-accent-ink" : "border-line hover:border-accent hover:text-accent"}`}
-          data-testid="watchlist-edit"
-        >
-          {editing ? w.done : w.edit}
-        </button>
+          {!editing && picked ? <WatchButton symbol={picked.symbol} lang={lang} icon /> : null}
+          {!editing && items.length ? (
+            <IconButton
+              label={listOpen ? w.hideSide : w.openSide}
+              active={listOpen}
+              expanded={listOpen}
+              controls="watchlist-side-list"
+              onClick={() => setListOpen(!listOpen)}
+              testId="watchlist-side-toggle"
+            >
+              {ICONS.sideList(listOpen)}
+            </IconButton>
+          ) : null}
+          <IconButton
+            label={editing ? w.done : w.edit}
+            active={editing}
+            pressed={editing}
+            onClick={() => go(editing ? (picked ? { s: picked.key } : {}) : { edit: "1" })}
+            testId="watchlist-edit"
+          >
+            {editing ? ICONS.check : ICONS.pencil}
+          </IconButton>
         </div>
       </div>
       {editing ? (
@@ -605,10 +614,6 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
         // widening its column — and the whole page with it — to the row's full length. The list is
         // hidden until asked for (D-075), as beside a stock: the one picked has the page
         <>
-        {/* on a wide screen the list is a column on the right (D-092), its button above it */}
-        <div className="mb-4 lg:flex lg:justify-end">
-          <SideToggle open={listOpen} setOpen={setListOpen} lang={lang} />
-        </div>
         <div
           className={`grid grid-cols-1 gap-6 ${listOpen ? "lg:grid-cols-[minmax(0,1fr)_16rem]" : ""}`}
           data-testid="watch-board"
@@ -620,28 +625,38 @@ export function WatchlistPage({ lang }: { lang: Lang }) {
             className="min-w-0 lg:order-last lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start lg:scroll-column lg:pr-1"
           >
             {sample ? <p className="mb-2 px-3 text-xs text-muted">{w.sample}</p> : null}
-            {/* a phone: a row to scroll; a wide screen: a column on the right, scrolled on its own */}
-            <ul className="flex gap-2 overflow-x-auto pb-1 lg:grid lg:gap-1 lg:overflow-visible">
+            {/* a phone: a row to scroll */}
+            <ul className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
               {items.map((item) => (
-                <li key={item.key} className="shrink-0 lg:shrink">
+                <li key={item.key} className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => go({ s: item.key })}
+                    aria-current={item.key === picked?.key ? "true" : undefined}
+                    className={`block rounded-full border px-3 py-1 text-sm ${item.key === picked?.key ? "border-accent text-accent" : "border-line"}`}
+                  >
+                    {item.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {/* a wide screen: a column on the right, scrolled on its own, in drawers (D-094) */}
+            <div className="hidden lg:block">
+              <GroupedList
+                items={items}
+                lang={lang}
+                row={(item) => (
                   <button
                     type="button"
                     onClick={() => go({ s: item.key })}
                     aria-current={item.key === picked?.key ? "true" : undefined}
                     className="block w-full text-left"
                   >
-                    <span className="lg:hidden">
-                      <span className={`block rounded-full border px-3 py-1 text-sm ${item.key === picked?.key ? "border-accent text-accent" : "border-line"}`}>
-                        {item.name}
-                      </span>
-                    </span>
-                    <span className="hidden lg:block">
-                      <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === picked?.key} plain />
-                    </span>
+                    <Row item={item} quote={byKey.get(item.key)} lang={lang} current={item.key === picked?.key} plain />
                   </button>
-                </li>
-              ))}
-            </ul>
+                )}
+              />
+            </div>
           </nav>
           ) : null}
           {picked ? <WatchPane key={picked.key} item={picked} quote={byKey.get(picked.key)} lang={lang} /> : null}

@@ -78,3 +78,20 @@ export function direction(quote: PublicQuote): "rise" | "fall" | "flat" {
 
 export const ARROW = { rise: "↑", fall: "↓", flat: "" } as const;
 export const TONE = { rise: "text-rise", fall: "text-fall", flat: "text-muted" } as const;
+
+export const GROUPS = ["tw", "us", "index", "commodity", "fx", "crypto"] as const;
+export type Group = (typeof GROUPS)[number];
+
+/** Funds that follow a commodity: with the futures, not the stocks (D-080, D-081). */
+const COMMODITY_FUNDS = new Set(["us:USO", "us:CORN", "us:SOYB", "us:WEAT"]);
+const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat"]);
+
+/** Which drawer of the watchlist an item sits in (D-094). */
+export function groupOf(key: string): Group {
+  if (COMMODITY_FUNDS.has(key) || COMMODITIES.has(key)) return "commodity";
+  if (key.startsWith("tw:")) return "tw";
+  if (key.startsWith("us:")) return "us";
+  if (isCurrency(key)) return "fx";
+  if (key === "btc" || key === "eth") return "crypto";
+  return "index"; // TAIEX, the Nasdaq, the 10-year yield
+}
