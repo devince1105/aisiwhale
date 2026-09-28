@@ -42,6 +42,7 @@ export function ArticleCalendar({
   selected,
   initialMonth,
   initialDays,
+  inline = false,
 }: {
   lang: Lang;
   section: Filter | null;
@@ -51,6 +52,8 @@ export function ArticleCalendar({
   initialMonth: string;
   /** Its days with stories, as the server found them. */
   initialDays: PublicDay[];
+  /** In the front page's sidebar (D-085): always open, no button, framed by its block. */
+  inline?: boolean;
 }) {
   const w = words(lang).calendar;
   const [open, setOpen] = useState(false);
@@ -79,9 +82,9 @@ export function ArticleCalendar({
     };
   }, [month, lang, section, initialMonth, initialDays]);
 
-  // closed by a click elsewhere, or Escape
+  // closed by a click elsewhere, or Escape (a dropdown's; the sidebar's stays)
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const away = (event: MouseEvent) => {
       if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
     };
@@ -92,14 +95,15 @@ export function ArticleCalendar({
       document.removeEventListener("mousedown", away);
       document.removeEventListener("keydown", escape);
     };
-  }, [open]);
+  }, [open, inline]);
 
   const [y, m] = month.split("-").map(Number);
   const thisMonth = (today ?? initialMonth).slice(0, 7);
   const atLatest = month >= thisMonth; // no stories from the future
 
   return (
-    <div ref={box} className="relative" data-testid="article-calendar">
+    <div ref={box} className="relative" data-testid={inline ? "article-calendar-inline" : "article-calendar"}>
+      {inline ? null : (
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -116,13 +120,18 @@ export function ArticleCalendar({
         </svg>
         {selected ? w.on(selected) : w.open}
       </button>
+      )}
 
-      {open ? (
+      {open || inline ? (
         <div
           id={panel}
-          role="dialog"
+          role={inline ? "group" : "dialog"}
           aria-label={w.label}
-          className="mt-2 w-full rounded-lg border border-line bg-surface p-3 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-72"
+          className={
+            inline
+              ? "w-full"
+              : "mt-2 w-full rounded-lg border border-line bg-surface p-3 shadow-lg sm:absolute sm:right-0 sm:z-20 sm:w-72"
+          }
         >
           <div className="flex items-center justify-between">
             <button

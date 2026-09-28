@@ -150,36 +150,67 @@ export function ArticleList({
   const lead = page === 1 ? articles[0] : undefined;
   const rest = lead ? articles.slice(1) : articles;
   return (
-    <section className="mx-auto max-w-3xl px-4 pt-2 pb-10">
-      <h1 className="sr-only">
-        {section ? filterName(lang, section) : w.latest}
-        {day ? `・${w.calendar.on(day)}` : ""}
-        {page > 1 ? `・${w.page(page)}` : ""}
-      </h1>
-      {/* the tab's tags on the left, the calendar to page back by date on the right (D-084) */}
-      <div className="flex flex-wrap items-start justify-between gap-x-4">
-        <div className="min-w-0 flex-1">{section ? <Tags lang={lang} filter={section} day={day} /> : null}</div>
-        {calendar ? (
-          <div className="w-full pt-4 sm:w-auto">
-            <ArticleCalendar lang={lang} section={section} selected={day} initialMonth={calendar.month} initialDays={calendar.days} />
-          </div>
-        ) : null}
+    // a newspaper's front page on a wide screen (D-085): the stories in the main column, a
+    // sidebar of blocks beside them — the calendar first, more to come; one column on a phone
+    <section className="mx-auto max-w-6xl px-4 pt-2 pb-10 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-10">
+      <div className="min-w-0">
+        <h1 className="sr-only">
+          {section ? filterName(lang, section) : w.latest}
+          {day ? `・${w.calendar.on(day)}` : ""}
+          {page > 1 ? `・${w.page(page)}` : ""}
+        </h1>
+        {/* the tab's tags; on a narrow screen the calendar's button beside them (D-084) */}
+        <div className="flex flex-wrap items-start justify-between gap-x-4">
+          <div className="min-w-0 flex-1">{section ? <Tags lang={lang} filter={section} day={day} /> : null}</div>
+          {calendar ? (
+            <div className="w-full pt-4 sm:w-auto lg:hidden">
+              <ArticleCalendar lang={lang} section={section} selected={day} initialMonth={calendar.month} initialDays={calendar.days} />
+            </div>
+          ) : null}
+        </div>
+        {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
+        {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
+        {articles.length === 0 ? (
+          <p className="py-16 text-center text-muted">{day ? w.calendar.emptyDay : w.empty}</p>
+        ) : (
+          <>
+            {lead ? <Lead article={lead} lang={lang} /> : null}
+            <ul className="divide-y divide-line">
+              {rest.map((article) => (
+                <Row key={article.article_id} article={article} lang={lang} />
+              ))}
+            </ul>
+          </>
+        )}
+        <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n, day)} />
       </div>
-      {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
-      {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
-      {articles.length === 0 ? (
-        <p className="py-16 text-center text-muted">{day ? w.calendar.emptyDay : w.empty}</p>
-      ) : (
-        <>
-          {lead ? <Lead article={lead} lang={lang} /> : null}
-          <ul className="divide-y divide-line">
-            {rest.map((article) => (
-              <Row key={article.article_id} article={article} lang={lang} />
-            ))}
-          </ul>
-        </>
-      )}
-      <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n, day)} />
+      {calendar ? (
+        <aside aria-label={w.sidebar} className="hidden lg:block" data-testid="front-sidebar">
+          <div className="sticky top-6 grid gap-8 border-l border-line pt-6 pl-8">
+            <SidebarBlock title={w.calendar.label}>
+              <ArticleCalendar
+                lang={lang}
+                section={section}
+                selected={day}
+                initialMonth={calendar.month}
+                initialDays={calendar.days}
+                inline
+              />
+            </SidebarBlock>
+          </div>
+        </aside>
+      ) : null}
+    </section>
+  );
+}
+
+/** A block of the front page's sidebar (D-085), headed as a newspaper heads one: a heavy rule and
+ * a small label above what it holds. */
+function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section aria-label={title}>
+      <h2 className="border-t-2 border-ink pt-2 pb-3 text-xs font-bold tracking-widest text-ink">{title}</h2>
+      {children}
     </section>
   );
 }

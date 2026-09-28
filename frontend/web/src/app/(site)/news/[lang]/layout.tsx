@@ -31,7 +31,7 @@ export default async function SiteLayout({
     <div lang={lang} className="flex min-h-screen flex-col">
       {/* after the WSJ's: the market strip on top, the masthead, then the sections */}
       <MarketStrip quotes={quotes} lang={lang} />
-      <header className="mx-auto flex w-full max-w-3xl items-start justify-between gap-4 px-4 pt-5 pb-3 print:pt-0">
+      <header className="mx-auto flex w-full max-w-6xl items-start justify-between gap-4 px-4 pt-5 pb-3 print:pt-0">
         <div className="min-w-0">
           <Link href={`/news/${lang}`} className="inline-block">
             <span className="block font-display text-3xl font-black tracking-wider sm:text-5xl">

@@ -48,6 +48,7 @@ const WORDS = {
       bankNote: "各幣別的現金與即期買賣匯率，以臺灣銀行公告為準。",
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=zh-TW",
     },
+    sidebar: "側欄",
     calendar: {
       open: "依日期瀏覽",
       label: "報導日曆",
@@ -336,6 +337,7 @@ const WORDS = {
       bankNote: "Cash and spot buying and selling rates for each currency, as the bank posts them.",
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=en-US",
     },
+    sidebar: "Sidebar",
     calendar: {
       open: "Browse by date",
       label: "Story calendar",

@@ -29,7 +29,7 @@ export function SiteFooter({
   ).filter(([, , shown]) => shown);
   return (
     <footer data-testid="site-footer" className="mt-12 border-t border-line bg-canvas print:hidden">
-      <div className="mx-auto max-w-5xl px-4 py-8 text-sm text-muted">
+      <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">
         <p className="mb-3 flex items-baseline gap-3">
           <span className="font-display text-base font-bold text-ink">{w.site}</span>
           <span className="text-xs">{w.tagline}</span>

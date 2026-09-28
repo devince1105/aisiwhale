@@ -31,7 +31,7 @@ function Tabs({ lang, current }: { lang: Lang; current: Current }) {
   ];
   return (
     // px-1: with each tab's own px-3, the first label sits on the column's edge, under the masthead
-    <ul className="mx-auto flex max-w-3xl gap-1 px-1">
+    <ul className="mx-auto flex max-w-6xl gap-1 px-1">
       {tabs.map(([id, label]) => {
         const here = (id ?? "all") === current;
         return (
