@@ -19,7 +19,7 @@ nothing about the reader either way.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -67,11 +67,13 @@ from autora.domains.newsroom.site import (
     BeaconRejected,
     PublicArticle,
     PublicArticleSummary,
+    PublicDay,
     count_articles_mentioning,
     count_published_articles,
     published_article,
     published_articles,
     published_articles_mentioning,
+    published_days,
     record_beacon,
 )
 from autora.infra.settings import get_settings
@@ -98,13 +100,34 @@ async def list_articles(
     section: Annotated[list[Section] | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIST)] = 20,
     offset: Annotated[int, Query(ge=0, le=10_000)] = 0,
+    day: Annotated[date | None, Query(description="Only that day's, in Taipei (D-084)")] = None,
 ) -> list[PublicArticleSummary]:
     """Newest first; ``offset`` pages through them (D-047). ``X-Total-Count`` says how many
     there are in all, for the list's page numbers (D-065)."""
-    total = await count_published_articles(session, lang, company_slug=company, section=section)
+    total = await count_published_articles(
+        session, lang, company_slug=company, section=section, day=day
+    )
     response.headers["X-Total-Count"] = str(total)
     return await published_articles(
-        session, lang, company_slug=company, section=section, limit=limit, offset=offset
+        session, lang, company_slug=company, section=section, limit=limit, offset=offset, day=day
+    )
+
+
+@router.get("/api/public/articles/calendar")
+async def article_calendar(
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+    month: Annotated[str, Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$", description="2026-09")],
+    company: Annotated[str | None, Query(max_length=100)] = None,
+    section: Annotated[list[Section] | None, Query()] = None,
+) -> list[PublicDay]:
+    """The days of a month (Taipei's) with published articles, and how many each (D-084): the
+    calendar a reader pages back through the stories with."""
+    response.headers["Cache-Control"] = "public, max-age=300"
+    year, number = (int(part) for part in month.split("-"))
+    return await published_days(
+        session, lang, date(year, number, 1), company_slug=company, section=section
     )
 
 

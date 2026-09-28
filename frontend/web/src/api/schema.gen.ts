@@ -917,6 +917,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/articles/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Article Calendar
+         * @description The days of a month (Taipei's) with published articles, and how many each (D-084): the
+         *     calendar a reader pages back through the stories with.
+         */
+        get: operations["article_calendar_api_public_articles_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/articles/{lang}/{slug}": {
         parameters: {
             query?: never;
@@ -2809,6 +2830,16 @@ export interface components {
             text: string;
             /** Type */
             type: string;
+        };
+        /** PublicDay */
+        PublicDay: {
+            /** Count */
+            count: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
         };
         /** PublicFigure */
         PublicFigure: {
@@ -5571,6 +5602,8 @@ export interface operations {
                 section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx")[] | null;
                 limit?: number;
                 offset?: number;
+                /** @description Only that day's, in Taipei (D-084) */
+                day?: string | null;
             };
             header?: never;
             path?: never;
@@ -5585,6 +5618,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicArticleSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    article_calendar_api_public_articles_calendar_get: {
+        parameters: {
+            query: {
+                lang: string;
+                /** @description 2026-09 */
+                month: string;
+                company?: string | null;
+                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx")[] | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicDay"][];
                 };
             };
             /** @description Validation Error */

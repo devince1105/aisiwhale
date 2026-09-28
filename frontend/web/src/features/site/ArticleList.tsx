@@ -4,7 +4,8 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary } from "./api";
+import type { PublicArticleSummary, PublicDay } from "./api";
+import { ArticleCalendar } from "./ArticleCalendar";
 import {
   filterName,
   formatDate,
@@ -22,14 +23,9 @@ import { StocksNamed } from "./StocksNamed";
 
 export const PAGE_SIZE = 10;
 
-/** The front page's address for a tab or a section, and a page (page 1 and "all" are left out). */
-export function listHref(lang: Lang, filter: Filter | null, page = 1): string {
-  const query = new URLSearchParams();
-  if (filter) query.set("section", filter);
-  if (page > 1) query.set("page", String(page));
-  const qs = query.toString();
-  return `/news/${lang}${qs ? `?${qs}` : ""}`;
-}
+import { listHref } from "./links";
+
+export { listHref };
 
 function Meta({ article, lang }: { article: PublicArticleSummary; lang: Lang }) {
   const w = words(lang);
@@ -85,7 +81,7 @@ function Row({ article, lang }: { article: PublicArticleSummary; lang: Lang }) {
 }
 
 /** A tab of several sections' tags: all of it, or one of them. */
-function Tags({ lang, filter }: { lang: Lang; filter: Filter }) {
+function Tags({ lang, filter, day = null }: { lang: Lang; filter: Filter; day?: string | null }) {
   const w = words(lang);
   const topic = isSection(filter) ? topicOf(filter) : filter;
   const tags = tagsOf(topic);
@@ -96,7 +92,7 @@ function Tags({ lang, filter }: { lang: Lang; filter: Filter }) {
       {chips.map(([id, label]) => (
         <Link
           key={id}
-          href={listHref(lang, id)}
+          href={listHref(lang, id, 1, day)}
           aria-current={id === filter ? "page" : undefined}
           className={`rounded-full border px-3 py-1 text-xs ${
             id === filter ? "border-ink bg-ink font-semibold text-surface" : "border-line text-muted hover:text-ink"
@@ -133,6 +129,8 @@ export function ArticleList({
   section = null,
   page = 1,
   pages = 1,
+  day = null,
+  calendar,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -141,6 +139,10 @@ export function ArticleList({
   page?: number;
   /** How many pages the list has in all. */
   pages?: number;
+  /** The day shown (``?date=``, D-084), if one is. */
+  day?: string | null;
+  /** The calendar's first month and its days with stories; no calendar without it. */
+  calendar?: { month: string; days: PublicDay[] };
 
 }) {
   const w = words(lang);
@@ -151,13 +153,22 @@ export function ArticleList({
     <section className="mx-auto max-w-3xl px-4 pt-2 pb-10">
       <h1 className="sr-only">
         {section ? filterName(lang, section) : w.latest}
+        {day ? `・${w.calendar.on(day)}` : ""}
         {page > 1 ? `・${w.page(page)}` : ""}
       </h1>
-      {section ? <Tags lang={lang} filter={section} /> : null}
+      {/* the tab's tags on the left, the calendar to page back by date on the right (D-084) */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4">
+        <div className="min-w-0 flex-1">{section ? <Tags lang={lang} filter={section} day={day} /> : null}</div>
+        {calendar ? (
+          <div className="w-full pt-4 sm:w-auto">
+            <ArticleCalendar lang={lang} section={section} selected={day} initialMonth={calendar.month} initialDays={calendar.days} />
+          </div>
+        ) : null}
+      </div>
       {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
       {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
       {articles.length === 0 ? (
-        <p className="py-16 text-center text-muted">{w.empty}</p>
+        <p className="py-16 text-center text-muted">{day ? w.calendar.emptyDay : w.empty}</p>
       ) : (
         <>
           {lead ? <Lead article={lead} lang={lang} /> : null}
@@ -168,7 +179,7 @@ export function ArticleList({
           </ul>
         </>
       )}
-      <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n)} />
+      <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n, day)} />
     </section>
   );
 }

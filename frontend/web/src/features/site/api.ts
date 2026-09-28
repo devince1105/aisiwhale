@@ -20,6 +20,7 @@ export type PublicHolder = Schemas["PublicHolder"];
 export type PublicTrade = Schemas["PublicTrade"];
 export type PublicFigure = Schemas["PublicFigure"];
 export type PublicGold = Schemas["PublicGold"];
+export type PublicDay = Schemas["PublicDay"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -57,6 +58,8 @@ export interface ListOptions extends SiteClientOptions {
   section?: Section | Section[];
   limit?: number;
   offset?: number;
+  /** Only that day's, "YYYY-MM-DD" in Taipei (D-084). */
+  day?: string;
 }
 
 /** Newest first. A page that comes back shorter than ``limit`` is the last. */
@@ -64,15 +67,38 @@ export async function fetchArticles(lang: string, options: ListOptions = {}): Pr
   return (await fetchArticlePage(lang, options)).articles;
 }
 
+/** A month's days with stories (D-084), for the calendar. Never throws: no marks, not no page. */
+export async function fetchCalendar(
+  lang: string,
+  month: string,
+  options: SiteClientOptions & { company?: string; section?: Section | Section[] } = {},
+): Promise<PublicDay[]> {
+  try {
+    const { data } = await client(options).GET("/api/public/articles/calendar", {
+      params: {
+        query: {
+          lang,
+          month,
+          company: options.company,
+          section: options.section === undefined ? undefined : [options.section].flat(),
+        },
+      },
+    });
+    return data ?? [];
+  } catch {
+    return [];
+  }
+}
+
 /** A page of the list, and how many articles there are in all (D-065): the list's page numbers. */
 export async function fetchArticlePage(
   lang: string,
   options: ListOptions = {},
 ): Promise<{ articles: PublicArticleSummary[]; total: number }> {
-  const { company, section, limit, offset } = options;
+  const { company, section, limit, offset, day } = options;
   const { data, error, response } = await client(options).GET("/api/public/articles", {
     params: {
-      query: { lang, company, section: section === undefined ? undefined : [section].flat(), limit, offset },
+      query: { lang, company, section: section === undefined ? undefined : [section].flat(), limit, offset, day },
     },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);

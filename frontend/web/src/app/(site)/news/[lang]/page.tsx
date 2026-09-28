@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage } from "@/features/site/api";
+import { fetchArticlePage, fetchCalendar } from "@/features/site/api";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -13,27 +13,38 @@ async function where(searchParams: Search) {
   const query = await searchParams;
   const section = isFilter(query.section) ? query.section : null;
   const page = Math.min(Math.max(Number.parseInt(String(query.page ?? "1"), 10) || 1, 1), 500);
-  return { section, page };
+  // a day to show (D-084): "YYYY-MM-DD", a real one, not after today
+  const asked = typeof query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.date) ? query.date : null;
+  const day = asked && !Number.isNaN(Date.parse(`${asked}T00:00:00Z`)) && asked <= taipeiToday() ? asked : null;
+  return { section, page, day };
+}
+
+/** Today in Taipei, "YYYY-MM-DD": the site's day. */
+function taipeiToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
 }
 
 export async function generateMetadata({ params, searchParams }: { params: Params; searchParams: Search }) {
   const { lang } = await params;
   if (!isLang(lang)) return {};
-  const { section } = await where(searchParams);
+  const { section, day } = await where(searchParams);
   const w = words(lang);
-  return { title: section ? `${filterName(lang, section)} · ${w.site}` : w.site };
+  const name = [section ? filterName(lang, section) : null, day ? w.calendar.on(day) : null].filter(Boolean);
+  return { title: name.length ? `${name.join(" ")} · ${w.site}` : w.site };
 }
 
 export default async function Page({ params, searchParams }: { params: Params; searchParams: Search }) {
   const { lang } = await params;
   if (!isLang(lang)) notFound();
-  const { section, page } = await where(searchParams);
-  const { articles, total } = await fetchArticlePage(lang, {
-    company: process.env.SITE_COMPANY || undefined,
-    section: section ? sectionsOf(section) : undefined,
-    limit: PAGE_SIZE,
-    offset: (page - 1) * PAGE_SIZE,
-  });
+  const { section, page, day } = await where(searchParams);
+  const company = process.env.SITE_COMPANY || undefined;
+  const sections = section ? sectionsOf(section) : undefined;
+  // the calendar opens on the day's month, else this one, its days already marked (D-084)
+  const month = (day ?? taipeiToday()).slice(0, 7);
+  const [{ articles, total }, days] = await Promise.all([
+    fetchArticlePage(lang, { company, section: sections, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, day: day ?? undefined }),
+    fetchCalendar(lang, month, { company, section: sections }),
+  ]);
   return (
     <ArticleList
       articles={articles}
@@ -41,6 +52,8 @@ export default async function Page({ params, searchParams }: { params: Params; s
       section={section}
       page={page}
       pages={Math.ceil(total / PAGE_SIZE)}
+      day={day}
+      calendar={{ month, days }}
     />
   );
 }

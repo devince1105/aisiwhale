@@ -141,3 +141,41 @@ async def test_pages_and_the_next_article_along(public, newsroom_room):
     assert middle["older"]["path"] == f"/news/zh-TW/articles/{older.slug}"
     top = (await public.get(f"/api/public/articles/zh-TW/{newer.slug}")).json()
     assert top["newer"] is None and top["older"]["path"] == f"/news/zh-TW/articles/{first.slug}"
+
+
+async def test_a_day_s_stories_and_a_month_s_calendar_in_taipei(public, newsroom_room):
+    """D-084: a reader pages back by date. A story at 23:30 in Taipei (15:30 UTC) is that day's;
+    the calendar says which days of a month have stories, and how many."""
+    from datetime import UTC, datetime
+
+    room = newsroom_room
+    first_id = uuid.UUID(await room.publish())
+    async with room.committed() as session:
+        first = await session.get(Article, first_id)
+        first.published_at = datetime(2026, 9, 24, 15, 30, tzinfo=UTC)  # 9/24 23:30 in Taipei
+        same_day = await _another(session, first, later=-timedelta(hours=10))  # 9/24 13:30
+        next_day = await _another(session, first, later=timedelta(hours=1))  # 9/25 00:30
+        await _another(session, first, later=-timedelta(days=30))  # August
+        await session.commit()
+        slugs = (first.slug, same_day.slug, next_day.slug)
+
+    list_ = {"lang": "zh-TW", "company": room.company.slug}
+    day = await public.get("/api/public/articles", params=list_ | {"day": "2026-09-24"})
+    assert {a["slug"] for a in day.json()} == {slugs[0], slugs[1]}
+    assert day.headers["X-Total-Count"] == "2"
+    after = (await public.get("/api/public/articles", params=list_ | {"day": "2026-09-25"})).json()
+    assert [a["slug"] for a in after] == [slugs[2]]
+
+    month = await public.get("/api/public/articles/calendar", params=list_ | {"month": "2026-09"})
+    assert month.json() == [{"day": "2026-09-24", "count": 2}, {"day": "2026-09-25", "count": 1}]
+    august = (
+        await public.get("/api/public/articles/calendar", params=list_ | {"month": "2026-08"})
+    ).json()
+    assert [d["count"] for d in august] == [1]
+    none = await public.get(
+        "/api/public/articles/calendar", params=list_ | {"month": "2026-09", "section": "ai"}
+    )
+    assert none.json() == []
+    assert (
+        await public.get("/api/public/articles/calendar", params=list_ | {"month": "2026-13"})
+    ).status_code == 422

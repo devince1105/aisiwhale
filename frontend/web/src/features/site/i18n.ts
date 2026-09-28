@@ -48,6 +48,20 @@ const WORDS = {
       bankNote: "各幣別的現金與即期買賣匯率，以臺灣銀行公告為準。",
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=zh-TW",
     },
+    calendar: {
+      open: "依日期瀏覽",
+      label: "報導日曆",
+      prev: "上個月",
+      next: "下個月",
+      clear: "清除日期",
+      hint: "有圓點的日子有報導",
+      weekdays: ["日", "一", "二", "三", "四", "五", "六"],
+      month: (y: number, m: number) => `${y}年${m}月`,
+      on: (day: string) => `${Number(day.slice(0, 4))}年${Number(day.slice(5, 7))}月${Number(day.slice(8))}日`,
+      dayLabel: (day: string, count: number) =>
+        `${Number(day.slice(5, 7))}月${Number(day.slice(8))}日，${count} 篇報導`,
+      emptyDay: "這一天沒有這個分類的報導。",
+    },
     pagination: {
       label: "分頁",
       first: "第一頁",
@@ -321,6 +335,22 @@ const WORDS = {
       bank: "Bank of Taiwan exchange rates",
       bankNote: "Cash and spot buying and selling rates for each currency, as the bank posts them.",
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=en-US",
+    },
+    calendar: {
+      open: "Browse by date",
+      label: "Story calendar",
+      prev: "Previous month",
+      next: "Next month",
+      clear: "Clear date",
+      hint: "Days with a dot have stories",
+      weekdays: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+      month: (y: number, m: number) =>
+        new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 1))),
+      on: (day: string) =>
+        new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`)),
+      dayLabel: (day: string, count: number) =>
+        `${new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${day}T00:00:00Z`))}, ${count} ${count === 1 ? "story" : "stories"}`,
+      emptyDay: "No stories in this section that day.",
     },
     pagination: {
       label: "Pages",

@@ -28,11 +28,11 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel
-from sqlalchemy import Text, cast, func, or_, select, tuple_
+from sqlalchemy import Date, Text, cast, func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -296,11 +296,13 @@ async def published_articles(
     section: str | list[str] | None = None,
     limit: int = 20,
     offset: int = 0,
+    day: date | None = None,
 ) -> list[PublicArticleSummary]:
     """Newest first. ``offset`` pages through them; a page that comes back shorter than
     ``limit`` is the last. ``section`` may be several: the site's 持股觀察 (holdings watch) is the
-    big investors' and the public figures' together (D-050)."""
-    query = _listed(lang, company_slug, section).order_by(
+    big investors' and the public figures' together (D-050). ``day``: only that day's, in
+    Taipei (D-084)."""
+    query = _listed(lang, company_slug, section, day).order_by(
         Article.published_at.desc(), Article.id.desc()
     )
     query = query.limit(min(max(limit, 1), MAX_LIST)).offset(max(offset, 0))
@@ -314,13 +316,28 @@ async def count_published_articles(
     *,
     company_slug: str | None = None,
     section: str | list[str] | None = None,
+    day: date | None = None,
 ) -> int:
     """How many ``published_articles`` pages through, all told: a list's page numbers."""
-    listed = _listed(lang, company_slug, section).subquery()
+    listed = _listed(lang, company_slug, section, day).subquery()
     return int(await session.scalar(select(func.count()).select_from(listed)) or 0)
 
 
-def _listed(lang: str, company_slug: str | None, section: str | list[str] | None):
+TAIPEI = timezone(timedelta(hours=8))
+"""The site's day (D-084): a story published at 23:30 in Taipei is that day's, whatever UTC says."""
+
+
+def _taipei_day(day: date) -> tuple[datetime, datetime]:
+    start = datetime(day.year, day.month, day.day, tzinfo=TAIPEI)
+    return start, start + timedelta(days=1)
+
+
+def _listed(
+    lang: str,
+    company_slug: str | None,
+    section: str | list[str] | None,
+    day: date | None = None,
+):
     query = _published(lang)
     if company_slug is not None:
         query = query.join(Company, Company.id == Article.company_id).where(
@@ -329,7 +346,40 @@ def _listed(lang: str, company_slug: str | None, section: str | list[str] | None
     if section:
         sections = [section] if isinstance(section, str) else list(section)
         query = query.where(_section().in_(sections))
+    if day is not None:
+        start, end = _taipei_day(day)
+        query = query.where(Article.published_at >= start, Article.published_at < end)
     return query
+
+
+class PublicDay(BaseModel):
+    day: date
+    count: int
+
+
+async def published_days(
+    session: AsyncSession,
+    lang: str,
+    month: date,
+    *,
+    company_slug: str | None = None,
+    section: str | list[str] | None = None,
+) -> list[PublicDay]:
+    """The days of ``month`` (Taipei's) with published articles, and how many each (D-084): the
+    calendar marks them, and only they are a link."""
+    first = month.replace(day=1)
+    after = (first + timedelta(days=32)).replace(day=1)
+    start, _ = _taipei_day(first)
+    end, _ = _taipei_day(after)
+    local = cast(func.timezone("Asia/Taipei", Article.published_at), Date)
+    query = (
+        _listed(lang, company_slug, section)
+        .where(Article.published_at >= start, Article.published_at < end)
+        .with_only_columns(local, func.count(), maintain_column_froms=True)
+        .group_by(local)
+        .order_by(local)
+    )
+    return [PublicDay(day=day, count=count) for day, count in (await session.execute(query)).all()]
 
 
 async def published_articles_mentioning(
