@@ -6,8 +6,9 @@
 - Earnings dates of the strip's US stocks (TSMC's through its ADR), from Finnhub's earnings
   calendar — on its free plan, one symbol a request — with before or after the US market.
 
-The Fed's rate decisions are not here: FRED's "FOMC Press Release" lists every day, not the
-meeting days, and a list of dates typed in by hand could not be checked.
+- The Fed's rate decisions (D-089): the FOMC's meeting calendar as the Federal Reserve publishes
+  it (``FOMC_DECISIONS``), the decision on each meeting's second day at 2 p.m. Eastern. FRED's
+  "FOMC Press Release" is no help — it lists every day, not the meeting days.
 
 Asked for twice a day (``KEEP``) for every reader; the last good answer stands when a service
 does not give one. Offline (fixtures, tests), there is no calendar.
@@ -28,6 +29,8 @@ log = logging.getLogger(__name__)
 FRED_DATES = "https://api.stlouisfed.org/fred/release/dates"
 FINNHUB_EARNINGS = "https://finnhub.io/api/v1/calendar/earnings"
 AHEAD = timedelta(days=45)
+FED_AHEAD = timedelta(days=60)
+"""Far enough for the next FOMC decision: meetings are up to seven weeks apart."""
 KEEP = timedelta(hours=12)
 RETRY = timedelta(hours=1)
 
@@ -39,6 +42,22 @@ RELEASES: dict[int, tuple[str, str]] = {
     9: ("美國零售銷售", "US retail sales"),
 }
 """FRED release ids (checked 2026-09-28) and how the calendar names each."""
+
+FOMC_DECISIONS: tuple[tuple[str, bool], ...] = (
+    ("2026-01-28", False), ("2026-03-18", True), ("2026-04-29", False), ("2026-06-17", True),
+    ("2026-07-29", False), ("2026-09-16", True), ("2026-10-28", False), ("2026-12-09", True),
+    ("2027-01-27", False), ("2027-03-17", True), ("2027-04-28", False), ("2027-06-09", True),
+    ("2027-07-28", False), ("2027-09-15", True), ("2027-10-27", False), ("2027-12-08", True),
+)  # fmt: skip
+"""Each FOMC meeting's decision day (its second day) and whether it publishes the Summary of
+Economic Projections (the calendar's asterisk). Read from
+https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm on 2026-09-28; the Fed sets them
+a year or more ahead — add 2028's when it does."""
+FOMC_NAMES = ("聯準會利率決議（FOMC）", "Fed rate decision (FOMC)")
+FOMC_DETAIL = (
+    ("美東 14:00", "2 p.m. ET"),
+    ("美東 14:00・含經濟預測", "2 p.m. ET, with projections"),
+)
 
 EARNINGS = ("NVDA", "AAPL", "GOOGL", "MSFT", "AMZN", "TSM", "META", "AVGO", "TSLA", "MU", "AMD")
 """The strip's US stocks that report earnings (its ETFs, QQQ and VOO, do not)."""
@@ -87,6 +106,11 @@ class EconomicCalendar:
     async def _fetch(self, today: date) -> list[tuple]:
         rows: list[tuple] = []
         end = today + AHEAD
+        # the Fed's decisions: its own published calendar, no service to ask
+        for day, projections in FOMC_DECISIONS:
+            when = date.fromisoformat(day)
+            if today <= when <= today + FED_AHEAD:
+                rows.append((when, "macro", "fomc", "fomc", None, "sep" if projections else None))
         if self.fred is not None:
             for release in RELEASES:
                 answer = await self.fred(
@@ -136,6 +160,12 @@ class EconomicCalendar:
         for day, kind, _, what, hour, quarter in rows:
             if day < today:
                 continue
+            if what == "fomc":
+                detail = FOMC_DETAIL[1 if quarter == "sep" else 0]
+                out.append(PublicEvent(day=day, kind="macro", key="fomc",
+                                       name=FOMC_NAMES[0 if zh else 1],
+                                       detail=detail[0 if zh else 1]))  # fmt: skip
+                continue
             if kind == "macro":
                 names = RELEASES[int(what)]
                 out.append(PublicEvent(day=day, kind="macro", key=f"release:{what}",
@@ -155,7 +185,11 @@ class EconomicCalendar:
                         detail=detail or None,
                     )  # fmt: skip
                 )
-        return out[:limit]
+        # the next rate decision always shows, however busy the weeks before it (D-089)
+        shown = out[:limit]
+        if not any(e.key == "fomc" for e in shown):
+            shown += [e for e in out if e.key == "fomc"][:1]
+        return shown
 
 
 def _reader(

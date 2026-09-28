@@ -1,4 +1,4 @@
-// The site's sidebar on a wide screen (D-085–D-088): the calendar, 市場概況, 財經行事曆 and 熱門文章,
+// The site's sidebar on a wide screen (D-085–D-089): 市場概況, the calendar, 財經行事曆 and 熱門文章,
 // beside the front page's stories and beside an article. Hidden on a phone, where the front page
 // keeps its calendar button and an article is the page.
 import Link from "next/link";
@@ -30,6 +30,11 @@ export function Sidebar({
     <aside aria-label={w.sidebar} className="hidden lg:block" data-testid="front-sidebar">
       {/* not sticky: four blocks are taller than a screen, and a pinned column hides its end */}
       <div className="grid gap-10 pt-6">
+        {markets.length ? (
+          <SidebarBlock label={w.marketOverview} title={w.marketOverview}>
+            <MarketOverview quotes={markets} lang={lang} />
+          </SidebarBlock>
+        ) : null}
         {/* the calendar needs no title: its month is one */}
         <SidebarBlock label={w.calendar.label}>
           <ArticleCalendar
@@ -41,11 +46,6 @@ export function Sidebar({
             inline
           />
         </SidebarBlock>
-        {markets.length ? (
-          <SidebarBlock label={w.marketOverview} title={w.marketOverview}>
-            <MarketOverview quotes={markets} lang={lang} />
-          </SidebarBlock>
-        ) : null}
         {events.length ? (
           <SidebarBlock label={w.events.title} title={w.events.title}>
             <Events events={events} lang={lang} />
@@ -70,7 +70,8 @@ function Events({ events, lang }: { events: PublicEvent[]; lang: Lang }) {
     <ol className="grid gap-3 text-sm" data-testid="events">
       {days.map((day) => (
         <li key={day}>
-          <p className="text-xs font-semibold text-muted tabular-nums">{w.day(day)}</p>
+          {/* a grey with a touch of teal: the days apart from what falls on them, quietly (D-089) */}
+          <p className="text-xs font-semibold text-date tabular-nums">{w.day(day)}</p>
           <ul className="mt-1 grid gap-1">
             {events
               .filter((e) => e.day === day)
