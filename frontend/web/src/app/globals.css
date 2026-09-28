@@ -44,9 +44,9 @@
     --color-danger-line: #5a2a2d;
     /* dark: a muted wine red, as a diff's removed line, with light red words — dark red on dark
        would not be read (D-099) */
-    --color-alert: #45282b;
+    --color-alert: #4b2224;
     --color-alert-ink: #ef8a85;
-    --color-alert-line: #5e3337;
+    --color-alert-line: #66302f;
     --color-neutral: #5f6875;
   }
 }
@@ -95,9 +95,9 @@ body {
   --color-danger-line: #5a2a2d;
   /* dark: a muted wine red, as a diff's removed line, with light red words — dark red on dark
        would not be read (D-099) */
-  --color-alert: #45282b;
+  --color-alert: #4b2224;
   --color-alert-ink: #ef8a85;
-  --color-alert-line: #5e3337;
+  --color-alert-line: #66302f;
   --color-neutral: #5f6875;
 }
 
