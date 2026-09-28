@@ -3,7 +3,7 @@
 // 新聞情緒 on a stock's page (D-091): how the week's headlines about it read — a ring of positive,
 // neutral and negative, how many there are against the usual (熱度), and the latest headlines,
 // each with its tone and the model's reason, to be checked. A count of coverage, never a
-// forecast: no arrows, no advice, and it says so. Colours as the site's prices (D-048): red is
+// forecast: no arrows, no advice (the footer says so, for every page: D-097). Colours as the site's prices (D-048): red is
 // good news, green is bad. Asked for after the page, like the chart's 15 minutes.
 import { useEffect, useState } from "react";
 
@@ -104,7 +104,6 @@ export function NewsSentiment({ symbol, lang }: { symbol: string; lang: Lang }) 
           ))}
         </ul>
       ) : null}
-      <p className="mt-3 text-xs leading-relaxed text-muted">{w.notice}</p>
     </section>
   );
 }

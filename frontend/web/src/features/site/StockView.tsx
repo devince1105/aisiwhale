@@ -8,6 +8,8 @@ import { formatDate, words, type Lang } from "./i18n";
 import { StockChart } from "./StockChart";
 import { WatchButton } from "./WatchButton";
 import { NewsSentiment } from "./NewsSentiment";
+import { StockSignals } from "./StockSignals";
+import { technicals } from "./technicals";
 import { Pagination } from "./Pagination";
 import { ARROW, direction, formatCap, formatChange, formatValue, stockCode, TONE } from "./quote";
 
@@ -196,6 +198,9 @@ export function StockView({
         </section>
       ) : null}
 
+      {/* what analysts say, and the chart's figures — facts, no call of the site's (D-096) */}
+      <StockSignals symbol={stock.symbol} lang={lang} figures={history && !history.preparing ? technicals(history.bars) : null} />
+
       {/* US filings say nothing about a stock with no US listing: 13F holders and officials'
           trades only for a US stock or a Taiwan one's ADR (2330 → TSM) */}
       {stock.us_listing ? (
@@ -294,7 +299,6 @@ export function StockView({
         )}
       </section>
 
-      <p className="mt-10 rounded-lg bg-canvas p-4 text-xs leading-relaxed text-muted">{stock.tracks_13f ? s.notice : s.noticeNo13f}</p>
       <p className="mt-6 text-sm">
         <Link href={`/news/${lang}`} className="text-accent hover:underline">
           {s.back}

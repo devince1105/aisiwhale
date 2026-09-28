@@ -1144,6 +1144,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/stocks/{symbol}/analysts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Analyst Ratings
+         * @description 分析師評等 (D-096): how many analysts rate a US stock each way this month and last, as
+         *     Finnhub reports it — no verdict of the site's. TSMC through its ADR; None for the rest of
+         *     Taiwan's and when there is none.
+         */
+        get: operations["get_analyst_ratings_api_public_stocks__symbol__analysts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/stocks/{symbol}/history": {
         parameters: {
             query?: never;
@@ -1988,6 +2010,26 @@ export interface components {
              * @default []
              */
             trimmed: string[];
+        };
+        /** Counts */
+        Counts: {
+            /** Buy */
+            buy: number;
+            /** Hold */
+            hold: number;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Sell */
+            sell: number;
+            /** Strong Buy */
+            strong_buy: number;
+            /** Strong Sell */
+            strong_sell: number;
+            /** Total */
+            readonly total: number;
         };
         /** CycleDetail */
         CycleDetail: {
@@ -3141,6 +3183,20 @@ export interface components {
             source: string;
             /** Value */
             value: number;
+        };
+        /** PublicRatings */
+        PublicRatings: {
+            latest: components["schemas"]["Counts"];
+            previous?: components["schemas"]["Counts"] | null;
+            /**
+             * Source
+             * @default Finnhub
+             */
+            source: string;
+            /** Symbol */
+            symbol: string;
+            /** Via */
+            via?: string | null;
         };
         /** PublicSecurity */
         PublicSecurity: {
@@ -6106,6 +6162,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicStock"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_analyst_ratings_api_public_stocks__symbol__analysts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRatings"] | null;
                 };
             };
             /** @description Validation Error */

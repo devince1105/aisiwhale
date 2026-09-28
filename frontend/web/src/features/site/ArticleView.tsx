@@ -117,8 +117,6 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
         </section>
       ) : null}
 
-      <p className="mt-10 rounded-lg bg-canvas p-4 text-xs leading-relaxed text-muted">{w.notice}</p>
-
       {article.newer || article.older ? (
         <nav className="mt-10 grid gap-3 border-t border-line pt-6 sm:grid-cols-2 print:hidden">
           {article.newer ? (

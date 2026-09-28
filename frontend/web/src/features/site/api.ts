@@ -23,6 +23,7 @@ export type PublicGold = Schemas["PublicGold"];
 export type PublicDay = Schemas["PublicDay"];
 export type PublicEvent = Schemas["PublicEvent"];
 export type PublicSentiment = Schemas["PublicSentiment"];
+export type PublicRatings = Schemas["PublicRatings"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -92,6 +93,17 @@ export async function fetchSentimentOverview(lang: string, options: SiteClientOp
     return data ?? [];
   } catch {
     return [];
+  }
+}
+
+/** 分析師評等 (D-096): a US stock's (TSMC's through its ADR), as Finnhub counts them. Never
+ * throws: no block, not no page. */
+export async function fetchRatings(symbol: string, options: SiteClientOptions = {}): Promise<PublicRatings | null> {
+  try {
+    const { data } = await client(options).GET("/api/public/stocks/{symbol}/analysts", { params: { path: { symbol } } });
+    return data?.latest ? data : null; // anything else is no card, not a broken page
+  } catch {
+    return null;
   }
 }
 

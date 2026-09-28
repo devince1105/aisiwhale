@@ -54,6 +54,13 @@ describe("who runs the site", () => {
     expect(hrefs).toEqual(["/news/zh-TW/terms", "/news/zh-TW/privacy", "mailto:service@nanguado.com"]);
   });
 
+  it("says once, for every page, what the site's figures are and are not (D-097)", () => {
+    render(<SiteFooter lang="zh-TW" operator={PERSON} />);
+    const said = screen.getByTestId("site-disclaimer").textContent!;
+    expect(said.startsWith("免責聲明：")).toBe(true);
+    for (const part of ["AI 新聞室", "13F", "Finnhub", "新聞情緒", "技術指標", "不構成投資建議"]) expect(said).toContain(part);
+  });
+
   it("is free until somebody says otherwise", () => {
     expect(membershipOpen({})).toBe(false);
     expect(membershipOpen({ SITE_MEMBERSHIP_OPEN: "false" })).toBe(false);

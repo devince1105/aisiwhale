@@ -109,7 +109,7 @@ describe("a stock's page", () => {
     expect(duan!.textContent).toContain("6.58%");
     expect(within(duan!).getByRole("link", { name: /申報/ }).getAttribute("href")).toBe(NVDA.holders[0]!.filing_url);
     expect(screen.getByRole("link", { name: /減持輝達逾五成/ }).getAttribute("href")).toBe("/news/zh-TW/articles/hh");
-    expect(document.body.textContent).toContain("不構成投資建議");
+    expect(document.body.textContent).not.toContain("不構成投資建議"); // in the footer, once (D-097)
     // an option is a bet on the stock, not a holding of it
     expect(burry!.textContent).toContain("新建倉・賣權（看跌）");
     expect(burry!.textContent).toContain("標的股數");
@@ -170,7 +170,7 @@ describe("a stock's page", () => {
     expect(trade!.textContent).not.toContain("逾 30 天");
   });
 
-  it("an over-the-counter stock reads .TWO, and a page without 13F does not cite it", () => {
+  it("an over-the-counter stock reads .TWO; no page cites 13F in a notice of its own (D-097: the footer's)", () => {
     render(
       <StockView
         stock={{ ...NVDA, symbol: "6488", market: "tw", name: "環球晶", holders: [], us_listing: null, tracks_13f: false, exchange: "TPEx" }}
@@ -178,10 +178,10 @@ describe("a stock's page", () => {
       />,
     );
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("環球晶6488.TWO");
-    expect(document.body.textContent).not.toContain("持股來自 SEC 13F 申報");
+    expect(document.body.textContent).not.toContain("持股來自 SEC 13F");
     cleanup();
     render(<StockView stock={NVDA} lang="zh-TW" />);
-    expect(document.body.textContent).toContain("持股來自 SEC 13F 申報");
+    expect(document.body.textContent).not.toContain("持股來自 SEC 13F");
   });
 
   it("a Taiwan stock with an ADR shows the ADR's holders; one without has no US sections", () => {

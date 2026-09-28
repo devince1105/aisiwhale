@@ -33,6 +33,7 @@ from autora.db.models import Company
 from autora.db.session import get_sessionmaker
 from autora.domains.newsroom import forex as currencies
 from autora.domains.newsroom import securities
+from autora.domains.newsroom.analysts import AnalystRatings, PublicRatings
 from autora.domains.newsroom.economic_calendar import (
     EconomicCalendar,
     PublicEvent,
@@ -133,6 +134,28 @@ def economic_calendar() -> EconomicCalendar:
         finnhub_json(finnhub) if live and finnhub else None,
         {symbol: (stock.zh, stock.en) for symbol, stock in STOCKS.items()},
     )
+
+
+@lru_cache
+def analyst_ratings() -> AnalystRatings:
+    """One per process (D-096): Finnhub's analyst counts, each stock at most twice a day."""
+    settings = get_settings()
+    finnhub = _secret(settings.finnhub_api_key)
+    live = settings.tools_profile == "live"
+    return AnalystRatings(finnhub_json(finnhub) if live and finnhub else None)
+
+
+@router.get("/api/public/stocks/{symbol}/analysts")
+async def get_analyst_ratings(
+    symbol: Annotated[str, Path(max_length=12)],
+    response: Response,
+    ratings: Annotated[AnalystRatings, Depends(analyst_ratings)],
+) -> PublicRatings | None:
+    """分析師評等 (D-096): how many analysts rate a US stock each way this month and last, as
+    Finnhub reports it — no verdict of the site's. TSMC through its ADR; None for the rest of
+    Taiwan's and when there is none."""
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return await ratings.ratings(symbol)
 
 
 @router.get("/api/public/events")

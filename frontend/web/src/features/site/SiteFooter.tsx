@@ -60,6 +60,12 @@ export function SiteFooter({
             </>
           ) : null}
         </p>
+        {/* one statement for the whole site, not one per section (D-097) */}
+        <p className="mt-4 max-w-4xl text-xs leading-relaxed" data-testid="site-disclaimer">
+          <span className="font-semibold text-ink">{w.disclaimerTitle}</span>
+          {w.sep}
+          {w.disclaimer}
+        </p>
         {marketSources.length ? (
           <p className="mt-3 text-xs">{w.marketsCredit(marketSources.map((s) => w.sourceNames[s] ?? s))}</p>
         ) : null}

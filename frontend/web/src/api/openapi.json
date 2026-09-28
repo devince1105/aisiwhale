@@ -1657,6 +1657,51 @@
     "title": "CompanySnapshot",
     "type": "object"
    },
+   "Counts": {
+    "properties": {
+     "buy": {
+      "title": "Buy",
+      "type": "integer"
+     },
+     "hold": {
+      "title": "Hold",
+      "type": "integer"
+     },
+     "period": {
+      "format": "date",
+      "title": "Period",
+      "type": "string"
+     },
+     "sell": {
+      "title": "Sell",
+      "type": "integer"
+     },
+     "strong_buy": {
+      "title": "Strong Buy",
+      "type": "integer"
+     },
+     "strong_sell": {
+      "title": "Strong Sell",
+      "type": "integer"
+     },
+     "total": {
+      "readOnly": true,
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "period",
+     "strong_buy",
+     "buy",
+     "hold",
+     "sell",
+     "strong_sell",
+     "total"
+    ],
+    "title": "Counts",
+    "type": "object"
+   },
    "CycleDetail": {
     "properties": {
      "cost": {
@@ -4642,6 +4687,49 @@
      "source"
     ],
     "title": "PublicQuote",
+    "type": "object"
+   },
+   "PublicRatings": {
+    "properties": {
+     "latest": {
+      "$ref": "#/components/schemas/Counts"
+     },
+     "previous": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Counts"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "source": {
+      "default": "Finnhub",
+      "title": "Source",
+      "type": "string"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "via": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Via"
+     }
+    },
+    "required": [
+     "symbol",
+     "latest"
+    ],
+    "title": "PublicRatings",
     "type": "object"
    },
    "PublicSecurity": {
@@ -11085,6 +11173,58 @@
      }
     },
     "summary": "Get Stock",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/stocks/{symbol}/analysts": {
+   "get": {
+    "description": "分析師評等 (D-096): how many analysts rate a US stock each way this month and last, as\nFinnhub reports it — no verdict of the site's. TSMC through its ADR; None for the rest of\nTaiwan's and when there is none.",
+    "operationId": "get_analyst_ratings_api_public_stocks__symbol__analysts_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "symbol",
+      "required": true,
+      "schema": {
+       "maxLength": 12,
+       "title": "Symbol",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/PublicRatings"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Get Analyst Ratings Api Public Stocks  Symbol  Analysts Get"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Analyst Ratings",
     "tags": [
      "public"
     ]

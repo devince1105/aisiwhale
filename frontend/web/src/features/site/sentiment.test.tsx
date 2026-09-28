@@ -63,7 +63,7 @@ describe("新聞情緒 (D-091)", () => {
     expect(first.getAttribute("href")).toBe("https://tw.stock.yahoo.com/n/1");
     expect(first.textContent).toContain("正面");
     expect(section.getByText(/量產時程明確/)).toBeTruthy();
-    expect(section.getByText(/不是股價預測，也不構成投資建議/)).toBeTruthy();
+    expect(section.queryByText(/投資建議/)).toBeNull(); // said once, in the footer (D-097)
   });
 
   it("off the strip, or nothing read yet: no section", async () => {
