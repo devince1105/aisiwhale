@@ -45,7 +45,7 @@
     /* dark: a muted wine red, as a diff's removed line, with light red words — dark red on dark
        would not be read (D-099) */
     --color-alert: #45282b;
-    --color-alert-ink: #e39b9b;
+    --color-alert-ink: #ef8a85;
     --color-alert-line: #5e3337;
     --color-neutral: #5f6875;
   }
@@ -96,7 +96,7 @@ body {
   /* dark: a muted wine red, as a diff's removed line, with light red words — dark red on dark
        would not be read (D-099) */
   --color-alert: #45282b;
-  --color-alert-ink: #e39b9b;
+  --color-alert-ink: #ef8a85;
   --color-alert-line: #5e3337;
   --color-neutral: #5f6875;
 }
