@@ -120,3 +120,4 @@
 | D-104 | 2026-09-29 | **免責聲明改寫得更精簡**：開頭依使用者改為「本站報導由 AI 新聞室撰寫、事實查核並核准後發布」，其餘合併同類（持股與分析師評等的來源同一句）、去掉重複的「照原樣列出」「只列數值」，結尾統一為「本站不做買賣判斷或股價預測，內容不構成投資建議；投資有風險，請審慎評估」；英文版同步 | `i18n.ts` 的 `disclaimer` | 使用者：「請改為『本站報導由 AI 新聞室撰寫、事實查核並核准後發布』，整段句子其實可以再優化敘述」。 |
 | D-105 | 2026-09-29 | **免責聲明精簡為兩句**：「本站報導由 AI 新聞室撰寫、查核並核准後發布，資料取自公開申報與 Finnhub 等來源；行情或有延遲，AI 判讀亦可能有誤。內容僅供參考，不構成投資建議，投資請審慎評估。」不再逐項列出各區塊（13F、新聞情緒、技術指標）；英文版同步 | `i18n.ts` 的 `disclaimer` | 使用者：「原本的描述實在太過於饒舌和重覆，缺乏文字和句子的精煉美感」。 |
 | D-106 | 2026-09-29 | **英文免責聲明照中文的精簡風格重寫**：「Our stories are written, checked and approved by an AI newsroom, drawing on public filings, Finnhub and other sources; prices may be delayed, and AI readings may err. For reference only, not investment advice — invest with care.」與中文同樣兩句、同樣順序 | `i18n.ts` 的英文 `disclaimer` | 使用者：「英文版也照這個精簡風格再調一下」。 |
+| D-107 | 2026-09-29 | **警示條上下留白縮小**：上下內距從 12px 改為 6px（`py-3` → `py-1.5`），圖示與文字間距 10px → 8px | `SiteFooter.tsx` | 使用者：「這警示的區塊的 margin-y 可以再縮小」。 |
