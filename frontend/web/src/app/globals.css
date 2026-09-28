@@ -8,8 +8,8 @@
   --color-line: #e3e6eb;
   --color-ink: #15181d;
   --color-muted: #5b6472;
-  /* a date among quiet text: grey with a touch of teal (D-089) */
-  --color-date: #557579;
+  /* a date among quiet text: a dark teal, Tailwind's teal-800 (teal-700 on dark, to be read) (D-089) */
+  --color-date: #115e59;
   --color-accent: #2f5bea;
   --color-accent-ink: #ffffff;
   --color-ok: #1f9d55;
@@ -33,7 +33,7 @@
     --color-line: #262c35;
     --color-ink: #e8ebf0;
     --color-muted: #98a2b1;
-    --color-date: #8ea7a9;
+    --color-date: #0f766e;
     --color-accent: #6d8dff;
     --color-accent-ink: #0f1216;
     --color-danger-soft: #2a1618;
@@ -59,8 +59,8 @@ body {
   --color-line: #e3e6eb;
   --color-ink: #15181d;
   --color-muted: #5b6472;
-  /* a date among quiet text: grey with a touch of teal (D-089) */
-  --color-date: #557579;
+  /* a date among quiet text: a dark teal, Tailwind's teal-800 (teal-700 on dark, to be read) (D-089) */
+  --color-date: #115e59;
   --color-accent: #2f5bea;
   --color-accent-ink: #ffffff;
   --color-danger-soft: #fdf0f0;
@@ -75,7 +75,7 @@ body {
   --color-line: #262c35;
   --color-ink: #e8ebf0;
   --color-muted: #98a2b1;
-  --color-date: #8ea7a9;
+  --color-date: #0f766e;
   --color-accent: #6d8dff;
   --color-accent-ink: #0f1216;
   --color-danger-soft: #2a1618;

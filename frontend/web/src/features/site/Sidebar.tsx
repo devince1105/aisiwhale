@@ -70,7 +70,7 @@ function Events({ events, lang }: { events: PublicEvent[]; lang: Lang }) {
     <ol className="grid gap-3 text-sm" data-testid="events">
       {days.map((day) => (
         <li key={day}>
-          {/* a grey with a touch of teal: the days apart from what falls on them, quietly (D-089) */}
+          {/* a dark teal (teal-800): the days apart from what falls on them, quietly (D-089) */}
           <p className="text-xs font-semibold text-date tabular-nums">{w.day(day)}</p>
           <ul className="mt-1 grid gap-1">
             {events
