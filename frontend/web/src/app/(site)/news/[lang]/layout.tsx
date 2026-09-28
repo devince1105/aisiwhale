@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { fetchMarkets } from "@/features/site/api";
 import { MarketStrip } from "@/features/site/MarketStrip";
 import { MemberBadge } from "@/features/site/MemberBadge";
-import { isLang, LANG_NAMES, LANGS, words } from "@/features/site/i18n";
+import { isLang, words } from "@/features/site/i18n";
 import { membershipOpen } from "@/features/site/membership";
 import { operator } from "@/features/site/operator";
 import { SectionNav } from "@/features/site/SectionNav";
@@ -40,18 +40,9 @@ export default async function SiteLayout({
           </Link>
           <p className="mt-1.5 text-xs whitespace-nowrap text-muted">{w.tagline}</p>
         </div>
-        {/* the reader's controls together, top right: the other language, light or dark, sign-in */}
+        {/* the reader's controls, top right: light or dark, and who they are; the language is at
+            the sections bar's end (D-087) */}
         <span className="flex shrink-0 items-center gap-1 text-sm print:hidden">
-          {LANGS.filter((other) => other !== lang).map((other) => (
-            <Link
-              key={other}
-              href={`/news/${other}`}
-              hrefLang={other}
-              className="rounded-md px-2 py-1.5 text-muted hover:bg-canvas hover:text-ink"
-            >
-              {LANG_NAMES[other]}
-            </Link>
-          ))}
           <ThemeToggle lang={lang} />
           <MemberBadge lang={lang} />
         </span>

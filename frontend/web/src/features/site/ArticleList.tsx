@@ -4,7 +4,8 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicDay } from "./api";
+import type { PublicArticleSummary, PublicDay, PublicQuote } from "./api";
+import { direction, formatChange, formatValue, TONE } from "./quote";
 import { ArticleCalendar } from "./ArticleCalendar";
 import {
   filterName,
@@ -132,6 +133,7 @@ export function ArticleList({
   day = null,
   calendar,
   popular = [],
+  markets = [],
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -146,6 +148,8 @@ export function ArticleList({
   calendar?: { month: string; days: PublicDay[] };
   /** 熱門文章, the week's most read (D-086), for the sidebar. */
   popular?: PublicArticleSummary[];
+  /** The market strip's figures, for 市場概況 (D-087). */
+  markets?: PublicQuote[];
 
 }) {
   const w = words(lang);
@@ -201,6 +205,11 @@ export function ArticleList({
                 inline
               />
             </SidebarBlock>
+            {markets.length ? (
+              <SidebarBlock label={w.marketOverview} title={w.marketOverview}>
+                <MarketOverview quotes={markets} lang={lang} />
+              </SidebarBlock>
+            ) : null}
             {popular.length ? (
               <SidebarBlock label={w.popular} title={w.popular}>
                 <Popular articles={popular} lang={lang} />
@@ -221,6 +230,43 @@ function SidebarBlock({ label, title, children }: { label: string; title?: strin
       {title ? <h2 className="pb-3 text-sm font-bold text-ink">{title}</h2> : null}
       {children}
     </section>
+  );
+}
+
+/** 市場概況's figures (D-087), in this order: the two markets, the yield, gold and oil, the dollar,
+ * the coin — each a link to its chart on the watchlist page. */
+const OVERVIEW = ["taiex", "nasdaq", "us10y", "xau", "wti", "usdtwd", "btc"];
+
+function MarketOverview({ quotes, lang }: { quotes: PublicQuote[]; lang: Lang }) {
+  const w = words(lang);
+  const byKey = new Map(quotes.map((q) => [q.key, q]));
+  const shown = OVERVIEW.flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : []));
+  return (
+    <ul className="divide-y divide-line text-sm" data-testid="market-overview">
+      {shown.map((quote) => {
+        const way = direction(quote);
+        const change = formatChange(quote);
+        return (
+          <li key={quote.key}>
+            <Link
+              href={`/news/${lang}/watchlist?${new URLSearchParams({ s: quote.key })}`}
+              className="flex items-baseline justify-between gap-3 py-2 hover:text-accent"
+            >
+              <span className="min-w-0 truncate">{w.quoteNames[quote.key] ?? quote.key}</span>
+              <span className={`shrink-0 text-right tabular-nums ${TONE[way]}`}>
+                {formatValue(quote, lang)}
+                {change ? (
+                  <span className="ml-2 text-xs">
+                    {way === "rise" ? "+" : way === "fall" ? "−" : ""}
+                    {change}
+                  </span>
+                ) : null}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

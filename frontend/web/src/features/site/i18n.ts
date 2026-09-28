@@ -7,6 +7,8 @@ export function isLang(value: string): value is Lang {
 }
 
 export const LANG_NAMES: Record<Lang, string> = { "zh-TW": "中文", en: "English" };
+/** As the language menu names each (D-087): its script, as a newspaper names its editions. */
+export const LANG_LABELS: Record<Lang, string> = { "zh-TW": "繁體中文", en: "English" };
 
 const WORDS = {
   "zh-TW": {
@@ -49,6 +51,9 @@ const WORDS = {
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=zh-TW",
     },
     sidebar: "側欄",
+    languageLabel: "語言",
+    marketOverview: "市場概況",
+    account: (email: string) => `帳號：${email}`,
     popular: "熱門文章",
     calendar: {
       open: "依日期瀏覽",
@@ -338,6 +343,9 @@ const WORDS = {
       bankUrl: "https://rate.bot.com.tw/xrt?Lang=en-US",
     },
     sidebar: "Sidebar",
+    languageLabel: "Language",
+    marketOverview: "Markets",
+    account: (email: string) => `Account: ${email}`,
     popular: "Most read",
     calendar: {
       open: "Browse by date",

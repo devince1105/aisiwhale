@@ -117,6 +117,26 @@ describe("the front page's sidebar (D-085, D-086)", () => {
     expect(popular.getByRole("link", { name: "第 7 篇" }).getAttribute("href")).toBe("/news/zh-TW/articles/s7");
   });
 
+  it("市場概況: the strip's main figures, each to its chart on the watchlist page (D-087)", () => {
+    const quote = (key: string, value: number, change_pct: number | null, change: number | null = null) =>
+      ({ key, value, change, change_pct, as_of: "2026-09-25", basis: "close", source: "FRED" }) as never;
+    render(
+      <ArticleList
+        articles={[story(1, "tw")]}
+        lang="zh-TW"
+        calendar={{ month: "2026-09", days: DAYS }}
+        markets={[quote("tw:2330", 2475, -1), quote("us10y", 5.18, null, 0.07), quote("taiex", 48024.6, -0.28), quote("btc", 84712, 0.86)]}
+      />,
+    );
+    const rows = within(screen.getByTestId("market-overview")).getAllByRole("link");
+    expect(rows.map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["加權指數48,024.60−0.28%", "/news/zh-TW/watchlist?s=taiex"],
+      ["美國10年期公債5.18%+0.07", "/news/zh-TW/watchlist?s=us10y"],
+      ["比特幣84,712+0.86%", "/news/zh-TW/watchlist?s=btc"],
+    ]); // stocks are not in it; the figures in its own order
+    expect(rows[0].querySelector(".text-fall, [class*=text-fall]")).toBeTruthy();
+  });
+
   it("nothing read yet: no 熱門文章 block", () => {
     render(<ArticleList articles={[story(1, "tw")]} lang="zh-TW" calendar={{ month: "2026-09", days: DAYS }} />);
     expect(screen.queryByTestId("popular")).toBeNull();

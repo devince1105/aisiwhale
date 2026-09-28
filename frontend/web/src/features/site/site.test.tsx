@@ -198,9 +198,25 @@ describe("the header's member badge", () => {
     expect(link.getAttribute("href")).toBe("/news/zh-TW/login");
   });
 
+  it("signed in: an avatar with the address's first letter, which opens who they are (D-087)", async () => {
+    answer({ reader_id: "r", email: "reader@example.com", member_until: null });
+    render(<MemberBadge lang="zh-TW" />);
+    const avatar = await screen.findByRole("button", { name: "帳號：reader@example.com" });
+    expect(avatar.textContent).toBe("R");
+    expect(screen.getByTestId("member-badge").textContent).toBe("R"); // the address is not shown
+    fireEvent.click(avatar);
+    const badge = screen.getByTestId("member-badge");
+    expect(badge.textContent).toContain("reader@example.com");
+    expect(screen.getByRole("link", { name: "我的觀察清單" }).getAttribute("href")).toBe("/news/zh-TW/watchlist");
+    expect(screen.getByRole("button", { name: "登出" })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("button", { name: "登出" })).toBeNull();
+  });
+
   it("says when the membership runs out", async () => {
     answer({ reader_id: "r", email: "reader@example.com", member_until: "2027-09-23T00:00:00Z" });
     render(<MemberBadge lang="zh-TW" />);
+    fireEvent.click(await screen.findByTestId("avatar"));
     const badge = await screen.findByTestId("member-badge");
     expect(badge.textContent).toContain("會員");
     expect(badge.textContent).toContain(formatDate("zh-TW", "2027-09-23T00:00:00Z"));
@@ -209,6 +225,7 @@ describe("the header's member badge", () => {
   it("a signed-in reader who has not paid is not called a member", async () => {
     answer({ reader_id: "r", email: "reader@example.com", member_until: null });
     render(<MemberBadge lang="zh-TW" />);
+    fireEvent.click(await screen.findByTestId("avatar"));
     const badge = await screen.findByTestId("member-badge");
     expect(badge.textContent).toContain("reader@example.com");
     expect(badge.textContent).not.toContain("會員");
@@ -217,6 +234,7 @@ describe("the header's member badge", () => {
   it("a membership that has already run out is not a membership", async () => {
     answer({ reader_id: "r", email: "reader@example.com", member_until: "2020-01-01T00:00:00Z" });
     render(<MemberBadge lang="zh-TW" />);
+    fireEvent.click(await screen.findByTestId("avatar"));
     const badge = await screen.findByTestId("member-badge");
     expect(badge.textContent).not.toContain("會員");
   });

@@ -6,11 +6,12 @@
 // tab it is on (a day's 台股 stories) and keeps to Taipei's days, as the site does. Closed until
 // asked for, like the watchlist beside a stock: the list is the page.
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { API_URL, SITE_COMPANY } from "@/config";
 
 import { fetchCalendar, type PublicDay } from "./api";
+import { useDismiss } from "./dismiss";
 import { listHref } from "./links";
 import { sectionsOf, words, type Filter, type Lang } from "./i18n";
 
@@ -83,19 +84,7 @@ export function ArticleCalendar({
   }, [month, lang, section, initialMonth, initialDays]);
 
   // closed by a click elsewhere, or Escape (a dropdown's; the sidebar's stays)
-  useEffect(() => {
-    if (!open || inline) return;
-    const away = (event: MouseEvent) => {
-      if (box.current && !box.current.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => event.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open, inline]);
+  useDismiss(box, open && !inline, useCallback(() => setOpen(false), []));
 
   const [y, m] = month.split("-").map(Number);
   const thisMonth = (today ?? initialMonth).slice(0, 7);

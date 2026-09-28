@@ -7,7 +7,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
-import { listHref } from "./ArticleList";
+import { listHref } from "./links";
+import { LanguageMenu } from "./LanguageMenu";
 import { filterName, isFilter, isSection, topicOf, TOPICS, type Lang, type Topic, words } from "./i18n";
 
 type Current = Topic | "all" | "watchlist" | null;
@@ -31,7 +32,7 @@ function Tabs({ lang, current }: { lang: Lang; current: Current }) {
   ];
   return (
     // px-1: with each tab's own px-3, the first label sits on the column's edge, under the masthead
-    <ul className="mx-auto flex max-w-6xl gap-1 px-1">
+    <ul className="flex gap-1 px-1">
       {tabs.map(([id, label]) => {
         const here = (id ?? "all") === current;
         return (
@@ -63,12 +64,21 @@ export function SectionNav({ lang }: { lang: Lang }) {
   return (
     <nav
       aria-label={w.sectionsLabel}
-      className="sticky top-0 z-30 overflow-x-auto border-b border-line bg-surface/90 backdrop-blur-md [scrollbar-width:none] print:hidden"
+      className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur-md print:hidden"
     >
-      {/* the query string is read in the browser: until then, the tabs without a current one */}
-      <Suspense fallback={<Tabs lang={lang} current={null} />}>
-        <Current lang={lang} />
-      </Suspense>
+      {/* the tabs scroll sideways on a phone; the language menu beside them does not, so its list
+          is not cut off by the scrolling (D-087) */}
+      <div className="mx-auto flex max-w-6xl items-center">
+        <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
+          {/* the query string is read in the browser: until then, the tabs without a current one */}
+          <Suspense fallback={<Tabs lang={lang} current={null} />}>
+            <Current lang={lang} />
+          </Suspense>
+        </div>
+        <Suspense fallback={null}>
+          <LanguageMenu lang={lang} />
+        </Suspense>
+      </div>
     </nav>
   );
 }
