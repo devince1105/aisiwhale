@@ -12,6 +12,7 @@ import { fetchRatings, type PublicRatings } from "./api";
 import { words, type Lang } from "./i18n";
 import type { Technicals } from "./technicals";
 
+const PANE = "py-5 first:pt-0 last:pb-0 sm:px-6 sm:py-0 sm:first:pl-0 sm:last:pr-0";
 const KINDS = ["strong_sell", "sell", "hold", "buy", "strong_buy"] as const;
 type Kind = (typeof KINDS)[number];
 const COLOUR: Record<Kind, [string, number]> = {
@@ -68,7 +69,8 @@ export function StockSignals({ symbol, lang, figures }: { symbol: string; lang: 
       <h2 id="signals-title" className="text-xl font-bold">
         {w.title}
       </h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      {/* no frames: side by side, a thin line between; stacked on a phone, a line across (D-098) */}
+      <div className="mt-4 grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0" data-testid="signals-grid">
         {ratings ? <Analysts ratings={ratings} lang={lang} /> : null}
         {figures ? <Figures figures={figures} lang={lang} /> : null}
       </div>
@@ -80,7 +82,7 @@ function Analysts({ ratings, lang }: { ratings: PublicRatings; lang: Lang }) {
   const w = words(lang).signals;
   const { latest, previous } = ratings;
   return (
-    <div className="rounded-lg border border-line p-4" data-testid="analyst-ratings">
+    <div className={PANE} data-testid="analyst-ratings">
       <h3 className="flex items-baseline justify-between gap-2 font-semibold">
         {w.analysts}
         <span className="text-xs font-normal text-date">{w.month(latest.period)}</span>
@@ -141,7 +143,7 @@ function Analysts({ ratings, lang }: { ratings: PublicRatings; lang: Lang }) {
 function Figures({ figures, lang }: { figures: Technicals; lang: Lang }) {
   const w = words(lang).signals;
   return (
-    <div className="rounded-lg border border-line p-4" data-testid="technicals">
+    <div className={PANE} data-testid="technicals">
       <h3 className="font-semibold">{w.technicals}</h3>
       <dl className="mt-3 grid gap-3 text-sm">
         {figures.averages.map(({ days, value, gap }) => (
