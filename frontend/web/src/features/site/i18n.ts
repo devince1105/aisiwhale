@@ -53,6 +53,13 @@ const WORDS = {
     sidebar: "側欄",
     languageLabel: "語言",
     marketOverview: "市場概況",
+    events: {
+      title: "財經行事曆",
+      day: (day: string) => {
+        const at = new Date(`${day}T00:00:00Z`);
+        return `${at.getUTCMonth() + 1}/${at.getUTCDate()}（${"日一二三四五六"[at.getUTCDay()]}）`;
+      },
+    },
     account: (email: string) => `帳號：${email}`,
     popular: "熱門文章",
     calendar: {
@@ -345,6 +352,13 @@ const WORDS = {
     sidebar: "Sidebar",
     languageLabel: "Language",
     marketOverview: "Markets",
+    events: {
+      title: "Economic calendar",
+      day: (day: string) =>
+        new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(
+          new Date(`${day}T00:00:00Z`),
+        ),
+    },
     account: (email: string) => `Account: ${email}`,
     popular: "Most read",
     calendar: {

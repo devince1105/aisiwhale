@@ -21,6 +21,7 @@ export type PublicTrade = Schemas["PublicTrade"];
 export type PublicFigure = Schemas["PublicFigure"];
 export type PublicGold = Schemas["PublicGold"];
 export type PublicDay = Schemas["PublicDay"];
+export type PublicEvent = Schemas["PublicEvent"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -65,6 +66,16 @@ export interface ListOptions extends SiteClientOptions {
 /** Newest first. A page that comes back shorter than ``limit`` is the last. */
 export async function fetchArticles(lang: string, options: ListOptions = {}): Promise<PublicArticleSummary[]> {
   return (await fetchArticlePage(lang, options)).articles;
+}
+
+/** 財經行事曆 (D-088). Never throws: no block, not no page. */
+export async function fetchEvents(lang: string, options: SiteClientOptions = {}): Promise<PublicEvent[]> {
+  try {
+    const { data } = await client(options).GET("/api/public/events", { params: { query: { lang } } });
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** 熱門文章, the week's most read (D-086). Never throws: no block, not no page. */

@@ -4,8 +4,7 @@
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
 
-import type { PublicArticleSummary, PublicDay, PublicQuote } from "./api";
-import { direction, formatChange, formatValue, TONE } from "./quote";
+import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote } from "./api";
 import { ArticleCalendar } from "./ArticleCalendar";
 import {
   filterName,
@@ -20,6 +19,7 @@ import {
   type Section,
 } from "./i18n";
 import { Pagination } from "./Pagination";
+import { Sidebar } from "./Sidebar";
 import { StocksNamed } from "./StocksNamed";
 
 export const PAGE_SIZE = 10;
@@ -134,6 +134,7 @@ export function ArticleList({
   calendar,
   popular = [],
   markets = [],
+  events = [],
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -150,6 +151,8 @@ export function ArticleList({
   popular?: PublicArticleSummary[];
   /** The market strip's figures, for 市場概況 (D-087). */
   markets?: PublicQuote[];
+  /** 財經行事曆, the coming weeks' releases and earnings (D-088). */
+  events?: PublicEvent[];
 
 }) {
   const w = words(lang);
@@ -192,103 +195,17 @@ export function ArticleList({
         <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n, day)} />
       </div>
       {calendar ? (
-        <aside aria-label={w.sidebar} className="hidden lg:block" data-testid="front-sidebar">
-          <div className="sticky top-6 grid gap-10 pt-6">
-            {/* the calendar needs no title: its month is one */}
-            <SidebarBlock label={w.calendar.label}>
-              <ArticleCalendar
-                lang={lang}
-                section={section}
-                selected={day}
-                initialMonth={calendar.month}
-                initialDays={calendar.days}
-                inline
-              />
-            </SidebarBlock>
-            {markets.length ? (
-              <SidebarBlock label={w.marketOverview} title={w.marketOverview}>
-                <MarketOverview quotes={markets} lang={lang} />
-              </SidebarBlock>
-            ) : null}
-            {popular.length ? (
-              <SidebarBlock label={w.popular} title={w.popular}>
-                <Popular articles={popular} lang={lang} />
-              </SidebarBlock>
-            ) : null}
-          </div>
-        </aside>
+        <Sidebar
+          lang={lang}
+          section={section}
+          day={day}
+          calendar={calendar}
+          markets={markets}
+          popular={popular}
+          events={events}
+        />
       ) : null}
     </section>
   );
 }
 
-/** A block of the front page's sidebar (D-085): what it holds, under a plain title when it
- * needs one (D-086: no rule above, no line beside). */
-function SidebarBlock({ label, title, children }: { label: string; title?: string; children: React.ReactNode }) {
-  return (
-    <section aria-label={label}>
-      {title ? <h2 className="pb-3 text-sm font-bold text-ink">{title}</h2> : null}
-      {children}
-    </section>
-  );
-}
-
-/** 市場概況's figures (D-087), in this order: the two markets, the yield, gold and oil, the dollar,
- * the coin — each a link to its chart on the watchlist page. */
-const OVERVIEW = ["taiex", "nasdaq", "us10y", "xau", "wti", "usdtwd", "btc"];
-
-function MarketOverview({ quotes, lang }: { quotes: PublicQuote[]; lang: Lang }) {
-  const w = words(lang);
-  const byKey = new Map(quotes.map((q) => [q.key, q]));
-  const shown = OVERVIEW.flatMap((key) => (byKey.has(key) ? [byKey.get(key)!] : []));
-  return (
-    <ul className="divide-y divide-line text-sm" data-testid="market-overview">
-      {shown.map((quote) => {
-        const way = direction(quote);
-        const change = formatChange(quote);
-        return (
-          <li key={quote.key}>
-            <Link
-              href={`/news/${lang}/watchlist?${new URLSearchParams({ s: quote.key })}`}
-              className="flex items-baseline justify-between gap-3 py-2 hover:text-accent"
-            >
-              <span className="min-w-0 truncate">{w.quoteNames[quote.key] ?? quote.key}</span>
-              <span className={`shrink-0 text-right tabular-nums ${TONE[way]}`}>
-                {formatValue(quote, lang)}
-                {change ? (
-                  <span className="ml-2 text-xs">
-                    {way === "rise" ? "+" : way === "fall" ? "−" : ""}
-                    {change}
-                  </span>
-                ) : null}
-              </span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** 熱門文章 (D-086): the week's most read, numbered as a newspaper's "most read" is. */
-function Popular({ articles, lang }: { articles: PublicArticleSummary[]; lang: Lang }) {
-  const w = words(lang);
-  return (
-    <ol className="grid gap-4" data-testid="popular">
-      {articles.map((article, i) => (
-        <li key={article.article_id} className="flex gap-3">
-          <span className="w-5 shrink-0 font-display text-xl leading-none font-bold text-accent tabular-nums">{i + 1}</span>
-          <span className="min-w-0">
-            <Link href={article.path} className="line-clamp-3 text-sm leading-snug font-semibold hover:text-accent">
-              {article.title}
-            </Link>
-            <span className="mt-1 block text-xs text-muted">
-              {article.section ? `${w.sections[article.section as Section]}・` : ""}
-              {formatDate(lang, article.published_at)}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ol>
-  );
-}

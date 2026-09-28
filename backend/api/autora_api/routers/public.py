@@ -33,6 +33,12 @@ from autora.db.models import Company
 from autora.db.session import get_sessionmaker
 from autora.domains.newsroom import forex as currencies
 from autora.domains.newsroom import securities
+from autora.domains.newsroom.economic_calendar import (
+    EconomicCalendar,
+    PublicEvent,
+    finnhub_json,
+    fred_json,
+)
 from autora.domains.newsroom.figures import (
     GRAINS,
     Figures,
@@ -112,6 +118,33 @@ async def list_articles(
     return await published_articles(
         session, lang, company_slug=company, section=section, limit=limit, offset=offset, day=day
     )
+
+
+@lru_cache
+def economic_calendar() -> EconomicCalendar:
+    """One per process (D-088): FRED's release dates and Finnhub's earnings, twice a day."""
+    settings = get_settings()
+    live = settings.tools_profile == "live"
+    fred = _secret(settings.fred_api_key)
+    finnhub = _secret(settings.finnhub_api_key)
+    return EconomicCalendar(
+        fred_json(fred) if live and fred else None,
+        finnhub_json(finnhub) if live and finnhub else None,
+        {symbol: (stock.zh, stock.en) for symbol, stock in STOCKS.items()},
+    )
+
+
+@router.get("/api/public/events")
+async def events(
+    response: Response,
+    calendar: Annotated[EconomicCalendar, Depends(economic_calendar)],
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> list[PublicEvent]:
+    """財經行事曆 (D-088): the coming weeks' US economic releases and the strip's earnings dates,
+    soonest first."""
+    response.headers["Cache-Control"] = "public, max-age=1800"
+    return await calendar.events(lang, limit=limit)
 
 
 @router.get("/api/public/articles/popular")

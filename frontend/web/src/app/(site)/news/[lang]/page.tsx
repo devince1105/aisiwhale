@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage, fetchCalendar, fetchMarkets, fetchPopular } from "@/features/site/api";
+import { fetchArticlePage } from "@/features/site/api";
+import { loadSidebar, taipeiToday } from "@/features/site/sidebarData";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
 
@@ -19,10 +20,6 @@ async function where(searchParams: Search) {
   return { section, page, day };
 }
 
-/** Today in Taipei, "YYYY-MM-DD": the site's day. */
-function taipeiToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
-}
 
 export async function generateMetadata({ params, searchParams }: { params: Params; searchParams: Search }) {
   const { lang } = await params;
@@ -38,16 +35,16 @@ export default async function Page({ params, searchParams }: { params: Params; s
   if (!isLang(lang)) notFound();
   const { section, page, day } = await where(searchParams);
   const company = process.env.SITE_COMPANY || undefined;
-  const sections = section ? sectionsOf(section) : undefined;
   // the calendar opens on the day's month, else this one, its days already marked (D-084)
-  const month = (day ?? taipeiToday()).slice(0, 7);
-  const [{ articles, total }, days, popular, markets] = await Promise.all([
-    fetchArticlePage(lang, { company, section: sections, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, day: day ?? undefined }),
-    fetchCalendar(lang, month, { company, section: sections }),
-    // 熱門文章 for the sidebar: the whole site's, whatever the tab (D-086)
-    fetchPopular(lang, { company }),
-    // 市場概況: the strip's own figures (the layout asks for the same, cached) (D-087)
-    fetchMarkets(),
+  const [{ articles, total }, sidebar] = await Promise.all([
+    fetchArticlePage(lang, {
+      company,
+      section: section ? sectionsOf(section) : undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+      day: day ?? undefined,
+    }),
+    loadSidebar(lang, { section, month: (day ?? taipeiToday()).slice(0, 7) }),
   ]);
   return (
     <ArticleList
@@ -57,9 +54,10 @@ export default async function Page({ params, searchParams }: { params: Params; s
       page={page}
       pages={Math.ceil(total / PAGE_SIZE)}
       day={day}
-      calendar={{ month, days }}
-      popular={popular}
-      markets={markets}
+      calendar={sidebar.calendar}
+      popular={sidebar.popular}
+      markets={sidebar.markets}
+      events={sidebar.events}
     />
   );
 }

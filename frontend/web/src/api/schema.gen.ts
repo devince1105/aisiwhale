@@ -975,6 +975,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events
+         * @description 財經行事曆 (D-088): the coming weeks' US economic releases and the strip's earnings dates,
+         *     soonest first.
+         */
+        get: operations["events_api_public_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/figures/{key}": {
         parameters: {
             query?: never;
@@ -2860,6 +2881,25 @@ export interface components {
              * Format: date
              */
             day: string;
+        };
+        /** PublicEvent */
+        PublicEvent: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Detail */
+            detail?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "macro" | "earnings";
+            /** Name */
+            name: string;
         };
         /** PublicFigure */
         PublicFigure: {
@@ -5740,6 +5780,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicArticle"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    events_api_public_events_get: {
+        parameters: {
+            query: {
+                lang: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicEvent"][];
                 };
             };
             /** @description Validation Error */

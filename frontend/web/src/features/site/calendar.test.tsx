@@ -137,6 +137,26 @@ describe("the front page's sidebar (D-085, D-086)", () => {
     expect(rows[0].querySelector(".text-fall, [class*=text-fall]")).toBeTruthy();
   });
 
+  it("財經行事曆: the coming days, a stock's earnings a link to its chart (D-088)", () => {
+    render(
+      <ArticleList
+        articles={[story(1, "tw")]}
+        lang="zh-TW"
+        calendar={{ month: "2026-09", days: DAYS }}
+        events={[
+          { day: "2026-09-30", kind: "macro", key: "release:53", name: "美國 GDP", detail: null },
+          { day: "2026-09-30", kind: "earnings", key: "us:MU", name: "美光 財報", detail: "2026Q4 盤前" },
+          { day: "2026-10-02", kind: "macro", key: "release:50", name: "美國就業報告（非農就業）", detail: null },
+        ]}
+      />,
+    );
+    const events = within(screen.getByTestId("events"));
+    expect(events.getAllByText(/^\d+\/\d+（.）$/).map((d) => d.textContent)).toEqual(["9/30（三）", "10/2（五）"]);
+    expect(events.getByRole("link", { name: "美光 財報" }).getAttribute("href")).toBe("/news/zh-TW/watchlist?s=us%3AMU");
+    expect(events.queryByRole("link", { name: "美國 GDP" })).toBeNull(); // data has no chart
+    expect(events.getByText("2026Q4 盤前")).toBeTruthy();
+  });
+
   it("nothing read yet: no 熱門文章 block", () => {
     render(<ArticleList articles={[story(1, "tw")]} lang="zh-TW" calendar={{ month: "2026-09", days: DAYS }} />);
     expect(screen.queryByTestId("popular")).toBeNull();

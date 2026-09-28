@@ -6,6 +6,8 @@ import { cache } from "react";
 import { fetchArticle } from "@/features/site/api";
 import { ArticleView } from "@/features/site/ArticleView";
 import { isLang, words } from "@/features/site/i18n";
+import { Sidebar } from "@/features/site/Sidebar";
+import { loadSidebar } from "@/features/site/sidebarData";
 
 // Rendered per request, not cached: whether the rest of a members-only article is in the page
 // depends on who is asking (D-025), and a cached page would answer for the wrong reader.
@@ -39,5 +41,16 @@ export default async function Page({ params }: { params: Params }) {
   if (!isLang(lang)) notFound();
   const article = await load(lang, slug, await readerCookie());
   if (!article) notFound();
-  return <ArticleView article={article} lang={lang} />;
+  // the front page's sidebar beside the article on a wide screen (D-088); its calendar opens on
+  // the article's month
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(article.published_at)).slice(0, 7);
+  const sidebar = await loadSidebar(lang, { month });
+  return (
+    <div className="mx-auto max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-10 lg:px-4">
+      <div className="min-w-0">
+        <ArticleView article={article} lang={lang} />
+      </div>
+      <Sidebar lang={lang} {...sidebar} />
+    </div>
+  );
 }

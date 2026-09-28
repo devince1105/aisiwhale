@@ -4033,6 +4033,50 @@
     "title": "PublicDay",
     "type": "object"
    },
+   "PublicEvent": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "macro",
+       "earnings"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "day",
+     "kind",
+     "key",
+     "name"
+    ],
+    "title": "PublicEvent",
+    "type": "object"
+   },
    "PublicFigure": {
     "properties": {
      "as_of": {
@@ -10496,6 +10540,67 @@
      }
     },
     "summary": "Get Article",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/events": {
+   "get": {
+    "description": "財經行事曆 (D-088): the coming weeks' US economic releases and the strip's earnings dates,\nsoonest first.",
+    "operationId": "events_api_public_events_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 8,
+       "maximum": 20,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PublicEvent"
+         },
+         "title": "Response Events Api Public Events Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Events",
     "tags": [
      "public"
     ]
