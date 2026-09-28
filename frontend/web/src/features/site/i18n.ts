@@ -561,7 +561,7 @@ const WORDS = {
     figuresNamed: "Related markets",
     readIn: "Read in:",
     disclaimer:
-      "Stories are written, checked and approved by an AI newsroom, from public filings, Finnhub and other sources; prices may be delayed and AI readings may err. For reference only, not investment advice — invest with care.",
+      "Our stories are written, checked and approved by an AI newsroom, drawing on public filings, Finnhub and other sources; prices may be delayed, and AI readings may err. For reference only, not investment advice — invest with care.",
     disclaimerTitle: "Disclaimer",
     membersOnly: "This story is for members",
     membersOnlyWhy: "Members can read every members-only story.",
