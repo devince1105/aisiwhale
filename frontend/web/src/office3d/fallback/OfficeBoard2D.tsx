@@ -87,7 +87,7 @@ function Card({ card, selected, cardRef }: { card: BoardCard; selected: boolean;
       <span className="flex items-center justify-between gap-2">
         {/* a square, like everything on this board (D-113) */}
         {card.photo ? (
-          <img src={card.photo} alt="" aria-hidden className="size-9 shrink-0 object-cover" data-testid="board-photo" />
+          <img src={card.photo} alt="" aria-hidden className="size-9 shrink-0 bg-[#f1e7f0] object-cover" data-testid="board-photo" />
         ) : null}
         <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold text-[color:var(--console-text)]">{card.name}</span>

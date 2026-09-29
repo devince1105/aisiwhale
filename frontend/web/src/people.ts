@@ -14,10 +14,17 @@ export function personName(name: string | null | undefined, lang: string = ADMIN
   return lang.startsWith("zh") ? chinese : english;
 }
 
-/** The staff who have a head photo (D-113): ``/avatars/<avatar_key>.jpg``. */
+/** The staff who have a picture (D-113, D-118): their Q-version head, ``/avatars/<key>.webp``, and
+ * their full figure for the office, ``/figures/<key>.webp`` — both cut out of one Q-version
+ * portrait (``avatars-source/q``), transparent around them. */
 const PHOTOS = new Set(["tifa", "ada", "sayla", "rei", "mari", "shinobu", "ami", "chunli"]);
 
 /** An agent's head photo, or null: then the screen shows the desk's icon or an initial. */
 export function avatarPhoto(avatarKey: string | null | undefined): string | null {
-  return avatarKey && PHOTOS.has(avatarKey) ? `/avatars/${avatarKey}.jpg` : null;
+  return avatarKey && PHOTOS.has(avatarKey) ? `/avatars/${avatarKey}.webp` : null;
+}
+
+/** Someone's full figure, standing, for the office (D-118); null for the rest. */
+export function figurePhoto(avatarKey: string | null | undefined): string | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? `/figures/${avatarKey}.webp` : null;
 }

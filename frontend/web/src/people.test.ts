@@ -20,7 +20,7 @@ describe("a name in one language", () => {
 describe("a head photo (D-113)", () => {
   it("for the staff who have one; none for the rest", async () => {
     const { avatarPhoto } = await import("./people");
-    expect(avatarPhoto("tifa")).toBe("/avatars/tifa.jpg");
+    expect(avatarPhoto("tifa")).toBe("/avatars/tifa.webp");
     expect(avatarPhoto("default")).toBeNull();
     expect(avatarPhoto(null)).toBeNull();
   });

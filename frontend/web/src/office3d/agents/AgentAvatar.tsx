@@ -17,6 +17,7 @@ import { avatarHandlers } from "../interaction/picking";
 import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
 import { dress } from "./dress";
+import { Standee, standeeLift } from "./Standee";
 import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
 
 export { AVATAR_SCALE, SEAT_LIFT };
@@ -42,12 +43,15 @@ export function AgentAvatar({
   seat,
   model,
   outfit = null,
+  figure = null,
 }: {
   agentId: string;
   seat: Seat;
   model: AvatarModel;
   /** Dressed as herself (D-115): her own palette and colours on the clone. */
   outfit?: Outfit | null;
+  /** Her Q-version figure (D-118): a standee facing the camera instead of the model. */
+  figure?: string | null;
 }) {
   const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
@@ -68,6 +72,7 @@ export function AgentAvatar({
   latestRoster.current = roster;
   const walk = useRef<{ seq: number; startedAt: number; route: Route | null } | null>(null);
   const handlers = useMemo(() => avatarHandlers(agentId), [agentId]);
+  const standee = useRef<Group>(null);
 
   useEffect(() => realtimeStore.subscribe(() => void (dirty.current = true)), []);
   useEffect(() => () => controller.dispose(), [controller]);
@@ -88,6 +93,7 @@ export function AgentAvatar({
       if (g) g.rotation.y = step.heading;
       if (paper.current) paper.current.visible = step.carrying;
       controller.update(Math.min(dt, 0.1));
+      if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000);
       return;
     }
     if (walk.current) {
@@ -111,6 +117,7 @@ export function AgentAvatar({
       }
     }
     controller.update(Math.min(dt, 0.1));
+    if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000);
   });
 
   return (
@@ -122,7 +129,13 @@ export function AgentAvatar({
       userData={{ agentId }}
       {...handlers}
     >
-      <primitive object={body} />
+      {figure ? (
+        <group ref={standee}>
+          <Standee url={figure} />
+        </group>
+      ) : (
+        <primitive object={body} />
+      )}
       {/*
         What a click hits: a box a bit larger than the figure (and its chair), never drawn. At the
         overview a figure is a few dozen pixels tall; its mesh alone is a small target (T-413:

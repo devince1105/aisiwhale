@@ -31,7 +31,7 @@ export function Face({
   if (photo)
     return (
       // a 256-px square from /public: next/image would add nothing here but a loader
-      <img src={photo} alt="" aria-hidden="true" style={box} className="shrink-0 rounded-full object-cover" data-testid="face-photo" />
+      <img src={photo} alt="" aria-hidden="true" style={box} className="shrink-0 rounded-full bg-[#f1e7f0] object-cover" data-testid="face-photo" />
     );
   return (
     <span
