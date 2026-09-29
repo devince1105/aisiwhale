@@ -48,7 +48,9 @@ export const ROLE_NAME: Record<string, string> = {
 /** Whose work an event is, when no agent is on it: the approval is the editor-in-chief's to ask. */
 const VOICE: Record<string, string> = { APPROVAL_REQUESTED: "editor_in_chief" };
 
-export type Speaker = { kind: "agent"; id: string | null; name: string; role: string } | { kind: "me" };
+export type Speaker =
+  | { kind: "agent"; id: string | null; name: string; role: string; avatarKey?: string }
+  | { kind: "me" };
 
 export interface ChatLink {
   href: string;
@@ -84,10 +86,10 @@ function speakerOf(event: EventEnvelope, agents: Record<string, AgentState>): Sp
   if (event.actor.kind === "human") return { kind: "me" };
   const id = event.agent_id ?? (event.actor.kind === "agent" ? event.actor.id : null);
   const agent = id ? agents[id] : undefined;
-  if (agent) return { kind: "agent", id: agent.id, name: personName(agent.display_name), role: agent.role };
+  if (agent) return { kind: "agent", id: agent.id, name: personName(agent.display_name), role: agent.role, avatarKey: agent.avatar_key };
   const role = VOICE[event.event_type];
   const byRole = role ? Object.values(agents).find((a) => a.role === role) : undefined;
-  if (byRole) return { kind: "agent", id: byRole.id, name: personName(byRole.display_name), role: byRole.role };
+  if (byRole) return { kind: "agent", id: byRole.id, name: personName(byRole.display_name), role: byRole.role, avatarKey: byRole.avatar_key };
   if (role) return { kind: "agent", id: null, name: ROLE_NAME[role] ?? role, role };
   return null; // the system: a notice, not a message
 }

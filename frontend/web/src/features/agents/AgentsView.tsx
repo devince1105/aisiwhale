@@ -6,6 +6,7 @@ import { useState, type FormEvent } from "react";
 
 import type { Schemas } from "@/api/client";
 import type { AgentAction, NewAgent } from "@/api/queries";
+import { Face } from "@/features/agent-panel/Face";
 import { ROLE_LABEL, STATE_LABEL } from "@/features/agent-panel/model";
 import type { ActivityState } from "@/realtime/snapshot";
 import { personName } from "@/people";
@@ -46,6 +47,7 @@ export function AgentsView({
       <ul className="divide-y divide-line rounded border border-line bg-surface text-sm">
         {agents.map((agent) => (
           <li key={agent.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <Face name={agent.display_name} role={agent.role} avatarKey={agent.avatar_key} size={28} />
             <span className="font-medium">{personName(agent.display_name)}</span>
             <span className="text-muted">{ROLE_LABEL[agent.role] ?? agent.role}</span>
             <span className="grow" />

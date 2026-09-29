@@ -16,3 +16,23 @@ describe("a name in one language", () => {
     expect(personName(null)).toBe("");
   });
 });
+
+describe("a head photo (D-113)", () => {
+  it("for the staff who have one; none for the rest", async () => {
+    const { avatarPhoto } = await import("./people");
+    expect(avatarPhoto("tifa")).toBe("/avatars/tifa.jpg");
+    expect(avatarPhoto("default")).toBeNull();
+    expect(avatarPhoto(null)).toBeNull();
+  });
+});
+
+describe("the office's figure for someone with a photo (D-113)", () => {
+  it("a woman's, the same one each time; the others as before", async () => {
+    const { characterFor } = await import("@/office3d/assets/characters");
+    for (const id of ["a1", "b2", "c3", "d4", "e5"]) {
+      expect(characterFor(id, "rei")).toContain("female");
+      expect(characterFor(id, "rei")).toBe(characterFor(id, "rei"));
+    }
+    expect(characterFor("a1", "character-male-b")).toBe("character-male-b");
+  });
+});

@@ -12,6 +12,7 @@ import {
   type ToolStats,
   type Trace,
 } from "./model";
+import { Face } from "./Face";
 import { ProgressBar, StateBadge } from "./StateBadge";
 
 export interface PanelData {
@@ -186,7 +187,8 @@ export function AgentPanelView({
       className="fixed inset-y-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-xl"
     >
       <header className="flex items-start justify-between gap-3 border-b border-line p-4">
-        <div className="min-w-0">
+        <Face name={card.name} role={card.role} avatarKey={card.avatarKey} size={48} />
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-lg font-semibold">{card.name}</h2>
           <p className="text-xs text-muted">{ROLE_LABEL[card.role] ?? card.role}</p>
         </div>

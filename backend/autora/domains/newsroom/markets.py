@@ -361,6 +361,7 @@ async def seed_markets(
             role=ceo_role.key,
             display_name=personas.CEO.name,
             description=personas.CEO.description,
+            avatar_key=personas.CEO.avatar,
             actor=actor,
             position=ceo_role,
         )

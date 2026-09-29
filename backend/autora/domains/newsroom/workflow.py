@@ -252,6 +252,7 @@ async def staff_newsroom(
                 role=role,
                 display_name=persona.name,
                 description=persona.description,
+                avatar_key=persona.avatar,
                 actor=actor,
                 position=position,
             )

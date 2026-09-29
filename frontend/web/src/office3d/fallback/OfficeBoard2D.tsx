@@ -85,7 +85,11 @@ function Card({ card, selected, cardRef }: { card: BoardCard; selected: boolean;
     >
       <span aria-hidden className="absolute inset-y-2 left-1.5 w-1" style={{ backgroundColor: card.color }} />
       <span className="flex items-center justify-between gap-2">
-        <span className="min-w-0">
+        {/* a square, like everything on this board (D-113) */}
+        {card.photo ? (
+          <img src={card.photo} alt="" aria-hidden className="size-9 shrink-0 object-cover" data-testid="board-photo" />
+        ) : null}
+        <span className="min-w-0 flex-1">
           <span className="block truncate font-semibold text-[color:var(--console-text)]">{card.name}</span>
           <span className="block text-xs text-[color:var(--console-text-dim)]">{card.roleLabel}</span>
         </span>

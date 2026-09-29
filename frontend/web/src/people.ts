@@ -13,3 +13,11 @@ export function personName(name: string | null | undefined, lang: string = ADMIN
   if (!chinese) return name;
   return lang.startsWith("zh") ? chinese : english;
 }
+
+/** The staff who have a head photo (D-113): ``/avatars/<avatar_key>.jpg``. */
+const PHOTOS = new Set(["tifa", "ada", "sayla", "rei", "mari", "shinobu", "ami", "chunli"]);
+
+/** An agent's head photo, or null: then the screen shows the desk's icon or an initial. */
+export function avatarPhoto(avatarKey: string | null | undefined): string | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? `/avatars/${avatarKey}.jpg` : null;
+}

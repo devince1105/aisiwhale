@@ -1,6 +1,8 @@
 // The avatar assets (T-404, D-008): Kenney "Mini Characters" 1.0, CC0 (see LICENSES.md). Twelve
 // chibi low-poly characters, each a GLB with the same skeleton and 32 animations, sharing one
 // texture. Which character an agent wears, and which clip plays for each pose, is decided here.
+import { avatarPhoto } from "@/people";
+
 import type { Pose } from "../visual/mapping";
 
 export const CHARACTER_DIR = "/models/characters";
@@ -48,5 +50,10 @@ export function characterFor(agentId: string, avatarKey?: string | null): Charac
   if (avatarKey && (CHARACTERS as readonly string[]).includes(avatarKey)) return avatarKey as Character;
   let hash = 0;
   for (const ch of agentId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  // someone with a head photo (D-113) is one of the office's women: a woman's figure for her
+  if (avatarPhoto(avatarKey)) {
+    const women = CHARACTERS.filter((c) => c.includes("female"));
+    return women[hash % women.length];
+  }
   return CHARACTERS[hash % CHARACTERS.length];
 }

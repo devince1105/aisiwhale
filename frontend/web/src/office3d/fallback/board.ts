@@ -22,7 +22,7 @@ import {
   type Seat,
 } from "../scene/layout";
 import { ROLE_LABEL, visualForAgent, type VisualState } from "../visual/mapping";
-import { personName } from "@/people";
+import { avatarPhoto, personName } from "@/people";
 
 export type RowId = string;
 
@@ -55,6 +55,8 @@ export interface BoardCard {
   role: string;
   roleLabel: string;
   color: string;
+  /** The head photo, if the agent has one (D-113). */
+  photo: string | null;
   visual: VisualState;
   taskName: string | null;
   since: string;
@@ -106,6 +108,7 @@ function card(agent: AgentState, company: RealtimeState, now: Date): BoardCard |
     role: agent.role,
     roleLabel: ROLE_LABEL[agent.role] ?? agent.role,
     color: ROLE_COLOR[agent.role] ?? ROLE_COLOR.spare,
+    photo: avatarPhoto(agent.avatar_key),
     visual,
     taskName: str(agent.activity.detail.task_name),
     since: formatSince(sinceMs),

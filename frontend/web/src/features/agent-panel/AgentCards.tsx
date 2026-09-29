@@ -1,3 +1,4 @@
+import { Face } from "./Face";
 import { formatDuration, ROLE_ICON, ROLE_LABEL, type CardModel } from "./model";
 import { ProgressBar, StateBadge } from "./StateBadge";
 
@@ -27,7 +28,8 @@ export function AgentCards({
             }`}
           >
             <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
+              <Face name={card.name} role={card.role} avatarKey={card.avatarKey} size={36} />
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{card.name}</p>
                 <p className="text-xs text-muted">
                   {ROLE_ICON[card.role] ? `${ROLE_ICON[card.role]} ` : ""}

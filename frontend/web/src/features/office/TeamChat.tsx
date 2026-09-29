@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { approvalsQuery, articlesQuery, decideApproval, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
-import { ROLE_ICON } from "@/features/agent-panel/model";
+import { Face } from "@/features/agent-panel/Face";
 import { withCompany } from "@/features/company/CompanyScope";
 import { useNow } from "@/hooks/useNow";
 import { useRealtime } from "@/stores/realtime";
@@ -18,16 +18,6 @@ import { useRealtime } from "@/stores/realtime";
 import { CHAT_TYPES, ROLE_NAME, chatItems, dayLabel, timeLabel, type ChatItem, type Speaker } from "./chatModel";
 import { personName } from "@/people";
 
-const ROLE_COLOUR: Record<string, string> = {
-  ceo: "#7c5cff",
-  editor_in_chief: "#d64545",
-  news_intelligence: "#8a6d1f",
-  editor: "#e07b39",
-  writer: "#2f9e6e",
-  analyst: "#2f6fe0",
-  researcher: "#0f9bb3",
-  marketing: "#c2489a",
-};
 const TONE_TEXT: Record<string, string> = { ok: "text-ok", warn: "text-warn", danger: "text-danger" };
 
 function parsed(items: unknown[]): EventEnvelope[] {
@@ -168,15 +158,7 @@ function sameVoice(a: Speaker, b: Speaker): boolean {
 }
 
 function Avatar({ speaker }: { speaker: Extract<Speaker, { kind: "agent" }> }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-      style={{ background: ROLE_COLOUR[speaker.role] ?? "#6b7280" }}
-    >
-      {ROLE_ICON[speaker.role] ?? speaker.name.slice(0, 1)}
-    </span>
-  );
+  return <Face name={speaker.name} role={speaker.role} avatarKey={speaker.avatarKey} size={32} />;
 }
 
 function Notice({ item }: { item: Extract<ChatItem, { type: "notice" }> }) {

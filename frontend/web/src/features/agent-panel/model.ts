@@ -76,6 +76,8 @@ export interface CardModel {
   id: string;
   name: string;
   role: string;
+  /** Which head photo, if any (D-113). */
+  avatarKey: string;
   state: ActivityState;
   stateLabel: string;
   taskName: string | null;
@@ -109,6 +111,7 @@ export function cardModel(agent: AgentState, now: Date): CardModel | null {
   return {
     id: agent.id,
     name: personName(agent.display_name),
+    avatarKey: agent.avatar_key,
     role: agent.role,
     state,
     stateLabel: waitReason ?? STATE_LABEL[state],
