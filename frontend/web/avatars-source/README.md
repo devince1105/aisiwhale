@@ -28,6 +28,12 @@ right, 1376 × 768. Split at the white divider, lifted, and scaled per pair so t
 
 ## Standing, from the side (D-126)
 
-`stand-side/<avatar_key>.jpg` hold two frames side by side, facing left then right, 1376 × 768 (no
-Ada yet; `sayia.jpg` was renamed `sayla.jpg`). Made like the walking frames:
+`stand-side/<avatar_key>.jpg` hold two frames side by side, facing left then right, 1376 × 768 (Ada's
+came later; `sayia.jpg` was renamed `sayla.jpg`). Made like the walking frames:
 `public/figures-side/<avatar_key>-left.webp` and `-right.webp`.
+
+## Thinking (D-127)
+
+`think/<avatar_key>.jpg` hold two frames, hand on chin, from the front: standing, then seated,
+1376 × 768. Made like the walking frames, one scale per pair: `public/figures-think/<avatar_key>-stand.webp`
+and `-sit.webp`. The office shows the seated one; no standing pose is a thinking one yet.

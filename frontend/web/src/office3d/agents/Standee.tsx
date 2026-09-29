@@ -128,13 +128,17 @@ export interface Pictures {
   sitBack?: string | null;
   walk?: readonly [string, string] | null;
   standSide?: readonly [left: string, right: string] | null;
+  /** Thinking, hand on chin, from the front (D-127). Only the seated one is shown yet: no
+   * standing pose is a thinking one. */
+  thinkSit?: string | null;
 }
-export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2" | "sideLeft" | "sideRight";
+export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2" | "sideLeft" | "sideRight" | "thinkSit";
 
 export interface Moment {
   seated: boolean;
   back: boolean;
   walking?: boolean;
+  thinking?: boolean;
   /** How far she faces the screen's right (1) or left (-1): ``aspectOf``'s ``across``. */
   across?: number;
   /** Which of the two walking frames (0 or 1). */
@@ -142,10 +146,12 @@ export interface Moment {
 }
 
 /** Which picture shows, for how she is and how she is seen. */
-export function viewFor(pictures: Pictures, { seated, back, walking = false, across = 0, stride = 0 }: Moment): View {
+export function viewFor(pictures: Pictures, { seated, back, walking = false, thinking = false, across = 0, stride = 0 }: Moment): View {
   const sideways = Math.abs(across) >= SIDEWAYS;
   if (walking && sideways && pictures.walk) return stride % 2 ? "walk2" : "walk1";
   if (!seated && sideways && pictures.standSide) return across > 0 ? "sideRight" : "sideLeft";
+  // thinking at her desk, her hand on her chin: seen from behind, she is just sitting
+  if (seated && thinking && !back && pictures.thinkSit) return "thinkSit";
   if (seated && pictures.sit) return back && pictures.sitBack ? "sitBack" : "sit";
   return back && pictures.standBack ? "standBack" : "stand";
 }
@@ -157,7 +163,7 @@ export function stepFor(view: View): number {
   return view === "stand" ? CARD_FORWARD : 0;
 }
 
-const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2", "sideLeft", "sideRight"];
+const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2", "sideLeft", "sideRight", "thinkSit"];
 
 function urlOf(pictures: Pictures, view: View): string | null | undefined {
   if (view === "walk1") return pictures.walk?.[0];
@@ -167,13 +173,13 @@ function urlOf(pictures: Pictures, view: View): string | null | undefined {
   return pictures[view];
 }
 
-/** The side views come in pairs cut at one scale, 512 px for the taller: the stride is a little
- * shorter than the step between, as it is. */
+/** The side views and the thinking ones come in pairs cut at one scale, 512 px for the taller:
+ * the stride is a little shorter than the step between, and sitting than standing, as they are. */
 const PAIR_FRAME_PX = 512;
 
 function sizeOf(texture: Texture, view: View): [number, number] {
   const image = texture.image as { width: number; height: number } | undefined;
-  const paired = view === "walk1" || view === "walk2" || view === "sideLeft" || view === "sideRight";
+  const paired = view === "walk1" || view === "walk2" || view === "sideLeft" || view === "sideRight" || view === "thinkSit";
   const height =
     view === "sit" || view === "sitBack"
       ? SIT_HEIGHT
@@ -210,6 +216,7 @@ export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Po
       seated: isSeated(current),
       back,
       walking: current === "walk",
+      thinking: current === "sit_think",
       across: aspect?.across ?? 0,
       stride: Math.floor(clock.elapsedTime * STRIDES_PER_SECOND),
     });

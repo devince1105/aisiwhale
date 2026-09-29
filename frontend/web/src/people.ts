@@ -45,11 +45,14 @@ export function figureWalkPhotos(avatarKey: string | null | undefined): [string,
   return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-walk/${avatarKey}-1.webp`, `/figures-walk/${avatarKey}-2.webp`] : null;
 }
 
-/** Her standing figure seen from the side (D-126): facing left, then right. The operator's set
- * has no side view of Ada yet: she is shown front or back. */
-const SIDE_PHOTOS = new Set(["tifa", "sayla", "rei", "mari", "shinobu", "ami", "chunli"]);
+/** Her standing figure seen from the side (D-126): facing left, then right. */
 export function figureSidePhotos(avatarKey: string | null | undefined): [string, string] | null {
-  return avatarKey && SIDE_PHOTOS.has(avatarKey) ? [`/figures-side/${avatarKey}-left.webp`, `/figures-side/${avatarKey}-right.webp`] : null;
+  return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-side/${avatarKey}-left.webp`, `/figures-side/${avatarKey}-right.webp`] : null;
+}
+
+/** Her thinking, hand on chin, from the front (D-127): standing, then seated. */
+export function figureThinkPhotos(avatarKey: string | null | undefined): [string, string] | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-think/${avatarKey}-stand.webp`, `/figures-think/${avatarKey}-sit.webp`] : null;
 }
 
 /** The same figure from behind (D-123), for when the camera is at her back; cut out of the

@@ -130,4 +130,12 @@ describe("a standee", () => {
       expect(aspect.across > 0).toBe(right);
     }
   });
+
+  it("thinking at her desk, hand on chin, seen from the front (D-127)", () => {
+    const all = { stand: "s", sit: "t", sitBack: "tb", thinkSit: "k" };
+    expect(viewFor(all, { seated: true, back: false, thinking: true })).toBe("thinkSit");
+    expect(viewFor(all, { seated: true, back: true, thinking: true })).toBe("sitBack");
+    expect(viewFor(all, { seated: true, back: false })).toBe("sit");
+    expect(stepFor("thinkSit")).toBe(0);
+  });
 });
