@@ -8,6 +8,7 @@ import type { Schemas } from "@/api/client";
 import { effectiveState, type AgentState, type RealtimeState } from "@/realtime/reducer";
 import type { ActivityState } from "@/realtime/snapshot";
 import { withCompany } from "@/features/company/CompanyScope";
+import { personName } from "@/people";
 
 export type Trace = Schemas["Trace"];
 export type Run = Schemas["RunOut"];
@@ -107,7 +108,7 @@ export function cardModel(agent: AgentState, now: Date): CardModel | null {
   const live = agent.liveProgress?.runId === activity.run_id ? agent.liveProgress : null;
   return {
     id: agent.id,
-    name: agent.display_name,
+    name: personName(agent.display_name),
     role: agent.role,
     state,
     stateLabel: waitReason ?? STATE_LABEL[state],

@@ -22,6 +22,7 @@ import {
   type Seat,
 } from "../scene/layout";
 import { ROLE_LABEL, visualForAgent, type VisualState } from "../visual/mapping";
+import { personName } from "@/people";
 
 export type RowId = string;
 
@@ -101,7 +102,7 @@ function card(agent: AgentState, company: RealtimeState, now: Date): BoardCard |
   const sinceMs = now.getTime() - Date.parse(agent.activity.since);
   return {
     id: agent.id,
-    name: agent.display_name,
+    name: personName(agent.display_name),
     role: agent.role,
     roleLabel: ROLE_LABEL[agent.role] ?? agent.role,
     color: ROLE_COLOR[agent.role] ?? ROLE_COLOR.spare,

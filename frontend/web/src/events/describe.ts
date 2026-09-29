@@ -8,6 +8,8 @@
 // a one-line summary from the payload. Shared by the trace viewer and the event timeline, so an
 // event reads the same everywhere. Unknown types are not dropped: the caller shows the type and
 // the raw payload.
+import { personName } from "@/people";
+
 export type Tone = "neutral" | "think" | "work" | "review" | "ok" | "warn" | "danger";
 
 /** Dot colour per tone (Tailwind tokens). */
@@ -86,9 +88,9 @@ const FORMAT: Record<string, (p: Payload) => [string, Tone, string | null]> = {
   WORKFLOW_RUN_FAILED: (p) => ["工作流程失敗", "danger", [s(p.reason), duration(p.duration_ms)].filter(Boolean).join("・") || null],
   WORKFLOW_RUN_CANCELLED: (p) => ["工作流程取消", "warn", s(p.reason)],
   WORKFLOW_RUN_EXTENDED: (p) => ["工作流程加一輪", "warn", `第 ${n(p.round) ?? "?"} 輪・${Array.isArray(p.task_ids) ? p.task_ids.length : 0} 個任務`],
-  AGENT_CREATED: (p) => ["新代理", "neutral", [s(p.display_name), s(p.role)].filter(Boolean).join("・") || null],
+  AGENT_CREATED: (p) => ["新代理", "neutral", [personName(s(p.display_name)), s(p.role)].filter(Boolean).join("・") || null],
   AGENT_PAUSED: (p) => ["代理暫停", "warn", s(p.reason)],
-  AGENT_RETIRED: (p) => ["代理離職", "warn", [s(p.display_name), s(p.reason)].filter(Boolean).join("・") || null],
+  AGENT_RETIRED: (p) => ["代理離職", "warn", [personName(s(p.display_name)), s(p.reason)].filter(Boolean).join("・") || null],
   AGENT_RESUMED: (p) => ["代理恢復", "neutral", s(p.reason)],
   TOOL_DENIED: (p) => [p.decision === "NEEDS_APPROVAL" ? "工具待審批" : "工具被拒", p.decision === "NEEDS_APPROVAL" ? "warn" : "danger", [s(p.tool), s(p.rule_id)].filter(Boolean).join("・") || null],
   EXPENSE_RECORDED: (p) => ["支出", "neutral", [s(p.category), money(p)].filter(Boolean).join("・") || null],

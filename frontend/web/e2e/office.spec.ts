@@ -469,7 +469,8 @@ test("the office is the organisation: enter a department, and the link says so (
 
   // the board shows the same departments as rooms, named as the org chart names them
   const room = page.getByRole("region", { name: "Research" });
-  await expect(room.locator('[data-testid^="board-agent-"]')).toHaveCount(2);
+  // the researcher, the analyst and News Intelligence (D-110)
+  await expect(room.locator('[data-testid^="board-agent-"]')).toHaveCount(3);
   await expect(research).toHaveText(/Research/);
 
   // a link into a department opens inside it

@@ -4,6 +4,7 @@
 import type { Schemas } from "@/api/client";
 import { formatDuration } from "@/features/agent-panel/model";
 import type { AgentState } from "@/realtime/reducer";
+import { personName } from "@/people";
 
 export type Approval = Schemas["ApprovalOut"];
 export type ApprovalState = "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
@@ -87,7 +88,7 @@ function officialReport(kind: string, payload: Record<string, unknown>): Officia
 function actorName(actor: Record<string, unknown> | null, agents: Record<string, AgentState>): string {
   if (!actor) return "—";
   const id = String(actor.id ?? "");
-  if (actor.kind === "agent") return agents[id]?.display_name ?? `代理 ${id.slice(0, 8)}`;
+  if (actor.kind === "agent") return personName(agents[id]?.display_name) || `代理 ${id.slice(0, 8)}`;
   return `${ACTOR_KIND[String(actor.kind)] ?? String(actor.kind)} ${id}`.trim();
 }
 

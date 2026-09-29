@@ -6,6 +6,7 @@ import { useRealtime } from "@/stores/realtime";
 
 import { characterFor, type Character } from "../assets/characters";
 import { assignSeats, type Seat } from "../scene/layout";
+import { personName } from "@/people";
 
 export interface Member {
   id: string;
@@ -52,7 +53,7 @@ function parseRoster(key: string): Member[] {
     return {
       id,
       role,
-      name,
+      name: personName(name), // one language, not both (D-112)
       character: character as Character,
       department: department || null,
       office_zone_key: zone || null,

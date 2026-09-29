@@ -16,6 +16,7 @@ import { useNow } from "@/hooks/useNow";
 import { useRealtime } from "@/stores/realtime";
 
 import { CHAT_TYPES, ROLE_NAME, chatItems, dayLabel, timeLabel, type ChatItem, type Speaker } from "./chatModel";
+import { personName } from "@/people";
 
 const ROLE_COLOUR: Record<string, string> = {
   ceo: "#7c5cff",
@@ -101,7 +102,7 @@ export function TeamChat({ companyId, onClose }: { companyId: string; onClose: (
         <div className="min-w-0">
           <h2 className="font-semibold">團隊群組</h2>
           <p className="truncate text-xs text-muted">
-            {members.length ? `${members.map((a) => a.display_name).join("、")} 和你` : "還沒有成員"}
+            {members.length ? `${members.map((a) => personName(a.display_name)).join("、")} 和你` : "還沒有成員"}
           </p>
         </div>
         <button type="button" onClick={onClose} aria-label="收起群組" className="rounded-md p-1.5 text-muted hover:bg-canvas hover:text-ink">

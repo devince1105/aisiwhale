@@ -6,6 +6,7 @@ import type { EventEnvelope } from "@autora/event-schema";
 import { describeEvent, type Tone } from "@/events/describe";
 import type { AgentState } from "@/realtime/reducer";
 import type { TimelineFilters } from "@/stores/ui";
+import { personName } from "@/people";
 
 export interface TimelineItem {
   key: string;
@@ -51,7 +52,7 @@ export function timelineItems(
         label,
         tone,
         summary,
-        actor: agent?.display_name ?? ACTOR_KIND[event.actor.kind] ?? event.actor.kind,
+        actor: personName(agent?.display_name) || (ACTOR_KIND[event.actor.kind] ?? event.actor.kind),
         agentId: event.agent_id,
         taskId: event.task_id,
         runId: event.run_id,
@@ -70,7 +71,7 @@ export function filterOptions(
   const types = new Set([...events.map((e) => e.event_type), ...filters.eventTypes]);
   return {
     agents: [...agentIds]
-      .map((id) => ({ id, name: agents[id]?.display_name ?? id.slice(0, 8) }))
+      .map((id) => ({ id, name: personName(agents[id]?.display_name) || id.slice(0, 8) }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     types: [...types].sort(),
   };

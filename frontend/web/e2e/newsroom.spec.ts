@@ -113,7 +113,7 @@ test("a story from the feeds to the public site, and from the office to its draf
       { timeout: 90_000 },
     );
     await expect(
-      page.getByTestId(/^head-tag-/).filter({ hasText: "Shinobu Kocho" }),
+      page.getByTestId(/^head-tag-/).filter({ hasText: "胡蝶忍" }),
     ).toBeVisible({ timeout: 30_000 });
     // Inside the writing department the number keys are its people (T-600 batch 3), and the
     // writer is the only one. Clicking the avatar is what office.spec measures; here it would
@@ -128,10 +128,10 @@ test("a story from the feeds to the public site, and from the office to its draf
   } else {
     await page
       .locator('[data-testid^="board-agent-"]')
-      .filter({ hasText: "Shinobu Kocho" })
+      .filter({ hasText: "胡蝶忍" })
       .click();
   }
-  await expect(panel(page)).toHaveAttribute("aria-label", "Shinobu Kocho｜胡蝶忍 的詳細資訊");
+  await expect(panel(page)).toHaveAttribute("aria-label", "胡蝶忍 的詳細資訊");
   // The panel is about this story: it names it either as the task in hand or as the hand-off
   // that follows. Not "撰稿：…" specifically — the writer may already have finished by the time
   // the browser gets here, and a test that needs the line to still be mid-draft is racing it.

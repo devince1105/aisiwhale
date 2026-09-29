@@ -5,6 +5,7 @@ import type { EventEnvelope } from "@autora/event-schema";
 
 import type { Tone } from "@/events/describe";
 import type { AgentState } from "@/realtime/reducer";
+import { personName } from "@/people";
 
 /** Mirrors the backend's CHAT_TYPES (autora/company/team_chat.py): what the group hears about. */
 export const CHAT_TYPES = new Set([
@@ -83,10 +84,10 @@ function speakerOf(event: EventEnvelope, agents: Record<string, AgentState>): Sp
   if (event.actor.kind === "human") return { kind: "me" };
   const id = event.agent_id ?? (event.actor.kind === "agent" ? event.actor.id : null);
   const agent = id ? agents[id] : undefined;
-  if (agent) return { kind: "agent", id: agent.id, name: agent.display_name, role: agent.role };
+  if (agent) return { kind: "agent", id: agent.id, name: personName(agent.display_name), role: agent.role };
   const role = VOICE[event.event_type];
   const byRole = role ? Object.values(agents).find((a) => a.role === role) : undefined;
-  if (byRole) return { kind: "agent", id: byRole.id, name: byRole.display_name, role: byRole.role };
+  if (byRole) return { kind: "agent", id: byRole.id, name: personName(byRole.display_name), role: byRole.role };
   if (role) return { kind: "agent", id: null, name: ROLE_NAME[role] ?? role, role };
   return null; // the system: a notice, not a message
 }
@@ -171,9 +172,9 @@ export function chatItem(
     case "POLICY_DENIED":
       return say(`這件事公司政策不允許${s(p.action) ? `：${s(p.action)}` : ""}${s(p.detail) ? `（${clip(s(p.detail)!, 60)}）` : ""}`, "danger");
     case "AGENT_CREATED":
-      return notice(`${s(p.display_name) ?? "新同事"}${s(p.role) ? `（${ROLE_NAME[s(p.role)!] ?? s(p.role)}）` : ""}加入群組`);
+      return notice(`${personName(s(p.display_name)) || "新同事"}${s(p.role) ? `（${ROLE_NAME[s(p.role)!] ?? s(p.role)}）` : ""}加入群組`);
     case "AGENT_RETIRED":
-      return notice(`${s(p.display_name) ?? "一位同事"}離開群組`);
+      return notice(`${personName(s(p.display_name)) || "一位同事"}離開群組`);
     default:
       return null;
   }
