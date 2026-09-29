@@ -293,10 +293,11 @@ def _titles(lang: str, title: str) -> tuple[str, str]:
 
 def _in(lang: str, text: str) -> str:
     """The claim's words in a language's paragraph: as they are when the claim is already in that
-    language, else attributed to the source (the simulation does not translate)."""
+    language, else quoted from the source (the simulation does not translate; English in the
+    Chinese is refused unless it is quoted, D-130)."""
     chinese = bool(_CJK.search(text))
     if lang.startswith("zh"):
-        return text if chinese else f"根據來源：{text}"
+        return text if chinese else f"根據來源：「{text}」"
     return f"According to the source: {text}" if chinese else text
 
 

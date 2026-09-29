@@ -27,6 +27,7 @@ from autora.domains.newsroom.articles import (
     check_draft,
     slugify,
 )
+from autora.domains.newsroom.bilingual import mismatch_problems, untranslated_problems
 from autora.domains.newsroom.events import ArticleCreated
 from autora.domains.newsroom.models import (
     Article,
@@ -166,6 +167,10 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
         issues += advice_problems(args.versions, {row.id: row.claim_type for row in rows})
     # a period a reader can place (D-083): the editor's most frequent reason to send a draft back
     issues += vague_time_problems(args.versions)
+    # English left in the Chinese, and languages that disagree on a year or a percentage (D-130):
+    # the editor's next most frequent reasons, caught here for the price of a tool error
+    issues += untranslated_problems(args.versions)
+    issues += mismatch_problems(args.versions)
     if await _section_of(session, story.id) == institutions.SECTION:
         issues += institutions.attribution_problems(
             args.versions, await _evidence_urls(session, cited)

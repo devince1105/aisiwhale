@@ -86,7 +86,13 @@ class Newsroom:
                     "lang": lang,
                     "title": titles[lang],
                     "blocks": [
-                        {"type": "paragraph", "text": f"{lang} paragraph {i}", "claim_ids": [c]}
+                        {
+                            "type": "paragraph",
+                            "text": f"{lang} 第{i}段"
+                            if lang.startswith("zh")
+                            else f"{lang} paragraph {i}",
+                            "claim_ids": [c],
+                        }
                         for i, c in enumerate(claim_ids)
                     ],
                 }

@@ -20,7 +20,7 @@ from typing import Any
 
 VAGUE_TIME = re.compile(
     r"今年|去年|明年|前年|上週|本週|下週|上周|本周|下周|上個月|上月|本月|下個月|下月"
-    r"|本季|上季|下季|近期|近日|日前|昨天|今天|明天|昨日|今日"
+    r"|本季|上季|下季|近期|近日|近來|日前|如今|昨天|今天|明天|昨日|今日"
     r"|\b(?:this|last|next) (?:year|week|month|quarter)\b|\brecently\b|\byesterday\b"
     r"|\btoday\b|\btomorrow\b|\byear[- ]to[- ]date\b",
     re.IGNORECASE,

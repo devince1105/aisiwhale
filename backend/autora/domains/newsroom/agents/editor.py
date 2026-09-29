@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.db.models import EventRecord
+from autora.db.models import EventRecord, Task, TaskState
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.models import Article, ArticleVersion, FactCheckReport, Story
@@ -143,7 +143,43 @@ async def review_context(session: AsyncSession, ctx: RunContext) -> str | None:
     change = next((v.change_summary for v in versions if v.change_summary), None)
     if change:
         lines.append(f"The writer's changes in this version: {change}")
+    if article.revision_count:
+        # what the last round asked for (D-130): a later round checks these fixes, so it has to
+        # know what they were; without the list it re-reviewed the whole draft and found new
+        # things each round, and stories ran out of revisions while getting better
+        asked = await last_round_issues(session, ctx.company_id, article.id)
+        if asked:
+            lines.append(
+                "The issues sent back last round (check each is fixed; raise a new one only for "
+                "what a fix broke, or an error of the kind in rule 4):"
+            )
+            lines += [
+                f"- [{i.get('kind', 'other')}"
+                + (f", {i['lang']}" if i.get("lang") else "")
+                + (f", block {i['block_ref']}" if i.get("block_ref") else "")
+                + f"] {i.get('message', '')}"
+                for i in asked
+            ]
     return "\n".join(lines)
+
+
+async def last_round_issues(
+    session: AsyncSession, company_id: uuid.UUID, article_id: uuid.UUID
+) -> list[dict]:
+    """The issues of the latest review that sent this article back (empty: none)."""
+    output = await session.scalar(
+        select(Task.output)
+        .where(
+            Task.company_id == company_id,
+            Task.state == TaskState.SUCCEEDED.value,
+            Task.output["article_id"].astext == str(article_id),
+            Task.output["verdict"].astext == "revise",
+        )
+        .order_by(Task.created_at.desc())
+        .limit(1)
+    )
+    issues = (output or {}).get("issues") or []
+    return [i for i in issues if isinstance(i, dict)][:20]
 
 
 # --- validators (EVALUATE) --------------------------------------------------------------------

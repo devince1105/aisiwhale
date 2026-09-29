@@ -122,6 +122,41 @@ async def test_the_context_gives_the_draft_and_the_revisions_left(newsroom_room)
         assert expected in text
 
 
+async def test_a_later_round_is_told_what_the_last_one_asked_for(newsroom_room):
+    """D-130: the editor checks the fixes, so the context lists what was sent back."""
+    room = newsroom_room
+    drafted = await room.call("write_draft", room.draft(list(room.claims.values())))
+    article_id = drafted.output["article_id"]
+    async with room.committed() as session:
+        earlier = await session.scalar(select(Task).where(Task.company_id == room.company.id))
+        earlier.state = "SUCCEEDED"
+        earlier.output = {
+            "article_id": article_id,
+            "verdict": "revise",
+            "issues": [
+                {
+                    "kind": "fact",
+                    "lang": "en",
+                    "block_ref": "3",
+                    "message": "338億元 is NT$33.8 billion",
+                },
+                {"kind": "missing_context", "message": "name the week"},
+            ],
+        }
+        article = await session.get(Article, uuid.UUID(article_id))
+        article.revision_count = 1
+        await session.flush()
+        task = Task(
+            id=uuid.uuid4(),
+            company_id=room.company.id,
+            input={"params": {"story_id": str(room.story.id)}},
+        )
+        text = await review_context(session, _ctx(room.company.id, task))
+    assert "The issues sent back last round" in text
+    assert "- [fact, en, block 3] 338億元 is NT$33.8 billion" in text
+    assert "- [missing_context] name the week" in text
+
+
 async def test_the_validators_hold_the_review_to_the_run(newsroom_room):
     room = newsroom_room
     drafted = await room.call("write_draft", room.draft(list(room.claims.values())))

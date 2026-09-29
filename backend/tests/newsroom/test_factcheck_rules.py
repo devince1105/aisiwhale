@@ -220,7 +220,13 @@ def draft(story_id, claim_ids):
                 "lang": lang,
                 "title": title,
                 "blocks": [
-                    {"type": "paragraph", "text": f"{lang} sentence {i}", "claim_ids": [c]}
+                    {
+                        "type": "paragraph",
+                        "text": f"{lang} 第{i}句"
+                        if lang.startswith("zh")
+                        else f"{lang} sentence {i}",
+                        "claim_ids": [c],
+                    }
                     for i, c in enumerate(claim_ids)
                 ],
             }

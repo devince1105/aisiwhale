@@ -123,7 +123,7 @@ async def test_the_context_and_the_policy_facts(newsroom_room):
         f"Site distribution id: {site.id}",
         "[zh-TW] Title: 流明市首座社區微電網啟用",
         f"  Page: /news/en/articles/{article.slug}",
-        "  Opening: zh-TW paragraph 0",
+        "  Opening: zh-TW 第0段",
     ):
         assert expected in text
     assert facts == {"article_state": "PUBLISHED"}
