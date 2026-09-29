@@ -527,8 +527,8 @@ const LEFT_WINDOWS: [number, number][] = [
   [-5.6, 2.4],
   // none along the server room (D-122): racks want no sun; the work row has two instead, the
   // picture between them
-  [-2.0, 1.8],
-  [2.3, 1.8],
+  [-1.8, 2.4],
+  [2.4, 2.4],
 ];
 const WINDOW = { sill: 1.0, height: 1.5 };
 
@@ -557,7 +557,7 @@ function outerWall(side: OuterWall): Part[] {
     box(WALL + 0.04, CAP, depth + 0.04, [ROOM.minX - WALL / 2, ROOM.wallHeight + CAP / 2, 0], P.wallCap),
     block(0.02, 0.12, depth, [ROOM.minX + 0.01, 0, 0], P.frame),
     ...LEFT_WINDOWS.flatMap(([z, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), ROOM.minX, z, Math.PI / 2)),
-    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, 0.15, Math.PI / 2, 1.75),
+    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, 0.3, Math.PI / 2, 1.75),
   ];
 }
 
