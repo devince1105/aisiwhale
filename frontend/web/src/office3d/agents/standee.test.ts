@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { figureBackPhoto, figurePhoto } from "@/people";
 
-import { CARD_FORWARD, faceCamera, seesBack, standeeLift } from "./Standee";
+import { CARD_FORWARD, faceCamera, seesBack, standeeLift, stepFor, viewFor } from "./Standee";
 
 describe("a standee", () => {
   it("turns to the camera about the vertical only, whatever way its desk faces", () => {
@@ -69,5 +69,26 @@ describe("a standee", () => {
     const edgeOn = new Vector3(0, -1, -1).normalize(); // looking along -z: she is side-on
     expect(seesBack(side, edgeOn, false)).toBe(false);
     expect(seesBack(side, edgeOn, true)).toBe(true);
+  });
+
+  it("sits in a seated picture when seated, the right side to the camera (D-124)", () => {
+    const all = { stand: "s", standBack: "sb", sit: "t", sitBack: "tb" };
+    expect(viewFor(all, true, false)).toBe("sit");
+    expect(viewFor(all, true, true)).toBe("sitBack");
+    expect(viewFor(all, false, true)).toBe("standBack");
+    expect(viewFor(all, false, false)).toBe("stand");
+    // what is missing is stood in for
+    expect(viewFor({ stand: "s" }, true, true)).toBe("stand");
+    expect(viewFor({ stand: "s", sit: "t" }, true, true)).toBe("sit");
+    // in the chair, whichever side is seen; standing and seen from the front, a step out of it
+    expect(stepFor("sit")).toBe(0);
+    expect(stepFor("sitBack")).toBe(0);
+    expect(stepFor("stand")).toBe(CARD_FORWARD);
+  });
+
+  it("a seated picture has her feet on the floor, below the chair's seat", () => {
+    expect(standeeLift("sit_idle", 1, true)).toBeLessThan(-0.15);
+    expect(standeeLift("sit_idle", 1, true)).toBeGreaterThan(-0.25);
+    expect(standeeLift("stand", 1, true)).toBe(0);
   });
 });

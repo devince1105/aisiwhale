@@ -13,3 +13,9 @@ with the hair's top and the chin in, resized to 256 px).
 them while the camera is at a figure's back: `public/figures-back/<avatar_key>.webp`, lifted out
 with `lift.swift` (macOS Vision), cropped to the figure and scaled to 512 px high, as the fronts in
 `public/figures/` are.
+
+## Seated views (D-124)
+
+`sit-front/` and `sit-back/` are the operator's seated pictures (sitting on nothing, so the office's
+own chair takes her), 1024 × 1024. Served as `public/figures-sit/` and `public/figures-sit-back/`,
+made the same way as the back views.

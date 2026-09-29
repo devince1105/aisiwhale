@@ -11,7 +11,7 @@
 import { useGLTF } from "@react-three/drei";
 import { Suspense, useMemo } from "react";
 
-import { figureBackPhoto, figurePhoto } from "@/people";
+import { figureBackPhoto, figurePhoto, figureSitBackPhoto, figureSitPhoto } from "@/people";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
 import { characterUrl } from "../assets/characters";
@@ -19,8 +19,17 @@ import { outfitFor } from "../assets/outfits";
 import type { Seat } from "../scene/layout";
 import { AgentAvatar } from "./AgentAvatar";
 import { useRoster, type Member } from "./roster";
+import type { Pictures } from "./Standee";
 
 export { rosterKey } from "./roster";
+
+/** Her standee's pictures, or null: then she is drawn as the dressed model. */
+function picturesOf(avatar: string | null | undefined): Pictures | null {
+  const stand = figurePhoto(avatar);
+  return stand
+    ? { stand, standBack: figureBackPhoto(avatar), sit: figureSitPhoto(avatar), sitBack: figureSitBackPhoto(avatar) }
+    : null;
+}
 
 function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
   const gltf = useGLTF(characterUrl(member.character), false);
@@ -31,8 +40,7 @@ function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
       seat={seat}
       model={model}
       outfit={outfitFor(member.avatar)}
-      figure={figurePhoto(member.avatar)}
-      figureBack={figureBackPhoto(member.avatar)}
+      figure={picturesOf(member.avatar)}
     />
   );
 }

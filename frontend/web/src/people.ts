@@ -29,6 +29,16 @@ export function figurePhoto(avatarKey: string | null | undefined): string | null
   return avatarKey && PHOTOS.has(avatarKey) ? `/figures/${avatarKey}.webp` : null;
 }
 
+/** Her seated figures, front and back (D-124): sitting on nothing, so that she sits in the
+ * office's own chair. */
+export function figureSitPhoto(avatarKey: string | null | undefined): string | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? `/figures-sit/${avatarKey}.webp` : null;
+}
+
+export function figureSitBackPhoto(avatarKey: string | null | undefined): string | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? `/figures-sit-back/${avatarKey}.webp` : null;
+}
+
 /** The same figure from behind (D-123), for when the camera is at her back; cut out of the
  * operator's back views (``avatars-source/back``) the same way. */
 export function figureBackPhoto(avatarKey: string | null | undefined): string | null {

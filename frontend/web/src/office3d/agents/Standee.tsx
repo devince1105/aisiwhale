@@ -8,14 +8,34 @@ import { useRef } from "react";
 import { DoubleSide, Quaternion, SRGBColorSpace, Vector3, type Group, type Mesh, type MeshBasicMaterial, type Object3D, type Texture } from "three";
 
 import type { Pose } from "../visual/mapping";
+import { AVATAR_SCALE, SEAT_LIFT } from "./body";
 
 /** Model units (the avatar group is scaled by AVATAR_SCALE): a little taller than the chibi
  * figures (0.78), so a face reads at the overview. */
 export const STANDEE_HEIGHT = 0.95;
 
-/** How high the standee stands for a pose, at time ``t`` (seconds). Seated, it sinks so the
- * desk hides her legs; typing and walking bob; slumping sinks further. */
-export function standeeLift(pose: Pose | null, t: number): number {
+/** A seated picture's height, in the same units: the chibi's legs are short, so sitting takes
+ * little off her height (the operator's seated and standing pictures, matched by head size). */
+export const SIT_HEIGHT = STANDEE_HEIGHT * 0.97;
+
+/** Seated, unless standing or walking (no pose yet is the chair, where everyone starts). */
+export function isSeated(pose: Pose | null): boolean {
+  return pose !== "stand" && pose !== "walk";
+}
+
+/** How high the standee stands for a pose, at time ``t`` (seconds). With a seated picture
+ * (D-124) she sits on her chair's seat, her feet on the floor, and only bobs. Without one the
+ * standing picture sinks so the desk hides her legs; typing and walking bob; slumping sinks
+ * further. */
+export function standeeLift(pose: Pose | null, t: number, seatedPicture = false): number {
+  if (seatedPicture && isSeated(pose)) {
+    // the avatar is raised to the chair's seat; her picture goes back down to the floor
+    const floor = -SEAT_LIFT / AVATAR_SCALE;
+    if (pose === "sit_type") return floor + Math.abs(Math.sin(t * 10)) * 0.012;
+    if (pose === "sit_think") return floor + Math.sin(t * 2) * 0.008;
+    if (pose === "slump") return floor - 0.05;
+    return floor;
+  }
   switch (pose) {
     case "walk":
       return Math.abs(Math.sin(t * 9)) * 0.04;
@@ -79,45 +99,76 @@ export function seesBack(avatar: Object3D, cameraDirection: Vector3, wasBack: bo
 
 const lookDirection = new Vector3();
 
-function widthOf(texture: Texture): number {
-  const image = texture.image as { width: number; height: number } | undefined;
-  return image ? (STANDEE_HEIGHT * image.width) / image.height : STANDEE_HEIGHT * 0.6;
+/** Someone's pictures: standing, from the front and behind (D-118, D-123), and seated (D-124).
+ * Only the standing front is needed; the rest stand in for each other when missing. */
+export interface Pictures {
+  stand: string;
+  standBack?: string | null;
+  sit?: string | null;
+  sitBack?: string | null;
+}
+export type View = "stand" | "standBack" | "sit" | "sitBack";
+
+/** Which picture shows, seated or not, seen from behind or not. */
+export function viewFor(pictures: Pictures, seated: boolean, back: boolean): View {
+  if (seated && pictures.sit) return back && pictures.sitBack ? "sitBack" : "sit";
+  return back && pictures.standBack ? "standBack" : "stand";
 }
 
-export function Standee({ url, back = null }: { url: string; back?: string | null }) {
+/** How far toward the camera the card stands for a view: seated, or seen from behind, she is in
+ * her chair (its back in front of her, as a sitter's is); standing and seen from the front, a step
+ * out of it, or the chair's back would hide her. */
+export function stepFor(view: View): number {
+  return view === "stand" ? CARD_FORWARD : 0;
+}
+
+const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack"];
+
+function sizeOf(texture: Texture, view: View): [number, number] {
+  const height = view === "sit" || view === "sitBack" ? SIT_HEIGHT : STANDEE_HEIGHT;
+  const image = texture.image as { width: number; height: number } | undefined;
+  return [image ? (height * image.width) / image.height : height * 0.6, height];
+}
+
+export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Pose | null }) {
   const card = useRef<Group>(null);
   const plane = useRef<Mesh>(null);
-  const showingBack = useRef(false);
-  const textures = useTexture(back ? [url, back] : [url], (t) => {
-    for (const loaded of Array.isArray(t) ? t : [t]) {
-      loaded.colorSpace = SRGBColorSpace;
-      loaded.anisotropy = 4;
-    }
-  });
-  const [front, behind] = textures;
+  const shown = useRef<View>("stand");
+  const views = VIEWS.filter((view) => pictures[view]);
+  const textures = useTexture(
+    views.map((view) => pictures[view]!),
+    (t) => {
+      for (const loaded of Array.isArray(t) ? t : [t]) {
+        loaded.colorSpace = SRGBColorSpace;
+        loaded.anisotropy = 4;
+      }
+    },
+  );
+  const texture = (view: View) => textures[views.indexOf(view)];
   useFrame(({ camera }) => {
     if (!card.current) return;
     camera.getWorldDirection(lookDirection);
     const avatar = card.current.parent;
-    const wasBack = showingBack.current;
-    const isBack = Boolean(behind && avatar && seesBack(avatar, lookDirection, wasBack));
-    // seen from behind she sits in her chair, its back in front of her as a sitter's is; seen
-    // from the front she stands a step out of it, or the chair's back would hide her
-    faceCamera(card.current, lookDirection, isBack ? 0 : CARD_FORWARD);
-    if (isBack === wasBack || !behind || !plane.current) return;
-    showingBack.current = isBack;
-    const texture = isBack ? behind : front;
+    const wasBack = shown.current === "standBack" || shown.current === "sitBack";
+    const back = Boolean(avatar && seesBack(avatar, lookDirection, wasBack));
+    const view = viewFor(pictures, isSeated(pose()), back);
+    faceCamera(card.current, lookDirection, stepFor(view));
+    if (view === shown.current || !plane.current) return;
+    shown.current = view;
     const material = plane.current.material as MeshBasicMaterial;
-    material.map = texture;
+    material.map = texture(view);
     material.needsUpdate = true;
-    plane.current.scale.x = widthOf(texture);
+    const [width, height] = sizeOf(texture(view), view);
+    plane.current.scale.set(width, height, 1);
+    plane.current.position.y = height / 2;
   });
+  const [width, height] = sizeOf(texture("stand"), "stand");
   return (
     // upright: it turns about the vertical only, so it never leans back at the isometric camera
     <group ref={card}>
-      <mesh ref={plane} name="standee" position={[0, STANDEE_HEIGHT / 2, 0]} scale={[widthOf(front), STANDEE_HEIGHT, 1]}>
+      <mesh ref={plane} name="standee" position={[0, height / 2, 0]} scale={[width, height, 1]}>
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial map={front} transparent alphaTest={0.4} side={DoubleSide} toneMapped={false} />
+        <meshBasicMaterial map={texture("stand")} transparent alphaTest={0.4} side={DoubleSide} toneMapped={false} />
       </mesh>
     </group>
   );

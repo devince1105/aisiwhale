@@ -17,7 +17,7 @@ import { avatarHandlers } from "../interaction/picking";
 import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
 import { dress } from "./dress";
-import { Standee, standeeLift } from "./Standee";
+import { Standee, standeeLift, type Pictures } from "./Standee";
 import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
 
 export { AVATAR_SCALE, SEAT_LIFT };
@@ -46,17 +46,15 @@ export function AgentAvatar({
   model,
   outfit = null,
   figure = null,
-  figureBack = null,
 }: {
   agentId: string;
   seat: Seat;
   model: AvatarModel;
   /** Dressed as herself (D-115): her own palette and colours on the clone. */
   outfit?: Outfit | null;
-  /** Her Q-version figure (D-118): a standee facing the camera instead of the model. */
-  figure?: string | null;
-  /** The same figure from behind (D-123), shown while the camera is at her back. */
-  figureBack?: string | null;
+  /** Her Q-version pictures (D-118, D-123, D-124): a standee facing the camera instead of the
+   * model, standing or seated, from the front or behind. */
+  figure?: Pictures | null;
 }) {
   const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
@@ -98,7 +96,7 @@ export function AgentAvatar({
       if (g) g.rotation.y = step.heading;
       if (paper.current) paper.current.visible = step.carrying;
       controller.update(Math.min(dt, 0.1));
-      if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000);
+      if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000, Boolean(figure?.sit));
       return;
     }
     if (walk.current) {
@@ -122,7 +120,7 @@ export function AgentAvatar({
       }
     }
     controller.update(Math.min(dt, 0.1));
-    if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000);
+    if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000, Boolean(figure?.sit));
   });
 
   return (
@@ -136,7 +134,7 @@ export function AgentAvatar({
     >
       {figure ? (
         <group ref={standee}>
-          <Standee url={figure} back={figureBack} />
+          <Standee pictures={figure} pose={() => controller.pose} />
         </group>
       ) : (
         <primitive object={body} />
