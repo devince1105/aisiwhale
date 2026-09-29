@@ -111,6 +111,29 @@ RESPONSIBILITIES = {
 """What each desk answers for (D-110), as the roles' ``responsibilities``."""
 
 
+MISSION = (
+    "Bilingual finance reporting that says where every fact came from. The site is free while it "
+    "builds its readers (D-035): no revenue is expected yet, so judge it on what it publishes, how "
+    "good that is, who reads it and what it costs — not on sales."
+)
+"""What AI Media is for, as the CEO reads it every cycle."""
+
+MAX_COST_PER_ARTICLE = 100.0
+"""NT$ per published article (D-117). It was written as 3.0 when the base currency was the US
+dollar (US$3); after D-023 made the base NT$ the same 3.0 meant NT$3 — less than an article costs
+— and the CEO paused the newsroom on it. NT$100 is about the US$3 it was meant to be."""
+
+KILL_CRITERIA = {
+    "evaluate_after_cycles": 7,
+    "auto_pause_if": {
+        "metric": "cost_per_published_article",
+        "op": ">",
+        "value": MAX_COST_PER_ARTICLE,
+        "unit": "TWD per published article",
+    },
+}
+
+
 @dataclass(frozen=True)
 class NewsroomOrg:
     business_unit: BusinessUnit
@@ -133,16 +156,9 @@ async def build(session: AsyncSession, company_id: uuid.UUID, *, actor: Actor) -
             key=BUSINESS_UNIT,
             name="AI Media",
             actor=actor,
-            mission="Bilingual reporting that says where every fact came from.",
+            mission=MISSION,
             state=BusinessUnitState.ACTIVE,
-            kill_criteria={
-                "evaluate_after_cycles": 7,
-                "auto_pause_if": {
-                    "metric": "cost_per_published_article",
-                    "op": ">",
-                    "value": 3.0,
-                },
-            },
+            kill_criteria=KILL_CRITERIA,
         )
     desk = await department_by_key(session, company_id, NEWSROOM)
     if desk is None:
