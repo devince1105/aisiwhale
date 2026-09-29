@@ -122,13 +122,14 @@ class ClaimRejected(EventPayload):
 
 @event("ARTICLE_REVIEWED")
 class ArticleReviewed(EventPayload):
-    """The editor's decision on a draft (T-511): ``accept`` sends it on to approval."""
+    """A reviewer's decision on a draft (T-511): the editor's, or the editor-in-chief's final
+    review (D-110, ``by_role`` editor_in_chief). ``accept`` sends it on to approval."""
 
     article_id: uuid.UUID
     version_id: uuid.UUID
     """The primary-language version of the draft reviewed."""
     verdict: str
-    """"accept" or "revise"."""
+    """"accept" or "revise"; the editor-in-chief may also "veto" (D-110)."""
     fact_check_passed: bool
     by_role: str
 
@@ -141,6 +142,8 @@ class ArticleRevisionRequested(EventPayload):
     by_role: str
     revision: int
     """How many revisions the article has had asked for, this one included (at most two)."""
+    back_to: str = "writer"
+    """Who fixes it (D-110): the writer (the draft) or the analyst (the claims under it)."""
 
 
 @event("ARTICLE_APPROVED")

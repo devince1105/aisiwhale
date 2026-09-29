@@ -35,6 +35,7 @@ from autora.db.models import (
 )
 from autora.db.repositories.companies import get_company_by_slug
 from autora.domains.newsroom import organization as newsroom_org
+from autora.domains.newsroom import personas
 from autora.domains.newsroom.models import Source, Story, StoryState
 from autora.domains.newsroom.sources import SourcePoller, add_source
 from autora.domains.newsroom.stories import StoryDesk
@@ -93,7 +94,8 @@ async def seed_demo(
             session,
             company_id=company.id,
             role=ceo_role.key,
-            display_name="Cyra",
+            display_name=personas.CEO.name,
+            description=personas.CEO.description,
             actor=actor,
             position=ceo_role,
         )

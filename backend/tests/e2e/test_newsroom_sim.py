@@ -185,7 +185,7 @@ async def test_the_demo_newsroom_publishes_a_story_from_its_feeds(committed, e2e
             assert verdict.passed, (claim.text, verdict.problems)
     # every agent ran, only the simulated model answered, every tool call finished
     assert {r.state for r in runs} == {"COMPLETED"}
-    assert len(runs) == 7  # research, analysis, 2 drafts, 2 reviews, distribute
+    assert len(runs) == 8  # research, analysis, 2 drafts, 2 reviews, final review, distribute
     assert model_providers == {"fake"}
     called = {e.payload["tool_call_id"] for e in tool_events if e.event_type == "TOOL_CALLED"}
     finished = {e.payload["tool_call_id"] for e in tool_events if e.event_type != "TOOL_CALLED"}
@@ -194,8 +194,9 @@ async def test_the_demo_newsroom_publishes_a_story_from_its_feeds(committed, e2e
     # not a newsroom pretending to be a company (T-605a/b)
     assert len(activities) == len(DISPLAY_NAMES) + 1
     # the ones that did the line's work carry their links; the planners' runs are their own
+    # (the chief's and, since D-110, News Intelligence's)
     working = [a for a in activities.values() if a.detail.get("links")]
-    assert len(working) >= len(DISPLAY_NAMES) - 1
+    assert len(working) >= len(DISPLAY_NAMES) - 2
 
 
 async def test_an_editor_that_never_decides_fails_visibly(committed, e2e_settings):
@@ -339,7 +340,8 @@ async def test_a_cycle_plans_and_commissions_without_anyone_pressing_anything(
     # the company planned its own day: the CEO in PLANNING, then the desk once the budget was
     # set (the desk plans at the start of EXECUTING, which is the first moment it can know it)
     assert templates[0] == "company.cycle_plan_v1"
-    assert "newsroom.editorial_plan_v1" in templates
+    # News Intelligence briefs the desk first, so the desk plans with a brief (D-110)
+    assert "newsroom.editorial_plan_v2" in templates
     # and the desk put the line to work on what it chose
     assert commissioned, "the editor-in-chief commissioned nothing"
     assert "newsroom.story_to_article_v2" in templates

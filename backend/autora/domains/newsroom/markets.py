@@ -44,7 +44,7 @@ from autora.company.companies import create_company
 from autora.company.organization import bootstrap_executive, business_unit_by_key
 from autora.db.models import Agent, Company, Project, ProjectState
 from autora.db.repositories.companies import get_company_by_slug, get_policies, upsert_policy
-from autora.domains.newsroom import forex, institutions
+from autora.domains.newsroom import forex, institutions, personas
 from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source, SourceStatus
@@ -359,7 +359,8 @@ async def seed_markets(
             session,
             company_id=company.id,
             role=ceo_role.key,
-            display_name="Cyra",
+            display_name=personas.CEO.name,
+            description=personas.CEO.description,
             actor=actor,
             position=ceo_role,
         )

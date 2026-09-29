@@ -17,7 +17,11 @@ Two additions (T-514):
 - a template may declare **loops** (``Loop``): when the node ``check`` succeeds and its output asks
   for it, the nodes ``back_to`` .. ``check`` are added again (a revision round), and whatever
   waited for ``check`` waits for the new round instead. At most ``max_rounds`` extra rounds; one
-  more request cancels what was waiting (the work did not get done).
+  more request cancels what was waiting (the work did not get done). Several loops may check the
+  same node: the first whose ``again`` asks for a round is the one that runs (the problem is in the
+  draft, or further back, in the analysis — D-110).
+- a template may declare **halts** (``Halt``): when the node ``check`` succeeds and its output says
+  the work must stop there (a veto), whatever waited for it is cancelled and the run closes.
 
 The engine plugs into the TaskManager's hooks, so all of this happens inside the same
 transaction as the task change that triggered it.
@@ -92,10 +96,22 @@ class Loop:
 
 
 @dataclass(frozen=True)
+class Halt:
+    """Stop the run after ``check`` when ``when(check's output)`` says so: everything that waited
+    for it is cancelled (D-110: the editor-in-chief's veto)."""
+
+    check: str
+    when: Callable[[dict[str, Any]], bool]
+    reason: str = "{name} stopped the work"
+    """Why the waiting tasks were cancelled: ``name`` is the node's name."""
+
+
+@dataclass(frozen=True)
 class WorkflowTemplate:
     name: str
     nodes: tuple[NodeSpec, ...]
     loops: tuple[Loop, ...] = ()
+    halts: tuple[Halt, ...] = ()
 
     def __post_init__(self) -> None:
         if not _TEMPLATE_NAME.match(self.name):
@@ -118,6 +134,9 @@ class WorkflowTemplate:
                 raise InvalidTemplate(f"{self.name}: loop over unknown nodes {loop}")
             if loop.back_to not in self.upstream(loop.check) and loop.back_to != loop.check:
                 raise InvalidTemplate(f"{self.name}: {loop.back_to} does not lead to {loop.check}")
+        for halt in self.halts:
+            if halt.check not in names:
+                raise InvalidTemplate(f"{self.name}: halt on unknown node {halt.check!r}")
 
     def upstream(self, name: str) -> set[str]:
         """Every node ``name`` depends on, directly or transitively."""
@@ -272,6 +291,8 @@ class WorkflowEngine:
         if task.workflow_run_id is None:
             return []
         siblings = await self._tasks(session, task.workflow_run_id, lock=True)
+        if await self._halt(session, task, siblings):
+            return []
         unlocked = await self._loop(session, task, siblings)
         if unlocked is not None:
             return unlocked
@@ -316,20 +337,20 @@ class WorkflowEngine:
             template = self.templates.get(run.template_name)
         except WorkflowError:
             return None
-        loop = next((lp for lp in template.loops if lp.check == task.name), None)
-        if loop is None or not loop.again(task.output or {}):
+        output = task.output or {}
+        loop = next(
+            (lp for lp in template.loops if lp.check == task.name and lp.again(output)), None
+        )
+        if loop is None:
             return None
         waiting = [t for t in siblings if task.id in t.depends_on]
         rounds = sum(1 for t in siblings if t.name == loop.check) - 1
         if rounds >= loop.max_rounds:
-            for downstream in waiting:
-                if not TASK_FSM.is_terminal(downstream.state):
-                    await self.task_manager.cancel(
-                        session,
-                        downstream,
-                        reason=f"{task.name} still asks for another round after "
-                        f"{loop.max_rounds} rounds",
-                    )
+            await self._cancel_waiting(
+                session,
+                waiting,
+                reason=f"{task.name} still asks for another round after {loop.max_rounds} rounds",
+            )
             await self._close_if_done(session, run.id)
             return []
 
@@ -385,6 +406,34 @@ class WorkflowEngine:
             for t in new.values()
             if t.state == TaskState.READY
         ]
+
+    async def _halt(self, session: AsyncSession, task: Task, siblings: list[Task]) -> bool:
+        """Stop the run here if a halt says so (a veto): what waited for ``task`` is cancelled."""
+        run = await session.get(WorkflowRun, task.workflow_run_id)
+        if run is None:
+            return False
+        try:
+            template = self.templates.get(run.template_name)
+        except WorkflowError:
+            return False
+        halt = next(
+            (h for h in template.halts if h.check == task.name and h.when(task.output or {})),
+            None,
+        )
+        if halt is None:
+            return False
+        await self._cancel_waiting(
+            session,
+            [t for t in siblings if task.id in t.depends_on],
+            reason=halt.reason.format(name=task.name),
+        )
+        await self._close_if_done(session, run.id)
+        return True
+
+    async def _cancel_waiting(self, session: AsyncSession, waiting: list[Task], *, reason: str):
+        for downstream in waiting:
+            if not TASK_FSM.is_terminal(downstream.state):
+                await self.task_manager.cancel(session, downstream, reason=reason)
 
     # --- internals -------------------------------------------------------------------------
 

@@ -38,7 +38,7 @@ from autora.company.agents import hire_agent
 from autora.company.organization import role_by_key
 from autora.company.workflows import StartWorkflowError, start_workflow
 from autora.db.models import Agent, AgentStatus, Approval, WorkflowRun
-from autora.domains.newsroom import organization
+from autora.domains.newsroom import organization, personas
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
 from autora.domains.newsroom.publisher import (
     NotAllowed,
@@ -51,7 +51,14 @@ from autora.domains.newsroom.publisher import (
 )
 from autora.domains.newsroom.stories import STORY_FSM
 from autora.runtime.actor import Actor
-from autora.runtime.dag import Loop, NodeSpec, TemplateRegistry, WorkflowEngine, WorkflowTemplate
+from autora.runtime.dag import (
+    Halt,
+    Loop,
+    NodeSpec,
+    TemplateRegistry,
+    WorkflowEngine,
+    WorkflowTemplate,
+)
 from autora.runtime.policy import PolicyEngine
 from autora.runtime.services import ServiceContext
 
@@ -69,6 +76,21 @@ def _revise(output: dict[str, Any]) -> bool:
     return output.get("verdict") == "revise"
 
 
+def _to_analyst(output: dict[str, Any]) -> bool:
+    """The editor found the problem in the claims themselves (D-110): the analysis is redone."""
+    return _revise(output) and output.get("back_to") == "analyst"
+
+
+def _to_writer(output: dict[str, Any]) -> bool:
+    return _revise(output) and output.get("back_to") != "analyst"
+
+
+def _chief_stops(output: dict[str, Any]) -> bool:
+    """The editor-in-chief vetoed the piece, or sent it back once too often and the story was
+    dropped (D-110): nothing downstream runs."""
+    return output.get("verdict") == "veto" or bool(output.get("dropped"))
+
+
 def _issues(output: dict[str, Any]) -> dict[str, Any]:
     return {"issues": output.get("issues") or []}
 
@@ -83,6 +105,19 @@ def _their_reason(output: dict[str, Any]) -> dict[str, Any]:
     return {"issues": [{"message": f"審批退回（人工）：{output.get('reason') or ''}"}]}
 
 
+CHIEF_LOOP = Loop(
+    check="chief_review",
+    back_to="draft",
+    again=_revise,
+    carry=_issues,
+    max_rounds=MAX_REVISIONS,
+    round_label="{name}（總編退回第 {round} 輪）",
+)
+"""The editor-in-chief sends a draft back: the writer revises, the editor reviews it again, and it
+comes back to the chief (D-110)."""
+CHIEF_HALT = Halt("chief_review", when=_chief_stops, reason="the editor-in-chief stopped it")
+
+
 TEMPLATE = WorkflowTemplate(
     name=TEMPLATE_NAME,
     nodes=(
@@ -90,19 +125,34 @@ TEMPLATE = WorkflowTemplate(
         NodeSpec("analysis", "分析：{title}", "analyst", depends_on=("research",)),
         NodeSpec("draft", "撰稿：{title}", "writer", depends_on=("analysis",)),
         NodeSpec("review", "審稿：{title}", "editor", depends_on=("draft",)),
-        NodeSpec("approve", "核准：{title}", "human", depends_on=("review",), service=APPROVE),
+        # the editor-in-chief's final review, before a person approves (D-110)
+        NodeSpec("chief_review", "總編終審：{title}", "editor_in_chief", depends_on=("review",)),
+        NodeSpec(
+            "approve", "核准：{title}", "human", depends_on=("chief_review",), service=APPROVE
+        ),
         NodeSpec("publish", "發布：{title}", "system", depends_on=("approve",), service=PUBLISH),
         NodeSpec("distribute", "推廣：{title}", "marketing", depends_on=("publish",)),
     ),
     loops=(
+        # the editor sends it back to the analyst (the claims) or the writer (the draft); both
+        # count against the same revisions (D-110)
         Loop(
             check="review",
-            back_to="draft",
-            again=_revise,
+            back_to="analysis",
+            again=_to_analyst,
             carry=_issues,
             max_rounds=MAX_REVISIONS,
             round_label="{name}（第 {round} 輪）",
         ),
+        Loop(
+            check="review",
+            back_to="draft",
+            again=_to_writer,
+            carry=_issues,
+            max_rounds=MAX_REVISIONS,
+            round_label="{name}（第 {round} 輪）",
+        ),
+        CHIEF_LOOP,
         # D-044: a person sends it back from approval; the writer drafts again with their reason,
         # the editor reviews again, and it comes back to approval. The editor's loop above counts
         # reviews, so a round sent back by a person uses one of those too.
@@ -115,6 +165,7 @@ TEMPLATE = WorkflowTemplate(
             round_label="{name}（退回後第 {round} 輪）",
         ),
     ),
+    halts=(CHIEF_HALT,),
 )
 
 
@@ -126,16 +177,36 @@ REVISION_TEMPLATE = WorkflowTemplate(
         NodeSpec("draft", "修改：{title}", "writer"),
         NodeSpec("review", "審稿（修改）：{title}", "editor", depends_on=("draft",)),
         NodeSpec(
-            "approve", "核准（修改）：{title}", "human", depends_on=("review",), service=APPROVE
+            "chief_review", "總編終審（修改）：{title}", "editor_in_chief", depends_on=("review",)
+        ),
+        NodeSpec(
+            "approve",
+            "核准（修改）：{title}",
+            "human",
+            depends_on=("chief_review",),
+            service=APPROVE,
         ),
         NodeSpec(
             "publish", "發布（修改）：{title}", "system", depends_on=("approve",), service=PUBLISH
         ),
     ),
-    loops=TEMPLATE.loops,
+    # no analysis here: whatever the editor sends back, the writer revises
+    loops=(
+        Loop(
+            check="review",
+            back_to="draft",
+            again=_revise,
+            carry=_issues,
+            max_rounds=MAX_REVISIONS,
+            round_label="{name}（第 {round} 輪）",
+        ),
+        CHIEF_LOOP,
+        *(loop for loop in TEMPLATE.loops if loop.check == "approve"),
+    ),
+    halts=(CHIEF_HALT,),
 )
-"""D-045: a published article changed. Same loops as a story's: the editor's rounds, and a
-person's sending back."""
+"""D-045: a published article changed. The same rounds as a story's — the editor's, the
+editor-in-chief's and a person's sending back — except that there is no analysis to go back to."""
 
 
 def register_templates(templates: TemplateRegistry) -> None:
@@ -145,16 +216,9 @@ def register_templates(templates: TemplateRegistry) -> None:
 
 # --- staffing ---------------------------------------------------------------------------------
 
-DISPLAY_NAMES = {
-    "editor_in_chief": "Edda",
-    "researcher": "Rae",
-    "analyst": "Ana",
-    "writer": "Wren",
-    "editor": "Eli",
-    "marketing": "Mika",
-}
-"""The newsroom's desks (the echo demo's three share the names). Edda heads it: she decides
-what the desk covers, and nobody else does (T-605b)."""
+DISPLAY_NAMES = {role: persona.name for role, persona in personas.STAFF.items()}
+"""The newsroom's desks and who sits at each (D-110: ``personas.py``). The editor-in-chief heads
+it: she decides what the desk covers, and nobody else does (T-605b)."""
 
 
 async def staff_newsroom(
@@ -177,7 +241,7 @@ async def staff_newsroom(
         ).all()
     )
     hired = []
-    for role, name in DISPLAY_NAMES.items():
+    for role, persona in personas.STAFF.items():
         if role in existing:
             continue
         position = await role_by_key(session, company_id, role)
@@ -186,7 +250,8 @@ async def staff_newsroom(
                 session,
                 company_id=company_id,
                 role=role,
-                display_name=name,
+                display_name=persona.name,
+                description=persona.description,
                 actor=actor,
                 position=position,
             )

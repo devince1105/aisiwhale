@@ -82,6 +82,17 @@ describe("the group's messages (D-109)", () => {
     expect(mine.type === "message" && [mine.brief, mine.link?.href]).toEqual([true, "/admin/newsroom/stories/s1"]);
   });
 
+  it("the editor-in-chief's final review reads as hers (D-110)", () => {
+    const chief = { actor: { kind: "agent" as const, id: "c1" } };
+    const said = (verdict: string) => {
+      const item = chatItem(event("ARTICLE_REVIEWED", { article_id: "a1", verdict, by_role: "editor_in_chief" }, chief), AGENTS)!;
+      return item.type === "message" ? `${item.speaker.kind === "agent" ? item.speaker.name : ""}：${item.text}` : "";
+    };
+    expect(said("accept")).toBe("Edda：這篇終審通過，請您最後核准。");
+    expect(said("veto")).toBe("Edda：這篇不發了，我否決。");
+    expect(said("revise")).toBe("Edda：這篇要再改，退回給寫手。");
+  });
+
   it("keeps quiet about a failure that will be retried and the steps between; each event once", () => {
     const retry = event("AGENT_RUN_FAILED", { final: false, error_class: "Timeout" }, { agent_id: "w1" });
     const final = event("AGENT_RUN_FAILED", { final: true, error_class: "Timeout" }, { agent_id: "w1" });
@@ -157,6 +168,13 @@ describe("the group beside the office (D-109)", () => {
     open();
     const asked = await screen.findByTestId("chat-approval");
     expect(screen.getByText("早安")).toBeTruthy();
+    // newest first (D-111): the note (seq 2) above the approval asked for before it (seq 1)
+    const order = screen.getByTestId("team-chat-messages").textContent!;
+    expect(order.indexOf("早安")).toBeLessThan(order.indexOf("核准發布：黃金需求"));
+    // and what you write goes in at the top, above the messages
+    const chat = screen.getByTestId("team-chat");
+    const composer = screen.getByTestId("team-chat-composer");
+    expect([...chat.children].indexOf(composer)).toBeLessThan([...chat.children].indexOf(screen.getByTestId("team-chat-messages")));
     expect(screen.getByText(/Wren、Eli、Edda 和你/)).toBeTruthy();
     fireEvent.click(within(asked).getByRole("button", { name: "核准" }));
     await waitFor(() => expect(calls.some((c) => c.url.includes("/api/approvals/ap1/decide"))).toBe(true));

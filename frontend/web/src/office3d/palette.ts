@@ -558,5 +558,7 @@ export const ROLE_COLOR: Record<string, string> = {
   editor: "#8e5bd6",
   marketing: "#3fb58a",
   ceo: "#2d2f33",
+  editor_in_chief: "#b8322a",
+  news_intelligence: "#d98a1c",
   spare: "#9aa0a8",
 };

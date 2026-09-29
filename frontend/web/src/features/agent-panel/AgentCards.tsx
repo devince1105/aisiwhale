@@ -1,4 +1,4 @@
-import { formatDuration, ROLE_LABEL, type CardModel } from "./model";
+import { formatDuration, ROLE_ICON, ROLE_LABEL, type CardModel } from "./model";
 import { ProgressBar, StateBadge } from "./StateBadge";
 
 export function AgentCards({
@@ -29,7 +29,10 @@ export function AgentCards({
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <p className="truncate font-semibold">{card.name}</p>
-                <p className="text-xs text-muted">{ROLE_LABEL[card.role] ?? card.role}</p>
+                <p className="text-xs text-muted">
+                  {ROLE_ICON[card.role] ? `${ROLE_ICON[card.role]} ` : ""}
+                  {ROLE_LABEL[card.role] ?? card.role}
+                </p>
               </div>
               <StateBadge state={card.state} label={card.stateLabel} />
             </div>

@@ -38,10 +38,11 @@ MATRIX = {
     "link_evidence":        (D, A, D, D, D, D, D, D, D, D),
     "list_claims":          (A, A, A, A, A, A, A, D, D, D),
     "write_draft":          (D, D, A, D, D, D, D, D, D, D),
-    "read_draft":           (D, D, A, A, A, D, A, D, D, D),
+    "read_draft":           (D, D, A, A, A, A, A, D, D, D),  # the chief too (D-110)
     "run_fact_check":       (D, D, D, A, D, D, D, D, D, D),
     "request_revision":     (D, D, D, A, D, D, D, D, D, D),
     "accept_draft":         (D, D, D, A, D, D, D, D, D, D),
+    "final_review":         (D, D, D, D, D, A, D, D, D, D),  # the chief's final review (D-110)
     "approve_article":      (D, D, D, D, D, D, D, D, D, D),
     "publish_article":      (D, D, D, D, D, D, D, D, D, D),
     "create_distribution":  (D, D, D, D, A, D, D, D, D, D),

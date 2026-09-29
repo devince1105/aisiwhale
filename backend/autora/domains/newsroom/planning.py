@@ -37,6 +37,7 @@ from autora.db.models import (
     Task,
     WorkflowRun,
 )
+from autora.domains.newsroom.agents import news_intelligence
 from autora.domains.newsroom.agents.editor_in_chief import ROLE, TASK
 from autora.domains.newsroom.organization import BUSINESS_UNIT
 from autora.runtime.actor import Actor
@@ -44,14 +45,31 @@ from autora.runtime.dag import NodeSpec, TemplateRegistry, WorkflowEngine, Workf
 from autora.runtime.lifecycles import TASK_FSM
 
 TEMPLATE = "newsroom.editorial_plan_v1"
+BRIEFED_TEMPLATE = "newsroom.editorial_plan_v2"
 
 PLAN_TEMPLATE = WorkflowTemplate(
     name=TEMPLATE, nodes=(NodeSpec(TASK, "Plan the desk's day (cycle {seq})", ROLE),)
 )
+BRIEFED_PLAN_TEMPLATE = WorkflowTemplate(
+    name=BRIEFED_TEMPLATE,
+    nodes=(
+        NodeSpec(news_intelligence.TASK, "Market brief (cycle {seq})", news_intelligence.ROLE),
+        NodeSpec(
+            TASK,
+            "Plan the desk's day (cycle {seq})",
+            ROLE,
+            depends_on=(news_intelligence.TASK,),
+        ),
+    ),
+)
+"""D-110: News Intelligence says what is happening in the markets first, and the chief plans the
+day with that brief in hand. Used when the desk has someone in that chair; a desk without one
+plans as before (``PLAN_TEMPLATE``) rather than waiting on a brief nobody will write."""
 
 
 def register_template(templates: TemplateRegistry) -> None:
     templates.register(PLAN_TEMPLATE)
+    templates.register(BRIEFED_PLAN_TEMPLATE)
 
 
 class EditorialPlanning:
@@ -68,14 +86,15 @@ class EditorialPlanning:
         async def plan(session: AsyncSession, cycle: Cycle) -> None:
             if await self._run_for(session, cycle) is not None:
                 return
-            if not await self._has_chief(session, cycle.company_id):
+            if not await self._has(session, cycle.company_id, ROLE):
                 return
             project_id = await _newsroom_project(session, cycle.company_id)
             if project_id is None:
                 return  # the business has no project to work in; nothing to plan
+            briefed = await self._has(session, cycle.company_id, news_intelligence.ROLE)
             await self.workflows.instantiate(
                 session,
-                TEMPLATE,
+                BRIEFED_TEMPLATE if briefed else TEMPLATE,
                 company_id=cycle.company_id,
                 project_id=project_id,
                 params={"seq": cycle.seq},
@@ -103,16 +122,17 @@ class EditorialPlanning:
     async def _run_for(self, session: AsyncSession, cycle: Cycle) -> WorkflowRun | None:
         return await session.scalar(
             select(WorkflowRun).where(
-                WorkflowRun.cycle_id == cycle.id, WorkflowRun.template_name == TEMPLATE
+                WorkflowRun.cycle_id == cycle.id,
+                WorkflowRun.template_name.in_((TEMPLATE, BRIEFED_TEMPLATE)),
             )
         )
 
-    async def _has_chief(self, session: AsyncSession, company_id: uuid.UUID) -> bool:
+    async def _has(self, session: AsyncSession, company_id: uuid.UUID, role: str) -> bool:
         return (
             await session.scalar(
                 select(Agent.id).where(
                     Agent.company_id == company_id,
-                    Agent.role == ROLE,
+                    Agent.role == role,
                     Agent.status == AgentStatus.ACTIVE.value,
                 )
             )

@@ -1555,7 +1555,7 @@
         "persistence": "persisted",
         "payload": {
           "additionalProperties": false,
-          "description": "The editor's decision on a draft (T-511): ``accept`` sends it on to approval.",
+          "description": "A reviewer's decision on a draft (T-511): the editor's, or the editor-in-chief's final\nreview (D-110, ``by_role`` editor_in_chief). ``accept`` sends it on to approval.",
           "properties": {
             "article_id": {
               "format": "uuid",
@@ -1645,6 +1645,11 @@
             "revision": {
               "title": "Revision",
               "type": "integer"
+            },
+            "back_to": {
+              "default": "writer",
+              "title": "Back To",
+              "type": "string"
             }
           },
           "required": [

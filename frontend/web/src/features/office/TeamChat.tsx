@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { approvalsQuery, articlesQuery, decideApproval, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
+import { ROLE_ICON } from "@/features/agent-panel/model";
 import { withCompany } from "@/features/company/CompanyScope";
 import { useNow } from "@/hooks/useNow";
 import { useRealtime } from "@/stores/realtime";
@@ -19,6 +20,7 @@ import { CHAT_TYPES, ROLE_NAME, chatItems, dayLabel, timeLabel, type ChatItem, t
 const ROLE_COLOUR: Record<string, string> = {
   ceo: "#7c5cff",
   editor_in_chief: "#d64545",
+  news_intelligence: "#8a6d1f",
   editor: "#e07b39",
   writer: "#2f9e6e",
   analyst: "#2f6fe0",
@@ -72,14 +74,22 @@ export function TeamChat({ companyId, onClose }: { companyId: string; onClose: (
   const members = Object.values(agents).filter((a) => ROLE_NAME[a.role]);
   const now = useNow();
   const list = useRef<HTMLDivElement>(null);
-  const atBottom = useRef(true);
-  const lastSeq = items[items.length - 1]?.seq ?? 0;
+  // newest first (D-111): the latest message at the top, older ones below it
+  const shown = useMemo(() => [...items].reverse(), [items]);
+  const newest = shown[0]?.seq ?? 0;
+  const atTop = useRef(true);
+  const height = useRef(0);
 
-  // the newest stays in view as messages arrive — unless the reader has scrolled up to read
+  // a new message arrives at the top: in view if the reader is there; if they have scrolled down
+  // to read, what they are reading stays where it is
   useLayoutEffect(() => {
     const box = list.current;
-    if (box && atBottom.current) box.scrollTop = box.scrollHeight;
-  }, [lastSeq, loading]);
+    if (!box) return;
+    const grown = box.scrollHeight - height.current;
+    if (atTop.current) box.scrollTop = 0;
+    else if (grown > 0 && height.current) box.scrollTop += grown;
+    height.current = box.scrollHeight;
+  }, [newest, loading]);
 
   return (
     <aside
@@ -101,33 +111,30 @@ export function TeamChat({ companyId, onClose }: { companyId: string; onClose: (
         </button>
       </header>
 
+      {/* what you write goes to the top, where the newest is */}
+      <Composer companyId={companyId} onSent={() => (atTop.current = true)} />
+
       <div
         ref={list}
         onScroll={(e) => {
-          const box = e.currentTarget;
-          atBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+          atTop.current = e.currentTarget.scrollTop < 40;
+          height.current = e.currentTarget.scrollHeight;
         }}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-canvas px-3 py-4"
         data-testid="team-chat-messages"
       >
-        {more ? (
-          <p className="text-center">
-            <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="text-xs text-accent hover:underline disabled:opacity-50">
-              {loadingOlder ? "載入中…" : "載入較早的訊息"}
-            </button>
-          </p>
-        ) : null}
         {loading ? <p className="text-center text-sm text-muted">…</p> : null}
         {failed ? <p className="text-center text-sm text-muted">群組訊息暫時讀不到。</p> : null}
         {!loading && !failed && !items.length ? <p className="text-center text-sm text-muted">還沒有訊息。</p> : null}
-        {items.map((item, i) => {
+        {shown.map((item, i) => {
           const day = dayLabel(item.at, now);
-          const newDay = i === 0 || dayLabel(items[i - 1].at, now) !== day;
+          const newDay = i === 0 || dayLabel(shown[i - 1].at, now) !== day;
+          // a run of one speaker's messages shows their name and face once, on the newest
           const sameSpeaker =
             !newDay &&
             item.type === "message" &&
-            items[i - 1]?.type === "message" &&
-            sameVoice((items[i - 1] as Extract<ChatItem, { type: "message" }>).speaker, item.speaker);
+            shown[i - 1]?.type === "message" &&
+            sameVoice((shown[i - 1] as Extract<ChatItem, { type: "message" }>).speaker, item.speaker);
           return (
             <div key={item.key}>
               {newDay ? (
@@ -143,9 +150,14 @@ export function TeamChat({ companyId, onClose }: { companyId: string; onClose: (
             </div>
           );
         })}
+        {more ? (
+          <p className="text-center">
+            <button type="button" onClick={() => void loadOlder()} disabled={loadingOlder} className="text-xs text-accent hover:underline disabled:opacity-50">
+              {loadingOlder ? "載入中…" : "載入較早的訊息"}
+            </button>
+          </p>
+        ) : null}
       </div>
-
-      <Composer companyId={companyId} onSent={() => (atBottom.current = true)} />
     </aside>
   );
 }
@@ -161,7 +173,7 @@ function Avatar({ speaker }: { speaker: Extract<Speaker, { kind: "agent" }> }) {
       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
       style={{ background: ROLE_COLOUR[speaker.role] ?? "#6b7280" }}
     >
-      {speaker.name.slice(0, 1)}
+      {ROLE_ICON[speaker.role] ?? speaker.name.slice(0, 1)}
     </span>
   );
 }
@@ -336,7 +348,7 @@ function Composer({ companyId, onSent }: { companyId: string; onSent: () => void
     }
   };
   return (
-    <div className="border-t border-line p-3" data-testid="team-chat-composer">
+    <div className="border-b border-line p-3" data-testid="team-chat-composer">
       <div className="mb-2 flex items-center gap-2">
         <button
           type="button"

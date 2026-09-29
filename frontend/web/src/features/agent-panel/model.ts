@@ -39,6 +39,8 @@ export const PRODUCED_LABEL: Record<string, string> = {
 };
 
 export const ROLE_LABEL: Record<string, string> = {
+  editor_in_chief: "總編輯",
+  news_intelligence: "財經情報",
   researcher: "研究員",
   analyst: "分析師",
   writer: "寫手",
@@ -49,6 +51,18 @@ export const ROLE_LABEL: Record<string, string> = {
   business: "商業開發",
   human: "人工審批",
   system: "系統",
+};
+
+/** Each desk's icon (D-110), beside its name where people are listed. */
+export const ROLE_ICON: Record<string, string> = {
+  ceo: "👑",
+  editor_in_chief: "👑",
+  news_intelligence: "📰",
+  researcher: "🔎",
+  analyst: "📊",
+  writer: "✍️",
+  editor: "📝",
+  marketing: "📣",
 };
 
 export interface Progress {

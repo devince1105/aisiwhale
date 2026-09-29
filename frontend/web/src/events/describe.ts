@@ -122,7 +122,13 @@ const FORMAT: Record<string, (p: Payload) => [string, Tone, string | null]> = {
   ],
   ARTICLE_CREATED: (p) => ["文章初稿", "work", Array.isArray(p.langs) ? p.langs.join(" / ") : null],
   ARTICLE_REVIEWED: (p) =>
-    s(p.verdict) === "accept"
+    p.by_role === "editor_in_chief"
+      ? s(p.verdict) === "accept"
+        ? ["總編終審通過", "ok", "送交核准"]
+        : s(p.verdict) === "veto"
+          ? ["總編否決", "danger", "題材放棄"]
+          : ["總編退回", "warn", "需要修改"]
+      : s(p.verdict) === "accept"
       ? ["編輯通過", "ok", "送交核准"]
       : ["編輯退回", "warn", p.fact_check_passed === false ? "事實查核未過" : "需要修改"],
   ARTICLE_REVISION_REQUESTED: (p) => ["要求修改", "warn", `第 ${n(p.revision) ?? "?"} 次・${n(p.issues_count) ?? 0} 個問題`],

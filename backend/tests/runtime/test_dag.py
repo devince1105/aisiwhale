@@ -15,7 +15,9 @@ from autora.db.models import (
 from autora.runtime.activity import initialize_activity
 from autora.runtime.actor import Actor
 from autora.runtime.dag import (
+    Halt,
     InvalidTemplate,
+    Loop,
     NodeSpec,
     TemplateRegistry,
     WorkflowEngine,
@@ -303,3 +305,84 @@ async def test_tasks_outside_workflows_are_unaffected(db_session, world):
     )
     _, unlocked = await _run_task(world, db_session, "researcher")
     assert unlocked == [] and await _state(db_session, task) == "SUCCEEDED"
+
+
+# --- D-110: two loops on one node, and a halt ---------------------------------------------------
+
+REVIEWED = WorkflowTemplate(
+    name="test.reviewed",
+    nodes=(
+        NodeSpec("analysis", "Analysis", "analyst"),
+        NodeSpec("draft", "Draft", "writer", depends_on=("analysis",)),
+        NodeSpec("review", "Review", "editor", depends_on=("draft",)),
+        NodeSpec("file", "File", "researcher", depends_on=("review",)),
+    ),
+    loops=(
+        # the first loop that asks for a round runs: the analysis, when the editor says so
+        Loop(
+            check="review",
+            back_to="analysis",
+            again=lambda o: o.get("verdict") == "revise" and o.get("back_to") == "analyst",
+        ),
+        Loop(check="review", back_to="draft", again=lambda o: o.get("verdict") == "revise"),
+    ),
+    halts=(Halt("review", when=lambda o: o.get("verdict") == "veto", reason="{name} vetoed it"),),
+)
+
+
+async def _reviewed(world, session):
+    world["engine"].templates.register(REVIEWED)
+    run, tasks = await _start(world, session, "test.reviewed")
+    await _run_task(world, session, "analyst")
+    await _run_task(world, session, "writer")
+    return run, tasks
+
+
+async def _review(world, session, output):
+    claim = await world["tm"].claim_next(session, world["agents"]["editor"], "w1")
+    return await world["tm"].succeed(session, claim, output)
+
+
+async def _names(session, run_id):
+    rows = await session.scalars(
+        select(Task).where(Task.workflow_run_id == run_id).order_by(Task.created_at, Task.id)
+    )
+    return [(t.name, t.state) for t in rows]
+
+
+async def test_the_loop_that_asks_is_the_one_that_runs(db_session, world):
+    run, _ = await _reviewed(world, db_session)
+    unlocked = await _review(world, db_session, {"verdict": "revise", "back_to": "analyst"})
+    assert [u.required_role for u in unlocked] == ["analyst"]  # back to the analysis this time
+    names = await _names(db_session, run.id)
+    assert [n for n, _ in names].count("analysis") == 2
+    assert [n for n, _ in names].count("draft") == 2 and [n for n, _ in names].count("review") == 2
+
+    await _run_task(world, db_session, "analyst")
+    await _run_task(world, db_session, "writer")
+    unlocked = await _review(world, db_session, {"verdict": "revise"})
+    assert [u.required_role for u in unlocked] == ["writer"]  # and to the writer the next
+    assert [n for n, _ in await _names(db_session, run.id)].count("analysis") == 2
+
+
+async def test_a_halt_cancels_what_waited_and_closes_the_run(db_session, world):
+    run, tasks = await _reviewed(world, db_session)
+    assert await _review(world, db_session, {"verdict": "veto"}) == []
+    assert await _state(db_session, tasks["file"]) == "CANCELLED"
+    run = await db_session.get(WorkflowRun, run.id, populate_existing=True)
+    assert run.state == "CANCELLED"
+    reason = await db_session.scalar(
+        select(EventRecord.payload["reason"].astext).where(
+            EventRecord.task_id == tasks["file"].id, EventRecord.event_type == "TASK_CANCELLED"
+        )
+    )
+    assert reason == "review vetoed it"
+
+
+def test_a_halt_on_an_unknown_node_is_refused():
+    with pytest.raises(InvalidTemplate, match="halt on unknown node"):
+        WorkflowTemplate(
+            name="test.bad_halt",
+            nodes=(NodeSpec("a", "A", "writer"),),
+            halts=(Halt("b", when=lambda o: True),),
+        )

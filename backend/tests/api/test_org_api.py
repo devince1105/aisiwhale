@@ -61,19 +61,27 @@ async def test_the_newsroom_is_a_department_with_teams_under_it(api, staffed):
         "newsroom_writing",
     ]
     research = next(t for t in desk["teams"] if t["key"] == "newsroom_research")
-    assert sorted(r["key"] for r in research["roles"]) == ["analyst", "researcher"]
-    assert sorted(a["display_name"] for a in research["agents"]) == ["Ana", "Rae"]
+    assert sorted(r["key"] for r in research["roles"]) == [
+        "analyst",
+        "news_intelligence",
+        "researcher",
+    ]  # D-110: News Intelligence sits with research
+    assert sorted(a["display_name"] for a in research["agents"]) == [
+        "Mari Makinami｜真希波",
+        "Rei Ayanami｜綾波零",
+        "Sayla Mass｜雪拉・瑪絲",
+    ]
 
 
 async def test_everyone_hired_is_on_the_chart_and_counted_once(api, staffed):
     org = (await api.get(f"/api/companies/{staffed.id}/org")).json()
 
-    assert org["headcount"] == 6  # the five who make the articles, plus the head of the desk
+    assert org["headcount"] == 7  # the six who make the articles, plus the head of the desk
     assert org["unplaced"] == []
     (unit,) = org["units"]
     (desk,) = unit["departments"]
-    assert desk["headcount"] == 6  # the head sits at the desk; the rest in its teams
-    assert sum(t["headcount"] for t in desk["teams"]) == 5
+    assert desk["headcount"] == 7  # the head sits at the desk; the rest in its teams
+    assert sum(t["headcount"] for t in desk["teams"]) == 6
 
 
 async def test_a_position_says_who_holds_it(api, staffed):
@@ -93,8 +101,8 @@ async def test_an_agent_carries_its_department_in_the_roster_too(api, staffed):
     agents = (await api.get(f"/api/companies/{staffed.id}/agents")).json()
 
     by_name = {a["display_name"]: a for a in agents}
-    assert by_name["Rae"]["department_key"] == "newsroom_research"
-    assert by_name["Mika"]["department_key"] == "newsroom_audience"
+    assert by_name["Rei Ayanami｜綾波零"]["department_key"] == "newsroom_research"
+    assert by_name["Chun-Li｜春麗"]["department_key"] == "newsroom_audience"
 
 
 async def test_a_company_with_no_organisation_still_answers(api):

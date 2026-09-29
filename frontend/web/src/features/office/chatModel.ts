@@ -34,6 +34,7 @@ export const CHAT_TYPES = new Set([
 export const ROLE_NAME: Record<string, string> = {
   ceo: "執行長",
   editor_in_chief: "總編輯",
+  news_intelligence: "財經情報",
   editor: "編輯",
   writer: "寫手",
   analyst: "分析師",
@@ -130,6 +131,13 @@ export function chatItem(
     case "ARTICLE_CREATED":
       return say(`${title ? which : ""}初稿寫好了${langs(p) ? `（${langs(p)}）` : ""}，請編輯看一下。`, "work", { link: draft });
     case "ARTICLE_REVIEWED":
+      // the editor-in-chief's final review (D-110)
+      if (p.by_role === "editor_in_chief")
+        return s(p.verdict) === "accept"
+          ? say(`${title ? which : "這篇"}終審通過，請您最後核准。`, "ok", { link: draft })
+          : s(p.verdict) === "veto"
+            ? say(`${which}不發了，我否決。`, "danger", { link: draft })
+            : say(`${which}要再改，退回給寫手。`, "warn", { link: draft });
       return s(p.verdict) === "accept"
         ? say(`${title ? which : ""}看過了，沒有問題，送交核准。`, "ok", { link: draft })
         : say(p.fact_check_passed === false ? `${which}要改：事實查核沒有過。` : `${which}要改，已經退回給寫手。`, "warn", { link: draft });

@@ -725,3 +725,12 @@ async def test_a_run_that_was_sent_back_remembers_why(world, blobs):
         ).all()
         assert entry.content["outcome"] == "sent back"
         assert entry.content["issues"]  # what the validator said, kept for the next attempt
+
+
+def test_an_agent_s_persona_comes_before_its_role_s_rules():
+    """D-110: who the agent is, then what the role requires; no persona, the role's prompt."""
+    from autora.runtime.agent_runner import with_persona
+
+    assert with_persona("RULES", "  You are Rei.  ") == "You are Rei.\n\nRULES"
+    assert with_persona("RULES", None) == "RULES"
+    assert with_persona("RULES", "   ") == "RULES"

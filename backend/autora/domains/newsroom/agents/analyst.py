@@ -25,7 +25,7 @@ from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.advice import NO_ADVICE_BRIEF, no_advice
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.factcheck import check_claim
-from autora.domains.newsroom.models import Claim, ClaimType, Evidence, Story
+from autora.domains.newsroom.models import Claim, ClaimStatus, ClaimType, Evidence, Story
 from autora.domains.newsroom.policy import trust_policy
 from autora.domains.newsroom.tools.factcheck import claim_quotes
 from autora.runtime.behaviors import AgentBehavior, RunContext
@@ -85,6 +85,38 @@ class AnalysisNote(BaseModel):
     contradictions: list[Contradiction] = Field(default=[], max_length=10)
 
 
+def sent_back(ctx: RunContext) -> list[dict]:
+    """The editor's issues, when the editor sent the analysis back (D-110); else none."""
+    issues = (ctx.task.input.get("params") or {}).get("issues")
+    return [i for i in issues if isinstance(i, dict)] if isinstance(issues, list) else []
+
+
+async def earlier_claims(session: AsyncSession, ctx: RunContext) -> list[Claim]:
+    """This story's claims from an earlier analysis of the same workflow run, not rejected: on a
+    revision the analyst keeps the good ones and fixes the rest (D-110)."""
+    run = ctx.task.workflow_run_id
+    story_id = task_story_id(ctx)
+    if run is None or story_id is None:
+        return []
+    earlier = select(Task.id).where(
+        Task.workflow_run_id == run, Task.name == ctx.task.name, Task.id != ctx.task.id
+    )
+    return list(
+        (
+            await session.scalars(
+                select(Claim)
+                .where(
+                    Claim.story_id == story_id,
+                    Claim.company_id == ctx.company_id,
+                    Claim.task_id.in_(earlier),
+                    Claim.status != ClaimStatus.REJECTED.value,
+                )
+                .order_by(Claim.created_at)
+            )
+        ).all()
+    )
+
+
 def min_claims(ctx: RunContext) -> int:
     value = (ctx.task.input.get("params") or {}).get("min_claims", DEFAULT_MIN_CLAIMS)
     return max(1, value) if isinstance(value, int) else DEFAULT_MIN_CLAIMS
@@ -135,6 +167,24 @@ async def analysis_context(session: AsyncSession, ctx: RunContext) -> str | None
         lines.append("No research note found: use search_evidence to find this story's evidence.")
     if angles:
         lines.append("Suggested angles: " + "; ".join(angles))
+    issues = sent_back(ctx)
+    if issues:
+        # the editor sent the analysis back (D-110): fix what it names, keep what was sound
+        lines.append("")
+        lines.append(
+            "The editor sent the analysis back: the problem is in the claims. Fix or replace the "
+            "claims these issues are about (record corrected ones with create_claim) and keep "
+            "the sound ones — list the claims the article should use, kept and new, in claim_ids."
+        )
+        for issue in issues:
+            where = " ".join(
+                f"{k}={issue[k]}" for k in ("kind", "lang", "block_ref") if issue.get(k)
+            )
+            lines.append(f"- {issue.get('message', '')}" + (f" ({where})" if where else ""))
+        kept = await earlier_claims(session, ctx)
+        if kept:
+            lines.append("Your earlier claims (you may keep any of these):")
+            lines.extend(f"- {c.id} [{c.claim_type}] {c.text[:200]}" for c in kept)
     lines.append(f"Record at least {min_claims(ctx)} claims.")
     return "\n".join(lines)
 
@@ -152,13 +202,15 @@ async def claims_made_here(session: AsyncSession, ctx: RunContext, note: BaseMod
     claims = {
         c.id: c for c in (await session.scalars(select(Claim).where(Claim.id.in_(listed)))).all()
     }
+    # on a revision, the sound claims of the earlier analysis may be kept (D-110)
+    kept = {c.id for c in await earlier_claims(session, ctx)} if sent_back(ctx) else set()
     for claim_id in listed:
         claim = claims.get(claim_id)
         if claim is None or claim.company_id != ctx.company_id:
             issues.append(
                 f"claim {claim_id} does not exist: use the claim_id create_claim returned"
             )
-        elif claim.task_id != ctx.task.id:
+        elif claim.task_id != ctx.task.id and claim_id not in kept:
             issues.append(f"claim {claim_id} was not made in this task")
         elif expected is not None and claim.story_id != expected:
             issues.append(f"claim {claim_id} is about another story")

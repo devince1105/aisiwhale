@@ -411,12 +411,14 @@ def _review(request: ModelRequest) -> FakeTurn:
         if not report["passed"]
         else []
     )
+    to_analyst = bool(_demo(request).get("revise_to_analyst")) and "Revisions so far: 0 of" in first
     if (
         report["passed"]
-        and _demo(request).get("revise_first_review")
+        and (_demo(request).get("revise_first_review") or to_analyst)
         and ("Revisions so far: 0 of" in first)
     ):
         issues = [DEMO_ISSUE]
+    back_to = "analyst" if to_analyst else "writer"
     decided = [
         name
         for name, _, result in calls
@@ -430,7 +432,8 @@ def _review(request: ModelRequest) -> FakeTurn:
             )
         else:
             use = FakeToolUse(
-                name="request_revision", input={"article_id": article_id, "issues": issues}
+                name="request_revision",
+                input={"article_id": article_id, "issues": issues, "back_to": back_to},
             )
         return FakeTurn(text="Deciding.", tool_uses=[use])
     return FakeTurn(
@@ -439,6 +442,48 @@ def _review(request: ModelRequest) -> FakeTurn:
             "verdict": "revise" if decided[-1] == "request_revision" else "accept",
             "fact_check_report_id": report["report_id"],
             "issues": issues if decided[-1] == "request_revision" else [],
+            "back_to": back_to if decided[-1] == "request_revision" else "writer",
+        }
+    )
+
+
+def _chief_review(request: ModelRequest) -> FakeTurn:
+    """The simulated editor-in-chief's final review (D-110): read the draft, then accept — or,
+    for a demo, send the first round back (``chief_revise_first``) or veto (``chief_veto``)."""
+    first = _first_text(request)
+    article_id = _field(first, "Article id")
+    calls = _calls(request)
+    if not any(name == "read_draft" for name, _, _ in calls):
+        return FakeTurn(
+            text="Reading the draft for the final review.",
+            tool_uses=[FakeToolUse(name="read_draft", input={"article_id": article_id})],
+        )
+    demo = _demo(request)
+    decided = [
+        (args, out)
+        for name, args, result in calls
+        if name == "final_review" and (out := _output(result))
+    ]
+    if not decided:
+        if demo.get("chief_veto"):
+            args = {"article_id": article_id, "verdict": "veto", "reason": "不符合本站選題方向。"}
+        elif demo.get("chief_revise_first") and "Revisions so far: 0 of" in first:
+            args = {
+                "article_id": article_id,
+                "verdict": "revise",
+                "issues": [{"message": "標題請寫出具體日期與公司名稱。", "kind": "style"}],
+            }
+        else:
+            args = {"article_id": article_id, "verdict": "accept"}
+        return FakeTurn(text="Deciding.", tool_uses=[FakeToolUse(name="final_review", input=args)])
+    args, out = decided[-1]
+    return FakeTurn(
+        structured={
+            "article_id": article_id,
+            "verdict": args["verdict"],
+            "issues": args.get("issues") or [],
+            "reason": args.get("reason"),
+            "dropped": bool(out.get("dropped")),
         }
     )
 
@@ -530,8 +575,33 @@ def _candidate_ids(request: ModelRequest) -> list[str]:
     for message in request.messages:
         text = _text_of(message)
         if text and "Candidate stories" in text:
-            return _UUID.findall(text)
+            # only the list itself: the market brief after it names stories too (D-110)
+            block = text.split("Candidate stories", 1)[1].split("\n\n", 1)[0]
+            return _UUID.findall(block)
     return []
+
+
+def _market_brief(request: ModelRequest) -> FakeTurn:
+    """The simulated News Intelligence (D-110): flag the newest candidates, in the list's order,
+    and say so plainly. Real judgement is the model's; this exercises the brief's path — the
+    plan that waits for it and the chief who reads it."""
+    offered = _candidate_ids(request)[:SIM_STORIES]
+    return FakeTurn(
+        text=json.dumps(
+            {
+                "summary": "今日市場以來源帶回的最新題材為主；詳見以下各則。"
+                if offered
+                else "來源今天沒有帶回新的題材。",
+                "market_moves": [],
+                "stories": [
+                    {"story_id": story_id, "why_it_matters": "來源最新帶回、值得總編輯評估。"}
+                    for story_id in offered
+                ],
+                "watch": [],
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def _commissioned(request: ModelRequest) -> dict[str, bool]:
@@ -563,10 +633,12 @@ def _text_of(message) -> str | None:
 
 
 _HANDLERS = {
+    ("news_intelligence", "brief"): _market_brief,
     ("editor_in_chief", "plan"): _editorial_plan,
     ("researcher", "research"): _research,
     ("analyst", "analysis"): _analysis,
     ("writer", "draft"): _draft,
     ("editor", "review"): _review,
+    ("editor_in_chief", "chief_review"): _chief_review,
     ("marketing", "distribute"): _distribute,
 }

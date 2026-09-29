@@ -25,6 +25,7 @@ from autora.db.models import (
     WorkflowRun,
 )
 from autora.domains.newsroom import organization as newsroom_org
+from autora.domains.newsroom.agents import news_intelligence
 from autora.domains.newsroom.agents.editor_in_chief import (
     BEHAVIOR,
     MAX_STORIES,
@@ -38,7 +39,7 @@ from autora.domains.newsroom.agents.editor_in_chief import (
     the_count_matches,
 )
 from autora.domains.newsroom.models import Story, StoryState
-from autora.domains.newsroom.planning import TEMPLATE, EditorialPlanning
+from autora.domains.newsroom.planning import BRIEFED_TEMPLATE, TEMPLATE, EditorialPlanning
 from autora.domains.newsroom.tools.commission import register as register_commission
 from autora.runtime.actor import Actor
 from autora.runtime.behaviors import RunContext
@@ -406,3 +407,101 @@ async def test_the_company_s_cap_is_the_one_that_refuses(db_session):
 
     assert allowed.outcome == "allow"
     assert refused.outcome == "deny" and "cap" in refused.reason
+
+
+# --- D-110: News Intelligence briefs the desk first -----------------------------------------------
+
+
+async def _intel(db_session, company):
+    position = await role_by_key(db_session, company.id, news_intelligence.ROLE)
+    return await hire_agent(
+        db_session,
+        company_id=company.id,
+        role=news_intelligence.ROLE,
+        display_name="Sayla Mass｜雪拉・瑪絲",
+        actor=HUMAN,
+        position=position,
+    )
+
+
+async def test_with_news_intelligence_the_plan_waits_for_the_brief(db_session):
+    company, project, candidates, chief = await _desk(db_session)
+    await _intel(db_session, company)
+    runtime = build_runtime()
+    planning = EditorialPlanning(runtime.workflows)
+    cycle = Cycle(company_id=company.id, seq=1, stage=CycleStage.PLANNING.value)
+    db_session.add(cycle)
+    await db_session.flush()
+
+    await planning.plan_hook()(db_session, cycle)
+
+    run = await db_session.scalar(select(WorkflowRun).where(WorkflowRun.cycle_id == cycle.id))
+    assert run.template_name == BRIEFED_TEMPLATE
+    tasks = {
+        t.name: t
+        for t in (await db_session.scalars(select(Task).where(Task.workflow_run_id == run.id)))
+    }
+    assert (tasks["brief"].required_role, tasks["brief"].state) == ("news_intelligence", "READY")
+    assert tasks[TASK].state == "PENDING" and tasks[TASK].depends_on == [tasks["brief"].id]
+    assert await planning.planning_is_done()(db_session, cycle) is False
+    await planning.plan_hook()(db_session, cycle)  # asked again: still one run
+    assert len((await db_session.scalars(select(WorkflowRun.id).where(
+        WorkflowRun.cycle_id == cycle.id))).all()) == 1  # fmt: skip
+
+
+async def test_the_chief_plans_with_the_brief_in_hand(db_session):
+    company, project, candidates, chief = await _desk(db_session)
+    brief = Task(
+        company_id=company.id,
+        project_id=project.id,
+        name="brief",
+        display_name="Market brief",
+        required_role="news_intelligence",
+        state="SUCCEEDED",
+        output={
+            "summary": "聯準會決議前市場觀望。",
+            "market_moves": [{"what": "美債殖利率走高", "why": "市場預期降息延後"}],
+            "stories": [{"story_id": str(candidates[1].id), "why_it_matters": "最新的一則"}],
+            "watch": ["週三 FOMC"],
+        },
+    )
+    db_session.add(brief)
+    await db_session.flush()
+    plan = Task(
+        company_id=company.id,
+        project_id=project.id,
+        name=TASK,
+        display_name="Plan",
+        required_role=ROLE,
+        depends_on=[brief.id],
+    )
+    ctx = RunContext(
+        company_id=company.id, project_id=project.id, task=plan, agent=chief, run_id=uuid.uuid4()
+    )
+    text = await desk_context(db_session, ctx)
+    after = text.split("Market brief (from News Intelligence):", 1)[1]
+    assert "聯準會決議前市場觀望。" in after and "美債殖利率走高 — 市場預期降息延後" in after
+    assert f"story {candidates[1].id}: 最新的一則" in after and "Watch: 週三 FOMC" in after
+
+
+async def test_the_brief_names_only_this_desk_s_candidates(db_session):
+    company, project, candidates, _ = await _desk(db_session)
+    intel = await _intel(db_session, company)
+    other, _, theirs, _ = await _desk(db_session)
+    ctx = RunContext(
+        company_id=company.id, project_id=project.id, task=None, agent=intel, run_id=uuid.uuid4()
+    )
+    shown = await news_intelligence.brief_context(db_session, ctx)
+    assert all(str(s.id) in shown for s in candidates)
+    assert not any(str(s.id) in shown for s in theirs)
+
+    def brief(*stories):
+        return news_intelligence.MarketBrief(
+            summary="今天市場的重點。",
+            stories=[{"story_id": s.id, "why_it_matters": "重要"} for s in stories],
+        )
+
+    ok = news_intelligence.stories_are_candidates
+    assert await ok(db_session, ctx, brief(candidates[0])) == []
+    [issue] = await ok(db_session, ctx, brief(theirs[0]))
+    assert "not one of this newsroom's" in issue

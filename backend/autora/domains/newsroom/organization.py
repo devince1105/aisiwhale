@@ -9,7 +9,7 @@ The shape it builds:
       Executive                      (no business unit: it decides which businesses to run)
       AI Media                       business unit
         Newsroom                     department      -> editor_in_chief
-          Research                   team            -> researcher, analyst
+          Research                   team            -> news_intelligence, researcher, analyst
           Writing                    team            -> writer
           Editing                    team            -> editor
           Audience                   team            -> marketing
@@ -64,23 +64,51 @@ TEAMS = (
         "newsroom_research",
         "Research",
         "research",
-        (("researcher", "Researcher"), ("analyst", "Analyst")),
+        (
+            ("news_intelligence", "News Intelligence"),
+            ("researcher", "Researcher"),
+            ("analyst", "Analyst"),
+        ),
     ),
     Team("newsroom_writing", "Writing", "editorial", (("writer", "Writer"),)),
-    Team("newsroom_editing", "Editing", "editorial", (("editor", "Copy Editor"),)),
-    Team("newsroom_audience", "Audience", "growth", (("marketing", "Audience Lead"),)),
+    Team("newsroom_editing", "Editing", "editorial", (("editor", "Editor"),)),
+    Team("newsroom_audience", "Audience", "growth", (("marketing", "Marketing"),)),
 )
 """The desk's teams. ``zone`` is which part of the floor they occupy — the 3D office's own
 setting, kept next to the department it describes rather than hard-coded in the frontend."""
 
 RESPONSIBILITIES = {
-    "editor_in_chief": "Chooses what the newsroom covers, and holds the editorial standard.",
-    "researcher": "Finds and captures the evidence a story stands on.",
-    "analyst": "Turns evidence into checkable claims and the numbers a story leads with.",
-    "writer": "Writes the story in both languages from the claims, and nothing else.",
-    "editor": "Checks the draft against its claims and sends it back or accepts it.",
-    "marketing": "Takes a published article to its readers.",
+    "editor_in_chief": (
+        "The highest content authority: final review, editorial direction, story priorities, "
+        "headlines and the decision to publish. May veto or send back any agent's work; only "
+        "what passes the chief's final review goes on to publication."
+    ),
+    "news_intelligence": (
+        "Watches breaking finance news — international markets, policy, central banks, major "
+        "events — and briefs the desk each day on what is happening in the markets now."
+    ),
+    "researcher": (
+        "Deep research: data, source verification, filings, company and industry information — "
+        "reliable and traceable to its source."
+    ),
+    "analyst": (
+        "Analyses what the researcher found — markets, companies, industries, trends and risks "
+        "— and says what the data means."
+    ),
+    "writer": (
+        "Turns the research and analysis into finance articles readers can follow: structure, "
+        "narrative, headline, readability. Never invents facts or research."
+    ),
+    "editor": (
+        "The quality gate: data consistency, numbers, dates, company names, tickers, cited "
+        "sources and logic; sends work back to the writer or the analyst."
+    ),
+    "marketing": (
+        "After publication: brand, social channels, SEO, traffic and promotion, so that more "
+        "readers see the coverage."
+    ),
 }
+"""What each desk answers for (D-110), as the roles' ``responsibilities``."""
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,5 @@
 """``accept_draft`` and ``request_revision`` (T-511): the editor's decision on a draft, through
-the commands in ``review.py``.
+the commands in ``review.py``; and ``final_review`` (D-110), the editor-in-chief's.
 
 The editor's issues travel in the review task's output (``EditorReview.issues``) to the writer's
 revision task; ``request_revision`` echoes them back so the model sees what it sent.
@@ -39,6 +39,9 @@ class AcceptDraftArgs(BaseModel):
 class RequestRevisionArgs(BaseModel):
     article_id: uuid.UUID
     issues: list[Issue] = Field(min_length=1, max_length=20)
+    back_to: Literal["writer", "analyst"] = "writer"
+    """Who fixes it (D-110): the writer (how the draft says things) or the analyst (the claims
+    themselves: a wrong or missing number, a misread source)."""
 
 
 async def _role(ctx: ToolContext) -> str:
@@ -96,19 +99,57 @@ async def request_revision(args: RequestRevisionArgs, ctx: ToolContext) -> ToolR
         actor=ctx.actor,
         by_role=await _role(ctx),
         refs=_refs(ctx),
+        back_to=args.back_to,
     )
     next_step = (
         "too many revisions: the article was rejected and the story dropped"
         if decided.dropped
-        else f"the writer revises (revision {decided.revision} of {review.MAX_REVISIONS})"
+        else f"the {args.back_to} revises (revision {decided.revision} of {review.MAX_REVISIONS})"
     )
     return ToolResult(
         output=_output(decided)
-        | {"issues": [i.model_dump(exclude_none=True) for i in args.issues], "next": next_step},
+        | {
+            "issues": [i.model_dump(exclude_none=True) for i in args.issues],
+            "back_to": args.back_to,
+            "next": next_step,
+        },
         summary=f"asked for revision {decided.revision} of article {args.article_id} "
         f"({len(args.issues)} issues)"
         if not decided.dropped
         else f"dropped the story of article {args.article_id} after too many revisions",
+    )
+
+
+class FinalReviewArgs(BaseModel):
+    article_id: uuid.UUID
+    verdict: Literal["accept", "revise", "veto"]
+    issues: list[Issue] = Field(default=[], max_length=20)
+    """For revise: what the writer must change, and why."""
+    reason: str | None = Field(default=None, max_length=1000)
+    """For veto: why the piece must not run."""
+
+
+async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
+    decided = await review.chief_decide(
+        ctx.session,
+        company_id=ctx.company_id,
+        article_id=args.article_id,
+        verdict=args.verdict,
+        issues_count=len(args.issues),
+        reason=args.reason,
+        actor=ctx.actor,
+        refs=_refs(ctx),
+    )
+    if decided.dropped:
+        next_step = "the article is turned down and its story dropped"
+    elif args.verdict == "accept":
+        next_step = "the article goes on to a person's approval"
+    else:
+        next_step = f"the writer revises (revision {decided.revision} of {review.MAX_REVISIONS})"
+    return ToolResult(
+        output=_output(decided)
+        | {"issues": [i.model_dump(exclude_none=True) for i in args.issues], "next": next_step},
+        summary=f"final review of article {args.article_id}: {args.verdict}",
     )
 
 
@@ -126,10 +167,24 @@ def register(registry: ToolRegistry) -> None:
     registry.tool(
         "request_revision",
         description=(
-            "Send the current draft back to the writer with the issues to fix (at most "
+            "Send the current draft back with the issues to fix — to the writer (back_to "
+            "'writer', the default: how the draft says things) or to the analyst (back_to "
+            "'analyst': a claim itself is wrong or missing) (at most "
             f"{review.MAX_REVISIONS} revisions per article; one more drops the story)."
         ),
         side_effect="write",
         timeout_s=10.0,
         retryable=True,
     )(request_revision)
+    registry.tool(
+        "final_review",
+        description=(
+            "The editor-in-chief's final review of a draft the editor accepted: accept (on to a "
+            "person's approval), revise (back to the writer with issues; counts against the "
+            f"article's {review.MAX_REVISIONS} revisions) or veto (with a reason: the piece is "
+            "turned down and its story dropped)."
+        ),
+        side_effect="write",
+        timeout_s=10.0,
+        retryable=True,
+    )(final_review)

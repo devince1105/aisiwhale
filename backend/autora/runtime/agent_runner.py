@@ -74,6 +74,14 @@ _SUMMARY = 200
 _MODEL_CALL_KINDS = (StepKind.THINK.value, StepKind.REPAIR.value)
 
 
+def with_persona(system_prompt: str, persona: str | None) -> str:
+    """The agent's own persona (its ``description``: who it is and what it answers for) above the
+    role's instructions (D-110). The role's rules stay as they are and come last; an agent with no
+    description runs on the role's prompt alone."""
+    persona = (persona or "").strip()
+    return f"{persona}\n\n{system_prompt}" if persona else system_prompt
+
+
 @dataclass(frozen=True)
 class RunOutcome:
     status: RunStatus
@@ -177,7 +185,7 @@ class AgentRunner:
                 ctx=ctx,
                 policies=policies,
                 tool_names=[self.tools.get(t).name for t in behavior.offered_tools(agent)],
-                system=behavior.system_prompt,
+                system=with_persona(behavior.system_prompt, agent.description),
                 prompt_hash="",
                 messages=[],
                 next_seq=run.steps_count,

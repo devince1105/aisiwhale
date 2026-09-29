@@ -11,8 +11,13 @@ records ARTICLE_REVIEWED (the verdict and whether the fact-check passed):
   writes the next version (ARTICLE_REVISION_REQUESTED). A story gets at most ``MAX_REVISIONS``
   revisions; asking for one more rejects the article and drops the story.
 
-A draft is reviewed once: deciding again on the same draft returns the first decision when it is
-the same verdict (a retried call) and refuses a different one.
+A draft is reviewed once by each reviewer: deciding again on the same draft returns the first
+decision when it is the same verdict (a retried call) and refuses a different one.
+
+Then the editor-in-chief's final review (D-110), on the draft the editor accepted (IN_REVIEW),
+with ``chief_decide``: ``accept`` (on to a person's approval), ``revise`` (back to DRAFT and the
+writer, within the same ``MAX_REVISIONS``) or ``veto`` (the article rejected and the story
+dropped; a revision of a published article is dropped instead, the published one stays).
 """
 
 from __future__ import annotations
@@ -46,6 +51,8 @@ from autora.runtime.events.schema import EventPayload, new_event
 MAX_REVISIONS = 2
 ACCEPT = "accept"
 REVISE = "revise"
+VETO = "veto"
+CHIEF = "editor_in_chief"
 
 
 class ReviewError(Exception):
@@ -110,15 +117,23 @@ async def _latest_report(session: AsyncSession, article: Article) -> FactCheckRe
 
 
 async def _earlier(
-    session: AsyncSession, article: Article, version: ArticleVersion, verdict: str
+    session: AsyncSession,
+    article: Article,
+    version: ArticleVersion,
+    verdict: str,
+    *,
+    chief: bool = False,
 ) -> Review | None:
-    """The decision already taken on this draft, if any (a different verdict is refused)."""
+    """The decision this reviewer already took on this draft, if any (a different verdict is
+    refused). The editor and the editor-in-chief each review a draft once (D-110)."""
+    by_chief = EventRecord.payload["by_role"].astext == CHIEF
     earlier = await session.scalar(
         select(EventRecord).where(
             EventRecord.aggregate_type == "article",
             EventRecord.aggregate_id == article.id,
             EventRecord.event_type == "ARTICLE_REVIEWED",
             EventRecord.payload["version_id"].astext == str(version.id),
+            by_chief if chief else ~by_chief,
         )
     )
     if earlier is None:
@@ -217,6 +232,7 @@ async def request_revision(
     actor: Actor,
     by_role: str,
     refs: EventRefs = NO_REFS,
+    back_to: str = "writer",
 ) -> Review:
     if issues_count < 1:
         raise ReviewError("a revision needs at least one issue")
@@ -294,6 +310,7 @@ async def request_revision(
             issues_count=issues_count,
             by_role=by_role,
             revision=article.revision_count,
+            back_to=back_to,
         ),
     )
     return Review(
@@ -305,3 +322,109 @@ async def request_revision(
         dropped=False,
         reused=False,
     )
+
+
+async def _reject(
+    session: AsyncSession, article: Article, actor: Actor, refs: EventRefs, reason: str
+) -> None:
+    """Turned down for good: a published article's revision is dropped (the published version
+    stays); anything else is rejected and its story dropped."""
+    if article.published_group_id is not None:
+        await drop_revision(session, article, actor=actor, reason=reason)
+        return
+    await ARTICLE_FSM.transition_via(
+        session, article, ArticleState.REJECTED, actor=actor, reason=reason
+    )
+    story = await session.get(Story, article.story_id, with_for_update=True)
+    if story is not None:
+        await drop_story(session, story, actor=actor, reason=reason)
+    await _emit(
+        session,
+        article,
+        actor,
+        refs,
+        ArticleRejected(article_id=article.id, by=actor.kind, reason=reason),
+    )
+
+
+async def chief_decide(
+    session: AsyncSession,
+    *,
+    company_id: uuid.UUID,
+    article_id: uuid.UUID,
+    verdict: str,
+    actor: Actor,
+    issues_count: int = 0,
+    reason: str | None = None,
+    refs: EventRefs = NO_REFS,
+) -> Review:
+    """The editor-in-chief's final review of the draft the editor accepted (D-110)."""
+    if verdict not in (ACCEPT, REVISE, VETO):
+        raise ReviewError(f"the verdict is accept, revise or veto, not {verdict!r}")
+    if verdict == REVISE and issues_count < 1:
+        raise ReviewError("a revision needs at least one issue")
+    if verdict == VETO and not (reason or "").strip():
+        raise ReviewError("a veto says why")
+    article, version = await _draft(session, company_id, article_id)
+    earlier = await _earlier(session, article, version, verdict, chief=True)
+    if earlier is not None:
+        return earlier
+    if article.state != ArticleState.IN_REVIEW:
+        raise ReviewError(
+            f"the article is {article.state}: the final review is of a draft the editor accepted"
+        )
+    latest = await _latest_report(session, article)
+    passed = bool(latest and latest.passed)
+    await _emit(
+        session,
+        article,
+        actor,
+        refs,
+        ArticleReviewed(
+            article_id=article.id,
+            version_id=version.id,
+            verdict=verdict,
+            fact_check_passed=passed,
+            by_role=CHIEF,
+        ),
+    )
+
+    def decided(*, dropped: bool) -> Review:
+        return Review(
+            article_id=article.id,
+            version_id=version.id,
+            verdict=verdict,
+            fact_check_passed=passed,
+            revision=article.revision_count,
+            dropped=dropped,
+            reused=False,
+        )
+
+    if verdict == ACCEPT:
+        return decided(dropped=False)
+    if verdict == VETO:
+        await _reject(session, article, actor, refs, f"vetoed by the editor-in-chief: {reason}")
+        return decided(dropped=True)
+    if article.revision_count >= MAX_REVISIONS:
+        await _reject(
+            session, article, actor, refs, f"still not ready after {MAX_REVISIONS} revisions"
+        )
+        return decided(dropped=True)
+    await ARTICLE_FSM.transition(
+        session, article, ArticleState.DRAFT, actor=actor, reason="sent back at final review"
+    )
+    article.revision_count += 1
+    await _emit(
+        session,
+        article,
+        actor,
+        refs,
+        ArticleRevisionRequested(
+            article_id=article.id,
+            version_id=version.id,
+            issues_count=issues_count,
+            by_role=CHIEF,
+            revision=article.revision_count,
+        ),
+    )
+    return decided(dropped=False)

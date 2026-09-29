@@ -113,6 +113,7 @@ ACTIONS = {
     "run_fact_check": "write",
     "request_revision": "write",
     "accept_draft": "write",
+    "final_review": "write",  # the editor-in-chief's (D-110)
     "approve_article": "write",
     "publish_article": "write",
     "create_distribution": "write",
@@ -130,10 +131,11 @@ RULES: list[Rule] = [
     *allow("link_evidence", "analyst"),
     *allow("list_claims", *WRITERS_AND_READERS),
     *allow("write_draft", "writer"),
-    *allow("read_draft", "writer", "editor", "marketing", "ceo"),
+    *allow("read_draft", "writer", "editor", "editor_in_chief", "marketing", "ceo"),
     *allow("run_fact_check", "editor"),
     *allow("request_revision", "editor"),
     *allow("accept_draft", "editor"),
+    *allow("final_review", "editor_in_chief"),
     *allow(
         "approve_article",
         "system",

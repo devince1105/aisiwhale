@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.company.ledger import Ledger
-from autora.db.models import Budget, BusinessUnit, Company, Project
+from autora.db.models import Budget, BusinessUnit, Company, Project, Task
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
 from autora.infra.money import format_money
 from autora.runtime.behaviors import AgentBehavior, RunContext
@@ -193,6 +193,12 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
     else:
         lines.append("- none: nothing has been gathered that is worth covering")
 
+    brief = await _market_brief(session, ctx)
+    if brief:
+        lines.append("")
+        lines.append("Market brief (from News Intelligence):")
+        lines.append(brief)
+
     lines.append("")
     lines.append(
         f"Already in production: {', '.join(in_production) if in_production else 'nothing'}"
@@ -204,6 +210,26 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
         if budget
         else "This newsroom has no budget of its own this cycle; the company's cap applies."
     )
+    return "\n".join(lines)
+
+
+async def _market_brief(session: AsyncSession, ctx: RunContext) -> str | None:
+    """News Intelligence's brief, when the plan follows one (D-110): the task it depends on."""
+    if ctx.task is None or not ctx.task.depends_on:
+        return None
+    outputs = (
+        await session.scalars(select(Task.output).where(Task.id.in_(ctx.task.depends_on)))
+    ).all()
+    brief = next((o for o in outputs if o and "summary" in o), None)
+    if brief is None:
+        return None
+    lines = [brief["summary"]]
+    for move in brief.get("market_moves") or []:
+        lines.append(f"- {move.get('what')} — {move.get('why')}")
+    for note in brief.get("stories") or []:
+        lines.append(f"- story {note.get('story_id')}: {note.get('why_it_matters')}")
+    if brief.get("watch"):
+        lines.append("Watch: " + "; ".join(brief["watch"]))
     return "\n".join(lines)
 
 

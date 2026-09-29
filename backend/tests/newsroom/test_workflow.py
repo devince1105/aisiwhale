@@ -30,13 +30,13 @@ from autora.runtime.actor import Actor
 from tests.conftest import unique_company
 
 OPERATOR = Actor.human("operator")
-ROLES = ("researcher", "analyst", "writer", "editor", "marketing")
+ROLES = ("researcher", "analyst", "writer", "editor", "editor_in_chief", "marketing")
 
 
 class Newsroom:
     """A staffed company with a selected story, its workflow started, and a worker."""
 
-    async def start(self, committed, settings, *, auto_approve=False):
+    async def start(self, committed, settings, *, auto_approve=False, demo=None):
         self.committed = committed
         self.runtime = build_runtime()
         async with committed() as session:
@@ -75,6 +75,7 @@ class Newsroom:
                 story=self.story,
                 project_id=project.id,
                 actor=OPERATOR,
+                demo=demo,
             )
             await session.commit()
         self.worker = build_worker(
@@ -137,7 +138,7 @@ async def test_a_story_goes_to_a_person_then_is_published_and_distributed(commit
     await room.worker.run_until_idle()
 
     tasks = await room.tasks()
-    for name in ("research", "analysis", "draft", "review"):
+    for name in ("research", "analysis", "draft", "review", "chief_review"):
         assert tasks[name][0].state == "SUCCEEDED", name
     assert tasks["approve"][0].state == "WAITING_APPROVAL"
     assert tasks["approve"][0].required_role == "human"
@@ -173,7 +174,11 @@ async def test_a_story_goes_to_a_person_then_is_published_and_distributed(commit
 
     # the hand-offs are the template's: review unlocked approve, publish unlocked distribute
     succeeded = {e.task_id: e.payload["unlocks"] for e in await room.events("TASK_SUCCEEDED")}
-    assert [u["task_id"] for u in succeeded[tasks["review"][0].id]] == [str(tasks["approve"][0].id)]
+    # the editor hands it to the editor-in-chief's final review, and she to approval (D-110)
+    chief = tasks["chief_review"][0]
+    assert [u["task_id"] for u in succeeded[tasks["review"][0].id]] == [str(chief.id)]
+    assert [u["task_id"] for u in succeeded[chief.id]] == [str(tasks["approve"][0].id)]
+    assert chief.output["verdict"] == "accept" and chief.required_role == "editor_in_chief"
     assert succeeded[tasks["publish"][0].id][0]["required_role"] == "marketing"
 
     # every agent's activity links to its work (3d-office/06 §4)
@@ -244,7 +249,9 @@ async def test_a_revision_round_then_approval(committed, e2e_settings):
     assert redraft.display_name == "撰稿：Lumen City microgrid（第 2 輪）"
     assert redraft.input["params"]["issues"] == first.output["issues"]
     assert redraft.depends_on == [tasks["analysis"][0].id]
-    assert tasks["approve"][0].depends_on == [second.id]
+    # the final review waits for the second round, and approval for the final review
+    assert tasks["chief_review"][0].depends_on == [second.id]
+    assert tasks["approve"][0].depends_on == [tasks["chief_review"][0].id]
     assert tasks["approve"][0].state == "WAITING_APPROVAL"
     article = await room.article()
     assert article.revision_count == 1 and article.state == "IN_REVIEW"
@@ -263,7 +270,7 @@ async def test_too_many_revisions_drop_the_story(committed, e2e_settings):
     tasks = await room.tasks()
     assert len(tasks["draft"]) == len(tasks["review"]) == 3
     assert all(t.output["verdict"] == "revise" for t in tasks["review"])
-    for name in ("approve", "publish", "distribute"):
+    for name in ("chief_review", "approve", "publish", "distribute"):
         assert tasks[name][0].state == "CANCELLED", name
     assert (await room.get(WorkflowRun, room.run.id)).state == "CANCELLED"
     assert (await room.article()).state == "REJECTED"
@@ -520,3 +527,68 @@ async def test_only_a_published_article_is_revised(committed, e2e_settings):
     await room.worker.run_until_idle()  # waiting at approval: IN_REVIEW, never published
     with pytest.raises(PublishError, match="only a published"):
         await _revise(room, committed, await room.article())
+
+
+# --- D-110: the editor-in-chief's final review, and the editor sending back to the analyst ------
+
+
+async def test_the_chief_sends_it_back_and_it_comes_back_through_the_editor(
+    committed, e2e_settings
+):
+    room = await Newsroom().start(committed, e2e_settings, demo={"chief_revise_first": True})
+    await room.worker.run_until_idle()
+
+    tasks = await room.tasks()
+    assert [t.output["verdict"] for t in tasks["chief_review"]] == ["revise", "accept"]
+    assert len(tasks["draft"]) == len(tasks["review"]) == 2  # the editor reviews the rewrite
+    redraft = tasks["draft"][1]
+    assert redraft.input["params"]["issues"] == tasks["chief_review"][0].output["issues"]
+    assert redraft.display_name.endswith("（總編退回第 2 輪）")
+    assert tasks["approve"][0].state == "WAITING_APPROVAL"
+    assert tasks["approve"][0].depends_on == [tasks["chief_review"][1].id]
+    article = await room.article()
+    assert article.state == "IN_REVIEW" and article.revision_count == 1
+    [asked] = await room.events("ARTICLE_REVISION_REQUESTED")
+    assert asked.payload["by_role"] == "editor_in_chief"
+
+
+async def test_the_chief_vetoes_it_and_nothing_downstream_runs(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, demo={"chief_veto": True})
+    await room.worker.run_until_idle()
+
+    tasks = await room.tasks()
+    [chief] = tasks["chief_review"]
+    assert chief.state == "SUCCEEDED" and chief.output["verdict"] == "veto"
+    assert chief.output["dropped"] is True
+    for name in ("approve", "publish", "distribute"):
+        assert tasks[name][0].state == "CANCELLED", name
+    assert (await room.get(WorkflowRun, room.run.id)).state == "CANCELLED"
+    assert (await room.article()).state == "REJECTED"
+    assert (await room.get(Story, room.story.id)).state == "DROPPED"
+    [rejected] = await room.events("ARTICLE_REJECTED")
+    assert rejected.payload["reason"].startswith("vetoed by the editor-in-chief")
+
+
+async def test_the_editor_sends_it_back_to_the_analyst(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, demo={"revise_to_analyst": True})
+    await room.worker.run_until_idle()
+
+    tasks = await room.tasks()
+    first, second = tasks["review"]
+    assert first.output["verdict"] == "revise" and first.output["back_to"] == "analyst"
+    assert second.output["verdict"] == "accept"
+    # the analysis is redone, with the editor's issues, then the draft and the review
+    assert len(tasks["analysis"]) == len(tasks["draft"]) == 2 and len(tasks["research"]) == 1
+    again = tasks["analysis"][1]
+    assert again.input["params"]["issues"] == first.output["issues"]
+    assert again.depends_on == [tasks["research"][0].id]
+    assert tasks["draft"][1].depends_on == [again.id]
+    [extended] = await room.events("WORKFLOW_RUN_EXTENDED")
+    assert extended.payload["task_ids"] == [
+        str(again.id),
+        str(tasks["draft"][1].id),
+        str(second.id),
+    ]
+    [asked] = await room.events("ARTICLE_REVISION_REQUESTED")
+    assert asked.payload["back_to"] == "analyst"
+    assert tasks["approve"][0].state == "WAITING_APPROVAL"

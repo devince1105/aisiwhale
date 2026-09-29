@@ -481,6 +481,7 @@ export const ArticleRevisionRequestedV1Payload = z.object({
   issues_count: z.number().int(),
   by_role: z.string(),
   revision: z.number().int(),
+  back_to: z.string().default("writer"),
 });
 export type ArticleRevisionRequestedV1Payload = z.infer<typeof ArticleRevisionRequestedV1Payload>;
 export const ArticleRevisionRequestedV1Event = z.object({

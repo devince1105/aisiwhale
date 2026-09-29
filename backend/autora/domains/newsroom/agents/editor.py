@@ -57,18 +57,24 @@ How to review:
 5. Decide:
    - accept_draft(article_id, fact_check_report_id) only when the fact-check passed and nothing
      needs fixing (or, with no revisions left, nothing of the kind in 4);
-   - otherwise request_revision(article_id, issues): each issue says what to fix and why, with
-     the language and block when it is about one (block_ref: the 1-based block number). A claim
-     that failed the fact-check cannot be cited again: say what to do without it.
+   - otherwise request_revision(article_id, issues, back_to): each issue says what to fix and
+     why, with the language and block when it is about one (block_ref: the 1-based block
+     number). A claim that failed the fact-check cannot be cited again: say what to do without
+     it. back_to says who fixes it: "writer" (the default) when the draft misstates, omits or
+     mistranslates what the claims say; "analyst" when the claims themselves are the problem —
+     a number the evidence does not support, a key figure missing from the claims, a source
+     misread — so the analysis is redone before the draft.
    A draft can be revised at most twice; asking for a third revision drops the story.
 
 When done, reply with only a JSON object (no other text):
 {"article_id": "<the article id>",
  "verdict": "accept" | "revise",
+ "back_to": "writer" | "analyst",
  "fact_check_report_id": "<report_id from run_fact_check>",
  "issues": [{"message": "...", "kind": "fact|unsupported|missing_context|translation|style|other",
              "lang": "zh-TW|en (optional)", "block_ref": "3 (optional)"}]}
-For accept, issues is []. For revise, the issues you sent with request_revision.
+For accept, issues is [] and back_to "writer". For revise, the issues and back_to you sent with
+request_revision.
 Write the issues in Traditional Chinese (zh-TW); never Simplified Chinese.
 """
 
@@ -78,6 +84,8 @@ class EditorReview(BaseModel):
     verdict: Literal["accept", "revise"]
     fact_check_report_id: uuid.UUID
     issues: list[Issue] = Field(default=[], max_length=20)
+    back_to: Literal["writer", "analyst"] = "writer"
+    """Who fixes a revision (D-110): the workflow goes back to the draft or to the analysis."""
 
 
 async def _task_events(session: AsyncSession, ctx: RunContext, event_type: str) -> list[dict]:
@@ -189,6 +197,8 @@ async def rests_on_its_fact_check(
             f"report the {requested[-1]['issues_count']} issues you sent with request_revision "
             f"(you listed {len(note.issues)})"
         ]
+    if requested and requested[-1].get("back_to", "writer") != note.back_to:
+        return [f"report back_to {requested[-1].get('back_to', 'writer')!r}, as you sent it"]
     return []
 
 

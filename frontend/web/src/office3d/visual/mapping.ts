@@ -40,6 +40,8 @@ export interface MappingInput {
 }
 
 export const ROLE_LABEL: Record<string, string> = {
+  editor_in_chief: "總編輯",
+  news_intelligence: "財經情報",
   researcher: "研究員",
   analyst: "分析師",
   writer: "寫手",
