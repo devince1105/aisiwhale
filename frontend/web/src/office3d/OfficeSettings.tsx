@@ -8,6 +8,7 @@
 import { useEffect, useRef } from "react";
 
 import { THEMES, THEME_IDS, type ThemeId } from "./palette";
+import { useTagsShown } from "./tags";
 
 export function OfficeSettings({
   theme,
@@ -21,6 +22,7 @@ export function OfficeSettings({
   onOpen: (open: boolean) => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
+  const [tagsShown, showTags] = useTagsShown();
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +84,25 @@ export function OfficeSettings({
                     }`}
                   >
                     {THEMES[id].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div role="group" aria-label="名牌" className="mt-4">
+              <p className="text-xs text-muted">名牌</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {([true, false] as const).map((value) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    aria-pressed={tagsShown === value}
+                    onClick={() => showTags(value)}
+                    className={`rounded-lg border px-3 py-2 text-sm ${
+                      tagsShown === value ? "border-accent bg-accent text-canvas" : "border-line text-muted hover:text-fg"
+                    }`}
+                  >
+                    {value ? "顯示" : "隱藏"}
                   </button>
                 ))}
               </div>

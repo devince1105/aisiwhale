@@ -2,9 +2,9 @@
 import { Group, Quaternion, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 
-import { figurePhoto } from "@/people";
+import { figureBackPhoto, figurePhoto } from "@/people";
 
-import { CARD_FORWARD, faceCamera, standeeLift } from "./Standee";
+import { CARD_FORWARD, faceCamera, seesBack, standeeLift } from "./Standee";
 
 describe("a standee", () => {
   it("turns to the camera about the vertical only, whatever way its desk faces", () => {
@@ -44,8 +44,30 @@ describe("a standee", () => {
     expect(standeeLift("sit_type", 0.1)).not.toBe(standeeLift("sit_idle", 0.1));
   });
 
-  it("for the staff with a picture", () => {
+  it("for the staff with a picture, front and back", () => {
     expect(figurePhoto("chunli")).toBe("/figures/chunli.webp");
+    expect(figureBackPhoto("chunli")).toBe("/figures-back/chunli.webp");
     expect(figurePhoto("default")).toBeNull();
+    expect(figureBackPhoto("default")).toBeNull();
+  });
+
+  it("shows her back when the camera is behind her, her front otherwise (D-123)", () => {
+    const iso = new Vector3(-1, -1.15, -1).normalize(); // the camera at the front right
+    const atDesk = new Group();
+    atDesk.rotation.y = Math.PI; // facing her monitors (-z): the camera is at her back
+    atDesk.updateMatrixWorld(true);
+    expect(seesBack(atDesk, iso, false)).toBe(true);
+    const ceo = new Group(); // a turned desk: she faces the room's front, and the camera
+    ceo.updateMatrixWorld(true);
+    expect(seesBack(ceo, iso, true)).toBe(false);
+  });
+
+  it("does not flicker when seen edge-on", () => {
+    const side = new Group();
+    side.rotation.y = Math.PI / 2; // facing +x
+    side.updateMatrixWorld(true);
+    const edgeOn = new Vector3(0, -1, -1).normalize(); // looking along -z: she is side-on
+    expect(seesBack(side, edgeOn, false)).toBe(false);
+    expect(seesBack(side, edgeOn, true)).toBe(true);
   });
 });

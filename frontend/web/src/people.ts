@@ -28,3 +28,9 @@ export function avatarPhoto(avatarKey: string | null | undefined): string | null
 export function figurePhoto(avatarKey: string | null | undefined): string | null {
   return avatarKey && PHOTOS.has(avatarKey) ? `/figures/${avatarKey}.webp` : null;
 }
+
+/** The same figure from behind (D-123), for when the camera is at her back; cut out of the
+ * operator's back views (``avatars-source/back``) the same way. */
+export function figureBackPhoto(avatarKey: string | null | undefined): string | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? `/figures-back/${avatarKey}.webp` : null;
+}

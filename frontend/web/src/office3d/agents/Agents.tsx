@@ -11,7 +11,7 @@
 import { useGLTF } from "@react-three/drei";
 import { Suspense, useMemo } from "react";
 
-import { figurePhoto } from "@/people";
+import { figureBackPhoto, figurePhoto } from "@/people";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
 import { characterUrl } from "../assets/characters";
@@ -32,6 +32,7 @@ function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
       model={model}
       outfit={outfitFor(member.avatar)}
       figure={figurePhoto(member.avatar)}
+      figureBack={figureBackPhoto(member.avatar)}
     />
   );
 }

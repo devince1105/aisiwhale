@@ -46,6 +46,7 @@ export function AgentAvatar({
   model,
   outfit = null,
   figure = null,
+  figureBack = null,
 }: {
   agentId: string;
   seat: Seat;
@@ -54,6 +55,8 @@ export function AgentAvatar({
   outfit?: Outfit | null;
   /** Her Q-version figure (D-118): a standee facing the camera instead of the model. */
   figure?: string | null;
+  /** The same figure from behind (D-123), shown while the camera is at her back. */
+  figureBack?: string | null;
 }) {
   const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
@@ -133,7 +136,7 @@ export function AgentAvatar({
     >
       {figure ? (
         <group ref={standee}>
-          <Standee url={figure} />
+          <Standee url={figure} back={figureBack} />
         </group>
       ) : (
         <primitive object={body} />

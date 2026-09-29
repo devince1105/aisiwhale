@@ -23,6 +23,7 @@ import { useUi } from "@/stores/ui";
 import { ROLE_COLOR } from "../palette";
 import { approvalLampSpot, lampSpot, MONITOR, screenSpots } from "../scene/furniture";
 import { allSeats, type Seat } from "../scene/layout";
+import { useTagsShown } from "../tags";
 import { useCues } from "../visual/CueRunner";
 import { useVisualTracker } from "../visual/tracker";
 import { membersInRoom } from "./Agents";
@@ -48,7 +49,11 @@ function instanced(geometry: ConstructorParameters<typeof InstancedMesh>[0], mat
 
 /** A soft round spot for the lamp glow (none where there is no 2D canvas, e.g. tests). */
 /** Head tags float just over a seated figure's head (lowered with the smaller heads, T-413). */
-const TAG_Y = 1.9;
+/** Clear of a seated figure's head (the standee is 0.95 × AVATAR_SCALE standing, sunk seated).
+ * Seen from behind she sits in her chair rather than a step toward the camera (D-123), which on
+ * screen puts her head higher, so the tag is higher too; where tags hide a window, the settings
+ * can hide them. */
+const TAG_Y = 2.2;
 
 function glowTexture(): CanvasTexture | null {
   if (typeof document === "undefined") return null;
@@ -175,6 +180,8 @@ function HeadTag({ member, seat }: { member: Member; seat: Seat }) {
 export function HeadTags() {
   const { members, seats } = useRoster();
   const entered = useUi((s) => s.focusedDepartment);
+  const [shown] = useTagsShown();
+  if (!shown) return null;
   return (
     <>
       {membersInRoom(members, entered).map((member) => {
