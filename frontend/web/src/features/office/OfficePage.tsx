@@ -193,7 +193,8 @@ function CompanyOffice({ company }: { company: Company }) {
       <MiniDashboardView model={model} pendingApprovals={pending.data?.length ?? null} />
       <DepartmentStrip companyId={company.id} />
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1">
+        {/* clipped to its own area: a name tag near the edge must not sit over the team group */}
+        <div className="relative min-w-0 flex-1 overflow-hidden">
           {/* the detail panel is max-w-md (448 px) on the right while someone is selected */}
           <OfficeCanvas
             view={view}

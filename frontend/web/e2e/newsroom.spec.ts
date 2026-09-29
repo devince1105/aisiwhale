@@ -24,6 +24,9 @@ test.beforeEach(async ({ context }) => {
     (token) => window.localStorage.setItem("autora.operatorToken", token),
     TOKEN,
   );
+  // the office at its full width, as these clicks and timings were measured: the team group
+  // beside it (D-109) is its own business, closed here
+  await context.addInitScript(() => window.localStorage.setItem("autora:team-chat", "closed"));
 });
 
 const panel = (page: Page) =>
@@ -110,7 +113,7 @@ test("a story from the feeds to the public site, and from the office to its draf
       { timeout: 90_000 },
     );
     await expect(
-      page.getByTestId(/^head-tag-/).filter({ hasText: "Wren" }),
+      page.getByTestId(/^head-tag-/).filter({ hasText: "Shinobu Kocho" }),
     ).toBeVisible({ timeout: 30_000 });
     // Inside the writing department the number keys are its people (T-600 batch 3), and the
     // writer is the only one. Clicking the avatar is what office.spec measures; here it would
@@ -125,10 +128,10 @@ test("a story from the feeds to the public site, and from the office to its draf
   } else {
     await page
       .locator('[data-testid^="board-agent-"]')
-      .filter({ hasText: "Wren" })
+      .filter({ hasText: "Shinobu Kocho" })
       .click();
   }
-  await expect(panel(page)).toHaveAttribute("aria-label", "Wren 的詳細資訊");
+  await expect(panel(page)).toHaveAttribute("aria-label", "Shinobu Kocho｜胡蝶忍 的詳細資訊");
   // The panel is about this story: it names it either as the task in hand or as the hand-off
   // that follows. Not "撰稿：…" specifically — the writer may already have finished by the time
   // the browser gets here, and a test that needs the line to still be mid-draft is racing it.

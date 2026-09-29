@@ -27,6 +27,9 @@ test.beforeEach(async ({ context }) => {
     (token) => window.localStorage.setItem("autora.operatorToken", token),
     TOKEN,
   );
+  // the office at its full width, as these clicks and timings were measured: the team group
+  // beside it (D-109) is its own business, closed here
+  await context.addInitScript(() => window.localStorage.setItem("autora:team-chat", "closed"));
 });
 
 const office = (page: Page) => page.locator("[data-office-mode]");
