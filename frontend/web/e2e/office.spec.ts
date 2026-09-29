@@ -528,9 +528,10 @@ test("inside a department, the office draws its people and nobody else (T-600)",
   const whole = await settledTags(page);
   expect(whole.length).toBeGreaterThan(2);
 
-  // step into the newsroom's research team: two desks, and the rest of the company is not drawn
+  // step into the newsroom's research team: three desks (the researcher, the analyst and, since
+  // D-110, News Intelligence), and the rest of the company is not drawn
   await page.getByTestId("department-newsroom_research").click();
-  await expect(tags).toHaveCount(2, { timeout: 15_000 });
+  await expect(tags).toHaveCount(3, { timeout: 15_000 });
 
   // "elsewhere" counts the people in the other departments, which is not the same number as
   // the head tags on the floor (an agent the org chart has not placed is drawn and belongs to
