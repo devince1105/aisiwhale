@@ -62,7 +62,7 @@ export function ServerLights() {
   const meshes = useMemo(() => {
     const { leds, beacons } = serverLightSpots();
     return {
-      leds: instanced(new BoxGeometry(0.06, 0.03, 0.01), leds),
+      leds: instanced(new BoxGeometry(0.01, 0.03, 0.06), leds),
       beacons: instanced(new CylinderGeometry(0.045, 0.05, 0.1, 12), beacons),
     };
   }, []);

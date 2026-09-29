@@ -2,30 +2,32 @@ import { Color } from "three";
 import { describe, expect, it } from "vitest";
 
 import { SERVER_LIGHT_ROWS, serverLightSpots } from "./furniture";
-import { allSeats, obstacles, SERVER_RACKS, SERVER_ROOM } from "./layout";
+import { allSeats, DESK, obstacles, ROOM, SERVER_RACKS, SERVER_ROOM } from "./layout";
 import { beaconColor, healthOf, ledColor } from "./ServerLights";
 
 const hex = (c: Color) => `#${c.getHexString()}`;
 
 describe("the server room (D-121)", () => {
-  it("stands behind the R&D desk, the innermost of the front row, its door toward it", () => {
+  it("runs along the left wall beside the R&D desk, the innermost of the front row, its door toward it", () => {
     const rnd = allSeats().find((seat) => seat.role === "engineer")!;
     const front = allSeats().filter((seat) => seat.desk[1] === rnd.desk[1] && seat.zone !== "ceo");
     expect(Math.min(...front.map((seat) => seat.desk[0]))).toBe(rnd.desk[0]);
-    expect(SERVER_ROOM.minZ).toBeGreaterThan(rnd.chair[1]);
-    expect(Math.abs(SERVER_ROOM.doorX - rnd.desk[0])).toBeLessThan(0.6);
+    expect(SERVER_ROOM.minX).toBe(ROOM.minX);
+    expect(SERVER_ROOM.maxX).toBeLessThan(rnd.desk[0] - DESK.width / 2);
+    expect(SERVER_ROOM.doorZ).toBeGreaterThan(rnd.desk[1]);
+    expect(SERVER_RACKS.zs).toHaveLength(6);
   });
 
   it("its racks and every light are inside it", () => {
     const { leds, beacons } = serverLightSpots();
-    expect(leds).toHaveLength(SERVER_RACKS.xs.length * 2 * 2 * SERVER_LIGHT_ROWS);
+    expect(leds).toHaveLength(SERVER_RACKS.zs.length * 2 * 2 * SERVER_LIGHT_ROWS);
     for (const [x, , z] of [...leds, ...beacons]) {
       expect(x).toBeGreaterThan(SERVER_ROOM.minX);
       expect(x).toBeLessThan(SERVER_ROOM.maxX);
       expect(z).toBeGreaterThan(SERVER_ROOM.minZ);
       expect(z).toBeLessThan(SERVER_ROOM.maxZ);
     }
-    expect(obstacles().map((o) => o.name)).toContain("server glass (side)");
+    expect(obstacles().map((o) => o.name)).toContain("server glass (end)");
   });
 
   it("the lights say how the system is: green when live, amber while connecting, red when lost", () => {

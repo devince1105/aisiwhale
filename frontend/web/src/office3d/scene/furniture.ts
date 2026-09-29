@@ -396,12 +396,13 @@ function planter(length: number): Part[] {
   return parts;
 }
 
-/** The server room's racks, round the middle of the row, their fronts toward -z (D-121). Their
- * lights are live (``ServerLights``), at ``serverLightSpots``. */
+/** The server room's racks in a row round its middle, fronts toward -z; the decor turns the row
+ * along the left wall, fronts to +x (D-122). Their lights are live (``ServerLights``), at
+ * ``serverLightSpots``. */
 function serverRacks(): Part[] {
-  const { xs, width, depth, height } = SERVER_RACKS;
-  const mid = (xs[0] + xs[xs.length - 1]) / 2;
-  return xs.flatMap((x) => [
+  const { zs, width, depth, height } = SERVER_RACKS;
+  const mid = (zs[0] + zs[zs.length - 1]) / 2;
+  return zs.flatMap((x) => [
     block(width, height, depth, [x - mid, 0, 0], P.monitor),
     // a darker door panel on each face, and a plinth
     box(width - 0.08, height - 0.14, 0.02, [x - mid, height / 2, -depth / 2 - 0.005], P.screenOff),
@@ -415,29 +416,29 @@ function serverRacks(): Part[] {
  * the top one of each column the activity light, and a beacon on every rack's top. */
 export const SERVER_LIGHT_ROWS = 6;
 export function serverLightSpots(): { leds: [number, number, number][]; beacons: [number, number, number][] } {
-  const { xs, z, depth, height } = SERVER_RACKS;
+  const { x, zs, depth, height } = SERVER_RACKS;
   const leds: [number, number, number][] = [];
-  for (const x of xs)
+  for (const z of zs)
     for (const face of [-1, 1])
-      for (const dx of [-0.13, 0.13])
-        for (let row = 0; row < SERVER_LIGHT_ROWS; row++) leds.push([x + dx, height - 0.2 - row * 0.2, z + face * (depth / 2 + 0.02)]);
-  return { leds, beacons: xs.map((x) => [x, height + 0.08, z]) };
+      for (const dz of [-0.13, 0.13])
+        for (let row = 0; row < SERVER_LIGHT_ROWS; row++) leds.push([x + face * (depth / 2 + 0.02), height - 0.2 - row * 0.2, z + dz]);
+  return { leds, beacons: zs.map((z) => [x, height + 0.08, z]) };
 }
 
 /** The server room's frame (D-121): posts and rails round its glass, the door's frame, and its
  * raised floor. The panes are in ``partitionGlassParts``. */
 function serverRoomFrame(): Part[] {
-  const { minX, maxX, minZ, maxZ, doorX, doorWidth } = SERVER_ROOM;
+  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
   const h = SERVER_GLASS_H;
   const parts: Part[] = [block(maxX - minX, 0.03, maxZ - minZ, [(minX + maxX) / 2, 0, (minZ + maxZ) / 2], P.screenOff)];
-  // the front, along z = minZ
+  // the end, along z = minZ
   parts.push(box(maxX - minX, 0.06, 0.1, [(minX + maxX) / 2, h - 0.03, minZ], P.mullion));
-  for (const x of [minX + 0.03, (minX + doorX - doorWidth / 2) / 2, maxX]) parts.push(block(0.06, h, 0.1, [x, 0, minZ], P.mullion));
-  for (const side of [-1, 1]) parts.push(block(0.08, 2.1, 0.12, [doorX + (side * doorWidth) / 2, 0, minZ], P.door));
-  parts.push(box(doorWidth + 0.16, 0.08, 0.12, [doorX, 2.14, minZ], P.door));
-  // the side, along x = maxX
+  parts.push(block(0.06, h, 0.1, [minX + 0.03, 0, minZ], P.mullion));
+  // the side, along x = maxX, with its door
   parts.push(box(0.1, 0.06, maxZ - minZ, [maxX, h - 0.03, (minZ + maxZ) / 2], P.mullion));
-  parts.push(block(0.1, h, 0.06, [maxX, 0, maxZ - 0.03], P.mullion));
+  for (const z of [minZ, (minZ + doorZ - doorWidth / 2) / 2, maxZ - 0.03]) parts.push(block(0.1, h, 0.06, [maxX, 0, z], P.mullion));
+  for (const side of [-1, 1]) parts.push(block(0.12, 2.1, 0.08, [maxX, 0, doorZ + (side * doorWidth) / 2], P.door));
+  parts.push(box(0.12, 0.08, doorWidth + 0.16, [maxX, 2.14, doorZ], P.door));
   return parts;
 }
 const SERVER_GLASS_H = 2.4;
@@ -524,8 +525,10 @@ const BACK_WINDOWS: [number, number][] = [
 ];
 const LEFT_WINDOWS: [number, number][] = [
   [-5.6, 2.4],
-  [4.6, 1.6],
-  [6.6, 1.6],
+  // none along the server room (D-122): racks want no sun; the work row has two instead, the
+  // picture between them
+  [-2.0, 1.8],
+  [2.3, 1.8],
 ];
 const WINDOW = { sill: 1.0, height: 1.5 };
 
@@ -554,7 +557,7 @@ function outerWall(side: OuterWall): Part[] {
     box(WALL + 0.04, CAP, depth + 0.04, [ROOM.minX - WALL / 2, ROOM.wallHeight + CAP / 2, 0], P.wallCap),
     block(0.02, 0.12, depth, [ROOM.minX + 0.01, 0, 0], P.frame),
     ...LEFT_WINDOWS.flatMap(([z, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), ROOM.minX, z, Math.PI / 2)),
-    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, -0.2, Math.PI / 2, 1.75),
+    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, 0.15, Math.PI / 2, 1.75),
   ];
 }
 
@@ -721,13 +724,14 @@ export function partitionGlassParts(palette: Palette = DEFAULT_PALETTE): Part[] 
   // the transoms above the doors
   for (const door of DOORS) panes.push(box(door.width, INNER_WALL_H - 2.36, 0.02, [door.x, 2.28 + (INNER_WALL_H - 2.36) / 2, BACK_ROOMS_Z], P.glass));
   // the server room's (D-121): its front either side of the door and above it, and its side
-  const { minX, maxX, minZ, maxZ, doorX, doorWidth } = SERVER_ROOM;
+  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
   const g = SERVER_GLASS_H - 0.06;
+  const [doorFrom, doorTo] = [doorZ - doorWidth / 2, doorZ + doorWidth / 2];
   panes.push(
-    box(doorX - doorWidth / 2 - minX, g, 0.02, [(minX + doorX - doorWidth / 2) / 2, g / 2, minZ], P.glass),
-    box(maxX - doorX - doorWidth / 2, g, 0.02, [(maxX + doorX + doorWidth / 2) / 2, g / 2, minZ], P.glass),
-    box(doorWidth, g - 2.18, 0.02, [doorX, 2.18 + (g - 2.18) / 2, minZ], P.glass),
-    box(0.02, g, maxZ - minZ, [maxX, g / 2, (minZ + maxZ) / 2], P.glass),
+    box(maxX - minX, g, 0.02, [(minX + maxX) / 2, g / 2, minZ], P.glass),
+    box(0.02, g, doorFrom - minZ, [maxX, g / 2, (minZ + doorFrom) / 2], P.glass),
+    box(0.02, g, maxZ - doorTo, [maxX, g / 2, (doorTo + maxZ) / 2], P.glass),
+    box(0.02, g - 2.18, doorWidth, [maxX, 2.18 + (g - 2.18) / 2, doorZ], P.glass),
   );
   return panes;
 }

@@ -19,8 +19,8 @@
 //   z=0  │ [ni][res][ana][ana]  spine x=0  [flex][flex][flex]  [reception]│  bench desks
 //        │ ═══════════════ front corridor (lane z=2.4) ═══════════ │
 //        │                                                 entrance ◁ (T-413)
-//   z=4.6│ [r&d][mkt][mkt] ▒ [wri][edi][eic] ✿        lounge  │  single desks; lobby
-//   z=6.7├─server room─┐                                         │  (✿ low planters)
+//   z=4.6│▓ [r&d][mkt][mkt] ▒ [wri][edi][eic] ✿        lounge  │  single desks; lobby
+//        │▓ (▓ the server room along the left wall; ✿ low planters)│
 //
 // Where things stand follows the usual feng-shui rules of an office (D-120): the CEO in the
 // corner furthest from the entrance, a solid wall behind her and her door in view; the reception
@@ -28,7 +28,7 @@
 // its chair behind the counter and open floor around it; the flex desks, whose sitters come and
 // go, nearest the door; the editorial desk, the newsroom's own, in the front row with the wall at
 // its back; and nothing in the entrance's line or doorway. R&D is the innermost desk of the front
-// row, with the server room behind it (D-121).
+// row, next to the server room (D-121, D-122).
 //   z=8  └──────────────────────────────────────────────────────────┘
 //      x=-12                                                     x=12
 
@@ -125,12 +125,13 @@ export const SLOTS: Record<string, RoleSlots> = {
 };
 
 /**
- * A small server room in the front-left corner, behind the R&D desk (D-121): racks that stand for
- * the system itself, whose lights show whether it is running. Glass on its two open sides, the
- * door toward the R&D desk; the racks' fronts face the glass.
+ * The server room along the left wall of the front row, beside the R&D desk (D-121, enlarged in
+ * D-122): six racks that stand for the system itself, whose lights show whether it is running.
+ * Glass on its two open sides, the door in the side toward the R&D desk; the racks stand against
+ * the wall with their fronts to the glass (+x).
  */
-export const SERVER_ROOM = { minX: ROOM.minX, maxX: -8.2, minZ: 6.7, maxZ: ROOM.maxZ, doorX: -8.95, doorWidth: 0.9 } as const;
-export const SERVER_RACKS = { xs: [-11.45, -10.8, -10.15, -9.5], z: 7.55, width: 0.6, depth: 0.6, height: 1.6 } as const;
+export const SERVER_ROOM = { minX: ROOM.minX, maxX: -10.2, minZ: 3.95, maxZ: ROOM.maxZ, doorZ: 6.9, doorWidth: 0.9 } as const;
+export const SERVER_RACKS = { x: -11.6, zs: [4.45, 5.1, 5.75, 6.4, 7.05, 7.7], width: 0.6, depth: 0.6, height: 1.6 } as const;
 
 /** Desks for roles the floor plan does not know (a new domain's roles), first come first served. */
 export const SPARE: RoleSlots = { zone: "spare", lane: "front", bench: true, desks: [[2.2, WORK_Z], [4.4, WORK_Z], [6.6, WORK_Z]] };
@@ -306,12 +307,12 @@ export const DECOR: Decor[] = [
   d("palm", [-11.2, 2.4], [0.8, 0.8]),
   d("plant", [11.4, -0.4], [0.6, 0.6]),
   // front area: a planter between marketing and the flex desks; the lobby by the entrance
-  d("plant", [-11.4, 3.7], [0.6, 0.6]),
+  d("plant", [-11.4, 3.5], [0.6, 0.6]),
   d("planter", [-2.85, 4.9], [0.36, 1.6], QUARTER),
   // low planters between the editorial desk and the waiting area (D-121)
   d("planter", [4.15, 5.6], [0.36, 4.0], QUARTER),
   // the server room's racks (D-121)
-  d("server_racks", [(SERVER_RACKS.xs[0] + SERVER_RACKS.xs[3]) / 2, SERVER_RACKS.z], [SERVER_RACKS.xs[3] - SERVER_RACKS.xs[0] + SERVER_RACKS.width, SERVER_RACKS.depth]),
+  d("server_racks", [SERVER_RACKS.x, (SERVER_RACKS.zs[0] + SERVER_RACKS.zs.at(-1)!) / 2], [SERVER_RACKS.depth, SERVER_RACKS.zs.at(-1)! - SERVER_RACKS.zs[0] + SERVER_RACKS.width], -QUARTER),
   d("lounge", [10.3, 5.8], [3.2, 3.6]),
   d("plant", [11.5, 3.6], [0.6, 0.6]),
   // CEO office
@@ -351,10 +352,11 @@ export const LABELS: Label[] = [
   { text: "彈性座位", sub: "FLEX DESKS", at: [4.4, 0, 2.0], width: 2.4, kind: "floor" },
   { text: "接待", sub: "RECEPTION", at: [9.7, 0, 2.0], width: 1.8, kind: "floor" },
   // behind the front desks' chairs: in front of the desks the desks would hide them
-  { text: "研發", sub: "R&D", at: [-9.0, 0, 6.3], width: 1.4, kind: "floor" },
+  { text: "研發部", sub: "R&D", at: [-9.0, 0, 6.3], width: 2.0, kind: "floor" },
   { text: "行銷部", sub: "MARKETING", at: [-5.7, 0, 6.3], width: 2.4, kind: "floor" },
   { text: "編輯部", sub: "EDITORIAL", at: [0.4, 0, 6.3], width: 2.4, kind: "floor" },
-  { text: "機房", sub: "SERVERS", at: [-10.6, 0, 7.02], width: 1.2, kind: "floor" },
+  // over the server room's door, facing the R&D desk
+  { text: "機房", sub: "SERVER ROOM", at: [SERVER_ROOM.maxX + 0.08, 2.36, SERVER_ROOM.doorZ], width: 1.0, kind: "sign", facing: "x" },
   { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: 2.6, kind: "floor" },
   { text: "茶水間", sub: "PANTRY", at: [8.2, 0, -3.72], width: 2.4, kind: "floor" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
@@ -470,14 +472,14 @@ export function partitions(): Rect[] {
   ];
 }
 
-/** The server room's glass: its front (with the door) and its side (D-121). */
+/** The server room's glass: its end (toward the corridor) and its side, with the door (D-122). */
 export function serverRoomWalls(): Rect[] {
-  const { minX, maxX, minZ, maxZ, doorX, doorWidth } = SERVER_ROOM;
+  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
   const t = WALL_HALF;
   return [
-    { name: "server glass (left of door)", minX, maxX: doorX - doorWidth / 2, minZ: minZ - t, maxZ: minZ + t },
-    { name: "server glass (right of door)", minX: doorX + doorWidth / 2, maxX: maxX + t, minZ: minZ - t, maxZ: minZ + t },
-    { name: "server glass (side)", minX: maxX - t, maxX: maxX + t, minZ: minZ + t, maxZ },
+    { name: "server glass (end)", minX, maxX: maxX + t, minZ: minZ - t, maxZ: minZ + t },
+    { name: "server glass (side, before door)", minX: maxX - t, maxX: maxX + t, minZ: minZ + t, maxZ: doorZ - doorWidth / 2 },
+    { name: "server glass (side, after door)", minX: maxX - t, maxX: maxX + t, minZ: doorZ + doorWidth / 2, maxZ },
   ];
 }
 
