@@ -14,7 +14,9 @@ import type { Seat } from "../scene/layout";
 import { routeFor, useCues, type Route } from "../visual/CueRunner";
 import { visualForAgent, type Pose } from "../visual/mapping";
 import { avatarHandlers } from "../interaction/picking";
+import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
+import { dress } from "./dress";
 import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
 
 export { AVATAR_SCALE, SEAT_LIFT };
@@ -35,14 +37,26 @@ export function placeFor(seat: Seat, pose: Pose): [number, number, number] {
   return pose === "stand" ? [seat.chair[0], 0, seat.chair[1] + STAND_BACK] : [seat.chair[0], SEAT_LIFT, seat.chair[1]];
 }
 
-export function AgentAvatar({ agentId, seat, model }: { agentId: string; seat: Seat; model: AvatarModel }) {
-  const body = useMemo(() => {
+export function AgentAvatar({
+  agentId,
+  seat,
+  model,
+  outfit = null,
+}: {
+  agentId: string;
+  seat: Seat;
+  model: AvatarModel;
+  /** Dressed as herself (D-115): her own palette and colours on the clone. */
+  outfit?: Outfit | null;
+}) {
+  const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
     copy.traverse((o) => {
       if ((o as Mesh).isMesh) o.castShadow = true;
     });
-    return copy;
-  }, [model.scene]);
+    return { body: copy, dressed: outfit ? dress(copy, outfit) : null };
+  }, [model.scene, outfit]);
+  useEffect(() => () => dressed?.dispose(), [dressed]);
   const controller = useMemo(() => new AvatarController(body, model.animations), [body, model.animations]);
   const group = useRef<Group>(null);
   const paper = useRef<Mesh>(null);

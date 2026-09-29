@@ -13,6 +13,8 @@ export interface Member {
   role: string;
   name: string;
   character: Character;
+  /** Its avatar_key: the outfit it is dressed in, if it has one (D-115). */
+  avatar?: string;
   /** Its department, and the part of the floor that department occupies (T-600 batch 3). */
   department: string | null;
   office_zone_key: string | null;
@@ -37,6 +39,7 @@ export function rosterKey(agents: Record<string, RosterAgent> | undefined): stri
         a.role,
         a.display_name,
         characterFor(a.id, a.avatar_key),
+        a.avatar_key,
         a.department_key ?? "",
         a.office_zone_key ?? "",
         a.business_unit_key ?? "",
@@ -49,12 +52,13 @@ export function rosterKey(agents: Record<string, RosterAgent> | undefined): stri
 function parseRoster(key: string): Member[] {
   if (!key) return [];
   return key.split("\n").map((line) => {
-    const [id, role, name, character, department, zone, unit] = line.split("\t");
+    const [id, role, name, character, avatar, department, zone, unit] = line.split("\t");
     return {
       id,
       role,
       name: personName(name), // one language, not both (D-112)
       character: character as Character,
+      avatar,
       department: department || null,
       office_zone_key: zone || null,
       business_unit: unit || null,

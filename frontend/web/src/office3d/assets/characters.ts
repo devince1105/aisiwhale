@@ -3,6 +3,8 @@
 // texture. Which character an agent wears, and which clip plays for each pose, is decided here.
 import { avatarPhoto } from "@/people";
 
+import { outfitFor } from "./outfits";
+
 import type { Pose } from "../visual/mapping";
 
 export const CHARACTER_DIR = "/models/characters";
@@ -48,6 +50,9 @@ export const REQUIRED_CLIPS = [...new Set([...Object.values(POSE_CLIP).flatMap((
 /** A character per agent: `avatar_key` if it names one, else a stable pick from the agent id. */
 export function characterFor(agentId: string, avatarKey?: string | null): Character {
   if (avatarKey && (CHARACTERS as readonly string[]).includes(avatarKey)) return avatarKey as Character;
+  // dressed as herself (D-115): the figure her outfit is made on
+  const outfit = outfitFor(avatarKey);
+  if (outfit) return outfit.model;
   let hash = 0;
   for (const ch of agentId) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   // someone with a head photo (D-113) is one of the office's women: a woman's figure for her

@@ -14,6 +14,7 @@ import { Suspense, useMemo } from "react";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
 import { characterUrl } from "../assets/characters";
+import { outfitFor } from "../assets/outfits";
 import type { Seat } from "../scene/layout";
 import { AgentAvatar } from "./AgentAvatar";
 import { useRoster, type Member } from "./roster";
@@ -23,7 +24,7 @@ export { rosterKey } from "./roster";
 function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
   const gltf = useGLTF(characterUrl(member.character), false);
   const model = useMemo(() => ({ scene: gltf.scene, animations: gltf.animations }), [gltf]);
-  return <AgentAvatar agentId={member.id} seat={seat} model={model} />;
+  return <AgentAvatar agentId={member.id} seat={seat} model={model} outfit={outfitFor(member.avatar)} />;
 }
 
 /** Who is drawn: the entered room's people, or everybody when standing on the whole floor. */
