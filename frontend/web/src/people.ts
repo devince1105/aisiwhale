@@ -50,6 +50,12 @@ export function figureSidePhotos(avatarKey: string | null | undefined): [string,
   return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-side/${avatarKey}-left.webp`, `/figures-side/${avatarKey}-right.webp`] : null;
 }
 
+/** Her waiting, from the front (D-128): standing with a hand raised (waiting for the operator's
+ * approval), then seated (waiting on anything else). */
+export function figureWaitPhotos(avatarKey: string | null | undefined): [string, string] | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-wait/${avatarKey}-stand.webp`, `/figures-wait/${avatarKey}-sit.webp`] : null;
+}
+
 /** Her thinking, hand on chin, from the front (D-127): standing, then seated. */
 export function figureThinkPhotos(avatarKey: string | null | undefined): [string, string] | null {
   return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-think/${avatarKey}-stand.webp`, `/figures-think/${avatarKey}-sit.webp`] : null;

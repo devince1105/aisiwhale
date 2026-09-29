@@ -37,3 +37,9 @@ came later; `sayia.jpg` was renamed `sayla.jpg`). Made like the walking frames:
 `think/<avatar_key>.jpg` hold two frames, hand on chin, from the front: standing, then seated,
 1376 × 768. Made like the walking frames, one scale per pair: `public/figures-think/<avatar_key>-stand.webp`
 and `-sit.webp`. The office shows the seated one; no standing pose is a thinking one yet.
+
+## Waiting (D-128)
+
+`waiting/<avatar_key>.jpg` hold two frames from the front: standing with a hand raised, then seated,
+1376 × 768 (`sayia.jpg` renamed `sayla.jpg`). Made like the thinking frames:
+`public/figures-wait/<avatar_key>-stand.webp` and `-sit.webp`.

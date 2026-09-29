@@ -17,7 +17,7 @@ import { avatarHandlers } from "../interaction/picking";
 import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
 import { dress } from "./dress";
-import { Standee, standeeLift, type Pictures } from "./Standee";
+import { Standee, standeeLift, type Pictures, type Waiting } from "./Standee";
 import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
 
 export { AVATAR_SCALE, SEAT_LIFT };
@@ -76,6 +76,8 @@ export function AgentAvatar({
   const walk = useRef<{ seq: number; startedAt: number; route: Route | null } | null>(null);
   const handlers = useMemo(() => avatarHandlers(agentId), [agentId]);
   const standee = useRef<Group>(null);
+  /** What she waits for (D-128), read with her pose: her standee shows it. */
+  const waiting = useRef<Waiting>(null);
 
   useEffect(() => realtimeStore.subscribe(() => void (dirty.current = true)), []);
   useEffect(() => () => controller.dispose(), [controller]);
@@ -114,6 +116,8 @@ export function AgentAvatar({
       const state = realtimeStore.getState();
       const agent = state.company?.agents[agentId];
       const pose = (agent && visualForAgent(agent, serverNow(state))?.pose) || "sit_idle";
+      waiting.current =
+        agent?.activity?.stored_state === "WAITING" ? (agent.activity.detail.reason === "approval" ? "approval" : "other") : null;
       if (pose !== controller.pose) {
         controller.setPose(pose);
         group.current?.position.set(...placeFor(seat, pose));
@@ -134,7 +138,7 @@ export function AgentAvatar({
     >
       {figure ? (
         <group ref={standee}>
-          <Standee pictures={figure} pose={() => controller.pose} />
+          <Standee pictures={figure} pose={() => controller.pose} waiting={() => waiting.current} />
         </group>
       ) : (
         <primitive object={body} />

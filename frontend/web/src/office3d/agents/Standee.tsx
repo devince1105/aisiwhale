@@ -131,14 +131,33 @@ export interface Pictures {
   /** Thinking, hand on chin, from the front (D-127). Only the seated one is shown yet: no
    * standing pose is a thinking one. */
   thinkSit?: string | null;
+  /** Waiting, from the front (D-128): standing with a hand raised, for the operator's approval;
+   * seated, for anything else. */
+  waitStand?: string | null;
+  waitSit?: string | null;
 }
-export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2" | "sideLeft" | "sideRight" | "thinkSit";
+export type View =
+  | "stand"
+  | "standBack"
+  | "sit"
+  | "sitBack"
+  | "walk1"
+  | "walk2"
+  | "sideLeft"
+  | "sideRight"
+  | "thinkSit"
+  | "waitStand"
+  | "waitSit";
+
+/** What she is waiting for, if she is: the operator's approval, or anything else. */
+export type Waiting = "approval" | "other" | null;
 
 export interface Moment {
   seated: boolean;
   back: boolean;
   walking?: boolean;
   thinking?: boolean;
+  waiting?: Waiting;
   /** How far she faces the screen's right (1) or left (-1): ``aspectOf``'s ``across``. */
   across?: number;
   /** Which of the two walking frames (0 or 1). */
@@ -146,10 +165,20 @@ export interface Moment {
 }
 
 /** Which picture shows, for how she is and how she is seen. */
-export function viewFor(pictures: Pictures, { seated, back, walking = false, thinking = false, across = 0, stride = 0 }: Moment): View {
+export function viewFor(
+  pictures: Pictures,
+  { seated, back, walking = false, thinking = false, waiting = null, across = 0, stride = 0 }: Moment,
+): View {
   const sideways = Math.abs(across) >= SIDEWAYS;
   if (walking && sideways && pictures.walk) return stride % 2 ? "walk2" : "walk1";
+  // waiting for the operator's approval, she stands up at her desk and raises her hand: seen
+  // from the side or behind, she is simply standing there
+  if (seated && waiting === "approval" && pictures.waitStand) {
+    if (sideways && pictures.standSide) return across > 0 ? "sideRight" : "sideLeft";
+    return back ? (pictures.standBack ? "standBack" : "stand") : "waitStand";
+  }
   if (!seated && sideways && pictures.standSide) return across > 0 ? "sideRight" : "sideLeft";
+  if (seated && waiting === "other" && !back && pictures.waitSit) return "waitSit";
   // thinking at her desk, her hand on her chin: seen from behind, she is just sitting
   if (seated && thinking && !back && pictures.thinkSit) return "thinkSit";
   if (seated && pictures.sit) return back && pictures.sitBack ? "sitBack" : "sit";
@@ -163,7 +192,7 @@ export function stepFor(view: View): number {
   return view === "stand" ? CARD_FORWARD : 0;
 }
 
-const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2", "sideLeft", "sideRight", "thinkSit"];
+const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2", "sideLeft", "sideRight", "thinkSit", "waitStand", "waitSit"];
 
 function urlOf(pictures: Pictures, view: View): string | null | undefined {
   if (view === "walk1") return pictures.walk?.[0];
@@ -177,9 +206,11 @@ function urlOf(pictures: Pictures, view: View): string | null | undefined {
  * the stride is a little shorter than the step between, and sitting than standing, as they are. */
 const PAIR_FRAME_PX = 512;
 
+const PAIRED = new Set<View>(["walk1", "walk2", "sideLeft", "sideRight", "thinkSit", "waitStand", "waitSit"]);
+
 function sizeOf(texture: Texture, view: View): [number, number] {
   const image = texture.image as { width: number; height: number } | undefined;
-  const paired = view === "walk1" || view === "walk2" || view === "sideLeft" || view === "sideRight" || view === "thinkSit";
+  const paired = PAIRED.has(view);
   const height =
     view === "sit" || view === "sitBack"
       ? SIT_HEIGHT
@@ -189,7 +220,15 @@ function sizeOf(texture: Texture, view: View): [number, number] {
   return [image ? (height * image.width) / image.height : height * 0.6, height];
 }
 
-export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Pose | null }) {
+export function Standee({
+  pictures,
+  pose,
+  waiting = () => null,
+}: {
+  pictures: Pictures;
+  pose: () => Pose | null;
+  waiting?: () => Waiting;
+}) {
   const card = useRef<Group>(null);
   const plane = useRef<Mesh>(null);
   const shown = useRef<{ view: View; mirrored: boolean }>({ view: "stand", mirrored: false });
@@ -217,6 +256,7 @@ export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Po
       back,
       walking: current === "walk",
       thinking: current === "sit_think",
+      waiting: waiting(),
       across: aspect?.across ?? 0,
       stride: Math.floor(clock.elapsedTime * STRIDES_PER_SECOND),
     });

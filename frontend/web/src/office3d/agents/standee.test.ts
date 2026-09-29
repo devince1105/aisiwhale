@@ -138,4 +138,15 @@ describe("a standee", () => {
     expect(viewFor(all, { seated: true, back: false })).toBe("sit");
     expect(stepFor("thinkSit")).toBe(0);
   });
+
+  it("waiting: for approval she stands and raises her hand; for anything else, seated (D-128)", () => {
+    const all = { stand: "s", standBack: "sb", sit: "t", sitBack: "tb", standSide: ["l", "r"] as const, waitStand: "ws", waitSit: "wt" };
+    expect(viewFor(all, { seated: true, back: false, waiting: "approval" })).toBe("waitStand");
+    expect(viewFor(all, { seated: true, back: true, waiting: "approval" })).toBe("standBack");
+    expect(viewFor(all, { seated: true, back: true, waiting: "approval", across: 0.7 })).toBe("sideRight");
+    expect(viewFor(all, { seated: true, back: false, waiting: "other" })).toBe("waitSit");
+    expect(viewFor(all, { seated: true, back: true, waiting: "other" })).toBe("sitBack");
+    expect(viewFor(all, { seated: true, back: false, waiting: null })).toBe("sit");
+    expect(stepFor("waitStand")).toBe(0);
+  });
 });
