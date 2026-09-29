@@ -11,7 +11,7 @@
 import { useGLTF } from "@react-three/drei";
 import { Suspense, useMemo } from "react";
 
-import { figureBackPhoto, figurePhoto, figureSitBackPhoto, figureSitPhoto, figureWalkPhotos } from "@/people";
+import { figureBackPhoto, figurePhoto, figureSitBackPhoto, figureSidePhotos, figureSitPhoto, figureWalkPhotos } from "@/people";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
 import { characterUrl } from "../assets/characters";
@@ -33,6 +33,7 @@ function picturesOf(avatar: string | null | undefined): Pictures | null {
         sit: figureSitPhoto(avatar),
         sitBack: figureSitBackPhoto(avatar),
         walk: figureWalkPhotos(avatar),
+        standSide: figureSidePhotos(avatar),
       }
     : null;
 }

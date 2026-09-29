@@ -94,11 +94,24 @@ describe("a standee", () => {
 
   it("walking across the screen, the side view: its two frames in turn (D-125)", () => {
     const all = { stand: "s", standBack: "sb", sit: "t", sitBack: "tb", walk: ["w1", "w2"] as const };
-    expect(viewFor(all, { seated: false, back: true, sideways: true, stride: 0 })).toBe("walk1");
-    expect(viewFor(all, { seated: false, back: true, sideways: true, stride: 7 })).toBe("walk2");
-    expect(viewFor(all, { seated: false, back: true, sideways: false })).toBe("standBack");
-    expect(viewFor({ stand: "s" }, { seated: false, back: false, sideways: true })).toBe("stand");
+    expect(viewFor(all, { seated: false, back: true, walking: true, across: 0.7, stride: 0 })).toBe("walk1");
+    expect(viewFor(all, { seated: false, back: true, walking: true, across: -0.7, stride: 7 })).toBe("walk2");
+    expect(viewFor(all, { seated: false, back: true, walking: true, across: 0.2 })).toBe("standBack");
+    expect(viewFor({ stand: "s" }, { seated: false, back: false, walking: true, across: 0.7 })).toBe("stand");
     expect(stepFor("walk1")).toBe(0);
+  });
+
+  it("standing seen from the side, the side picture that faces her way (D-126)", () => {
+    const all = { stand: "s", standBack: "sb", sit: "t", walk: ["w1", "w2"] as const, standSide: ["l", "r"] as const };
+    expect(viewFor(all, { seated: false, back: false, across: 0.7 })).toBe("sideRight");
+    expect(viewFor(all, { seated: false, back: true, across: -0.7 })).toBe("sideLeft");
+    expect(viewFor(all, { seated: false, back: false, across: 0.3 })).toBe("stand");
+    // seated, the seat's own pictures; walking, the walk
+    expect(viewFor(all, { seated: true, back: false, across: 0.7 })).toBe("sit");
+    expect(viewFor(all, { seated: false, back: false, walking: true, across: 0.7 })).toBe("walk1");
+    // no walking pictures: walking across, she is shown standing side-on
+    expect(viewFor({ stand: "s", standSide: ["l", "r"] }, { seated: false, back: false, walking: true, across: -0.7 })).toBe("sideLeft");
+    expect(stepFor("sideLeft")).toBe(0);
   });
 
   it("under the isometric camera a walk along a corridor is seen from the side, facing the way she goes", () => {

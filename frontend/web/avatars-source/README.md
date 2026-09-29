@@ -25,3 +25,9 @@ made the same way as the back views.
 `walk/<avatar_key>.jpg` hold two frames side by side (the stride, and the step between), facing
 right, 1376 × 768. Split at the white divider, lifted, and scaled per pair so the taller frame is
 512 px: `public/figures-walk/<avatar_key>-1.webp` and `-2.webp`. Walking left, the office mirrors them.
+
+## Standing, from the side (D-126)
+
+`stand-side/<avatar_key>.jpg` hold two frames side by side, facing left then right, 1376 × 768 (no
+Ada yet; `sayia.jpg` was renamed `sayla.jpg`). Made like the walking frames:
+`public/figures-side/<avatar_key>-left.webp` and `-right.webp`.

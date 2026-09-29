@@ -117,61 +117,68 @@ export const STRIDES_PER_SECOND = 3.5;
 
 const lookDirection = new Vector3();
 
-/** Someone's pictures: standing, from the front and behind (D-118, D-123), seated (D-124), and
- * walking seen from the side, two frames facing right (D-125). Only the standing front is needed;
- * the rest stand in for each other when missing. */
+/** Someone's pictures: standing, from the front and behind (D-118, D-123), seated (D-124),
+ * walking seen from the side, two frames facing right (D-125), and standing seen from the side,
+ * facing left and right (D-126). Only the standing front is needed; the rest stand in for each
+ * other when missing. */
 export interface Pictures {
   stand: string;
   standBack?: string | null;
   sit?: string | null;
   sitBack?: string | null;
   walk?: readonly [string, string] | null;
+  standSide?: readonly [left: string, right: string] | null;
 }
-export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2";
+export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2" | "sideLeft" | "sideRight";
 
 export interface Moment {
   seated: boolean;
   back: boolean;
-  /** Walking, and seen from the side. */
-  sideways?: boolean;
+  walking?: boolean;
+  /** How far she faces the screen's right (1) or left (-1): ``aspectOf``'s ``across``. */
+  across?: number;
   /** Which of the two walking frames (0 or 1). */
   stride?: number;
 }
 
 /** Which picture shows, for how she is and how she is seen. */
-export function viewFor(pictures: Pictures, { seated, back, sideways = false, stride = 0 }: Moment): View {
-  if (sideways && pictures.walk) return stride % 2 ? "walk2" : "walk1";
+export function viewFor(pictures: Pictures, { seated, back, walking = false, across = 0, stride = 0 }: Moment): View {
+  const sideways = Math.abs(across) >= SIDEWAYS;
+  if (walking && sideways && pictures.walk) return stride % 2 ? "walk2" : "walk1";
+  if (!seated && sideways && pictures.standSide) return across > 0 ? "sideRight" : "sideLeft";
   if (seated && pictures.sit) return back && pictures.sitBack ? "sitBack" : "sit";
   return back && pictures.standBack ? "standBack" : "stand";
 }
 
 /** How far toward the camera the card stands for a view: seated, or seen from behind, she is in
  * her chair (its back in front of her, as a sitter's is); standing and seen from the front, a step
- * out of it, or the chair's back would hide her. Walking, she is nowhere near a chair. */
+ * out of it, or the chair's back would hide her. Walking or seen from the side, not at all. */
 export function stepFor(view: View): number {
   return view === "stand" ? CARD_FORWARD : 0;
 }
 
-const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2"];
+const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2", "sideLeft", "sideRight"];
 
 function urlOf(pictures: Pictures, view: View): string | null | undefined {
   if (view === "walk1") return pictures.walk?.[0];
   if (view === "walk2") return pictures.walk?.[1];
+  if (view === "sideLeft") return pictures.standSide?.[0];
+  if (view === "sideRight") return pictures.standSide?.[1];
   return pictures[view];
 }
 
-/** The walking frames are cut at one scale per pair, 512 px for the taller: the stride is a
- * little shorter than the step between, as it is. */
-const WALK_FRAME_PX = 512;
+/** The side views come in pairs cut at one scale, 512 px for the taller: the stride is a little
+ * shorter than the step between, as it is. */
+const PAIR_FRAME_PX = 512;
 
 function sizeOf(texture: Texture, view: View): [number, number] {
   const image = texture.image as { width: number; height: number } | undefined;
-  const walking = view === "walk1" || view === "walk2";
+  const paired = view === "walk1" || view === "walk2" || view === "sideLeft" || view === "sideRight";
   const height =
     view === "sit" || view === "sitBack"
       ? SIT_HEIGHT
-      : walking && image
-        ? (STANDEE_HEIGHT * image.height) / WALK_FRAME_PX
+      : paired && image
+        ? (STANDEE_HEIGHT * image.height) / PAIR_FRAME_PX
         : STANDEE_HEIGHT;
   return [image ? (height * image.width) / image.height : height * 0.6, height];
 }
@@ -202,7 +209,8 @@ export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Po
     const view = viewFor(pictures, {
       seated: isSeated(current),
       back,
-      sideways: current === "walk" && aspect !== null && Math.abs(aspect.across) >= SIDEWAYS,
+      walking: current === "walk",
+      across: aspect?.across ?? 0,
       stride: Math.floor(clock.elapsedTime * STRIDES_PER_SECOND),
     });
     // the walking frames face right: walking to the screen's left, she is drawn mirrored
