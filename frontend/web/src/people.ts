@@ -39,6 +39,12 @@ export function figureSitBackPhoto(avatarKey: string | null | undefined): string
   return avatarKey && PHOTOS.has(avatarKey) ? `/figures-sit-back/${avatarKey}.webp` : null;
 }
 
+/** Her walk seen from the side (D-125): two frames, the stride and the step between, facing
+ * right. */
+export function figureWalkPhotos(avatarKey: string | null | undefined): [string, string] | null {
+  return avatarKey && PHOTOS.has(avatarKey) ? [`/figures-walk/${avatarKey}-1.webp`, `/figures-walk/${avatarKey}-2.webp`] : null;
+}
+
 /** The same figure from behind (D-123), for when the camera is at her back; cut out of the
  * operator's back views (``avatars-source/back``) the same way. */
 export function figureBackPhoto(avatarKey: string | null | undefined): string | null {

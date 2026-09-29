@@ -85,58 +85,104 @@ const turn = new Quaternion();
 const SIDE_ON = 0.12;
 
 /**
- * Whether the camera is at her back (D-123): behind the way she faces — the avatar group's +z,
- * which her seat or her walk turns — measured on the floor. ``wasBack`` is what was shown last.
+ * How she is turned to the camera, measured on the floor: ``facing``, the cosine between the way
+ * she faces (the avatar group's +z, which her seat or her walk turns) and the way to the camera
+ * (1: she faces it, -1: her back to it); ``across``, how far she faces the screen's right (1) or
+ * left (-1). Null when either is straight up or down.
  */
-export function seesBack(avatar: Object3D, cameraDirection: Vector3, wasBack: boolean): boolean {
+export function aspectOf(avatar: Object3D, cameraDirection: Vector3): { facing: number; across: number } | null {
   forward.set(0, 0, 1).applyQuaternion(avatar.getWorldQuaternion(turn));
   forward.y = 0;
   toward.set(-cameraDirection.x, 0, -cameraDirection.z);
-  if (forward.lengthSq() < 1e-6 || toward.lengthSq() < 1e-6) return wasBack;
-  const facing = forward.normalize().dot(toward.normalize());
-  return wasBack ? facing < SIDE_ON : facing < -SIDE_ON;
+  if (forward.lengthSq() < 1e-6 || toward.lengthSq() < 1e-6) return null;
+  forward.normalize();
+  toward.normalize();
+  // the screen's right, on the floor: the camera looks along -toward
+  return { facing: forward.dot(toward), across: forward.x * toward.z - forward.z * toward.x };
 }
+
+/** Whether the camera is at her back (D-123). ``wasBack`` is what was shown last. */
+export function seesBack(avatar: Object3D, cameraDirection: Vector3, wasBack: boolean): boolean {
+  const aspect = aspectOf(avatar, cameraDirection);
+  if (!aspect) return wasBack;
+  return wasBack ? aspect.facing < SIDE_ON : aspect.facing < -SIDE_ON;
+}
+
+/** How far across the screen she must be walking for the side view (D-125): within 60° of
+ * side-on. Under the isometric camera every walk along a corridor is at 45°, so it is a side view. */
+export const SIDEWAYS = 0.5;
+
+/** Walking strides a second: the two frames alternate at this rate. */
+export const STRIDES_PER_SECOND = 3.5;
 
 const lookDirection = new Vector3();
 
-/** Someone's pictures: standing, from the front and behind (D-118, D-123), and seated (D-124).
- * Only the standing front is needed; the rest stand in for each other when missing. */
+/** Someone's pictures: standing, from the front and behind (D-118, D-123), seated (D-124), and
+ * walking seen from the side, two frames facing right (D-125). Only the standing front is needed;
+ * the rest stand in for each other when missing. */
 export interface Pictures {
   stand: string;
   standBack?: string | null;
   sit?: string | null;
   sitBack?: string | null;
+  walk?: readonly [string, string] | null;
 }
-export type View = "stand" | "standBack" | "sit" | "sitBack";
+export type View = "stand" | "standBack" | "sit" | "sitBack" | "walk1" | "walk2";
 
-/** Which picture shows, seated or not, seen from behind or not. */
-export function viewFor(pictures: Pictures, seated: boolean, back: boolean): View {
+export interface Moment {
+  seated: boolean;
+  back: boolean;
+  /** Walking, and seen from the side. */
+  sideways?: boolean;
+  /** Which of the two walking frames (0 or 1). */
+  stride?: number;
+}
+
+/** Which picture shows, for how she is and how she is seen. */
+export function viewFor(pictures: Pictures, { seated, back, sideways = false, stride = 0 }: Moment): View {
+  if (sideways && pictures.walk) return stride % 2 ? "walk2" : "walk1";
   if (seated && pictures.sit) return back && pictures.sitBack ? "sitBack" : "sit";
   return back && pictures.standBack ? "standBack" : "stand";
 }
 
 /** How far toward the camera the card stands for a view: seated, or seen from behind, she is in
  * her chair (its back in front of her, as a sitter's is); standing and seen from the front, a step
- * out of it, or the chair's back would hide her. */
+ * out of it, or the chair's back would hide her. Walking, she is nowhere near a chair. */
 export function stepFor(view: View): number {
   return view === "stand" ? CARD_FORWARD : 0;
 }
 
-const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack"];
+const VIEWS: View[] = ["stand", "standBack", "sit", "sitBack", "walk1", "walk2"];
+
+function urlOf(pictures: Pictures, view: View): string | null | undefined {
+  if (view === "walk1") return pictures.walk?.[0];
+  if (view === "walk2") return pictures.walk?.[1];
+  return pictures[view];
+}
+
+/** The walking frames are cut at one scale per pair, 512 px for the taller: the stride is a
+ * little shorter than the step between, as it is. */
+const WALK_FRAME_PX = 512;
 
 function sizeOf(texture: Texture, view: View): [number, number] {
-  const height = view === "sit" || view === "sitBack" ? SIT_HEIGHT : STANDEE_HEIGHT;
   const image = texture.image as { width: number; height: number } | undefined;
+  const walking = view === "walk1" || view === "walk2";
+  const height =
+    view === "sit" || view === "sitBack"
+      ? SIT_HEIGHT
+      : walking && image
+        ? (STANDEE_HEIGHT * image.height) / WALK_FRAME_PX
+        : STANDEE_HEIGHT;
   return [image ? (height * image.width) / image.height : height * 0.6, height];
 }
 
 export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Pose | null }) {
   const card = useRef<Group>(null);
   const plane = useRef<Mesh>(null);
-  const shown = useRef<View>("stand");
-  const views = VIEWS.filter((view) => pictures[view]);
+  const shown = useRef<{ view: View; mirrored: boolean }>({ view: "stand", mirrored: false });
+  const views = VIEWS.filter((view) => urlOf(pictures, view));
   const textures = useTexture(
-    views.map((view) => pictures[view]!),
+    views.map((view) => urlOf(pictures, view)!),
     (t) => {
       for (const loaded of Array.isArray(t) ? t : [t]) {
         loaded.colorSpace = SRGBColorSpace;
@@ -145,21 +191,30 @@ export function Standee({ pictures, pose }: { pictures: Pictures; pose: () => Po
     },
   );
   const texture = (view: View) => textures[views.indexOf(view)];
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     if (!card.current) return;
     camera.getWorldDirection(lookDirection);
     const avatar = card.current.parent;
-    const wasBack = shown.current === "standBack" || shown.current === "sitBack";
-    const back = Boolean(avatar && seesBack(avatar, lookDirection, wasBack));
-    const view = viewFor(pictures, isSeated(pose()), back);
+    const was = shown.current;
+    const back = Boolean(avatar && seesBack(avatar, lookDirection, was.view === "standBack" || was.view === "sitBack"));
+    const aspect = avatar ? aspectOf(avatar, lookDirection) : null;
+    const current = pose();
+    const view = viewFor(pictures, {
+      seated: isSeated(current),
+      back,
+      sideways: current === "walk" && aspect !== null && Math.abs(aspect.across) >= SIDEWAYS,
+      stride: Math.floor(clock.elapsedTime * STRIDES_PER_SECOND),
+    });
+    // the walking frames face right: walking to the screen's left, she is drawn mirrored
+    const mirrored = (view === "walk1" || view === "walk2") && aspect !== null && aspect.across < 0;
     faceCamera(card.current, lookDirection, stepFor(view));
-    if (view === shown.current || !plane.current) return;
-    shown.current = view;
+    if ((view === was.view && mirrored === was.mirrored) || !plane.current) return;
+    shown.current = { view, mirrored };
     const material = plane.current.material as MeshBasicMaterial;
     material.map = texture(view);
     material.needsUpdate = true;
     const [width, height] = sizeOf(texture(view), view);
-    plane.current.scale.set(width, height, 1);
+    plane.current.scale.set(mirrored ? -width : width, height, 1);
     plane.current.position.y = height / 2;
   });
   const [width, height] = sizeOf(texture("stand"), "stand");

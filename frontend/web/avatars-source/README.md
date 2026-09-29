@@ -19,3 +19,9 @@ with `lift.swift` (macOS Vision), cropped to the figure and scaled to 512 px hig
 `sit-front/` and `sit-back/` are the operator's seated pictures (sitting on nothing, so the office's
 own chair takes her), 1024 × 1024. Served as `public/figures-sit/` and `public/figures-sit-back/`,
 made the same way as the back views.
+
+## Walking, from the side (D-125)
+
+`walk/<avatar_key>.jpg` hold two frames side by side (the stride, and the step between), facing
+right, 1376 × 768. Split at the white divider, lifted, and scaled per pair so the taller frame is
+512 px: `public/figures-walk/<avatar_key>-1.webp` and `-2.webp`. Walking left, the office mirrors them.

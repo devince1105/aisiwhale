@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { figureBackPhoto, figurePhoto } from "@/people";
 
-import { CARD_FORWARD, faceCamera, seesBack, standeeLift, stepFor, viewFor } from "./Standee";
+import { aspectOf, CARD_FORWARD, faceCamera, seesBack, SIDEWAYS, standeeLift, stepFor, viewFor } from "./Standee";
 
 describe("a standee", () => {
   it("turns to the camera about the vertical only, whatever way its desk faces", () => {
@@ -73,13 +73,13 @@ describe("a standee", () => {
 
   it("sits in a seated picture when seated, the right side to the camera (D-124)", () => {
     const all = { stand: "s", standBack: "sb", sit: "t", sitBack: "tb" };
-    expect(viewFor(all, true, false)).toBe("sit");
-    expect(viewFor(all, true, true)).toBe("sitBack");
-    expect(viewFor(all, false, true)).toBe("standBack");
-    expect(viewFor(all, false, false)).toBe("stand");
+    expect(viewFor(all, { seated: true, back: false })).toBe("sit");
+    expect(viewFor(all, { seated: true, back: true })).toBe("sitBack");
+    expect(viewFor(all, { seated: false, back: true })).toBe("standBack");
+    expect(viewFor(all, { seated: false, back: false })).toBe("stand");
     // what is missing is stood in for
-    expect(viewFor({ stand: "s" }, true, true)).toBe("stand");
-    expect(viewFor({ stand: "s", sit: "t" }, true, true)).toBe("sit");
+    expect(viewFor({ stand: "s" }, { seated: true, back: true })).toBe("stand");
+    expect(viewFor({ stand: "s", sit: "t" }, { seated: true, back: true })).toBe("sit");
     // in the chair, whichever side is seen; standing and seen from the front, a step out of it
     expect(stepFor("sit")).toBe(0);
     expect(stepFor("sitBack")).toBe(0);
@@ -90,5 +90,31 @@ describe("a standee", () => {
     expect(standeeLift("sit_idle", 1, true)).toBeLessThan(-0.15);
     expect(standeeLift("sit_idle", 1, true)).toBeGreaterThan(-0.25);
     expect(standeeLift("stand", 1, true)).toBe(0);
+  });
+
+  it("walking across the screen, the side view: its two frames in turn (D-125)", () => {
+    const all = { stand: "s", standBack: "sb", sit: "t", sitBack: "tb", walk: ["w1", "w2"] as const };
+    expect(viewFor(all, { seated: false, back: true, sideways: true, stride: 0 })).toBe("walk1");
+    expect(viewFor(all, { seated: false, back: true, sideways: true, stride: 7 })).toBe("walk2");
+    expect(viewFor(all, { seated: false, back: true, sideways: false })).toBe("standBack");
+    expect(viewFor({ stand: "s" }, { seated: false, back: false, sideways: true })).toBe("stand");
+    expect(stepFor("walk1")).toBe(0);
+  });
+
+  it("under the isometric camera a walk along a corridor is seen from the side, facing the way she goes", () => {
+    const iso = new Vector3(-1, -1.15, -1).normalize(); // from the front right
+    const walker = new Group();
+    for (const [heading, right] of [
+      [Math.PI / 2, true], // toward +x: up and to the right on screen
+      [-Math.PI / 2, false], // toward -x
+      [0, false], // toward +z: down and to the left
+      [Math.PI, true], // toward -z: up and to the right
+    ] as const) {
+      walker.rotation.y = heading;
+      walker.updateMatrixWorld(true);
+      const aspect = aspectOf(walker, iso)!;
+      expect(Math.abs(aspect.across)).toBeGreaterThanOrEqual(SIDEWAYS);
+      expect(aspect.across > 0).toBe(right);
+    }
   });
 });
