@@ -8,6 +8,7 @@ import { businessColors, ROLE_COLOR } from "../palette";
 import {
   allSeats,
   APPROVAL_DESK,
+  SERVER_ROOM,
   assignSeats,
   CEO_OFFICE,
   CHAIR,
@@ -278,6 +279,7 @@ export function floorPlan(agentIds: readonly string[], seats: ReadonlyMap<string
     { id: "ceo", label: DEPARTMENT_LABEL.ceo, box: box(CEO_OFFICE, minX, minY), kind: "walled" as const },
     { id: "meeting", label: "會議室", box: box(MEETING_ROOM, minX, minY), kind: "walled" as const },
     { id: "pantry", label: "茶水間", box: box(PANTRY, minX, minY), kind: "walled" as const },
+    { id: "server", label: "機房", box: box(SERVER_ROOM, minX, minY), kind: "walled" as const },
   ];
   return {
     width: ROOM.maxX - ROOM.minX + WALL * 2,

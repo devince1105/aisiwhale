@@ -20,6 +20,7 @@ import { officeParts, partitionGlassParts } from "./furniture";
 import { buildGeometry } from "./kit";
 import { Labels } from "./Labels";
 import { OuterWalls } from "./OuterWalls";
+import { ServerLights } from "./ServerLights";
 
 const SHADOW_EXTENT = 17;
 
@@ -84,6 +85,8 @@ export function OfficeScene({ insetRight = 0, theme = DEFAULT_THEME }: { insetRi
       <mesh geometry={glass} renderOrder={1}>
         <meshStandardMaterial vertexColors transparent opacity={0.22} roughness={0.05} metalness={0.1} depthWrite={false} />
       </mesh>
+      {/* the server room's racks: their lights say whether the system is running (D-121) */}
+      <ServerLights />
       <VisualTrackerProvider>
         <CueProvider>
           <DeskStatus />
