@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from autora.company import team_chat
 from autora.domains.newsroom import official_trades, planning, workflow
 from autora.domains.newsroom.activity_links import activity_links
 from autora.domains.newsroom.planning import EditorialPlanning
@@ -18,6 +19,17 @@ from autora.runtime.approvals import ApprovalService
 from autora.runtime.policy import PolicyEngine
 from autora.runtime.services import ServiceRegistry
 from autora.runtime.task_manager import TaskManager
+
+# what the office's team group hears from the newsroom (D-109): its milestones, not its steps
+team_chat.hear(
+    "STORY_SELECTED",
+    "STORY_DROPPED",
+    "ARTICLE_CREATED",
+    "ARTICLE_REVIEWED",
+    "ARTICLE_PUBLISHED",
+    "ARTICLE_REJECTED",
+    "SOURCE_PAUSED",
+)
 
 
 class RuntimeParts(Protocol):

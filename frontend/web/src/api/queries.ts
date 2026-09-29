@@ -31,6 +31,8 @@ export const queryKeys = {
   finance: (companyId: string) => ["finance", companyId] as const,
   /** Projects, with who paused them and why (D-056). */
   projects: (companyId: string) => ["projects", companyId] as const,
+  /** The office's team group (D-109). */
+  team: (companyId: string) => ["team", companyId] as const,
 };
 
 export function companiesQuery(api: ApiClient = defaultApi) {
@@ -348,6 +350,34 @@ export async function startStory(storyId: string, projectId: string | null = nul
     await api.POST("/api/stories/{story_id}/start", {
       params: { path: { story_id: storyId } },
       body: { project_id: projectId },
+    }),
+  );
+}
+
+/** 團隊群組 (D-109): the group's latest messages before ``before`` (a seq), oldest first. */
+export async function fetchTeamFeed(companyId: string, before: number | null = null, api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.GET("/api/companies/{company_id}/team/feed", {
+      params: { path: { company_id: companyId }, query: before ? { before } : {} },
+    }),
+  );
+}
+
+export function teamFeedQuery(companyId: string, api: ApiClient = defaultApi) {
+  return queryOptions({ queryKey: queryKeys.team(companyId), queryFn: () => fetchTeamFeed(companyId, null, api) });
+}
+
+/** A note to the group, or a brief: a story for the newsroom, started at once (D-109). */
+export async function postTeamMessage(
+  companyId: string,
+  text: string,
+  kind: "note" | "brief" = "note",
+  api: ApiClient = defaultApi,
+) {
+  return unwrap(
+    await api.POST("/api/companies/{company_id}/team/messages", {
+      params: { path: { company_id: companyId } },
+      body: { text, kind },
     }),
   );
 }

@@ -4549,6 +4549,62 @@
         }
       }
     },
+    "TEAM_MESSAGE_POSTED": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "Someone wrote in the office's team group: a note, or a brief — work handed to a business,\nwhich says what it made of it (``ref_type``/``ref_id``, the thing it started).",
+          "properties": {
+            "text": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "title": "Text",
+              "type": "string"
+            },
+            "kind": {
+              "default": "note",
+              "enum": [
+                "note",
+                "brief"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "ref_type": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ref Type"
+            },
+            "ref_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Ref Id"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "title": "TeamMessagePosted",
+          "type": "object"
+        }
+      }
+    },
     "TOOL_CALLED": {
       "1": {
         "persistence": "persisted",

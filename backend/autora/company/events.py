@@ -442,3 +442,17 @@ class KpiSnapshotCreated(EventPayload):
     cycle_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
     metrics: dict[str, Any]
+
+
+# --- The team group (D-109) ------------------------------------------------------------------
+
+
+@event("TEAM_MESSAGE_POSTED")
+class TeamMessagePosted(EventPayload):
+    """Someone wrote in the office's team group: a note, or a brief — work handed to a business,
+    which says what it made of it (``ref_type``/``ref_id``, the thing it started)."""
+
+    text: str = Field(min_length=1, max_length=1000)
+    kind: Literal["note", "brief"] = "note"
+    ref_type: str | None = None
+    ref_id: uuid.UUID | None = None

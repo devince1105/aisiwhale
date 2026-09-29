@@ -18,6 +18,42 @@ import { useUi } from "@/stores/ui";
 
 import { DepartmentStrip, departmentNames as departmentNames_, departmentsOf } from "./Departments";
 import { MiniDashboardView } from "./MiniDashboard";
+import { TeamChat } from "./TeamChat";
+import { CHAT_TYPES } from "./chatModel";
+
+const CHAT_OPEN = "autora:team-chat";
+
+/** Whether the team group is showing (D-109): open unless the operator closed it, remembered in
+ * this browser; and how many of its messages came while it was closed. */
+function useTeamChat(companyId: string): [boolean, (open: boolean) => void, number] {
+  const [open, setOpenState] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(CHAT_OPEN) === "closed") setOpenState(false);
+    } catch {
+      // storage closed: open
+    }
+  }, []);
+  const latest = useRealtime((s) => {
+    if (s.company?.companyId !== companyId) return 0;
+    const events = s.company.recentEvents;
+    for (let i = events.length - 1; i >= 0; i--) if (CHAT_TYPES.has(events[i].event_type)) return events[i].seq ?? 0;
+    return 0;
+  });
+  const count = useRealtime((s) => s.company?.recentEvents);
+  const [seen, setSeen] = useState(0);
+  const unread = open ? 0 : (count ?? []).filter((e) => CHAT_TYPES.has(e.event_type) && (e.seq ?? 0) > seen).length;
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    setSeen(latest);
+    try {
+      localStorage.setItem(CHAT_OPEN, next ? "open" : "closed");
+    } catch {
+      // not remembered: it still opens or closes now
+    }
+  };
+  return [open, setOpen, seen === 0 && !open ? 0 : unread];
+}
 
 const VIEWS: { id: OfficeView; label: string }[] = [
   { id: "auto", label: "自動" },
@@ -105,6 +141,7 @@ function CompanyOffice({ company }: { company: Company }) {
   const model = dashboardModel(realtime, kpis.data, connection, now);
   // what the office settled on (``auto`` is decided in the canvas, by asking the browser)
   const [mode, setMode] = useState<"2d" | "3d">("3d");
+  const [chatOpen, setChatOpen, unread] = useTeamChat(company.id);
 
   return (
     <main
@@ -133,6 +170,20 @@ function CompanyOffice({ company }: { company: Company }) {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setChatOpen(!chatOpen)}
+            aria-pressed={chatOpen}
+            className={`relative rounded-lg border px-3 py-1 text-sm ${chatOpen ? "border-accent text-accent" : "border-line text-muted hover:text-ink"}`}
+            data-testid="team-chat-toggle"
+          >
+            團隊群組
+            {unread ? (
+              <span className="absolute -top-1.5 -right-1.5 min-w-5 rounded-full bg-danger px-1 text-center text-[11px] leading-5 text-white" aria-label={`${unread} 則新訊息`}>
+                {unread > 99 ? "99+" : unread}
+              </span>
+            ) : null}
+          </button>
           <Link href={withCompany("/admin/dashboard", company.id)} className="text-sm text-accent underline">
             Dashboard
           </Link>
@@ -141,15 +192,23 @@ function CompanyOffice({ company }: { company: Company }) {
       </header>
       <MiniDashboardView model={model} pendingApprovals={pending.data?.length ?? null} />
       <DepartmentStrip companyId={company.id} />
-      <div className="min-h-0 flex-1">
-        {/* the detail panel is max-w-md (448 px) on the right while someone is selected */}
-        <OfficeCanvas
-          view={view}
-          onViewChange={setView}
-          onMode={setMode}
-          selectionInsetRight={448}
-          departmentNames={departmentNames}
-        />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1">
+          {/* the detail panel is max-w-md (448 px) on the right while someone is selected */}
+          <OfficeCanvas
+            view={view}
+            onViewChange={setView}
+            onMode={setMode}
+            selectionInsetRight={448}
+            departmentNames={departmentNames}
+          />
+        </div>
+        {/* the team group beside the office (D-109); on a narrow screen, over it */}
+        {chatOpen ? (
+          <div className="absolute inset-y-0 right-0 z-30 w-full max-w-sm lg:static lg:w-auto lg:max-w-none">
+            <TeamChat companyId={company.id} onClose={() => setChatOpen(false)} />
+          </div>
+        ) : null}
       </div>
       <AgentPanel />
     </main>

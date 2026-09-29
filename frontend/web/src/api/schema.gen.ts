@@ -731,6 +731,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/team/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Feed
+         * @description The group's latest messages (before ``before``), oldest first.
+         */
+        get: operations["get_feed_api_companies__company_id__team_feed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/team/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Team Message
+         * @description A note to the group, or a brief: a story started by hand from the text (its title, and
+         *     the researcher's search), taken straight into production.
+         */
+        post: operations["post_team_message_api_companies__company_id__team_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/workflows": {
         parameters: {
             query?: never;
@@ -3785,6 +3826,35 @@ export interface components {
             /** Workflow Run Id */
             workflow_run_id: string | null;
         };
+        /** TeamFeed */
+        TeamFeed: {
+            /** Has More */
+            has_more: boolean;
+            /** Items */
+            items: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** TeamMessageIn */
+        TeamMessageIn: {
+            /**
+             * Kind
+             * @default note
+             * @enum {string}
+             */
+            kind: "note" | "brief";
+            /** Text */
+            text: string;
+        };
+        /** TeamMessageOut */
+        TeamMessageOut: {
+            /** Seq */
+            seq: number | null;
+            /** Story Id */
+            story_id?: string | null;
+            /** Workflow Run Id */
+            workflow_run_id?: string | null;
+        };
         /** Trace */
         Trace: {
             /**
@@ -5448,6 +5518,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StorySummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_feed_api_companies__company_id__team_feed_get: {
+        parameters: {
+            query?: {
+                /** @description Only messages with seq < before */
+                before?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamFeed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_team_message_api_companies__company_id__team_messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMessageOut"];
                 };
             };
             /** @description Validation Error */

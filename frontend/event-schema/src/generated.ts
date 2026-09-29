@@ -1435,6 +1435,20 @@ export const TaskWaitingV1Event = z.object({
   payload: TaskWaitingV1Payload,
 });
 
+export const TeamMessagePostedV1Payload = z.object({
+  text: z.string().min(1).max(1000),
+  kind: z.enum(["note", "brief"]).default("note"),
+  ref_type: z.string().nullable().default(null),
+  ref_id: z.uuid().nullable().default(null),
+});
+export type TeamMessagePostedV1Payload = z.infer<typeof TeamMessagePostedV1Payload>;
+export const TeamMessagePostedV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("TEAM_MESSAGE_POSTED"),
+  schema_version: z.literal(1),
+  payload: TeamMessagePostedV1Payload,
+});
+
 export const ToolCalledV1Payload = z.object({
   tool: z.string(),
   tool_call_id: z.string(),
@@ -1661,6 +1675,7 @@ export const EventEnvelope = z.discriminatedUnion("event_type", [
   TaskStartedV1Event,
   TaskSucceededV1Event,
   TaskWaitingV1Event,
+  TeamMessagePostedV1Event,
   ToolCalledV1Event,
   ToolCompletedV1Event,
   ToolDeniedV1Event,
@@ -1777,6 +1792,7 @@ export const EVENT_TYPES = [
   "TASK_STARTED",
   "TASK_SUCCEEDED",
   "TASK_WAITING",
+  "TEAM_MESSAGE_POSTED",
   "TOOL_CALLED",
   "TOOL_COMPLETED",
   "TOOL_DENIED",

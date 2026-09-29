@@ -135,6 +135,8 @@ const FORMAT: Record<string, (p: Payload) => [string, Tone, string | null]> = {
     [CHANNEL[s(p.channel) ?? ""] ?? s(p.channel), DISTRIBUTION_STATUS[s(p.status) ?? ""] ?? s(p.status)].filter(Boolean).join("・") || null,
   ],
   ANALYTICS_DAILY_UPDATED: (p) => ["讀者統計更新", "neutral", `${s(p.date) ?? ""} 瀏覽 ${n(p.views) ?? 0}・讀完 ${n(p.read_complete) ?? 0}`.trim()],
+  // the office's team group (D-109)
+  TEAM_MESSAGE_POSTED: (p) => [p.kind === "brief" ? "交辦題材" : "群組留言", "neutral", s(p.text)],
   STORY_DROPPED: (p) => ["放棄題材", "warn", [s(p.title), s(p.reason)].filter(Boolean).join("・") || null],
 };
 

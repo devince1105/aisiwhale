@@ -26,7 +26,7 @@ from sqlalchemy import select
 
 from autora.app import build_embedder
 from autora.company.workflows import StartWorkflowError, WorkflowNotAllowed
-from autora.db.models import Company, Project, ProjectState
+from autora.db.models import Company, Project, ProjectState, WorkflowRun
 from autora.domains.newsroom import admin
 from autora.domains.newsroom.models import Article, ArticleAccess, SourceKind, Story, StoryState
 from autora.domains.newsroom.publisher import (
@@ -96,8 +96,19 @@ async def start(
     story = await session.get(Story, story_id, with_for_update=True)
     if story is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"story {story_id} not found")
+    run = await start_now(session, story, body.project_id, operator, runtime)
+    await session.commit()
+    return StartedStory(story_id=story.id, workflow_run_id=run.id)
+
+
+async def start_now(
+    session, story: Story, project_id: uuid.UUID | None, operator, runtime
+) -> WorkflowRun:
+    """Select ``story`` if it was only discovered and start its workflow, in the given or its own
+    project, else the company's first active one. Also what the team group's brief does (D-109).
+    Not committed."""
     project_id = (
-        body.project_id
+        project_id
         or story.project_id
         or await session.scalar(
             select(Project.id)
@@ -112,7 +123,7 @@ async def start(
         if story.state == StoryState.DISCOVERED:
             desk = StoryDesk(build_embedder(None))
             await desk.select(session, story, project_id=project_id, actor=operator)
-        run = await start_story(
+        return await start_story(
             session,
             policy=runtime.policy,
             workflows=runtime.workflows,
@@ -124,8 +135,6 @@ async def start(
         raise HTTPException(status.HTTP_403_FORBIDDEN, refused.reason) from None
     except (StartWorkflowError, StoryError) as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from None
-    await session.commit()
-    return StartedStory(story_id=story.id, workflow_run_id=run.id)
 
 
 @router.get("/api/companies/{company_id}/articles")

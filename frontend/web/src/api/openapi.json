@@ -6282,6 +6282,96 @@
     "title": "TaskView",
     "type": "object"
    },
+   "TeamFeed": {
+    "properties": {
+     "has_more": {
+      "title": "Has More",
+      "type": "boolean"
+     },
+     "items": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "title": "Items",
+      "type": "array"
+     }
+    },
+    "required": [
+     "items",
+     "has_more"
+    ],
+    "title": "TeamFeed",
+    "type": "object"
+   },
+   "TeamMessageIn": {
+    "properties": {
+     "kind": {
+      "default": "note",
+      "enum": [
+       "note",
+       "brief"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "text": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "TeamMessageIn",
+    "type": "object"
+   },
+   "TeamMessageOut": {
+    "properties": {
+     "seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seq"
+     },
+     "story_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Story Id"
+     },
+     "workflow_run_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Workflow Run Id"
+     }
+    },
+    "required": [
+     "seq"
+    ],
+    "title": "TeamMessageOut",
+    "type": "object"
+   },
    "Trace": {
     "properties": {
      "agent_id": {
@@ -9634,6 +9724,177 @@
     "summary": "List Stories",
     "tags": [
      "newsroom"
+    ]
+   }
+  },
+  "/api/companies/{company_id}/team/feed": {
+   "get": {
+    "description": "The group's latest messages (before ``before``), oldest first.",
+    "operationId": "get_feed_api_companies__company_id__team_feed_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "company_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Company Id",
+       "type": "string"
+      }
+     },
+     {
+      "description": "Only messages with seq < before",
+      "in": "query",
+      "name": "before",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "minimum": 1,
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Only messages with seq < before",
+       "title": "Before"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 60,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TeamFeed"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Feed",
+    "tags": [
+     "team"
+    ]
+   }
+  },
+  "/api/companies/{company_id}/team/messages": {
+   "post": {
+    "description": "A note to the group, or a brief: a story started by hand from the text (its title, and\nthe researcher's search), taken straight into production.",
+    "operationId": "post_team_message_api_companies__company_id__team_messages_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "company_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Company Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TeamMessageIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TeamMessageOut"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Post Team Message",
+    "tags": [
+     "team"
     ]
    }
   },
