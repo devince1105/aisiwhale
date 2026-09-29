@@ -4,6 +4,7 @@ import {
   allSeats,
   APPROVAL_DESK,
   assignSeats,
+  BENCHES,
   CEO_OFFICE,
   CORRIDORS,
   doorOf,
@@ -44,7 +45,7 @@ function samples(path: Vec2[]): { point: Vec2; segment: number }[] {
 
 describe("seats", () => {
   it("every role of the MVP office has a seat; single agents get the first desk", () => {
-    expect(ROLES.sort()).toEqual(["analyst", "ceo", "editor", "marketing", "researcher", "writer"]);
+    expect(ROLES.sort()).toEqual(["analyst", "ceo", "editor", "editor_in_chief", "engineer", "marketing", "news_intelligence", "researcher", "writer"]);
     for (const role of ROLES) {
       const [seat] = seatsForRole(role, 1);
       expect(seat.role).toBe(role);
@@ -53,9 +54,9 @@ describe("seats", () => {
   });
 
   it("seatsForRole gives up to the area's capacity, never more", () => {
-    expect(seatsForRole("researcher", 2)).toHaveLength(2);
-    expect(seatsForRole("researcher", 5)).toHaveLength(SLOTS.researcher.desks.length);
-    expect(seatsForRole("marketing", 3).map((s) => s.key)).toEqual(["growth:marketing:0", "growth:marketing:1", "growth:marketing:2"]);
+    expect(seatsForRole("analyst", 2)).toHaveLength(2);
+    expect(seatsForRole("analyst", 5)).toHaveLength(SLOTS.analyst.desks.length);
+    expect(seatsForRole("marketing", 3).map((s) => s.key)).toEqual(["growth:marketing:0", "growth:marketing:1"]);
     expect(seatsForRole("unknown_role", 1)).toEqual([]);
   });
 
@@ -81,16 +82,16 @@ describe("seats", () => {
 
   it("assignment: the desk built for the role first, then any desk in the same room", () => {
     const agents = [
-      { id: "b", role: "researcher" },
-      { id: "a", role: "researcher" },
-      { id: "c", role: "researcher" },
+      { id: "b", role: "analyst" },
+      { id: "a", role: "analyst" },
+      { id: "c", role: "analyst" },
       { id: "d", role: "fact_checker" },
       { id: "e", role: "writer" },
     ];
     const { seats, unseated } = assignSeats(agents);
-    expect(seats.get("a")!.key).toBe("research:researcher:0");
-    expect(seats.get("b")!.key).toBe("research:researcher:1");
-    // a third researcher is not homeless: research has other desks, and it takes one
+    expect(seats.get("a")!.key).toBe("research:analyst:0");
+    expect(seats.get("b")!.key).toBe("research:analyst:1");
+    // a third analyst is not homeless: research has other desks, and it takes one
     expect(seats.get("c")!.zone).toBe("research");
     expect(unseated).toEqual([]);
     expect(seats.get("d")!.zone).toBe("spare"); // a role the floor plan does not know
@@ -199,11 +200,14 @@ describe("zones, entrance and labels (T-413)", () => {
     }
   });
 
-  it("the entrance opens the right edge onto the front walkway, next to the lobby with the reception and lounge", () => {
+  it("the entrance opens the right edge onto the front walkway, the reception just inside it and the lounge in the lobby", () => {
     expect(ENTRANCE.x).toBe(ROOM.maxX);
     expect([ENTRANCE.minZ, ENTRANCE.maxZ]).toEqual([CORRIDORS.front.minZ, CORRIDORS.front.maxZ]);
     const desk = { minX: APPROVAL_DESK.center[0] - APPROVAL_DESK.width / 2, maxX: APPROVAL_DESK.center[0] + APPROVAL_DESK.width / 2, minZ: APPROVAL_DESK.center[1] - APPROVAL_DESK.depth / 2, maxZ: APPROVAL_DESK.center[1] + APPROVAL_DESK.depth / 2 };
-    expect(contains(ZONES.lobby, desk)).toBe(true);
+    // the reception just inside the entrance, in the work row with the flex desks but not up
+    // against them: a metre of floor between (D-120)
+    expect(contains(ZONES.spare, desk)).toBe(true);
+    expect(desk.minX - BENCHES[1].maxX).toBeGreaterThanOrEqual(1);
     const lounge = DECOR.find((item) => item.kind === "lounge")!;
     expect(inside(lounge.at, { name: "lobby", ...ZONES.lobby })).toBe(true);
     // nothing stands in the doorway

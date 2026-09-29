@@ -153,7 +153,8 @@ describe("the floor, as the 3D office has it", () => {
   it("each room has the furniture that makes it that room — the 3D office's own", () => {
     const kinds = (zone: string) =>
       new Set(scene().props.filter((prop: Prop) => prop.zone === zone).map((prop: Prop) => prop.kind));
-    expect(kinds("lobby")).toContain("counter"); // reception, which is also the approval desk
+    // reception, which is also the approval desk: just inside the entrance, past the flex desks (D-120)
+    expect(kinds("spare")).toContain("counter");
     expect(kinds("lobby")).toContain("lounge");
     expect(kinds("pantry")).toContain("fridge");
     expect(kinds("pantry")).toContain("pantry_counter");

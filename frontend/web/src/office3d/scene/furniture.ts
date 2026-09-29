@@ -171,9 +171,10 @@ export function lampSpot(seat: Seat): { shade: [number, number, number]; glow: [
 const APPROVAL_LAMP = { dx: 1.0, dz: 0.2, lift: 1.1 - TOP } as const;
 
 export function approvalLampSpot(): { shade: [number, number, number]; glow: [number, number, number] } {
-  const x = APPROVAL_DESK.center[0] + APPROVAL_LAMP.dx - LAMP.reach;
-  const z = APPROVAL_DESK.center[1] + APPROVAL_LAMP.dz;
-  return { shade: [x, 1.1 + LAMP.height - 0.05, z], glow: [x, 1.1 + 0.004, z - 0.05] };
+  // the desk is turned round (D-120): its own x and z run the other way
+  const x = APPROVAL_DESK.center[0] - (APPROVAL_LAMP.dx - LAMP.reach);
+  const z = APPROVAL_DESK.center[1] - APPROVAL_LAMP.dz;
+  return { shade: [x, 1.1 + LAMP.height - 0.05, z], glow: [x, 1.1 + 0.004, z + 0.05] };
 }
 
 /** The lamp's fixed parts: base, pole and arm (the shade is drawn live). */
@@ -298,20 +299,28 @@ function lounge(): Part[] {
   ];
 }
 
+/** The meeting table (D-120), built along its own x with its open end at +x: turned a quarter in
+ * the room, that end faces the projection screen on the back wall. Three chairs a side facing
+ * each other, one at the far end facing the screen, none in front of it. */
+export const MEETING_TABLE = { length: 2.8, width: 1.2 } as const;
+
 function meetingSet(): Part[] {
+  const { length, width } = MEETING_TABLE;
   const parts: Part[] = [
-    block(4.4, 0.06, 1.3, [0, TOP - 0.06, 0], P.tableWood),
-    block(0.12, TOP - 0.06, 0.9, [-1.5, 0, 0], P.metal),
-    block(0.12, TOP - 0.06, 0.9, [1.5, 0, 0], P.metal),
-    block(0.5, 0.02, 0.35, [-0.8, TOP, 0.1], P.keyboard),
-    block(0.5, 0.02, 0.35, [0.9, TOP, -0.15], P.keyboard),
+    block(length, 0.06, width, [0, TOP - 0.06, 0], P.tableWood),
+    block(0.12, TOP - 0.06, width - 0.4, [-length / 2 + 0.4, 0, 0], P.metal),
+    block(0.12, TOP - 0.06, width - 0.4, [length / 2 - 0.4, 0, 0], P.metal),
+    block(0.5, 0.02, 0.35, [-0.6, TOP, 0.15], P.keyboard),
+    block(0.5, 0.02, 0.35, [0.7, TOP, -0.15], P.keyboard),
   ];
-  for (const x of [-1.4, 0, 1.4]) {
-    parts.push(...place(officeChair(P.cushion), x, 1.0));
-    parts.push(...place(officeChair(P.cushion), x, -1.0, Math.PI));
+  for (const x of [-0.85, 0, 0.85]) {
+    parts.push(...place(officeChair(P.cushion), x, width / 2 + 0.35));
+    parts.push(...place(officeChair(P.cushion), x, -width / 2 - 0.35, Math.PI));
   }
-  parts.push(...place(officeChair(P.cushion), -2.55, 0, -Math.PI / 2), ...place(officeChair(P.cushion), 2.55, 0, Math.PI / 2));
-  return parts;
+  const end = -length / 2 - 0.55;
+  parts.push(...place(officeChair(P.cushion), end, 0, -Math.PI / 2));
+  // centred on what it covers (from the end chair to the table's open end), as its footprint is
+  return place(parts, -(end - 0.3 + length / 2) / 2, 0);
 }
 
 function whiteboard(): Part[] {
@@ -416,7 +425,8 @@ function decorParts(item: Decor, index: number): Part[] {
 
 function approvalDesk(): Part[] {
   const { width, depth } = APPROVAL_DESK;
-  // the visitor side faces the corridor (-z); the approver sits behind (+z)
+  // built with the visitor side at -z and the approver behind it (+z), then turned round (D-120):
+  // the counter faces the front walkway, the chair is on the inside
   const parts: Part[] = [
     block(width, 1.05, 0.12, [0, 0, -depth / 2 + 0.06], P.counter),
     block(0.12, 1.05, depth, [-width / 2 + 0.06, 0, 0], P.counter),
@@ -429,7 +439,7 @@ function approvalDesk(): Part[] {
     ...place(officeChair(P.approvalAccent), 0, depth / 2 + 0.45),
     ...place(lampBody(), APPROVAL_LAMP.dx - LAMP.x, APPROVAL_LAMP.dz - LAMP.z, 0, APPROVAL_LAMP.lift),
   ];
-  return place(parts, APPROVAL_DESK.center[0], APPROVAL_DESK.center[1]);
+  return place(parts, APPROVAL_DESK.center[0], APPROVAL_DESK.center[1], Math.PI);
 }
 
 // --- architecture ------------------------------------------------------------------------------
@@ -795,10 +805,10 @@ export const BAKEABLE: Record<string, BakeablePiece> = {
     ]),
   ),
   counterDesk: {
-    // approvalDesk() builds itself where it stands; bring it back to the origin. It comes with the
-    // approver's chair in front of it, so its footprint reaches the chair.
+    // approvalDesk() builds itself where it stands; bring it back to the origin. Turned round
+    // (D-120), its chair is behind it, so the counter's front is the footprint's front.
     parts: (p) => paintedWith(p, () => place(approvalDesk(), -APPROVAL_DESK.center[0], -APPROVAL_DESK.center[1])),
-    footprint: [APPROVAL_DESK.width, 2.4],
+    footprint: [APPROVAL_DESK.width, APPROVAL_DESK.depth + 0.1],
   },
   ...Object.fromEntries(
     BENCHES.map((b, i) => [

@@ -16,10 +16,17 @@
 //        │ (glass front)  │ (glass front)        │ (open)          │
 //   z=-3.2├──door─────────┴──────door────────────┘                 │
 //        │ ═══════════════ back corridor (lane z=-2.25) ══════════ │
-//   z=0  │ [res][res][ana][ana]  spine x=0  [wri][wri][edi][edi]   │  bench desks
+//   z=0  │ [ni][res][ana][ana]  spine x=0  [flex][flex][flex]  [reception]│  bench desks
 //        │ ═══════════════ front corridor (lane z=2.4) ═══════════ │
 //        │                                                 entrance ◁ (T-413)
-//   z=4.6│ [mkt][mkt][mkt] ▒ [spare][spare][spare]  [reception] lounge│  single desks; lobby
+//   z=4.6│ [mkt][mkt][r&d] ▒ [wri][edi][eic]          lounge  │  single desks; lobby
+//
+// Where things stand follows the usual feng-shui rules of an office (D-120): the CEO in the
+// corner furthest from the entrance, a solid wall behind her and her door in view; the reception
+// by the entrance, where it sees who comes in without standing in the door's straight line, with
+// its chair behind the counter and open floor around it; the flex desks, whose sitters come and
+// go, nearest the door; the editorial desk, the newsroom's own, in the front row with the wall at
+// its back; and nothing in the entrance's line or doorway.
 //   z=8  └──────────────────────────────────────────────────────────┘
 //      x=-12                                                     x=12
 
@@ -68,14 +75,18 @@ export interface Area {
  */
 export const ZONES: Record<"research" | "editorial" | "growth" | "spare" | "lobby", Area> = {
   research: { minX: -10.6, maxX: -1.4, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
-  editorial: { minX: 1.4, maxX: 10.6, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
+  // the flex desks and the editorial desk changed places (D-120): flex by the entrance, where
+  // people come and go; editorial in the front row, the wall behind it
+  spare: { minX: 1.2, maxX: 11.0, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
   growth: { minX: -10.4, maxX: -3.2, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
-  spare: { minX: -2.6, maxX: 3.9, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
+  editorial: { minX: -2.6, maxX: 3.9, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
   lobby: { minX: 4.2, maxX: ROOM.maxX, minZ: CORRIDORS.front.maxZ, maxZ: ROOM.maxZ },
 };
 
-/** The approval desk doubles as the reception counter in the lobby. */
-export const APPROVAL_DESK = { center: [6.4, 4.9] as Vec2, width: 2.6, depth: 0.9, approach: [6.4, 3.8] as Vec2 } as const;
+/** The approval desk doubles as the reception counter. It stands just inside the entrance
+ * (D-120), clear of the flex desks, turned like the CEO's desk: its counter faces the front
+ * walkway that visitors come in by, and its chair is on the inside, toward the back of the room. */
+export const APPROVAL_DESK = { center: [9.7, 0] as Vec2, width: 2.6, depth: 0.9, approach: [9.7, 1.2] as Vec2 } as const;
 
 interface RoleSlots {
   zone: ZoneId;
@@ -94,25 +105,31 @@ const FRONT_Z = 4.6;
 
 /** Desks per role, in the order they are filled. Capacity = number of desks. */
 export const SLOTS: Record<string, RoleSlots> = {
-  researcher: { zone: "research", lane: "front", bench: true, desks: [[-6.8, WORK_Z], [-9.0, WORK_Z]] },
-  analyst: { zone: "research", lane: "front", bench: true, desks: [[-2.4, WORK_Z], [-4.6, WORK_Z]] },
-  writer: { zone: "editorial", lane: "front", bench: true, desks: [[2.4, WORK_Z], [4.6, WORK_Z]] },
-  editor: { zone: "editorial", lane: "front", bench: true, desks: [[6.8, WORK_Z], [9.0, WORK_Z]] },
-  marketing: { zone: "growth", lane: "front", bench: false, desks: [[-6.8, FRONT_Z], [-9.0, FRONT_Z], [-4.6, FRONT_Z]] },
+  // every member of the newsroom has a desk of her own (D-120), so no one takes another's
+  news_intelligence: { zone: "research", lane: "front", bench: true, desks: [[-9.0, WORK_Z]] },
+  researcher: { zone: "research", lane: "front", bench: true, desks: [[-6.8, WORK_Z]] },
+  analyst: { zone: "research", lane: "front", bench: true, desks: [[-4.6, WORK_Z], [-2.4, WORK_Z]] },
+  // the editorial desk in the front row, in the order a story passes along it
+  writer: { zone: "editorial", lane: "front", bench: false, desks: [[-1.6, FRONT_Z]] },
+  editor: { zone: "editorial", lane: "front", bench: false, desks: [[0.6, FRONT_Z]] },
+  editor_in_chief: { zone: "editorial", lane: "front", bench: false, desks: [[2.8, FRONT_Z]] },
+  marketing: { zone: "growth", lane: "front", bench: false, desks: [[-6.8, FRONT_Z], [-9.0, FRONT_Z]] },
+  // a desk kept for R&D, next to marketing (D-120): empty until the company has an engineer
+  engineer: { zone: "growth", lane: "front", bench: false, desks: [[-4.6, FRONT_Z]] },
   // by the CEO office's window on the left wall, turned to face her door (D-119): seen from the
   // camera she is framed by the glass front, not hidden behind the door's frame
   ceo: { zone: "ceo", lane: "back", bench: false, desks: [[-10.4, -6.0]], turned: true },
 };
 
 /** Desks for roles the floor plan does not know (a new domain's roles), first come first served. */
-export const SPARE: RoleSlots = { zone: "spare", lane: "front", bench: false, desks: [[-1.6, FRONT_Z], [0.6, FRONT_Z], [2.8, FRONT_Z]] };
+export const SPARE: RoleSlots = { zone: "spare", lane: "front", bench: true, desks: [[2.2, WORK_Z], [4.4, WORK_Z], [6.6, WORK_Z]] };
 
 export const ROLES = Object.keys(SLOTS);
 
-/** The two bench tables of the work row (left: research, right: editorial). */
+/** The two bench tables of the work row (left: research, right: the flex desks). */
 export const BENCHES = [
   { name: "research bench", minX: -9.75, maxX: -1.65, z: WORK_Z },
-  { name: "editorial bench", minX: 1.65, maxX: 9.75, z: WORK_Z },
+  { name: "flex bench", minX: 1.45, maxX: 7.35, z: WORK_Z },
 ] as const;
 
 export interface Seat {
@@ -287,7 +304,8 @@ export const DECOR: Decor[] = [
   d("ceo_sofa", [-5.7, -5.8], [0.9, 2.0], -QUARTER),
   d("plant", [-11.4, -3.8], [0.6, 0.6]),
   // meeting room
-  d("meeting_set", [-0.8, -5.6], [5.4, 2.6]),
+  // the table points at the projection screen on the back wall (D-120)
+  d("meeting_set", [-0.8, -5.4], [2.5, 3.7], QUARTER),
   d("whiteboard", [-4.3, -4.4], [0.6, 1.6], QUARTER),
   d("plant", [3.5, -7.5], [0.6, 0.6]),
   // pantry
@@ -315,11 +333,13 @@ export interface Label {
 
 export const LABELS: Label[] = [
   { text: "研究部", sub: "RESEARCH", at: [-6.0, 0, 2.0], width: 3.0, kind: "floor" },
-  { text: "編輯部", sub: "EDITORIAL", at: [6.0, 0, 2.0], width: 3.0, kind: "floor" },
+  { text: "彈性座位", sub: "FLEX DESKS", at: [4.4, 0, 2.0], width: 2.4, kind: "floor" },
+  { text: "接待", sub: "RECEPTION", at: [9.7, 0, 2.0], width: 1.8, kind: "floor" },
   // behind the front desks' chairs: in front of the desks the desks would hide them
-  { text: "行銷部", sub: "MARKETING", at: [-6.8, 0, 6.3], width: 2.4, kind: "floor" },
-  { text: "彈性座位", sub: "FLEX DESKS", at: [0.6, 0, 6.3], width: 2.4, kind: "floor" },
-  { text: "接待區", sub: "RECEPTION", at: [6.4, 0, 7.05], width: 2.6, kind: "floor" },
+  { text: "行銷部", sub: "MARKETING", at: [-7.9, 0, 6.3], width: 2.4, kind: "floor" },
+  { text: "研發", sub: "R&D", at: [-4.6, 0, 6.3], width: 1.4, kind: "floor" },
+  { text: "編輯部", sub: "EDITORIAL", at: [0.6, 0, 6.3], width: 2.4, kind: "floor" },
+  { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: 2.6, kind: "floor" },
   { text: "茶水間", sub: "PANTRY", at: [8.2, 0, -3.72], width: 2.4, kind: "floor" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },

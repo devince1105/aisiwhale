@@ -1,6 +1,7 @@
 // Which business a room works for (ARCHITECTURE_V2 §14.7, T-600): a coloured band along the
 // front edge of each occupied department, so "how many businesses does this company run" is a
-// glance rather than a query.
+// glance rather than a query. Only when there are two or more (D-120): with one, every band is
+// the same colour and just a line on the floor.
 //
 // It is drawn from the roster and nothing else: a room gets a band when somebody works in it,
 // in the colour of the business they work for, and no band at all when their department belongs
@@ -47,6 +48,8 @@ export function bandsFor(agents: readonly Placed[]): Band[] {
       byZone.set(zone, agent.business_unit_key);
     }
   }
+  // one business: every band the same colour tells nothing (D-120); they mean something from two
+  if (new Set(byZone.values()).size < 2) return [];
   return [...byZone]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([zone, business]) => {
