@@ -158,7 +158,7 @@ const MUJI: Palette = {
     rugCeo: { color: "#cfc3b1", roughness: 0.95 },
     entranceMat: { color: "#8c8378", roughness: 1 },
   },
-  deskTop: "#ead9bc",
+  deskTop: "#f4efe4", // milk white (D-119)
   metal: "#8e8c88",
   chair: "#9d988f",
   monitor: "#2a2b2f",
@@ -501,12 +501,28 @@ const CYBER: Palette = {
   floorText: NEON.cyan,
 };
 
+/** The work areas that were carpeted, each its own colour: in most styles they read as blocks of
+ * colour on the floor, so they are laid in the style's own floor instead (D-119). */
+const CARPETED: FloorKind[] = ["research", "editorial", "growth", "spare", "meeting", "rugLounge"];
+
+/** One floor across the office (D-119): the corridors and the lobby in every style, and the
+ * carpets and the lounge rug except where they are the style (Google's team colours), in the
+ * style's base floor — so the wood (or concrete, or grid) runs through in one piece. The CEO
+ * office's own wood, the pantry's tiles and the entrance mat stay. */
+function oneFloor(palette: Palette, { carpets }: { carpets: boolean }): Palette {
+  const kinds: FloorKind[] = ["corridor", "lobby", ...(carpets ? [] : CARPETED)];
+  const floors = { ...palette.floors };
+  for (const kind of kinds) floors[kind] = palette.floors.base;
+  return { ...palette, floors };
+}
+
 export const THEMES: Record<ThemeId, { label: string; palette: Palette }> = {
-  muji: { label: "日式無印", palette: MUJI },
-  wabisabi: { label: "侘寂風", palette: WABISABI },
-  industrial: { label: "工業風", palette: INDUSTRIAL },
-  google: { label: "Google 風", palette: GOOGLE },
-  cyber: { label: "電光風", palette: CYBER },
+  muji: { label: "日式無印", palette: oneFloor(MUJI, { carpets: false }) },
+  wabisabi: { label: "侘寂風", palette: oneFloor(WABISABI, { carpets: false }) },
+  industrial: { label: "工業風", palette: oneFloor(INDUSTRIAL, { carpets: false }) },
+  // Google's coloured carpet per team is the style itself: kept (its corridors and lobby are not)
+  google: { label: "Google 風", palette: oneFloor(GOOGLE, { carpets: true }) },
+  cyber: { label: "電光風", palette: oneFloor(CYBER, { carpets: false }) },
 };
 
 export const THEME_IDS = Object.keys(THEMES) as ThemeId[];

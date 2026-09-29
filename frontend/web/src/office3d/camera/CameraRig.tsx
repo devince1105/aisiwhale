@@ -12,11 +12,9 @@ import { Vector3, type Object3D, type OrthographicCamera } from "three";
 import { uiStore } from "@/stores/ui";
 
 import {
-  AZIMUTH_SPREAD,
   CAMERA_DISTANCE,
   CameraTween,
   clampTarget,
-  DEFAULT_AZIMUTH,
   DEFAULT_ORIENTATION,
   FOCUS_FACTOR,
   fitZoom,
@@ -187,8 +185,9 @@ export function CameraRig({ insetRight = 0 }: { insetRight?: number }) {
       dampingFactor={0.12}
       minPolarAngle={POLAR_RANGE.min}
       maxPolarAngle={POLAR_RANGE.max}
-      minAzimuthAngle={DEFAULT_AZIMUTH - AZIMUTH_SPREAD}
-      maxAzimuthAngle={DEFAULT_AZIMUTH + AZIMUTH_SPREAD}
+      // all the way round (D-119): the wall the camera goes behind is hidden (scene/OuterWalls)
+      minAzimuthAngle={-Infinity}
+      maxAzimuthAngle={Infinity}
       screenSpacePanning
       target={ROOM_CENTRE}
     />

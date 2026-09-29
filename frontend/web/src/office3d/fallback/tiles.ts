@@ -163,7 +163,7 @@ export function buildScene(
     if (!card) continue;
     const sitting = card.visual.pose !== "stand";
     const character = characters.get(card.id) ?? characterFor(card.id);
-    const spot = planToPixels(desk.chair.cx, desk.chair.cy + (sitting ? 0 : STAND_BACK), plan);
+    const spot = planToPixels(desk.chair.cx, desk.chair.cy + (sitting ? 0 : (desk.turned ? -1 : 1) * STAND_BACK), plan);
     const drawn = figure(character, sitting ? "sit" : "stand", "away");
     const box = drawn ? { ...placeFigure(drawn, spot), w: drawn.piece.w, h: drawn.piece.h } : { x: spot.x - 12, y: spot.y - 40, w: 24, h: 44 };
     npcs.push({

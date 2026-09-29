@@ -133,11 +133,12 @@ export const MONITOR = { width: 0.62, height: 0.38, y: TOP + 0.32, spread: 0.33,
 
 /** Where each of a seat's two screens is, for the screen meshes (T-406 lights them). */
 export function screenSpots(seat: Seat): { pos: [number, number, number]; rotY: number }[] {
+  const flip = seat.turn ? -1 : 1; // a turned desk (D-119): the same spots, mirrored through its centre
   return [-1, 1].map((side) => {
     const rotY = -side * MONITOR.turn;
-    const x = seat.desk[0] + side * MONITOR.spread + Math.sin(rotY) * 0.02;
-    const z = seat.desk[1] + MONITOR.z + Math.cos(rotY) * 0.02;
-    return { pos: [x, MONITOR.y, z], rotY };
+    const x = seat.desk[0] + flip * (side * MONITOR.spread + Math.sin(rotY) * 0.02);
+    const z = seat.desk[1] + flip * (MONITOR.z + Math.cos(rotY) * 0.02);
+    return { pos: [x, MONITOR.y, z], rotY: rotY + seat.turn };
   });
 }
 
@@ -160,9 +161,10 @@ function workstation(): Part[] {
 export const LAMP = { x: 0.7, z: -0.3, height: 0.42, reach: 0.16 } as const;
 
 export function lampSpot(seat: Seat): { shade: [number, number, number]; glow: [number, number, number] } {
-  const x = seat.desk[0] + LAMP.x - LAMP.reach;
-  const z = seat.desk[1] + LAMP.z;
-  return { shade: [x, TOP + LAMP.height - 0.05, z], glow: [x, TOP + 0.004, z + 0.08] };
+  const flip = seat.turn ? -1 : 1;
+  const x = seat.desk[0] + flip * (LAMP.x - LAMP.reach);
+  const z = seat.desk[1] + flip * LAMP.z;
+  return { shade: [x, TOP + LAMP.height - 0.05, z], glow: [x, TOP + 0.004, z + flip * 0.08] };
 }
 
 /** The approval desk's lamp, on its counter: blinks while someone waits for a decision (T-407). */
@@ -188,8 +190,8 @@ function seatParts(seat: Seat): Part[] {
   const [x, z] = seat.desk;
   const desk = seat.bench ? [] : seat.role === "ceo" ? execDesk() : singleDesk();
   return [
-    ...place([...desk, ...workstation(), ...lampBody()], x, z),
-    ...place(officeChair(accent, seat.role === "ceo"), seat.chair[0], seat.chair[1]),
+    ...place([...desk, ...workstation(), ...lampBody()], x, z, seat.turn),
+    ...place(officeChair(accent, seat.role === "ceo"), seat.chair[0], seat.chair[1], seat.turn),
   ];
 }
 
@@ -468,29 +470,65 @@ const LEFT_WINDOWS: [number, number][] = [
 ];
 const WINDOW = { sill: 1.0, height: 1.5 };
 
+/** The two full-height walls of the diorama (D-119): the 3D office hides the one the camera is
+ * behind when it is turned round, so they are their own meshes there; the 2D board keeps them in
+ * its baked backdrop. */
+export type OuterWall = "back" | "left";
+export const OUTER_WALLS: readonly OuterWall[] = ["back", "left"];
+
+/** A wall with its cap, skirting, windows and what hangs on it. */
+function outerWall(side: OuterWall): Part[] {
+  const width = ROOM.maxX - ROOM.minX;
+  const depth = ROOM.maxZ - ROOM.minZ;
+  if (side === "back")
+    return [
+      block(width + WALL, ROOM.wallHeight, WALL, [-WALL / 2, 0, ROOM.minZ - WALL / 2], P.wall),
+      box(width + WALL + 0.04, CAP, WALL + 0.04, [-WALL / 2, ROOM.wallHeight + CAP / 2, ROOM.minZ - WALL / 2], P.wallCap),
+      block(width, 0.12, 0.02, [0, 0, ROOM.minZ + 0.01], P.frame),
+      ...BACK_WINDOWS.flatMap(([x, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), x, ROOM.minZ)),
+      // the meeting room's projection screen
+      box(3.2, 1.7, 0.03, [-0.8, 1.75, ROOM.minZ + 0.03], P.whiteboard),
+      box(3.4, 0.12, 0.14, [-0.8, 2.65, ROOM.minZ + 0.08], P.metal),
+    ];
+  return [
+    block(WALL, ROOM.wallHeight, depth, [ROOM.minX - WALL / 2, 0, 0], P.wall),
+    box(WALL + 0.04, CAP, depth + 0.04, [ROOM.minX - WALL / 2, ROOM.wallHeight + CAP / 2, 0], P.wallCap),
+    block(0.02, 0.12, depth, [ROOM.minX + 0.01, 0, 0], P.frame),
+    ...LEFT_WINDOWS.flatMap(([z, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), ROOM.minX, z, Math.PI / 2)),
+    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, -0.2, Math.PI / 2, 1.75),
+  ];
+}
+
+/** Whether the camera, at ``position``, is on a wall's outer side: that wall would stand between
+ * it and the room (D-119). */
+export function wallInTheWay(side: OuterWall, position: { x: number; z: number }): boolean {
+  return side === "back" ? position.z < ROOM.minZ : position.x < ROOM.minX;
+}
+
+/** A wall's parts, in a palette: its own mesh in the 3D office. */
+export function outerWallParts(side: OuterWall, palette: Palette = DEFAULT_PALETTE): Part[] {
+  return paintedWith(palette, () => outerWall(side));
+}
+
 /**
  * The office's shell: what never stands in front of anything — the slab, the back and left walls
  * with their windows and pictures, the low rims of the cut-away front and right, the entrance.
  * The 2D board bakes this as one backdrop and draws it first.
  */
 function shell(): Part[] {
+  return [...shellCore(), ...OUTER_WALLS.flatMap(outerWall)];
+}
+
+/** The shell without its two tall walls: what the 3D office merges into one mesh (D-119). */
+function shellCore(): Part[] {
   const width = ROOM.maxX - ROOM.minX;
-  const depth = ROOM.maxZ - ROOM.minZ;
   const parts: Part[] = [
     // the slab the diorama stands on, with its white edge
-    block(width + 0.8, 0.35, depth + 0.8, [0, -0.35, 0], P.slab),
-    // back and left walls, full height, with white caps
-    block(width + WALL, ROOM.wallHeight, WALL, [-WALL / 2, 0, ROOM.minZ - WALL / 2], P.wall),
-    box(width + WALL + 0.04, CAP, WALL + 0.04, [-WALL / 2, ROOM.wallHeight + CAP / 2, ROOM.minZ - WALL / 2], P.wallCap),
-    block(WALL, ROOM.wallHeight, depth, [ROOM.minX - WALL / 2, 0, 0], P.wall),
-    box(WALL + 0.04, CAP, depth + 0.04, [ROOM.minX - WALL / 2, ROOM.wallHeight + CAP / 2, 0], P.wallCap),
+    block(width + 0.8, 0.35, ROOM.maxZ - ROOM.minZ + 0.8, [0, -0.35, 0], P.slab),
     // the cut-away front and right edges: a low white rim, open at the entrance
     block(width + WALL * 2, 0.14, WALL, [0, 0, ROOM.maxZ + WALL / 2], P.wallCap),
     block(WALL, 0.14, ENTRANCE.minZ - ROOM.minZ + WALL, [ROOM.maxX + WALL / 2, 0, (ROOM.minZ - WALL + ENTRANCE.minZ) / 2], P.wallCap),
     block(WALL, 0.14, ROOM.maxZ - ENTRANCE.maxZ, [ROOM.maxX + WALL / 2, 0, (ENTRANCE.maxZ + ROOM.maxZ) / 2], P.wallCap),
-    // skirting
-    block(width, 0.12, 0.02, [0, 0, ROOM.minZ + 0.01], P.frame),
-    block(0.02, 0.12, depth, [ROOM.minX + 0.01, 0, 0], P.frame),
   ];
 
   // the entrance: a slim portal frame on the right edge (its sign is a label) and a threshold
@@ -503,15 +541,10 @@ function shell(): Part[] {
     parts.push(block(WALL, 0.02, span, [x, 0, mid], P.metal));
   }
 
-  // windows and pictures
-  for (const [x, w] of BACK_WINDOWS) parts.push(...place(windowFrame(w, WINDOW.height, WINDOW.sill), x, ROOM.minZ));
-  for (const [z, w] of LEFT_WINDOWS) parts.push(...place(windowFrame(w, WINDOW.height, WINDOW.sill), ROOM.minX, z, Math.PI / 2));
-  parts.push(...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, -0.2, Math.PI / 2, 1.75));
+  // pictures on the inner walls (the outer walls' own are with them)
   parts.push(...place(picture(0.7, 0.9, P.picture[1]), CEO_OFFICE.maxX + WALL_HALF, -6.4, Math.PI / 2, 1.6));
   parts.push(...place(picture(0.6, 0.6, P.picture[2]), MEETING_ROOM.maxX - WALL_HALF, -6.2, -Math.PI / 2, 1.7));
   parts.push(...place(picture(0.6, 0.8, P.picture[3]), PANTRY.minX + WALL_HALF, -6.9, Math.PI / 2, 1.8));
-  // the meeting room's projection screen
-  parts.push(box(3.2, 1.7, 0.03, [-0.8, 1.75, ROOM.minZ + 0.03], P.whiteboard), box(3.4, 0.12, 0.14, [-0.8, 2.65, ROOM.minZ + 0.08], P.metal));
   return parts;
 }
 
@@ -556,9 +589,10 @@ function doorsOf([from, to]: readonly [number, number]): Part[] {
   return parts;
 }
 
+/** The 3D office's merged architecture: the shell without its two tall walls (D-119). */
 function architecture(): Part[] {
   return [
-    ...shell(),
+    ...shellCore(),
     ...INNER_WALL_XS.flatMap(innerWall),
     ...GLASS_FRONTS.flatMap((front) => [...glassFront(front), ...doorsOf(front)]),
   ];
@@ -604,11 +638,11 @@ export function officeParts(palette: Palette = DEFAULT_PALETTE): Part[] {
 }
 
 /** Window panes (a separate, softly glowing mesh). */
-export function windowGlassParts(palette: Palette = DEFAULT_PALETTE): Part[] {
+export function windowGlassParts(palette: Palette = DEFAULT_PALETTE, side?: OuterWall): Part[] {
   const pane = (w: number) => box(w - 0.08, WINDOW.height - 0.08, 0.02, [0, WINDOW.sill + WINDOW.height / 2, 0.03], palette.windowGlass);
   return [
-    ...BACK_WINDOWS.flatMap(([x, w]) => place([pane(w)], x, ROOM.minZ)),
-    ...LEFT_WINDOWS.flatMap(([z, w]) => place([pane(w)], ROOM.minX, z, Math.PI / 2)),
+    ...(side === "left" ? [] : BACK_WINDOWS.flatMap(([x, w]) => place([pane(w)], x, ROOM.minZ))),
+    ...(side === "back" ? [] : LEFT_WINDOWS.flatMap(([z, w]) => place([pane(w)], ROOM.minX, z, Math.PI / 2))),
   ];
 }
 
@@ -666,7 +700,7 @@ export function floorRegions(): FloorRegion[] {
     { kind: "corridor", ...full, minZ: 1.6, maxZ: 3.2, layer: 2 },
     { kind: "corridor", minX: BENCHES[0].maxX + 0.25, maxX: BENCHES[1].minX - 0.25, minZ: -1.3, maxZ: 1.6, layer: 2 },
     { kind: "rugLounge", minX: 8.8, maxX: 11.8, minZ: 4.1, maxZ: 7.5, layer: 3 },
-    { kind: "rugCeo", minX: -10.2, maxX: -6.8, minZ: -7.2, maxZ: -4.2, layer: 3 },
+    // no rug in the CEO office (D-119): the wood floor alone, with the desk by the window
     { kind: "entranceMat", minX: ROOM.maxX - 1.0, maxX: ROOM.maxX, minZ: ENTRANCE.minZ + 0.2, maxZ: ENTRANCE.maxZ - 0.2, layer: 3 },
   ];
 }
@@ -704,6 +738,9 @@ export interface PlacedPiece {
 
 const deskSet = (desk: () => Part[]) => (p: Palette) => paintedWith(p, () => [...desk(), ...workstation(), ...lampBody()]);
 
+/** The suffix of a baked piece turned round (D-119). */
+const TURNED = ":turned";
+
 /** The key of the office's shell in ``BAKEABLE``: baked as one piece, drawn first, never sorted. */
 export const BACKDROP = "backdrop";
 
@@ -723,6 +760,15 @@ export const BAKEABLE: Record<string, BakeablePiece> = {
   benchSeat: { parts: deskSet(() => []), footprint: [DESK.width, DESK.depth] },
   chair: { parts: (p, accent) => paintedWith(p, () => officeChair(accent)), footprint: [0.6, 0.6] },
   chairTall: { parts: (p, accent) => paintedWith(p, () => officeChair(accent, true)), footprint: [0.6, 0.6] },
+  // the CEO's desk and chair turned round to face her door (D-119)
+  [`execDesk${TURNED}`]: {
+    parts: (p) => paintedWith(p, () => place([...execDesk(), ...workstation(), ...lampBody()], 0, 0, Math.PI)),
+    footprint: [DESK.width + 0.2, DESK.depth + 0.1],
+  },
+  [`chairTall${TURNED}`]: {
+    parts: (p, accent) => paintedWith(p, () => place(officeChair(accent, true), 0, 0, Math.PI)),
+    footprint: [0.6, 0.6],
+  },
   [BACKDROP]: {
     // everything that never stands in front of anything, in one piece: floors, the shell, the
     // window panes, and the zone trims of the styles that have them
@@ -779,8 +825,9 @@ export function placedPieces(): PlacedPiece[] {
   const pieces: PlacedPiece[] = [];
   for (const seat of allSeats()) {
     const ceo = seat.role === "ceo";
-    pieces.push({ bake: seat.bench ? "benchSeat" : ceo ? "execDesk" : "desk", at: seat.desk, seat: seat.key });
-    pieces.push({ bake: ceo ? "chairTall" : "chair", at: seat.chair, seat: seat.key });
+    const turned = seat.turn ? TURNED : ""; // a desk turned round has its own sprites (D-119)
+    pieces.push({ bake: (seat.bench ? "benchSeat" : ceo ? "execDesk" : "desk") + turned, at: seat.desk, seat: seat.key });
+    pieces.push({ bake: (ceo ? "chairTall" : "chair") + turned, at: seat.chair, seat: seat.key });
   }
   BENCHES.forEach((b, i) => pieces.push({ bake: benchKey(i), at: [(b.minX + b.maxX) / 2, b.z] }));
   DECOR.forEach((item, i) => pieces.push({ bake: decorKey(i, item), at: item.at }));

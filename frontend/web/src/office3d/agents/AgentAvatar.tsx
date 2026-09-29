@@ -35,7 +35,9 @@ export interface AvatarModel {
 }
 
 export function placeFor(seat: Seat, pose: Pose): [number, number, number] {
-  return pose === "stand" ? [seat.chair[0], 0, seat.chair[1] + STAND_BACK] : [seat.chair[0], SEAT_LIFT, seat.chair[1]];
+  // standing up is a step back from the desk: toward +z, or -z at a turned desk (D-119)
+  const back = seat.turn ? -1 : 1;
+  return pose === "stand" ? [seat.chair[0], 0, seat.chair[1] + back * STAND_BACK] : [seat.chair[0], SEAT_LIFT, seat.chair[1]];
 }
 
 export function AgentAvatar({

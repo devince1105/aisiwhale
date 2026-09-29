@@ -84,6 +84,9 @@ interface RoleSlots {
   bench: boolean;
   /** Desk centres; the first is the seat a single agent of this role gets. */
   desks: Vec2[];
+  /** The desk turned round (D-119): its sitter faces the room's front (+z) — the CEO facing her
+   * office's door — instead of the back wall. */
+  turned?: boolean;
 }
 
 const WORK_Z = 0;
@@ -96,7 +99,9 @@ export const SLOTS: Record<string, RoleSlots> = {
   writer: { zone: "editorial", lane: "front", bench: true, desks: [[2.4, WORK_Z], [4.6, WORK_Z]] },
   editor: { zone: "editorial", lane: "front", bench: true, desks: [[6.8, WORK_Z], [9.0, WORK_Z]] },
   marketing: { zone: "growth", lane: "front", bench: false, desks: [[-6.8, FRONT_Z], [-9.0, FRONT_Z], [-4.6, FRONT_Z]] },
-  ceo: { zone: "ceo", lane: "back", bench: false, desks: [[-8.5, -6]] },
+  // by the CEO office's window on the left wall, turned to face her door (D-119): seen from the
+  // camera she is framed by the glass front, not hidden behind the door's frame
+  ceo: { zone: "ceo", lane: "back", bench: false, desks: [[-10.4, -6.0]], turned: true },
 };
 
 /** Desks for roles the floor plan does not know (a new domain's roles), first come first served. */
@@ -118,8 +123,11 @@ export interface Seat {
   bench: boolean;
   desk: Vec2;
   chair: Vec2;
-  /** Rotation about y for the seated avatar: it faces its monitors (-z). */
+  /** Rotation about y for the seated avatar: it faces its monitors (-z; +z at a turned desk). */
   facing: number;
+  /** The desk's own turn about y: 0, or π at a turned desk (D-119). Everything placed around a
+   * desk — chair, screens, lamp, where one stands up — turns with it. */
+  turn: number;
   /** Centre between the seat's two monitors. */
   screen: Vec3;
   /** Where a visitor stops next to this seat. */
@@ -128,7 +136,9 @@ export interface Seat {
 
 function seatAt(role: string, slots: RoleSlots, index: number): Seat {
   const [x, z] = slots.desks[index];
-  const chair: Vec2 = [x, z + CHAIR_OFFSET];
+  const turn = slots.turned ? Math.PI : 0;
+  const back = slots.turned ? -1 : 1; // which way the chair is from the desk
+  const chair: Vec2 = [x, z + back * CHAIR_OFFSET];
   const side = x + APPROACH_OFFSET[0] > ROOM.maxX - 1 ? -1 : 1;
   return {
     key: `${slots.zone}:${role}:${index}`,
@@ -138,8 +148,9 @@ function seatAt(role: string, slots: RoleSlots, index: number): Seat {
     bench: slots.bench,
     desk: [x, z],
     chair,
-    facing: Math.PI,
-    screen: [x, DESK.height + 0.3, z - 0.18],
+    facing: slots.turned ? 0 : Math.PI,
+    turn,
+    screen: [x, DESK.height + 0.3, z - back * 0.18],
     approach: [chair[0] + side * APPROACH_OFFSET[0], chair[1] + APPROACH_OFFSET[1]],
   };
 }
@@ -272,7 +283,7 @@ export const DECOR: Decor[] = [
   d("lounge", [10.3, 5.8], [3.2, 3.6]),
   d("plant", [11.5, 3.6], [0.6, 0.6]),
   // CEO office
-  d("ceo_shelf", [-10.6, -7.6], [2.2, 0.5]),
+  d("ceo_shelf", [-8.0, -7.6], [2.2, 0.5]),
   d("ceo_sofa", [-5.7, -5.8], [0.9, 2.0], -QUARTER),
   d("plant", [-11.4, -3.8], [0.6, 0.6]),
   // meeting room
@@ -364,10 +375,28 @@ function approachOf(target: WalkTarget): { point: Vec2; lane: Lane } {
 export function walkPath(from: Seat, to: WalkTarget): Vec2[] {
   const start = approachOf(from);
   const end = approachOf(to);
-  const points: Vec2[] = [from.chair, start.point, [start.point[0], LANES[start.lane]]];
+  // a seat in the room with a door is left and reached through it (D-119: the CEO's desk is by
+  // her window, not in line with her door)
+  const outOf = doorway(from, start.point);
+  const into = typeof to === "object" && "key" in to ? doorway(to, end.point) : null;
+  const points: Vec2[] = [from.chair, start.point, ...outOf, [(outOf.at(-1) ?? start.point)[0], LANES[start.lane]]];
   if (start.lane !== end.lane) points.push([SPINE_X, LANES[start.lane]], [SPINE_X, LANES[end.lane]]);
-  points.push([end.point[0], LANES[end.lane]], end.point);
+  const entry = into ? [...into].reverse() : [];
+  points.push([(entry[0] ?? end.point)[0], LANES[end.lane]], ...entry, end.point);
   return points.filter((p, i) => i === 0 || p[0] !== points[i - 1][0] || p[1] !== points[i - 1][1]);
+}
+
+/** From a seat in the CEO office out through its door, at right angles: from beside the seat
+ * (``approach``) toward the front of the room, across to the door, and out. */
+function doorway(seat: Seat, approach: Vec2): Vec2[] {
+  if (seat.zone !== "ceo") return [];
+  // across the room beyond the open door leaf, which swings in along the hinge side
+  const inside = BACK_ROOMS_Z - WALL_HALF - CEO_OFFICE.doorWidth - 0.4;
+  return [
+    [approach[0], inside],
+    [CEO_OFFICE.doorX, inside],
+    [CEO_OFFICE.doorX, BACK_ROOMS_Z + 0.5],
+  ];
 }
 
 /** Axis-aligned footprints of everything a walker must go around (x/z rectangles). */

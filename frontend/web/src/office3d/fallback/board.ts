@@ -216,6 +216,8 @@ export interface PlanDesk {
   zone: string;
   desk: Box;
   chair: { cx: number; cy: number; r: number };
+  /** The desk turned round (D-119): standing up is a step toward the back wall. */
+  turned?: boolean;
 }
 
 export interface PlanRoom {
@@ -309,6 +311,7 @@ export function floorPlan(agentIds: readonly string[], seats: ReadonlyMap<string
           height: DESK.depth,
         },
         chair: { cx: seat.chair[0] - minX, cy: seat.chair[1] - minY, r: CHAIR.size / 2 },
+        turned: seat.turn !== 0,
       }))
       .sort((a, b) => a.desk.top - b.desk.top || a.desk.left - b.desk.left),
   };

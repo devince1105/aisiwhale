@@ -2,8 +2,8 @@
 //   overview — the whole room fits the canvas, whatever its size;
 //   focus    — an agent's desk, closer (FOCUS_FACTOR x the overview zoom);
 //   a room   — one department's zone, when the operator enters it (T-600 batch 3);
-// and the limits: a polar and azimuth range around the isometric view (the back and left walls
-// stay behind the room), zoom from a bit wider than the overview to close up, and a target that
+// and the limits: a polar range (the azimuth is free since D-119: scene/OuterWalls hides the wall
+// the camera goes behind), zoom from a bit wider than the overview to close up, and a target that
 // cannot leave the room.
 import { Box3, Matrix4, OrthographicCamera, Vector3, type Quaternion } from "three";
 
@@ -16,7 +16,8 @@ export const OVERVIEW_MARGIN = 1.06;
 export const FOCUS_FACTOR = 2.4;
 export const ZOOM_RANGE = { min: 0.8, max: 5 } as const; // x the overview zoom
 export const POLAR_RANGE = { min: 0.3, max: 1.3 } as const; // radians from straight down
-export const AZIMUTH_SPREAD = 0.9; // radians either side of the isometric azimuth
+/** The isometric azimuth, where the camera starts. Since D-119 it may turn all the way round (the
+ * tall wall it goes behind is hidden); it was held to 0.9 rad either side of this before. */
 export const DEFAULT_AZIMUTH = Math.atan2(VIEW_DIRECTION.x, VIEW_DIRECTION.z);
 export const FOCUS_MS = 600;
 

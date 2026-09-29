@@ -16,9 +16,10 @@ import { VisualTrackerProvider } from "../visual/tracker";
 import { BusinessBands } from "./BusinessBands";
 import { Floors } from "./Floors";
 import { OfficeEnvironment } from "./OfficeEnvironment";
-import { officeParts, partitionGlassParts, windowGlassParts } from "./furniture";
+import { officeParts, partitionGlassParts } from "./furniture";
 import { buildGeometry } from "./kit";
 import { Labels } from "./Labels";
+import { OuterWalls } from "./OuterWalls";
 
 const SHADOW_EXTENT = 17;
 
@@ -33,15 +34,13 @@ export function OfficeScene({ insetRight = 0, theme = DEFAULT_THEME }: { insetRi
     return [buildGeometry(lit), glowing.length ? buildGeometry(glowing) : null];
   }, [palette]);
   const glass = useMemo(() => buildGeometry(partitionGlassParts(palette)), [palette]);
-  const windows = useMemo(() => buildGeometry(windowGlassParts(palette)), [palette]);
   useEffect(
     () => () => {
       office.dispose();
       neon?.dispose();
       glass.dispose();
-      windows.dispose();
     },
-    [office, neon, glass, windows],
+    [office, neon, glass],
   );
 
   return (
@@ -80,9 +79,8 @@ export function OfficeScene({ insetRight = 0, theme = DEFAULT_THEME }: { insetRi
           </mesh>
         ) : null}
       </group>
-      <mesh geometry={windows}>
-        <meshStandardMaterial vertexColors emissive={light.windowGlow} emissiveIntensity={light.windowGlowIntensity} roughness={0.1} />
-      </mesh>
+      {/* the two tall walls, with their windows: hidden while the camera is behind one (D-119) */}
+      <OuterWalls palette={palette} />
       <mesh geometry={glass} renderOrder={1}>
         <meshStandardMaterial vertexColors transparent opacity={0.22} roughness={0.05} metalness={0.1} depthWrite={false} />
       </mesh>

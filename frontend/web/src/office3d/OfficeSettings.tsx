@@ -49,8 +49,9 @@ export function OfficeSettings({
         </svg>
       </button>
 
+      {/* above the name tags (drawn at z 0–20, StatusIndicators): the dialog is what is open */}
       {open ? (
-        <div className="absolute inset-0 z-10 grid place-content-center bg-canvas/60">
+        <div className="absolute inset-0 z-30 grid place-content-center bg-canvas/60">
           {/* the backdrop closes it; it is not the only way out, so it needs no role of its own */}
           <button type="button" aria-hidden tabIndex={-1} className="absolute inset-0 cursor-default" onClick={() => onOpen(false)} />
           <div
