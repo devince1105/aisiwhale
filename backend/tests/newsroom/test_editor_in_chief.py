@@ -418,7 +418,7 @@ async def _intel(db_session, company):
         db_session,
         company_id=company.id,
         role=news_intelligence.ROLE,
-        display_name="Sayla Mass｜雪拉・瑪絲",
+        display_name="Sayla Mass｜雪拉",
         actor=HUMAN,
         position=position,
     )

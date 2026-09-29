@@ -69,7 +69,7 @@ async def test_the_newsroom_is_a_department_with_teams_under_it(api, staffed):
     assert sorted(a["display_name"] for a in research["agents"]) == [
         "Mari Makinami｜真希波",
         "Rei Ayanami｜綾波零",
-        "Sayla Mass｜雪拉・瑪絲",
+        "Sayla Mass｜雪拉",
     ]
 
 
