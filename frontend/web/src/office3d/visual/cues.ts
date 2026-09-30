@@ -18,7 +18,7 @@ export type WalkTarget = { role: string } | { place: "approval" } | { door: stri
  * a word at a colleague's desk, a stretch behind the chair, IT's look at the server room. Never
  * while working: a run starting takes them straight back (``abort_walks``).
  */
-export type LifeKind = "coffee" | "chat" | "stretch" | "server" | "lounge";
+export type LifeKind = "coffee" | "chat" | "stretch" | "server" | "lounge" | "out";
 
 export type VisualCue =
   | {

@@ -97,6 +97,8 @@ export function AgentAvatar({
       const seated = step.phase === "handover" && walk.current?.route?.sitting === true;
       controller.setPose(seated ? "sit_idle" : step.phase === "handover" ? "stand" : "walk");
       g?.position.set(step.position[0], seated ? SEAT_LIFT : 0, step.position[1]);
+      // stepped out of the office (D-136): out of sight until the walk back begins
+      if (g) g.visible = !(step.phase === "handover" && walk.current?.route?.outside === true);
       if (g) g.rotation.y = step.heading;
       if (paper.current) paper.current.visible = step.carrying;
       controller.update(Math.min(dt, 0.1));
@@ -109,6 +111,7 @@ export function AgentAvatar({
       dirty.current = true;
       if (paper.current) paper.current.visible = false;
       if (g) g.rotation.y = seat.facing;
+      if (g) g.visible = true; // back in, if it had stepped out
       controller.pose = null;
     }
 

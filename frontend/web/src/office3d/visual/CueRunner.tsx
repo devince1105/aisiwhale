@@ -9,7 +9,18 @@ import { effectiveState, realtimeStore, serverNow, type RealtimeStoreState } fro
 
 import type { Roster } from "../agents/roster";
 import { useRoster } from "../agents/roster";
-import { APPROVAL_DESK, doorOf, loungeSeat, pantrySpot, seatsForRole, serverSpot, walkPath, type Seat, type Vec2 } from "../scene/layout";
+import {
+  APPROVAL_DESK,
+  doorOf,
+  loungeSeat,
+  outsideSpot,
+  pantrySpot,
+  seatsForRole,
+  serverSpot,
+  walkPath,
+  type Seat,
+  type Vec2,
+} from "../scene/layout";
 import type { WalkCue } from "./cues";
 import { cuesFor, CueQueue } from "./director";
 import { LifeDirector } from "./life";
@@ -102,6 +113,8 @@ export interface Route {
   carrying: boolean;
   /** Whether it sits down at the far end (a lounge seat, D-136) rather than standing. */
   sitting?: boolean;
+  /** Whether the far end is out of the office (D-136): gone from view while there. */
+  outside?: boolean;
 }
 
 /** Where an idle moment goes (D-136), and what it faces there. */
@@ -118,7 +131,8 @@ function lifeRoute(cue: WalkCue, from: Seat, roster: Pick<Roster, "members" | "s
     if (!seat || seat.key === from.key) return null;
     return { path: walkPath(from, seat), lookAt: seat.chair };
   }
-  const place = life === "coffee" ? pantrySpot(slot) : life === "lounge" ? loungeSeat(slot) : serverSpot();
+  const place =
+    life === "coffee" ? pantrySpot(slot) : life === "lounge" ? loungeSeat(slot) : life === "out" ? outsideSpot() : serverSpot();
   return { path: walkPath(from, place.target), lookAt: place.lookAt };
 }
 
@@ -142,6 +156,7 @@ export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">
       dwellMs,
       carrying,
       sitting: cue.target.life === "lounge",
+      outside: cue.target.life === "out",
     };
   }
   let to: Seat | "approval" | { door: string };

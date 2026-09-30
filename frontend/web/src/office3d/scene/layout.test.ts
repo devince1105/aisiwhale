@@ -16,6 +16,7 @@ import {
   obstacles,
   LOUNGE_SEATS,
   loungeSeat,
+  outsideSpot,
   pantrySpot,
   serverSpot,
   ROLES,
@@ -182,6 +183,24 @@ describe("courier paths", () => {
             if (place.name.startsWith("lounge") && rect.name.startsWith("lounge")) continue;
             if (inside(point, rect, WALKER)) problems.push(`${from.key} -> ${place.name} hits ${rect.name} at ${point}`);
           }
+        }
+      }
+    }
+    expect([...new Set(problems)].slice(0, 10)).toEqual([]);
+  });
+
+  it("out of the office through the entrance (D-136): along the front walkway, around everything", () => {
+    const out = outsideSpot();
+    const problems: string[] = [];
+    for (const from of seats) {
+      for (const { point, segment } of samples(walkPath(from, out.target))) {
+        // outside the room only past the entrance, on the walkway's line
+        if (!inRoom(point) && !(point[0] >= ROOM.maxX - 0.5 && point[1] > ENTRANCE.minZ && point[1] < ENTRANCE.maxZ)) {
+          problems.push(`${from.key} leaves the room at ${point}, not by the entrance`);
+        }
+        for (const rect of rects) {
+          if (segment === 0 && rect.name === `chair ${from.key}`) continue;
+          if (inside(point, rect, WALKER)) problems.push(`${from.key} -> out hits ${rect.name} at ${point}`);
         }
       }
     }

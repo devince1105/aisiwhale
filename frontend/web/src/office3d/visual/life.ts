@@ -38,6 +38,7 @@ const FIRST = [20_000, 4 * MINUTE] as const;
 const BETWEEN = [8 * MINUTE, 20 * MINUTE] as const;
 const RETRY = 30_000;
 const DWELL: Record<LifeKind, readonly [number, number]> = {
+  out: [120_000, 240_000],
   lounge: [40_000, 70_000],
   coffee: [25_000, 45_000],
   chat: [15_000, 30_000],
@@ -85,8 +86,8 @@ export class LifeDirector {
       let kind = pick(
         this.random,
         it
-          ? [["server", 0.4], ["coffee", 0.25], ["stretch", 0.15], ["chat", 0.1], ["lounge", 0.1]]
-          : [["coffee", 0.35], ["chat", 0.3], ["stretch", 0.2], ["lounge", 0.15]],
+          ? [["server", 0.35], ["coffee", 0.2], ["stretch", 0.15], ["chat", 0.1], ["lounge", 0.1], ["out", 0.1]]
+          : [["coffee", 0.3], ["chat", 0.25], ["stretch", 0.2], ["lounge", 0.13], ["out", 0.12]],
       );
       let peer: LifeMember | undefined;
       if (kind === "chat") {
@@ -110,7 +111,7 @@ export class LifeDirector {
         dwellMs: Math.round(between(this.random, DWELL[kind])),
         seq: 0,
       });
-      events.push({ agentId: member.id, kind, text: lifeText(kind, peer?.name) });
+      events.push({ agentId: member.id, kind, text: lifeText(kind, peer?.name, this.random()) });
       away += kind === "stretch" ? 0 : 1; // a stretch stays at the desk
       this.due.set(member.id, now + between(this.random, BETWEEN));
     }
@@ -118,9 +119,10 @@ export class LifeDirector {
   }
 }
 
-export const LIFE_ICON: Record<LifeKind, string> = { coffee: "☕", chat: "💬", stretch: "🙆", server: "🔧", lounge: "🛋️" };
+export const LIFE_ICON: Record<LifeKind, string> = { coffee: "☕", chat: "💬", stretch: "🙆", server: "🔧", lounge: "🛋️", out: "🚶" };
 
-export function lifeText(kind: LifeKind, peer?: string): string {
+/** ``roll`` (0–1) picks between the restroom and a short errand for a step out. */
+export function lifeText(kind: LifeKind, peer?: string, roll = 0): string {
   switch (kind) {
     case "coffee":
       return "去茶水間倒杯咖啡";
@@ -132,5 +134,7 @@ export function lifeText(kind: LifeKind, peer?: string): string {
       return "去機房巡一下";
     case "lounge":
       return "到等候區沙發坐一下";
+    case "out":
+      return roll < 0.7 ? "去洗手間" : "臨時外出一下";
   }
 }
