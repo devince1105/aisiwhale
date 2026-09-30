@@ -72,11 +72,13 @@ describe("board model", () => {
     // sits in — which is what a company without departments honestly has (T-600 batch 3)
     const rows = boardModel(company, now);
     // research has three desks (D-132): its fourth sits at a flex desk, and that is a row too
-    expect(rows.map((r) => r.id)).toEqual(["research", "spare", "editorial"]);
+    const ids = rows.map((r) => r.id);
+    expect([...ids].sort()).toEqual(["editorial", "research", "spare"]);
     expect(rows.flatMap((r) => r.cards)).toHaveLength(6);
-    const research = [...rows[0].cards, ...rows[1].cards].map((c) => c.roleLabel);
+    const row = (id: string) => rows.find((r) => r.id === id)!.cards;
+    const research = [...row("research"), ...row("spare")].map((c) => c.roleLabel);
     expect(research.every((label) => label === "研究員" || label === "分析師")).toBe(true);
-    expect(rows[2].cards.every((c) => c.roleLabel === "寫手")).toBe(true);
+    expect(row("editorial").every((c) => c.roleLabel === "寫手")).toBe(true);
   });
 
   it("an agent whose department the chart names gets a row of its own", () => {

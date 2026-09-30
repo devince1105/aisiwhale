@@ -15,6 +15,7 @@ import {
   DECOR,
   DESK,
   doorLeaves,
+  EXEC_DESK_WIDTH,
   DOORS,
   ENTRANCE,
   MEETING_ROOM,
@@ -129,11 +130,11 @@ function singleDesk(): Part[] {
 
 function execDesk(): Part[] {
   return [
-    block(DESK.width + 0.2, 0.06, DESK.depth + 0.1, [0, TOP - 0.06, 0], P.execWood),
-    ...deskEdge(DESK.width + 0.2, DESK.depth + 0.1),
-    block(0.06, TOP - 0.06, DESK.depth, [-DESK.width / 2, 0, 0], P.execWood),
-    block(0.06, TOP - 0.06, DESK.depth, [DESK.width / 2, 0, 0], P.execWood),
-    block(DESK.width, 0.5, 0.04, [0, 0.15, -DESK.depth / 2 + 0.05], P.execWood),
+    block(EXEC_DESK_WIDTH + 0.2, 0.06, DESK.depth + 0.1, [0, TOP - 0.06, 0], P.execWood),
+    ...deskEdge(EXEC_DESK_WIDTH + 0.2, DESK.depth + 0.1),
+    block(0.06, TOP - 0.06, DESK.depth, [-EXEC_DESK_WIDTH / 2, 0, 0], P.execWood),
+    block(0.06, TOP - 0.06, DESK.depth, [EXEC_DESK_WIDTH / 2, 0, 0], P.execWood),
+    block(EXEC_DESK_WIDTH, 0.5, 0.04, [0, 0.15, -DESK.depth / 2 + 0.05], P.execWood),
   ];
 }
 
@@ -899,7 +900,7 @@ const decorKey = (i: number, item: Decor) => `decor:${i}:${item.kind}`;
 
 export const BAKEABLE: Record<string, BakeablePiece> = {
   desk: { parts: deskSet(singleDesk), footprint: [DESK.width, DESK.depth] },
-  execDesk: { parts: deskSet(execDesk), footprint: [DESK.width + 0.2, DESK.depth + 0.1] },
+  execDesk: { parts: deskSet(execDesk), footprint: [EXEC_DESK_WIDTH + 0.2, DESK.depth + 0.1] },
   // a seat at a bench has no desk of its own: the bench is the desk, baked once for the row
   benchSeat: { parts: deskSet(() => []), footprint: [DESK.width, DESK.depth] },
   chair: { parts: (p, accent) => paintedWith(p, () => officeChair(accent)), footprint: [0.6, 0.6] },
@@ -907,7 +908,7 @@ export const BAKEABLE: Record<string, BakeablePiece> = {
   // the CEO's desk and chair turned round to face her door (D-119)
   [`execDesk${TURNED}`]: {
     parts: (p) => paintedWith(p, () => place([...execDesk(), ...workstation(), ...lampBody()], 0, 0, Math.PI)),
-    footprint: [DESK.width + 0.2, DESK.depth + 0.1],
+    footprint: [EXEC_DESK_WIDTH + 0.2, DESK.depth + 0.1],
   },
   [`chairTall${TURNED}`]: {
     parts: (p, accent) => paintedWith(p, () => place(officeChair(accent, true), 0, 0, Math.PI)),

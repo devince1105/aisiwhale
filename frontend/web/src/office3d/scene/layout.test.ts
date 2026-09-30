@@ -84,20 +84,19 @@ describe("seats", () => {
 
   it("assignment: the desk built for the role first, then any desk in the same room", () => {
     const agents = [
-      { id: "b", role: "marketing" },
-      { id: "a", role: "marketing" },
-      { id: "c", role: "marketing" },
+      { id: "b", role: "writer" },
+      { id: "a", role: "writer" },
       { id: "d", role: "fact_checker" },
-      { id: "e", role: "writer" },
+      { id: "e", role: "analyst" },
     ];
     const { seats, unseated } = assignSeats(agents);
-    expect(seats.get("a")!.key).toBe("growth:marketing:0");
-    expect(seats.get("b")!.key).toBe("growth:marketing:1");
-    // a third marketer is not homeless: research has other desks, and it takes one
-    expect(seats.get("c")!.zone).toBe("growth");
+    expect(seats.get("a")!.key).toBe("editorial:writer:0");
+    // a second writer is not homeless: editorial has other desks, and it takes one
+    expect(seats.get("b")!.zone).toBe("editorial");
+    expect(seats.get("b")!.key).not.toBe("editorial:writer:0");
     expect(unseated).toEqual([]);
     expect(seats.get("d")!.zone).toBe("spare"); // a role the floor plan does not know
-    expect(seats.get("e")!.key).toBe("editorial:writer:0");
+    expect(seats.get("e")!.key).toBe("research:analyst:0");
     // the same agents in another order: the same seats
     const again = assignSeats([...agents].reverse());
     for (const [id, seat] of seats) expect(again.seats.get(id)!.key).toBe(seat.key);
