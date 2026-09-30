@@ -156,6 +156,8 @@ class Settings(BaseSettings):
     r2_access_key_id: SecretStr | None = None
     r2_secret_access_key: SecretStr | None = None
     r2_bucket: str | None = None
+    r2_key_prefix: str = ""
+    """The folder in the bucket the covers go under, e.g. ``news/images`` (no slashes around)."""
     r2_public_base_url: str | None = None
     """The bucket's public address (a custom domain or its r2.dev one), without a trailing slash.
     Without the R2 settings covers are kept in the blob store and served by the API (dev)."""

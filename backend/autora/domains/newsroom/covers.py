@@ -270,6 +270,7 @@ class R2Store:
         secret_access_key: str,
         bucket: str,
         public_base_url: str,
+        prefix: str = "",
         client: httpx.AsyncClient | None = None,
     ):
         self._host = f"{account_id}.r2.cloudflarestorage.com"
@@ -277,10 +278,11 @@ class R2Store:
         self._secret = secret_access_key
         self._bucket = bucket
         self._public = public_base_url.rstrip("/")
+        self._prefix = f"{prefix.strip('/')}/" if prefix.strip("/") else ""
         self._client = client
 
     async def _send(self, method: str, key: str, data: bytes, headers: dict[str, str]) -> None:
-        path = f"/{self._bucket}/{key}"
+        path = f"/{self._bucket}/{self._prefix}{key}"
         signed = sigv4_headers(
             method=method,
             host=self._host,
@@ -312,7 +314,7 @@ class R2Store:
             data,
             {"content-type": content_type, "cache-control": "public, max-age=31536000, immutable"},
         )
-        return f"{self._public}/{key}"
+        return f"{self._public}/{self._prefix}{key}"
 
     async def delete(self, key: str) -> None:
         await self._send("DELETE", key, b"", {})

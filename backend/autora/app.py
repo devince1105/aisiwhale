@@ -187,6 +187,7 @@ def build_cover_store(settings: Settings | None, blobs: BlobStore):
                 secret_access_key=settings.r2_secret_access_key.get_secret_value(),
                 bucket=str(settings.r2_bucket),
                 public_base_url=str(settings.r2_public_base_url),
+                prefix=settings.r2_key_prefix,
             )
     return BlobCoverStore(blobs)
 

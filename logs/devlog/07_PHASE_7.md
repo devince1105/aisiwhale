@@ -2235,6 +2235,13 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 死結：首圖與撰稿並行後，完整測試出現兩種死結（兩個任務同時結束；結束的一方拿著事件鎖、等正在被認領的任務）。任務結束時先取同一流程的 advisory lock、並在寫任何事件前一次鎖住該流程所有任務，驗收測試（七個週期）與流程測試通過。
 - 測試：`test_covers.py` 6 項（裁切、簽章、R2 請求、Pixabay 解析與金鑰不外洩、設定／換圖／拿掉）、流程測試加上首圖；前端 `cover.test.tsx` 6 項。
 
+## D-142 後續：R2 接上、資料夾 news/images
+
+- 使用者填好 R2 金鑰，指定資料夾 `aisiwhale/news/images/`：新增 `R2_KEY_PREFIX`，首圖存在 `news/images/covers/<題材>/<圖庫>-<編號>.webp`，公開網址也帶這一段。
+- `.env` 的 R2 區整理成一段（帳號、兩把金鑰、bucket、資料夾、公開網址）；刪除程式用不到的 `R2_TOKEN_VALUE`、`S3 clients`、`R2_S3_API`、`R2_PUBLIC_DEVELOPMENT_URL`（已移到 `R2_PUBLIC_BASE_URL`）、`Catalog URI`、`Warehouse Name` 等。其他設定逐行比對未變。
+- 實測上傳：以 R2 寫入一張 159,834 bytes 的首圖 → 公開網址（r2.dev）讀回 200、`image/webp`、內容相同 → 刪除後 404。重啟 API 與 worker。
+- 發現：`aisiwhale.com/news/images/…` 也讀得到同一張——bucket 綁在主網域上。網站日後要放在 aisiwhale.com，建議把自訂網域改成 `img.aisiwhale.com`，再把 `R2_PUBLIC_BASE_URL` 換成它。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

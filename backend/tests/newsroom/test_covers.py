@@ -73,15 +73,17 @@ async def test_r2_puts_the_webp_with_a_long_cache_and_returns_the_public_address
         secret_access_key="secret",
         bucket="covers-bucket",
         public_base_url="https://img.example.test/",
+        prefix="/news/images/",
         client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
     )
     url = await store.put("covers/s1/pixabay-1.webp", b"webp", "image/webp")
-    assert url == "https://img.example.test/covers/s1/pixabay-1.webp"
+    # under the bucket's folder (R2_KEY_PREFIX), in the object's key and in its address
+    assert url == "https://img.example.test/news/images/covers/s1/pixabay-1.webp"
     request = seen[0]
     assert request.method == "PUT"
     assert (
         str(request.url)
-        == "https://acct.r2.cloudflarestorage.com/covers-bucket/covers/s1/pixabay-1.webp"
+        == "https://acct.r2.cloudflarestorage.com/covers-bucket/news/images/covers/s1/pixabay-1.webp"
     )
     assert request.headers["content-type"] == "image/webp"
     assert "immutable" in request.headers["cache-control"]
