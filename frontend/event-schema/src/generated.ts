@@ -923,6 +923,20 @@ export const MembershipGrantedV1Event = z.object({
   payload: MembershipGrantedV1Payload,
 });
 
+export const NewsroomQuietV1Payload = z.object({
+  hours: z.number().int(),
+  last_published_at: z.iso.datetime({ offset: true }).nullable().default(null),
+  causes: z.array(z.string()).default(() => ([])),
+  waiting_approvals: z.number().int().default(0),
+});
+export type NewsroomQuietV1Payload = z.infer<typeof NewsroomQuietV1Payload>;
+export const NewsroomQuietV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("NEWSROOM_QUIET"),
+  schema_version: z.literal(1),
+  payload: NewsroomQuietV1Payload,
+});
+
 export const OpportunityAdvancedV1Payload = z.object({
   key: z.string(),
   from_state: z.string(),
@@ -1637,6 +1651,7 @@ export const EventEnvelope = z.discriminatedUnion("event_type", [
   KpiSnapshotCreatedV1Event,
   MembershipExpiredV1Event,
   MembershipGrantedV1Event,
+  NewsroomQuietV1Event,
   OpportunityAdvancedV1Event,
   OpportunityDiscoveredV1Event,
   OpportunityExpiredV1Event,
@@ -1754,6 +1769,7 @@ export const EVENT_TYPES = [
   "KPI_SNAPSHOT_CREATED",
   "MEMBERSHIP_EXPIRED",
   "MEMBERSHIP_GRANTED",
+  "NEWSROOM_QUIET",
   "OPPORTUNITY_ADVANCED",
   "OPPORTUNITY_DISCOVERED",
   "OPPORTUNITY_EXPIRED",

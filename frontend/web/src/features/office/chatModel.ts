@@ -30,7 +30,21 @@ export const CHAT_TYPES = new Set([
   "POLICY_DENIED",
   "AGENT_CREATED",
   "AGENT_RETIRED",
+  // the newsroom stopping (D-131): a project paused or started again, a day without an article
+  "PROJECT_PAUSED",
+  "PROJECT_RESUMED",
+  "NEWSROOM_QUIET",
 ]);
+
+/** Why a quiet newsroom may be quiet, as the watch found it (D-131). */
+export const QUIET_CAUSE: Record<string, string> = {
+  business_paused: "事業暫停中",
+  project_paused: "新聞專案暫停中",
+  agent_paused: "有編輯部同事被暫停",
+  awaiting_approval: "有文章等您核准",
+  runs_failed: "有工作流程失敗",
+  no_work_started: "今天沒有開始任何工作",
+};
 
 export const ROLE_NAME: Record<string, string> = {
   ceo: "執行長",
@@ -76,6 +90,7 @@ export type ChatItem =
 
 type Payload = Record<string, unknown>;
 const s = (value: unknown) => (typeof value === "string" && value ? value : null);
+const n = (value: unknown) => (typeof value === "number" ? value : null);
 const clip = (text: string, most = 120) => (text.length > most ? `${text.slice(0, most - 1)}…` : text);
 const seconds = (ms: unknown) => (typeof ms === "number" ? `${Math.max(1, Math.round(ms / 1000))} 秒` : null);
 const LANG_NAME: Record<string, string> = { "zh-TW": "中文", en: "英文" };
@@ -177,6 +192,18 @@ export function chatItem(
       return notice(`${personName(s(p.display_name)) || "新同事"}${s(p.role) ? `（${ROLE_NAME[s(p.role)!] ?? s(p.role)}）` : ""}加入群組`);
     case "AGENT_RETIRED":
       return notice(`${personName(s(p.display_name)) || "一位同事"}離開群組`);
+    case "PROJECT_PAUSED": {
+      const who = p.trigger === "kill_criteria" ? "（停損規則）" : p.trigger === "ceo" ? "（總經理提出）" : "";
+      return notice(`專案「${clip(s(p.name) ?? "", 40)}」暫停${who}${s(p.reason) ? `：${clip(s(p.reason)!, 80)}` : ""}`, "danger");
+    }
+    case "PROJECT_RESUMED":
+      return notice(`專案「${clip(s(p.name) ?? "", 40)}」恢復運作`, "ok");
+    case "NEWSROOM_QUIET": {
+      const causes = (Array.isArray(p.causes) ? p.causes : []).map((c) => QUIET_CAUSE[String(c)] ?? String(c));
+      const waiting = n(p.waiting_approvals);
+      const why = causes.length ? `可能的原因：${causes.join("、")}${waiting ? `（${waiting} 篇）` : ""}。` : "";
+      return notice(`已經 ${n(p.hours) ?? 24} 小時沒有新文章。${why}`, "danger", waiting ? { href: "/admin/approvals", label: "去核准" } : undefined);
+    }
     default:
       return null;
   }

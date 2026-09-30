@@ -103,6 +103,14 @@ describe("the group's messages (D-109)", () => {
     expect(chatItems([final, final], AGENTS)).toHaveLength(1);
   });
 
+  it("a newsroom that stopped is said: a project paused, a day without an article (D-131)", () => {
+    const paused = chatItem(event("PROJECT_PAUSED", { name: "持股動態", reason: "每篇成本過高", trigger: "ceo" }, { actor: { kind: "agent", id: "a-ceo" } } as never), {})!;
+    expect(paused.type === "notice" && [paused.text, paused.tone]).toEqual(["專案「持股動態」暫停（總經理提出）：每篇成本過高", "danger"]);
+    const quiet = chatItem(event("NEWSROOM_QUIET", { hours: 30, causes: ["project_paused", "awaiting_approval"], waiting_approvals: 2 }), AGENTS)!;
+    expect(quiet.type === "notice" && quiet.text).toBe("已經 30 小時沒有新文章。可能的原因：新聞專案暫停中、有文章等您核准（2 篇）。");
+    expect(quiet.type === "notice" && quiet.link?.href).toBe("/admin/approvals");
+  });
+
   it("days and times in Taipei", () => {
     const now = new Date("2026-09-29T03:00:00Z");
     expect(dayLabel("2026-09-29T01:00:00Z", now)).toBe("今天");

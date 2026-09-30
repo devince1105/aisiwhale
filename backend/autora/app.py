@@ -252,6 +252,10 @@ def build_scheduler(
         feed_reader() if live else no_feed,
     )
     scheduler.register(SENTIMENT_SCHEDULE, sentiment.schedule_handler())
+    # a day without an article is told to the team group (D-131)
+    from autora.domains.newsroom import watch
+
+    scheduler.register(watch.WATCH_SCHEDULE, watch.schedule_handler())
     if cycles is not None:
         scheduler.register(CYCLE_START_SCHEDULE, cycles.schedule_handler())
     return scheduler

@@ -3091,6 +3091,52 @@
         }
       }
     },
+    "NEWSROOM_QUIET": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "Nothing published for a day (D-131): said once a day in the team group, with what the\nnewsroom's own records show might be why, so a stopped desk is noticed the same day.",
+          "properties": {
+            "hours": {
+              "title": "Hours",
+              "type": "integer"
+            },
+            "last_published_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Last Published At"
+            },
+            "causes": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Causes",
+              "type": "array"
+            },
+            "waiting_approvals": {
+              "default": 0,
+              "title": "Waiting Approvals",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "hours"
+          ],
+          "title": "NewsroomQuiet",
+          "type": "object"
+        }
+      }
+    },
     "OPPORTUNITY_ADVANCED": {
       "1": {
         "persistence": "persisted",

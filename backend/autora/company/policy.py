@@ -144,7 +144,12 @@ RULES: list[Rule] = [
         ),
     ),
     *needs_approval("allocate_budget", "finance"),
-    *allow("pause_project", "ceo", "system"),  # system: kill-criteria auto-pause (governance)
+    # system: kill-criteria auto-pause (governance), a rule fixed in advance. The CEO's own pause
+    # goes to a person (D-131): three pauses of the newsroom in four days, each a day without an
+    # article and none with a reason, were all hers — stopping the product is not an executive's
+    # call to make alone while a person is there to ask
+    *allow("pause_project", "system"),
+    *needs_approval("pause_project", "ceo"),
     *needs_approval("kill_project", "ceo"),
     *needs_approval("update_strategy", "ceo"),
     *needs_approval("payment", "ceo", "finance"),

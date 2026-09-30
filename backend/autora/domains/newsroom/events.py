@@ -232,3 +232,18 @@ class AnalyticsDailyUpdated(EventPayload):
     read_complete: int
     langs: dict[str, int] = {}
     """Views per language."""
+
+
+@event("NEWSROOM_QUIET")
+class NewsroomQuiet(EventPayload):
+    """Nothing published for a day (D-131): said once a day in the team group, with what the
+    newsroom's own records show might be why, so a stopped desk is noticed the same day."""
+
+    hours: int
+    """Since the last article was published (or since the desk started, when none has been)."""
+    last_published_at: dt.datetime | None = None
+    causes: list[str] = []
+    """What the records show (codes): business_paused, project_paused, agent_paused,
+    awaiting_approval, runs_failed, no_work_started."""
+    waiting_approvals: int = 0
+    """Articles waiting for the operator's approval."""

@@ -51,7 +51,7 @@ MATRIX = {
     "instantiate_workflow": (D, D, D, D, D, A, A, D, D, D),
     "create_project":       (D, D, D, D, D, D, H, D, D, D),
     "allocate_budget":      (D, D, D, D, D, D, A, H, D, D),
-    "pause_project":        (D, D, D, D, D, D, A, D, D, D),
+    "pause_project":        (D, D, D, D, D, D, H, D, D, D),  # a person decides (D-131)
     "kill_project":         (D, D, D, D, D, D, H, D, D, D),
     "update_strategy":      (D, D, D, D, D, D, H, D, D, D),
     "record_transaction":   (D, D, D, D, D, D, D, D, D, D),

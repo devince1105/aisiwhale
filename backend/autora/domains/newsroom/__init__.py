@@ -29,6 +29,7 @@ team_chat.hear(
     "ARTICLE_PUBLISHED",
     "ARTICLE_REJECTED",
     "SOURCE_PAUSED",
+    "NEWSROOM_QUIET",  # a day without an article (D-131)
 )
 
 

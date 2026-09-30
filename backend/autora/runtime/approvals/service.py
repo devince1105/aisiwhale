@@ -17,7 +17,10 @@ Three ways an approval can be attached:
   reacts to APPROVAL_APPROVED / APPROVAL_REJECTED.
 
 Expiry (D-001): an expired approval is marked EXPIRED, but the task keeps waiting; it is not
-cancelled. A new approval can then be requested for the same thing.
+cancelled. **A task still waiting gets a new approval at once** (D-131): an EXPIRED approval
+cannot be decided, so without one the task — and the article behind it — waited for a decision
+nobody could make, its workflow RUNNING for days and the operator's count of pending approvals
+at zero. The renewal is the reminder: it is asked again, and heard again in the team group.
 
 Only humans decide. Automatic approval (policy flag) is a PolicyEngine decision, not an approval.
 
@@ -246,7 +249,8 @@ class ApprovalService:
         return approval
 
     async def expire_due(self, session: AsyncSession) -> list[uuid.UUID]:
-        """Mark overdue approvals EXPIRED. Their tasks keep waiting (D-001)."""
+        """Mark overdue approvals EXPIRED. Their tasks keep waiting (D-001), under a new approval
+        (D-131, ``renew_waiting``)."""
         now = self.clock()
         due = (
             await session.scalars(
@@ -267,7 +271,45 @@ class ApprovalService:
                 ),
                 actor=Actor.system("approvals"),
             )
+        await self.renew_waiting(session)
         return [a.id for a in due]
+
+    async def renew_waiting(self, session: AsyncSession) -> list[uuid.UUID]:
+        """Ask again for every task still waiting on an approval nobody can decide any more (its
+        latest one EXPIRED, none PENDING). Returns the new approvals' ids."""
+        waiting = (
+            await session.scalars(
+                select(Task)
+                .where(Task.state == TaskState.WAITING_APPROVAL)
+                .with_for_update(skip_locked=True)
+            )
+        ).all()
+        renewed: list[uuid.UUID] = []
+        for task in waiting:
+            latest = await session.scalar(
+                select(Approval)
+                .where(Approval.task_id == task.id)
+                .order_by(Approval.created_at.desc())
+                .limit(1)
+            )
+            if latest is None or latest.state != ApprovalState.EXPIRED:
+                continue  # pending (decidable), or decided and the task is on its way
+            again = await self._create(
+                session,
+                company_id=latest.company_id,
+                kind=latest.kind,
+                ref_type=latest.ref_type,
+                ref_id=latest.ref_id,
+                task_id=latest.task_id,
+                run_id=latest.run_id,
+                action=latest.action,
+                payload=latest.payload or {},
+                summary=latest.summary,
+                requested_by=Actor.system("approvals"),
+                expires_after=None,
+            )
+            renewed.append(again.id)
+        return renewed
 
     async def approved_for_run(self, session: AsyncSession, run_id: uuid.UUID) -> list[Approval]:
         """Approvals granted to a run, newest first: what a resumed run is now allowed to do."""

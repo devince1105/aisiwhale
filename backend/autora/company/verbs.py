@@ -528,7 +528,7 @@ def register(bus: CommandBus) -> None:
             PauseProject,
             "pause_project",
             pause_project,
-            summary=lambda c: f"Pause project {c.project_id}",
+            summary=lambda c: f"Pause project {c.project_id}: {c.reason or 'no reason given'}",
         ),
         CommandSpec(
             "ResumeProject",

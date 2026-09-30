@@ -165,8 +165,7 @@ async def test_the_state_of_the_company_can_refuse_what_the_policy_allowed(db_se
         "PauseProject",
         {"project_id": str(project.id)},
         company_id=company.id,
-        actor=CEO,
-        role="ceo",
+        actor=HUMAN,
         idempotency_key=_key(),
     )
 
@@ -409,7 +408,7 @@ async def test_pausing_and_resuming_a_project(db_session, bus):
 
     paused = await bus.submit(
         db_session, "PauseProject", {"project_id": str(project.id), "reason": "over budget"},
-        company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
+        company_id=company.id, actor=HUMAN, idempotency_key=_key(),
     )  # fmt: skip
     assert paused.done and paused.result["state"] == "PAUSED"
 
@@ -430,13 +429,21 @@ async def test_pausing_and_resuming_a_project(db_session, bus):
 
 
 async def test_the_ceo_pausing_says_it_was_the_ceo(db_session, bus):
-    """The event's trigger is what tells auto-pause from a decision (T-606 will add the third)."""
+    """The event's trigger is what tells auto-pause from a decision (T-606 will add the third).
+    The CEO's pause waits for a person (D-131): until then the project keeps working."""
     company, _, project = await _world(db_session)
 
-    await bus.submit(
-        db_session, "PauseProject", {"project_id": str(project.id)},
+    asked = await bus.submit(
+        db_session, "PauseProject", {"project_id": str(project.id), "reason": "cost per article"},
         company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
     )  # fmt: skip
+    assert asked.awaiting
+    assert asked.approval.summary.endswith(": cost per article")
+    assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
+    await bus.approvals.decide(
+        db_session, asked.approval.id, outcome="approve", actor=HUMAN, reason="agreed"
+    )
+    assert (await db_session.get(Project, project.id)).state == ProjectState.PAUSED.value
 
     event = await db_session.scalar(
         select(EventRecord).where(

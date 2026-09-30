@@ -369,14 +369,15 @@ async def test_expired_approval_keeps_task_waiting(db_session, world):
     with pytest.raises(ApprovalError, match="already EXPIRED"):
         await world["approvals"].decide(db_session, approval.id, outcome="approve", actor=OPERATOR)
 
-    # The operator can ask again; the new approval releases the same suspended run.
-    again = await world["approvals"].request(
-        db_session,
-        company_id=world["company"].id,
-        kind=ApprovalKind.TOOL_CALL,
-        ref_type="agent_run",
-        ref_id=claim.run.id,
-        summary="re-requested",
-        requested_by=OPERATOR,
+    # D-131: it is asked again at once — an EXPIRED approval cannot be decided, and a task that
+    # waits for one nobody can make waits for ever. The new one releases the same run.
+    again = await db_session.scalar(
+        select(Approval).where(Approval.task_id == task.id, Approval.state == "PENDING")
     )
-    assert again.state == "PENDING"
+    assert again is not None and again.id != approval.id
+    assert (again.ref_type, again.ref_id, again.run_id) == ("agent_run", claim.run.id, claim.run.id)
+    assert again.summary == approval.summary
+    await world["approvals"].decide(db_session, again.id, outcome="approve", actor=OPERATOR)
+    assert (await _reload(db_session, Task, task.id)).state != "WAITING_APPROVAL"
+    # and it is not asked a third time while the second one is open
+    assert await world["approvals"].renew_waiting(db_session) == []

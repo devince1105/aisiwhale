@@ -99,6 +99,9 @@ const FORMAT: Record<string, (p: Payload) => [string, Tone, string | null]> = {
   SCHEDULE_FIRED: (p) => ["排程觸發", "neutral", s(p.schedule_name)],
   COMPANY_CREATED: (p) => ["公司建立", "neutral", s(p.name)],
   PROJECT_APPROVED: (p) => ["專案核准", "ok", s(p.name)],
+  PROJECT_PAUSED: (p) => ["專案暫停", "danger", [s(p.name), s(p.reason)].filter(Boolean).join("：") || null],
+  PROJECT_RESUMED: (p) => ["專案恢復", "ok", s(p.name)],
+  NEWSROOM_QUIET: (p) => ["新聞室沒有產出", "danger", `${n(p.hours) ?? 24} 小時沒有新文章`],
   BUDGET_EXHAUSTED: (p) => ["預算用盡", "danger", s(p.scope)],
   // newsroom (T-501)
   SOURCE_POLLED: (p) =>
