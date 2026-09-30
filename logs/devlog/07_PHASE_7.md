@@ -2242,6 +2242,12 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 實測上傳：以 R2 寫入一張 159,834 bytes 的首圖 → 公開網址（r2.dev）讀回 200、`image/webp`、內容相同 → 刪除後 404。重啟 API 與 worker。
 - 發現：`aisiwhale.com/news/images/…` 也讀得到同一張——bucket 綁在主網域上。網站日後要放在 aisiwhale.com，建議把自訂網域改成 `img.aisiwhale.com`，再把 `R2_PUBLIC_BASE_URL` 換成它。
 
+## D-142 後續：首圖網址改為 img.aisiwhale.com
+
+- 使用者把 R2 的自訂網域從 `aisiwhale.com` 改到 `img.aisiwhale.com`；主網域不再指向 bucket（回 530），留給網站。
+- `R2_PUBLIC_BASE_URL=https://img.aisiwhale.com`。實測：上傳 159,834 bytes → 從 img.aisiwhale.com 讀回 200、`image/webp`、`cache-control: public, max-age=31536000, immutable`、內容相同 → 刪除後 404。重啟 API 與 worker。
+- 本機 DNS 仍暫存著網域建立前的「查無此名」，本機一時解析不到 img.aisiwhale.com（公共 DNS 1.1.1.1、8.8.8.8 都正常）；只影響這台電腦、暫存到期後自然恢復，讀者不受影響。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
@@ -2352,3 +2358,4 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `80dc146` | 2026-09-30 | D-141 後續：還原誤跑的 prettier 格式 | ❌ 執行編號 `36684238871`（同上） |
 | `751565d` | 2026-09-30 | D-141 後續：複製圖示不用計時器 | ✅ 執行編號 `36686884760` |
 | `d6edfd7` | 2026-09-30 | D-142：文章首圖（Pixabay→R2）、並行步驟的死結 | ✅ 執行編號 `36690977479` |
+| `cd7a18e` | 2026-09-30 | D-142 後續：R2 資料夾 news/images | ✅ 執行編號 `36697513095` |
