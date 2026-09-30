@@ -3,6 +3,7 @@
 import itertools
 import json
 import uuid
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -65,6 +66,49 @@ def q(quote, support="supports", *, trust="0.9", source="source:a", intact=True,
 
 def verdict(claim_type, text, quotes):
     return check_claim("c", claim_type, text, quotes, min_trust=MIN)
+
+
+@pytest.mark.parametrize(
+    ("claim", "quote", "dates"),
+    [
+        # 2026-09-30's analyses, all refused though the source said so (D-137)
+        ("申報列有8個投資帳戶", "Trump lists eight separate investment accounts", ()),
+        ("報導稱4月特朗普曾讓DoorDash送餐", "in April, Trump had DoorDash deliver", ()),
+        ("帳戶在2月10日賣出500萬至2,500萬美元", "sold $5 million-$25 million on Feb. 10", ()),
+        ("連續5個交易日買超", "終止連續五個交易日買超紀錄", ()),
+        ("完整數值為0.882222768476302", "EUREuro0.8822227684763021.133500557605323", ()),
+        ("歐元兌美元約0.8822", "EUREuro0.8822227684763021.133500557605323", ()),
+        # a date the quote leaves to its source's own: 昨日, and the year
+        ("外資9月24日賣超台股338億元", "昨日賣超台股338億元", (date(2026, 9, 25),)),
+        ("2026年9月25日外資賣超338億元", "今日外資賣超台股338億元", (date(2026, 9, 25),)),
+    ],
+)  # fmt: skip
+def test_a_number_as_the_source_wrote_it_or_dated_by_it(claim, quote, dates):
+    facts = QuoteFacts("e1", quote, "supports", True, Decimal("0.9"), "source:a", dates)
+    assert verdict("number", claim, [facts]).problems == []
+
+
+@pytest.mark.parametrize(
+    ("claim", "quote", "dates"),
+    [
+        (
+            "申報列有9個投資帳戶",
+            "Trump lists eight separate investment accounts",
+            (date(2026, 9, 9),),
+        ),
+        ("外資賣超台股400億元", "昨日賣超台股338億元", (date(2026, 9, 25),)),
+        ("外資9月24日賣超", "外資賣超", ()),  # no date to count from
+        (
+            "外資9月20日賣超",
+            "昨日外資賣超",
+            (date(2026, 9, 25),),
+        ),  # not that day, nor the day before
+        ("歐元兌美元約0.89", "EUREuro0.8822227684763021.13", ()),  # not a rounding of it
+    ],
+)
+def test_what_the_source_does_not_say_still_fails(claim, quote, dates):
+    facts = QuoteFacts("e1", quote, "supports", True, Decimal("0.9"), "source:a", dates)
+    assert not verdict("number", claim, [facts]).passed
 
 
 def test_supported_claims_pass():

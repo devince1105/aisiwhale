@@ -14,6 +14,7 @@ story close to the claim) come along as advisory notes.
 from __future__ import annotations
 
 import uuid
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -37,6 +38,7 @@ from autora.domains.newsroom.models import (
     EvidenceChunk,
     FactCheckReport,
     Source,
+    SourceItem,
     SupportType,
 )
 from autora.domains.newsroom.policy import trust_policy
@@ -145,6 +147,8 @@ def _facts(
     source_id: uuid.UUID | None,
     trust: Decimal | None,
     default_trust: Decimal,
+    retrieved_on: date | None = None,
+    published_at: datetime | None = None,
 ) -> QuoteFacts:
     return QuoteFacts(
         evidence_id=str(link.evidence_id),
@@ -153,6 +157,7 @@ def _facts(
         intact=evidence_text[link.quote_start : link.quote_end] == link.quote,
         trust=Decimal(trust) if trust is not None else default_trust,
         source_key=source_key(source_id, url),
+        dates=tuple(d for d in (published_at.date() if published_at else None, retrieved_on) if d),
     )
 
 
@@ -164,9 +169,12 @@ def _quote_rows(claim_ids):
             Evidence.url,
             Evidence.source_id,
             Source.trust_level,
+            Evidence.retrieved_on,
+            SourceItem.published_at,
         )
         .join(Evidence, Evidence.id == ClaimEvidence.evidence_id)
         .outerjoin(Source, Source.id == Evidence.source_id)
+        .outerjoin(SourceItem, SourceItem.id == Evidence.source_item_id)
         .where(ClaimEvidence.claim_id.in_(claim_ids))
         .order_by(ClaimEvidence.id)
     )
@@ -178,8 +186,12 @@ async def claim_quotes(
     """What the deterministic check needs about each claim's quotes (also used by the analyst's
     validator, T-507, so claims are checked the same way before they reach a draft)."""
     quotes: dict[uuid.UUID, list[QuoteFacts]] = {c: [] for c in claim_ids}
-    for link, text_, url, source_id, trust in (await session.execute(_quote_rows(claim_ids))).all():
-        quotes[link.claim_id].append(_facts(link, text_, url, source_id, trust, default_trust))
+    for link, text_, url, source_id, trust, retrieved, published in (
+        await session.execute(_quote_rows(claim_ids))
+    ).all():
+        quotes[link.claim_id].append(
+            _facts(link, text_, url, source_id, trust, default_trust, retrieved, published)
+        )
     return quotes
 
 
@@ -222,12 +234,21 @@ def fact_check_tool(embedder: Embedder) -> ToolFn:
         quotes: dict[uuid.UUID, list[QuoteFacts]] = {c.id: [] for c in claims}
         linked: dict[uuid.UUID, set[uuid.UUID]] = {}
         pool: set[uuid.UUID] = set()
-        for link, evidence_text, url, source_id, trust in rows:
+        for link, evidence_text, url, source_id, trust, retrieved, published in rows:
             pool.add(link.evidence_id)
             linked.setdefault(link.claim_id, set()).add(link.evidence_id)
             if link.claim_id in quotes:
                 quotes[link.claim_id].append(
-                    _facts(link, evidence_text, url, source_id, trust, default_trust)
+                    _facts(
+                        link,
+                        evidence_text,
+                        url,
+                        source_id,
+                        trust,
+                        default_trust,
+                        retrieved,
+                        published,
+                    )
                 )
 
         checked = [c for c in claims if ClaimType(c.claim_type) in CHECKED]
