@@ -5,7 +5,14 @@ import { useState, type ReactNode } from "react";
 
 import { ApiError } from "@/api/client";
 
-import { STATES, type ApprovalCard, type ApprovalState, type Decision, type OfficialReportCheck } from "./model";
+import { Folded } from "./Folded";
+import {
+  STATES,
+  type ApprovalCard,
+  type ApprovalState,
+  type Decision,
+  type OfficialReportCheck,
+} from "./model";
 
 const SENT_LABEL: Record<Decision, string> = {
   approve: "已送出核准",
@@ -21,9 +28,17 @@ function time(iso: string): string {
  * rows a stock page will show — each with its page, to find it in the PDF. */
 function OfficialReportPreview({ check }: { check: OfficialReportCheck }) {
   return (
-    <div className="mt-2 grid gap-2 rounded-lg border border-line bg-canvas p-3 text-sm" data-testid="official-report">
+    <div
+      className="mt-2 grid gap-2 rounded-lg border border-line bg-canvas p-3 text-sm"
+      data-testid="official-report"
+    >
       <p>
-        <a href={check.url} target="_blank" rel="noopener noreferrer" className="text-accent underline">
+        <a
+          href={check.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent underline"
+        >
           開啟原始申報（PDF，{check.pages} 頁）
         </a>
         <span className="text-muted">
@@ -31,9 +46,13 @@ function OfficialReportPreview({ check }: { check: OfficialReportCheck }) {
         </span>
       </p>
       {check.unreadable ? (
-        <p className="text-warn">有 {check.unreadable} 筆的日期或金額讀不清，網站上不會顯示這些欄位。</p>
+        <p className="text-warn">
+          有 {check.unreadable} 筆的日期或金額讀不清，網站上不會顯示這些欄位。
+        </p>
       ) : null}
-      <p className="text-muted">會出現在個股頁的 {check.stockRows} 筆（請對照 PDF 的頁碼與列號）：</p>
+      <p className="text-muted">
+        會出現在個股頁的 {check.stockRows} 筆（請對照 PDF 的頁碼與列號）：
+      </p>
       {check.stocks.length ? (
         <ul className="max-h-64 overflow-y-auto font-mono text-xs leading-relaxed">
           {check.stocks.map((line) => (
@@ -41,7 +60,9 @@ function OfficialReportPreview({ check }: { check: OfficialReportCheck }) {
           ))}
         </ul>
       ) : (
-        <p className="text-xs text-muted">沒有股票代號的交易（多半是債券），不會出現在個股頁。</p>
+        <p className="text-xs text-muted">
+          沒有股票代號的交易（多半是債券），不會出現在個股頁。
+        </p>
       )}
     </div>
   );
@@ -65,7 +86,10 @@ function Card({
   const [reason, setReason] = useState("");
   const pending = card.state === "PENDING";
   return (
-    <li className="rounded-xl border border-line bg-surface p-4" data-testid={`approval-${card.id}`}>
+    <li
+      className="min-w-0 rounded-xl border border-line bg-surface p-4"
+      data-testid={`approval-${card.id}`}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-xs text-muted">
           {card.kind}
@@ -74,7 +98,9 @@ function Card({
         <p className="text-xs text-muted tabular-nums">
           {pending ? `已等待 ${card.waiting}` : null}
           {pending && card.expires?.in ? (
-            <span className={card.expires.soon ? "text-warn" : undefined}>・{card.expires.in}後過期</span>
+            <span className={card.expires.soon ? "text-warn" : undefined}>
+              ・{card.expires.in}後過期
+            </span>
           ) : null}
         </p>
       </div>
@@ -84,28 +110,47 @@ function Card({
       ) : card.officialReport ? (
         <OfficialReportPreview check={card.officialReport} />
       ) : (
-        <pre className="mt-2 overflow-x-auto rounded-lg border border-line bg-canvas p-3 text-xs">
-          {JSON.stringify(card.details, null, 2)}
-        </pre>
+        <Folded
+          text={JSON.stringify(card.details, null, 2)}
+          className="mt-2 rounded-lg border border-line bg-canvas p-3"
+        >
+          <pre className="text-xs break-words whitespace-pre-wrap">
+            {JSON.stringify(card.details, null, 2)}
+          </pre>
+        </Folded>
       )}
       <p className="mt-2 flex gap-3 text-sm">
         {card.runId ? (
-          <Link href={`/admin/trace/${card.runId}`} className="text-accent underline">
+          <Link
+            href={`/admin/trace/${card.runId}`}
+            className="text-accent underline"
+          >
             執行軌跡
           </Link>
         ) : null}
         {card.taskId ? (
-          <Link href={`/admin/tasks/${card.taskId}`} className="text-accent underline">
+          <Link
+            href={`/admin/tasks/${card.taskId}`}
+            className="text-accent underline"
+          >
             任務
           </Link>
         ) : null}
       </p>
 
       {card.decision ? (
-        <p className="mt-3 text-sm text-muted">
-          {card.decision.by} 於 {time(card.decision.at)} 決定
-          {card.decision.reason ? `：${card.decision.reason}` : null}
-        </p>
+        <div className="mt-3 text-sm text-muted">
+          <p>
+            {card.decision.by} 於 {time(card.decision.at)} 決定
+            {card.decision.reason ? "：" : null}
+          </p>
+          {card.decision.reason ? (
+            <Folded
+              text={card.decision.reason}
+              className="mt-1 rounded-lg border border-line bg-canvas px-3 py-2 text-ink"
+            />
+          ) : null}
+        </div>
       ) : null}
 
       {pending ? (
@@ -117,7 +162,9 @@ function Card({
           <div className="mt-3 grid gap-2">
             <label className="grid gap-1 text-sm">
               <span className="text-muted">
-                {card.canSendBack ? "意見（退回修改時必填：寫手會照這段修改）" : "理由（選填，駁回時建議填寫）"}
+                {card.canSendBack
+                  ? "意見（退回修改時必填：寫手會照這段修改）"
+                  : "理由（選填，駁回時建議填寫）"}
               </span>
               <textarea
                 value={reason}
@@ -174,7 +221,11 @@ export interface ApprovalInboxProps {
   cards: ApprovalCard[] | undefined;
   loadError: string | null;
   /** POST /api/approvals/{id}/decide. */
-  decide: (id: string, decision: Decision, reason: string | null) => Promise<unknown>;
+  decide: (
+    id: string,
+    decision: Decision,
+    reason: string | null,
+  ) => Promise<unknown>;
   /** Is the event stream live? If not, no APPROVAL_* event will refresh the list. */
   live: boolean;
   refresh: () => void;
@@ -187,12 +238,25 @@ export interface ApprovalInboxProps {
  * when the APPROVAL_* event arrives and invalidates it (refetched right away when the stream is
  * down, since no event would come).
  */
-export function ApprovalInbox({ state, onState, cards, loadError, decide, live, refresh, preview }: ApprovalInboxProps) {
+export function ApprovalInbox({
+  state,
+  onState,
+  cards,
+  loadError,
+  decide,
+  live,
+  refresh,
+  preview,
+}: ApprovalInboxProps) {
   const [sent, setSent] = useState<Record<string, Decision>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
-  async function onDecide(id: string, decision: Decision, reason: string | null) {
+  async function onDecide(
+    id: string,
+    decision: Decision,
+    reason: string | null,
+  ) {
     setBusy(id);
     setErrors((prev) => {
       const next = { ...prev };
@@ -204,10 +268,14 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
       setSent((prev) => ({ ...prev, [id]: decision }));
       if (!live) refresh();
     } catch (error) {
-      const gone = error instanceof ApiError && (error.status === 409 || error.status === 404);
+      const gone =
+        error instanceof ApiError &&
+        (error.status === 409 || error.status === 404);
       setErrors((prev) => ({
         ...prev,
-        [id]: gone ? "這筆審批已經被處理或不存在，已重新載入列表。" : `送出失敗：${(error as Error).message}`,
+        [id]: gone
+          ? "這筆審批已經被處理或不存在，已重新載入列表。"
+          : `送出失敗：${(error as Error).message}`,
       }));
       if (gone) refresh();
     } finally {
@@ -226,7 +294,9 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
             aria-selected={state === s.id}
             onClick={() => onState(s.id)}
             className={`border-b-2 px-3 py-2 text-sm ${
-              state === s.id ? "border-accent font-medium" : "border-transparent text-muted"
+              state === s.id
+                ? "border-accent font-medium"
+                : "border-transparent text-muted"
             }`}
           >
             {s.label}
@@ -240,7 +310,7 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
       ) : !cards ? (
         <p className="text-muted">載入中…</p>
       ) : cards.length ? (
-        <ul className="grid gap-3" aria-label="審批">
+        <ul className="grid grid-cols-1 gap-3" aria-label="審批">
           {cards.map((card) => (
             <Card
               key={card.id}
@@ -248,13 +318,17 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
               sent={sent[card.id]}
               error={errors[card.id]}
               busy={busy === card.id}
-              onDecide={(decision, reason) => onDecide(card.id, decision, reason)}
+              onDecide={(decision, reason) =>
+                onDecide(card.id, decision, reason)
+              }
               preview={preview}
             />
           ))}
         </ul>
       ) : (
-        <p className="text-muted">{state === "PENDING" ? "目前沒有等待審批的項目。" : "沒有資料。"}</p>
+        <p className="text-muted">
+          {state === "PENDING" ? "目前沒有等待審批的項目。" : "沒有資料。"}
+        </p>
       )}
     </>
   );
