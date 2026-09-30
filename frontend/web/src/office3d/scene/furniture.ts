@@ -169,8 +169,10 @@ export function lampSpot(seat: Seat): { shade: [number, number, number]; glow: [
   return { shade: [x, TOP + LAMP.height - 0.05, z], glow: [x, TOP + 0.004, z + flip * 0.08] };
 }
 
-/** The approval desk's lamp, on its counter: blinks while someone waits for a decision (T-407). */
-const APPROVAL_LAMP = { dx: 1.0, dz: 0.2, lift: 1.1 - TOP } as const;
+/** The approval desk's lamp, on its raised counter (the visitor side, 1.1 m up): blinks while
+ * someone waits for a decision (T-407). At dz 0.2 it was over the low desk behind the counter,
+ * at the counter's height — standing on nothing. */
+const APPROVAL_LAMP = { dx: 1.0, dz: -0.33, lift: 1.1 - TOP } as const;
 
 export function approvalLampSpot(): { shade: [number, number, number]; glow: [number, number, number] } {
   // the desk is turned round (D-120): its own x and z run the other way
