@@ -4,7 +4,9 @@ import {
   allSeats,
   APPROVAL_DESK,
   assignSeats,
-  BENCHES,
+  DESK,
+  DIVIDER_X,
+  APPROVAL_FOOTPRINT,
   CEO_OFFICE,
   CORRIDORS,
   doorOf,
@@ -54,8 +56,8 @@ describe("seats", () => {
   });
 
   it("seatsForRole gives up to the area's capacity, never more", () => {
-    expect(seatsForRole("analyst", 2)).toHaveLength(2);
-    expect(seatsForRole("analyst", 5)).toHaveLength(SLOTS.analyst.desks.length);
+    expect(seatsForRole("marketing", 2)).toHaveLength(2);
+    expect(seatsForRole("marketing", 5)).toHaveLength(SLOTS.marketing.desks.length);
     expect(seatsForRole("marketing", 3).map((s) => s.key)).toEqual(["growth:marketing:0", "growth:marketing:1"]);
     expect(seatsForRole("unknown_role", 1)).toEqual([]);
   });
@@ -82,17 +84,17 @@ describe("seats", () => {
 
   it("assignment: the desk built for the role first, then any desk in the same room", () => {
     const agents = [
-      { id: "b", role: "analyst" },
-      { id: "a", role: "analyst" },
-      { id: "c", role: "analyst" },
+      { id: "b", role: "marketing" },
+      { id: "a", role: "marketing" },
+      { id: "c", role: "marketing" },
       { id: "d", role: "fact_checker" },
       { id: "e", role: "writer" },
     ];
     const { seats, unseated } = assignSeats(agents);
-    expect(seats.get("a")!.key).toBe("research:analyst:0");
-    expect(seats.get("b")!.key).toBe("research:analyst:1");
-    // a third analyst is not homeless: research has other desks, and it takes one
-    expect(seats.get("c")!.zone).toBe("research");
+    expect(seats.get("a")!.key).toBe("growth:marketing:0");
+    expect(seats.get("b")!.key).toBe("growth:marketing:1");
+    // a third marketer is not homeless: research has other desks, and it takes one
+    expect(seats.get("c")!.zone).toBe("growth");
     expect(unseated).toEqual([]);
     expect(seats.get("d")!.zone).toBe("spare"); // a role the floor plan does not know
     expect(seats.get("e")!.key).toBe("editorial:writer:0");
@@ -128,9 +130,9 @@ describe("seats", () => {
     }));
     const { seats, unseated } = assignSeats(crowd);
     const zones = [...seats.values()].map((s) => s.zone);
-    expect(zones.filter((z) => z === "research")).toHaveLength(4); // research has four desks
-    expect(zones.filter((z) => z === "spare")).toHaveLength(3); // then the flex desks
-    expect(unseated).toHaveLength(5);
+    expect(zones.filter((z) => z === "research")).toHaveLength(3); // research has three desks
+    expect(zones.filter((z) => z === "spare")).toHaveLength(3); // then the flex desks (D-132)
+    expect(unseated).toHaveLength(6);
     expect(assignSeats([...crowd].reverse()).unseated).toEqual(unseated);
   });
 });
@@ -200,14 +202,16 @@ describe("zones, entrance and labels (T-413)", () => {
     }
   });
 
-  it("the entrance opens the right edge onto the front walkway, the reception just inside it and the lounge in the lobby", () => {
+  it("the entrance opens the right edge onto the front walkway; the reception past the glass, the lounge in the lobby", () => {
     expect(ENTRANCE.x).toBe(ROOM.maxX);
     expect([ENTRANCE.minZ, ENTRANCE.maxZ]).toEqual([CORRIDORS.front.minZ, CORRIDORS.front.maxZ]);
-    const desk = { minX: APPROVAL_DESK.center[0] - APPROVAL_DESK.width / 2, maxX: APPROVAL_DESK.center[0] + APPROVAL_DESK.width / 2, minZ: APPROVAL_DESK.center[1] - APPROVAL_DESK.depth / 2, maxZ: APPROVAL_DESK.center[1] + APPROVAL_DESK.depth / 2 };
-    // the reception just inside the entrance, in the work row with the flex desks but not up
-    // against them: a metre of floor between (D-120)
-    expect(contains(ZONES.spare, desk)).toBe(true);
-    expect(desk.minX - BENCHES[1].maxX).toBeGreaterThanOrEqual(1);
+    const desk = { minX: APPROVAL_DESK.center[0] - APPROVAL_FOOTPRINT[0] / 2, maxX: APPROVAL_DESK.center[0] + APPROVAL_FOOTPRINT[0] / 2, minZ: APPROVAL_DESK.center[1] - APPROVAL_FOOTPRINT[1] / 2, maxZ: APPROVAL_DESK.center[1] + APPROVAL_FOOTPRINT[1] / 2 };
+    // the reception in the waiting area just past the glass, its chair by the glass (D-132)
+    expect(contains(ZONES.lobby, desk)).toBe(true);
+    expect(desk.minX - DIVIDER_X).toBeGreaterThanOrEqual(0.3);
+    expect(APPROVAL_DESK.approach[0]).toBeGreaterThan(desk.maxX); // the visitor on the lounge's side
+    // the flex desks behind the glass
+    for (const seat of allSeats().filter((s) => s.zone === "spare")) expect(seat.desk[0] + DESK.width / 2).toBeLessThan(DIVIDER_X);
     const lounge = DECOR.find((item) => item.kind === "lounge")!;
     expect(inside(lounge.at, { name: "lobby", ...ZONES.lobby })).toBe(true);
     // nothing stands in the doorway
@@ -233,7 +237,9 @@ describe("zones, entrance and labels (T-413)", () => {
 });
 
 function rectAroundSeat(seat: Seat): Omit<Rect, "name"> {
-  return { minX: Math.min(seat.desk[0], seat.chair[0]) - 0.75, maxX: Math.max(seat.desk[0], seat.chair[0]) + 0.75, minZ: seat.desk[1] - 0.4, maxZ: seat.chair[1] + 0.3 };
+  // the chair in front of the desk, or behind it at a turned desk (D-119)
+  const [front, back] = seat.turn ? [seat.desk[1] + 0.4, seat.chair[1] - 0.3] : [seat.chair[1] + 0.3, seat.desk[1] - 0.4];
+  return { minX: Math.min(seat.desk[0], seat.chair[0]) - 0.75, maxX: Math.max(seat.desk[0], seat.chair[0]) + 0.75, minZ: back, maxZ: front };
 }
 
 describe("the door of a department (T-600 batch 4)", () => {

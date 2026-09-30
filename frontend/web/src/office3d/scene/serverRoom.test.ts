@@ -2,32 +2,44 @@ import { Color } from "three";
 import { describe, expect, it } from "vitest";
 
 import { SERVER_LIGHT_ROWS, serverLightSpots } from "./furniture";
-import { allSeats, DESK, obstacles, ROOM, SERVER_RACKS, SERVER_ROOM } from "./layout";
+import { DECOR, ENTRANCE, GLASS_WALLS, obstacles, ROOM, SERVER_RACKS, SERVER_ROOM, SMALL_MEETING, TALK_ROOM } from "./layout";
 import { beaconColor, healthOf, ledColor } from "./ServerLights";
 
 const hex = (c: Color) => `#${c.getHexString()}`;
 
 describe("the server room (D-121)", () => {
-  it("runs along the left wall beside the R&D desk, the innermost of the front row, its door toward it", () => {
-    const rnd = allSeats().find((seat) => seat.role === "engineer")!;
-    const front = allSeats().filter((seat) => seat.desk[1] === rnd.desk[1] && seat.zone !== "ceo");
-    expect(Math.min(...front.map((seat) => seat.desk[0]))).toBe(rnd.desk[0]);
-    expect(SERVER_ROOM.minX).toBe(ROOM.minX);
-    expect(SERVER_ROOM.maxX).toBeLessThan(rnd.desk[0] - DESK.width / 2);
-    expect(SERVER_ROOM.doorZ).toBeGreaterThan(rnd.desk[1]);
-    expect(SERVER_RACKS.zs).toHaveLength(6);
+  it("stands by the entrance where the reception was, a small meeting room beside it (D-132)", () => {
+    expect(SERVER_ROOM.maxX).toBe(ROOM.maxX);
+    expect(ENTRANCE.minZ - SERVER_ROOM.maxZ).toBeLessThan(0.3); // just inside the way in
+    expect(TALK_ROOM.maxX).toBe(SERVER_ROOM.minX);
+    expect(SMALL_MEETING.maxX).toBe(TALK_ROOM.minX);
+    // six racks, in two rows facing each other across the aisle its door opens onto
+    expect(SERVER_RACKS.rows.length * SERVER_RACKS.zs.length).toBe(6);
+    const [a, b] = SERVER_RACKS.rows.map((row) => row.x).sort();
+    expect(SERVER_ROOM.doorX).toBeGreaterThan(a + SERVER_RACKS.depth / 2);
+    expect(SERVER_ROOM.doorX).toBeLessThan(b - SERVER_RACKS.depth / 2);
+    // the doors open onto the back walkway, inside the company, never onto the waiting area
+    for (const room of ["server", "small meeting", "talk"]) {
+      expect(GLASS_WALLS.find((wall) => wall.name === `${room} back`)?.door, room).toBeDefined();
+      expect(GLASS_WALLS.find((wall) => wall.name === `${room} front`)?.door, room).toBeUndefined();
+    }
+    expect(GLASS_WALLS.find((wall) => wall.name === "server back")!.door!.at).toBe(SERVER_ROOM.doorX);
+    // two small rooms of one size, each a table for two; the rest of the row is the server room's
+    expect(TALK_ROOM.maxX - TALK_ROOM.minX).toBeCloseTo(SMALL_MEETING.maxX - SMALL_MEETING.minX);
+    expect(SERVER_ROOM.maxX - SERVER_ROOM.minX).toBeGreaterThan(TALK_ROOM.maxX - TALK_ROOM.minX);
+    expect(DECOR.filter((item) => item.kind === "small_meeting")).toHaveLength(2);
   });
 
   it("its racks and every light are inside it", () => {
     const { leds, beacons } = serverLightSpots();
-    expect(leds).toHaveLength(SERVER_RACKS.zs.length * 2 * 2 * SERVER_LIGHT_ROWS);
+    expect(leds).toHaveLength(SERVER_RACKS.rows.length * SERVER_RACKS.zs.length * 2 * 2 * SERVER_LIGHT_ROWS);
     for (const [x, , z] of [...leds, ...beacons]) {
       expect(x).toBeGreaterThan(SERVER_ROOM.minX);
       expect(x).toBeLessThan(SERVER_ROOM.maxX);
       expect(z).toBeGreaterThan(SERVER_ROOM.minZ);
       expect(z).toBeLessThan(SERVER_ROOM.maxZ);
     }
-    expect(obstacles().map((o) => o.name)).toContain("server glass (end)");
+    expect(obstacles().map((o) => o.name)).toContain("server back (before door)");
   });
 
   it("the lights say how the system is: green when live, amber while connecting, red when lost", () => {

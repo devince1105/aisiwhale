@@ -71,11 +71,12 @@ describe("board model", () => {
     // this company is not on an org chart, so each agent's row is the part of the floor it
     // sits in — which is what a company without departments honestly has (T-600 batch 3)
     const rows = boardModel(company, now);
-    expect(rows.map((r) => r.id)).toEqual(["research", "editorial"]);
+    // research has three desks (D-132): its fourth sits at a flex desk, and that is a row too
+    expect(rows.map((r) => r.id)).toEqual(["research", "spare", "editorial"]);
     expect(rows.flatMap((r) => r.cards)).toHaveLength(6);
-    const research = rows[0].cards.map((c) => c.roleLabel);
+    const research = [...rows[0].cards, ...rows[1].cards].map((c) => c.roleLabel);
     expect(research.every((label) => label === "研究員" || label === "分析師")).toBe(true);
-    expect(rows[1].cards.every((c) => c.roleLabel === "寫手")).toBe(true);
+    expect(rows[2].cards.every((c) => c.roleLabel === "寫手")).toBe(true);
   });
 
   it("an agent whose department the chart names gets a row of its own", () => {
@@ -153,8 +154,8 @@ describe("the floor, as the 3D office has it", () => {
   it("each room has the furniture that makes it that room — the 3D office's own", () => {
     const kinds = (zone: string) =>
       new Set(scene().props.filter((prop: Prop) => prop.zone === zone).map((prop: Prop) => prop.kind));
-    // reception, which is also the approval desk: just inside the entrance, past the flex desks (D-120)
-    expect(kinds("spare")).toContain("counter");
+    // reception, which is also the approval desk: in the waiting area past the glass (D-132)
+    expect(kinds("lobby")).toContain("counter");
     expect(kinds("lobby")).toContain("lounge");
     expect(kinds("pantry")).toContain("fridge");
     expect(kinds("pantry")).toContain("pantry_counter");

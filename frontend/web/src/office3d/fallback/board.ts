@@ -8,6 +8,7 @@ import { businessColors, ROLE_COLOR } from "../palette";
 import {
   allSeats,
   APPROVAL_DESK,
+  APPROVAL_FOOTPRINT,
   SERVER_ROOM,
   assignSeats,
   CEO_OFFICE,
@@ -290,10 +291,10 @@ export function floorPlan(agentIds: readonly string[], seats: ReadonlyMap<string
       box({ minX: ROOM.minX, maxX: ROOM.maxX, minZ: area.minZ, maxZ: area.maxZ }, minX, minY),
     ),
     reception: {
-      left: APPROVAL_DESK.center[0] - minX - APPROVAL_DESK.width / 2,
-      top: APPROVAL_DESK.center[1] - minY - APPROVAL_DESK.depth / 2,
-      width: APPROVAL_DESK.width,
-      height: APPROVAL_DESK.depth,
+      left: APPROVAL_DESK.center[0] - minX - APPROVAL_FOOTPRINT[0] / 2,
+      top: APPROVAL_DESK.center[1] - minY - APPROVAL_FOOTPRINT[1] / 2,
+      width: APPROVAL_FOOTPRINT[0],
+      height: APPROVAL_FOOTPRINT[1],
     },
     entrance: {
       left: ENTRANCE.x - minX - WALL / 2,

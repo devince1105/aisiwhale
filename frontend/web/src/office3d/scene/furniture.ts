@@ -8,6 +8,7 @@ import { block, box, cyl, place, sphere, type Part } from "./kit";
 import {
   allSeats,
   APPROVAL_DESK,
+  APPROVAL_FOOTPRINT,
   BACK_ROOMS_Z,
   BENCHES,
   CEO_OFFICE,
@@ -19,8 +20,13 @@ import {
   MEETING_ROOM,
   PANTRY,
   ROOM,
+  GLASS_HEIGHT,
+  GLASS_WALLS,
+  glassSpans,
   SERVER_RACKS,
   SERVER_ROOM,
+  SPINE,
+  type GlassWall,
   WALL_HALF,
   ZONES,
   type Decor,
@@ -175,10 +181,15 @@ export function lampSpot(seat: Seat): { shade: [number, number, number]; glow: [
 const APPROVAL_LAMP = { dx: 1.0, dz: -0.33, lift: 1.1 - TOP } as const;
 
 export function approvalLampSpot(): { shade: [number, number, number]; glow: [number, number, number] } {
-  // the desk is turned round (D-120): its own x and z run the other way
-  const x = APPROVAL_DESK.center[0] - (APPROVAL_LAMP.dx - LAMP.reach);
-  const z = APPROVAL_DESK.center[1] - APPROVAL_LAMP.dz;
-  return { shade: [x, 1.1 + LAMP.height - 0.05, z], glow: [x, 1.1 + 0.004, z + 0.05] };
+  // the desk is turned (D-120, D-132): its own x and z, turned with it
+  const [cos, sin] = [Math.cos(APPROVAL_DESK.turn), Math.sin(APPROVAL_DESK.turn)];
+  const at = (lx: number, lz: number): [number, number] => [
+    APPROVAL_DESK.center[0] + lx * cos + lz * sin,
+    APPROVAL_DESK.center[1] - lx * sin + lz * cos,
+  ];
+  const [x, z] = at(APPROVAL_LAMP.dx - LAMP.reach, APPROVAL_LAMP.dz);
+  const [gx, gz] = at(APPROVAL_LAMP.dx - LAMP.reach, APPROVAL_LAMP.dz - 0.05);
+  return { shade: [x, 1.1 + LAMP.height - 0.05, z], glow: [gx, 1.1 + 0.004, gz] };
 }
 
 /** The lamp's fixed parts: base, pole and arm (the shade is drawn live). */
@@ -398,9 +409,9 @@ function planter(length: number): Part[] {
   return parts;
 }
 
-/** The server room's racks in a row round its middle, fronts toward -z; the decor turns the row
- * along the left wall, fronts to +x (D-122). Their lights are live (``ServerLights``), at
- * ``serverLightSpots``. */
+/** One row of the server room's racks round its middle, fronts toward -z; each row's decor turns
+ * it along z, fronts to the aisle between the rows (D-132). Their lights are live
+ * (``ServerLights``), at ``serverLightSpots``. */
 function serverRacks(): Part[] {
   const { zs, width, depth, height } = SERVER_RACKS;
   const mid = (zs[0] + zs[zs.length - 1]) / 2;
@@ -418,32 +429,81 @@ function serverRacks(): Part[] {
  * the top one of each column the activity light, and a beacon on every rack's top. */
 export const SERVER_LIGHT_ROWS = 6;
 export function serverLightSpots(): { leds: [number, number, number][]; beacons: [number, number, number][] } {
-  const { x, zs, depth, height } = SERVER_RACKS;
+  const { rows, zs, depth, height } = SERVER_RACKS;
   const leds: [number, number, number][] = [];
-  for (const z of zs)
-    for (const face of [-1, 1])
-      for (const dz of [-0.13, 0.13])
-        for (let row = 0; row < SERVER_LIGHT_ROWS; row++) leds.push([x + face * (depth / 2 + 0.02), height - 0.2 - row * 0.2, z + dz]);
-  return { leds, beacons: zs.map((z) => [x, height + 0.08, z]) };
+  const beacons: [number, number, number][] = [];
+  for (const { x } of rows)
+    for (const z of zs) {
+      for (const face of [-1, 1])
+        for (const dz of [-0.13, 0.13])
+          for (let row = 0; row < SERVER_LIGHT_ROWS; row++) leds.push([x + face * (depth / 2 + 0.02), height - 0.2 - row * 0.2, z + dz]);
+      beacons.push([x, height + 0.08, z]);
+    }
+  return { leds, beacons };
 }
 
-/** The server room's frame (D-121): posts and rails round its glass, the door's frame, and its
- * raised floor. The panes are in ``partitionGlassParts``. */
-function serverRoomFrame(): Part[] {
-  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
-  const h = SERVER_GLASS_H;
-  const parts: Part[] = [block(maxX - minX, 0.03, maxZ - minZ, [(minX + maxX) / 2, 0, (minZ + maxZ) / 2], P.screenOff)];
-  // the end, along z = minZ
-  parts.push(box(maxX - minX, 0.06, 0.1, [(minX + maxX) / 2, h - 0.03, minZ], P.mullion));
-  parts.push(block(0.06, h, 0.1, [minX + 0.03, 0, minZ], P.mullion));
-  // the side, along x = maxX, with its door
-  parts.push(box(0.1, 0.06, maxZ - minZ, [maxX, h - 0.03, (minZ + maxZ) / 2], P.mullion));
-  for (const z of [minZ, (minZ + doorZ - doorWidth / 2) / 2, maxZ - 0.03]) parts.push(block(0.1, h, 0.06, [maxX, 0, z], P.mullion));
-  for (const side of [-1, 1]) parts.push(block(0.12, 2.1, 0.08, [maxX, 0, doorZ + (side * doorWidth) / 2], P.door));
-  parts.push(box(0.12, 0.08, doorWidth + 0.16, [maxX, 2.14, doorZ], P.door));
+/** A glass wall's frame (D-132), in place: a top rail, posts at its ends and every
+ * 1.8 m (sparser than the back rooms' fronts: in the neon style the frames glow, and the office
+ * is meant to stay mostly lit normally), and its door's frame. The panes are in
+ * ``partitionGlassParts``. */
+function glassWallFrame(wall: GlassWall): Part[] {
+  const h = GLASS_HEIGHT;
+  const along = (a: number, y: number, len: number, height: number, thick: number, color: string, standing: boolean): Part =>
+    (standing ? block : box)(
+      wall.axis === "x" ? len : thick,
+      height,
+      wall.axis === "x" ? thick : len,
+      wall.axis === "x" ? [a, y, wall.at] : [wall.at, y, a],
+      color,
+    );
+  const length = wall.to - wall.from;
+  const middle = (wall.from + wall.to) / 2;
+  // a top rail only: the panes stand on the floor
+  const parts: Part[] = [along(middle, h - 0.03, length, 0.06, 0.1, P.mullion, false)];
+  const posts = Math.max(1, Math.ceil(length / 1.8));
+  for (let i = 0; i <= posts; i++) {
+    const a = wall.from + (i * length) / posts;
+    if (wall.door && Math.abs(a - wall.door.at) < wall.door.width / 2 + 0.05) continue; // not in the doorway
+    parts.push(along(a, 0, 0.06, h, 0.1, P.mullion, true));
+  }
+  if (wall.door) {
+    const { at, width } = wall.door;
+    // a plain metal frame, not the back rooms' doors' (which glow in the neon style)
+    for (const side of [-1, 1]) parts.push(along(at + (side * width) / 2, 0, 0.08, 2.1, 0.12, P.metal, true));
+    parts.push(along(at, 2.14, width + 0.16, 0.08, 0.12, P.metal, false));
+  }
   return parts;
 }
-const SERVER_GLASS_H = 2.4;
+
+function wallCentre(wall: GlassWall): [number, number] {
+  const middle = (wall.from + wall.to) / 2;
+  return wall.axis === "x" ? [middle, wall.at] : [wall.at, middle];
+}
+
+/** The server room's raised floor (D-121). */
+function serverFloor(): Part[] {
+  const { minX, maxX, minZ, maxZ } = SERVER_ROOM;
+  return [block(maxX - minX, 0.03, maxZ - minZ, [(minX + maxX) / 2, 0, (minZ + maxZ) / 2], P.screenOff)];
+}
+
+/** A small meeting room's table and its two chairs (D-132): the table turned to the room's
+ * diagonal and a chair at each end of it, so the two sit across a corner from each other rather
+ * than squarely face to face — the easier way to talk, and it leaves the room's floor open. */
+const DIAGONAL = Math.PI / 4;
+const CHAIR_OUT = 0.62;
+function smallMeeting(): Part[] {
+  const table = [
+    block(1.0, 0.05, 0.7, [0, TOP - 0.05, 0], P.tableWood),
+    block(0.5, TOP - 0.05, 0.1, [0, 0, 0], P.metal),
+    block(0.35, 0.02, 0.25, [0.2, TOP, 0.05], P.keyboard),
+  ];
+  return [
+    ...place(table, 0, 0, DIAGONAL),
+    // each chair faces the table's middle along the diagonal
+    ...place(officeChair(P.cushion), CHAIR_OUT, CHAIR_OUT, DIAGONAL),
+    ...place(officeChair(P.cushion), -CHAIR_OUT, -CHAIR_OUT, DIAGONAL - Math.PI),
+  ];
+}
 
 function ceoSofa(): Part[] {
   return sofa(1.8, P.armchair, P.cushion);
@@ -467,6 +527,7 @@ function decorBuild(item: Decor, index: number): Part[] {
     ceo_sofa: ceoSofa,
     planter: () => planter(Math.max(item.size[0], item.size[1])),
     server_racks: serverRacks,
+    small_meeting: smallMeeting,
   };
   return build[item.kind]();
 }
@@ -491,7 +552,7 @@ function approvalDesk(): Part[] {
     ...place(officeChair(P.approvalAccent), 0, depth / 2 + 0.45),
     ...place(lampBody(), APPROVAL_LAMP.dx - LAMP.x, APPROVAL_LAMP.dz - LAMP.z, 0, APPROVAL_LAMP.lift),
   ];
-  return place(parts, APPROVAL_DESK.center[0], APPROVAL_DESK.center[1], Math.PI);
+  return place(parts, APPROVAL_DESK.center[0], APPROVAL_DESK.center[1], APPROVAL_DESK.turn);
 }
 
 // --- architecture ------------------------------------------------------------------------------
@@ -527,10 +588,11 @@ const BACK_WINDOWS: [number, number][] = [
 ];
 const LEFT_WINDOWS: [number, number][] = [
   [-5.6, 2.4],
-  // none along the server room (D-122): racks want no sun; the work row has two instead, the
-  // picture between them
+  // the open office's three, all the CEO office's size and evenly spaced (1.3 m apart), the
+  // picture in the first gap (D-122, D-132)
   [-1.8, 2.4],
-  [2.4, 2.4],
+  [1.9, 2.4],
+  [5.6, 2.4],
 ];
 const WINDOW = { sill: 1.0, height: 1.5 };
 
@@ -559,7 +621,7 @@ function outerWall(side: OuterWall): Part[] {
     box(WALL + 0.04, CAP, depth + 0.04, [ROOM.minX - WALL / 2, ROOM.wallHeight + CAP / 2, 0], P.wallCap),
     block(0.02, 0.12, depth, [ROOM.minX + 0.01, 0, 0], P.frame),
     ...LEFT_WINDOWS.flatMap(([z, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), ROOM.minX, z, Math.PI / 2)),
-    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, 0.3, Math.PI / 2, 1.75),
+    ...place(picture(0.9, 0.7, P.picture[0]), ROOM.minX + 0.01, 0.05, Math.PI / 2, 1.75),
   ];
 }
 
@@ -627,6 +689,7 @@ function innerWall(x: number): Part[] {
 const GLASS_FRONTS: readonly (readonly [number, number])[] = [
   [CEO_OFFICE.minX, CEO_OFFICE.maxX],
   [MEETING_ROOM.minX, MEETING_ROOM.maxX],
+  [PANTRY.minX, PANTRY.maxX], // glassed in too (D-132)
 ];
 
 function glassFront([from, to]: readonly [number, number]): Part[] {
@@ -697,7 +760,8 @@ export function officeParts(palette: Palette = DEFAULT_PALETTE): Part[] {
     ...allSeats().flatMap(seatParts),
     ...DECOR.flatMap(decorParts),
     ...approvalDesk(),
-    ...serverRoomFrame(),
+    ...GLASS_WALLS.flatMap(glassWallFrame),
+    ...serverFloor(),
     ...zoneTrims(),
   ]);
 }
@@ -719,22 +783,27 @@ export function partitionGlassParts(palette: Palette = DEFAULT_PALETTE): Part[] 
   for (const [room, door] of [
     [CEO_OFFICE, DOORS[0]],
     [MEETING_ROOM, DOORS[1]],
+    [PANTRY, DOORS[2]],
   ] as const) {
     segments.push([room.minX, door.x - door.width / 2], [door.x + door.width / 2, room.maxX]);
   }
   const panes = segments.map(([from, to]) => box(to - from, h, 0.02, [(from + to) / 2, 0.06 + h / 2, BACK_ROOMS_Z], P.glass));
   // the transoms above the doors
   for (const door of DOORS) panes.push(box(door.width, INNER_WALL_H - 2.36, 0.02, [door.x, 2.28 + (INNER_WALL_H - 2.36) / 2, BACK_ROOMS_Z], P.glass));
-  // the server room's (D-121): its front either side of the door and above it, and its side
-  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
-  const g = SERVER_GLASS_H - 0.06;
-  const [doorFrom, doorTo] = [doorZ - doorWidth / 2, doorZ + doorWidth / 2];
-  panes.push(
-    box(maxX - minX, g, 0.02, [(minX + maxX) / 2, g / 2, minZ], P.glass),
-    box(0.02, g, doorFrom - minZ, [maxX, g / 2, (minZ + doorFrom) / 2], P.glass),
-    box(0.02, g, maxZ - doorTo, [maxX, g / 2, (doorTo + maxZ) / 2], P.glass),
-    box(0.02, g - 2.18, doorWidth, [maxX, 2.18 + (g - 2.18) / 2, doorZ], P.glass),
-  );
+  // the work row's glass walls (D-132): either side of each door, and above it
+  const g = GLASS_HEIGHT - 0.06;
+  const pane = (wall: GlassWall, from: number, to: number, y0: number, y1: number) =>
+    box(
+      wall.axis === "x" ? to - from : 0.02,
+      y1 - y0,
+      wall.axis === "x" ? 0.02 : to - from,
+      wall.axis === "x" ? [(from + to) / 2, (y0 + y1) / 2, wall.at] : [wall.at, (y0 + y1) / 2, (from + to) / 2],
+      P.glass,
+    );
+  for (const wall of GLASS_WALLS) {
+    for (const [from, to] of glassSpans(wall)) panes.push(pane(wall, from, to, 0.06, g));
+    if (wall.door) panes.push(pane(wall, wall.door.at - wall.door.width / 2, wall.door.at + wall.door.width / 2, 2.18, g));
+  }
   return panes;
 }
 
@@ -773,7 +842,7 @@ export function floorRegions(): FloorRegion[] {
     room("lobby", ZONES.lobby, 1),
     { kind: "corridor", ...full, minZ: -3.2, maxZ: -1.3, layer: 2 },
     { kind: "corridor", ...full, minZ: 1.6, maxZ: 3.2, layer: 2 },
-    { kind: "corridor", minX: BENCHES[0].maxX + 0.25, maxX: BENCHES[1].minX - 0.25, minZ: -1.3, maxZ: 1.6, layer: 2 },
+    { kind: "corridor", minX: SPINE.minX, maxX: SPINE.maxX, minZ: -1.3, maxZ: 1.6, layer: 2 },
     { kind: "rugLounge", minX: 8.8, maxX: 11.8, minZ: 4.1, maxZ: 7.5, layer: 3 },
     // no rug in the CEO office (D-119): the wood floor alone, with the desk by the window
     { kind: "entranceMat", minX: ROOM.maxX - 1.0, maxX: ROOM.maxX, minZ: ENTRANCE.minZ + 0.2, maxZ: ENTRANCE.maxZ - 0.2, layer: 3 },
@@ -873,7 +942,7 @@ export const BAKEABLE: Record<string, BakeablePiece> = {
     // approvalDesk() builds itself where it stands; bring it back to the origin. Turned round
     // (D-120), its chair is behind it, so the counter's front is the footprint's front.
     parts: (p) => paintedWith(p, () => place(approvalDesk(), -APPROVAL_DESK.center[0], -APPROVAL_DESK.center[1])),
-    footprint: [APPROVAL_DESK.width, APPROVAL_DESK.depth + 0.1],
+    footprint: [APPROVAL_FOOTPRINT[0] + 0.1, APPROVAL_FOOTPRINT[1]],
   },
   ...Object.fromEntries(
     BENCHES.map((b, i) => [
@@ -883,6 +952,20 @@ export const BAKEABLE: Record<string, BakeablePiece> = {
         footprint: [b.maxX - b.minX, DESK.depth] as const,
       },
     ]),
+  ),
+  // the work row's glass walls (D-132)
+  ...Object.fromEntries(
+    GLASS_WALLS.map((wall, i) => {
+      const [cx, cz] = wallCentre(wall);
+      const length = wall.to - wall.from;
+      return [
+        `glass:${i}`,
+        {
+          parts: (p: Palette) => paintedWith(p, () => place(glassWallFrame(wall), -cx, -cz)),
+          footprint: (wall.axis === "x" ? [length, 0.12] : [0.12, length]) as readonly [number, number],
+        },
+      ];
+    }),
   ),
   ...Object.fromEntries(
     DECOR.map((item, i) => [
@@ -909,5 +992,6 @@ export function placedPieces(): PlacedPiece[] {
   pieces.push({ bake: "counterDesk", at: APPROVAL_DESK.center });
   INNER_WALL_XS.forEach((x, i) => pieces.push({ bake: `wall:${i}`, at: [x, ROOM.minZ + INNER_WALL_DEPTH / 2] }));
   GLASS_FRONTS.forEach((front, i) => pieces.push({ bake: `front:${i}`, at: [(front[0] + front[1]) / 2, BACK_ROOMS_Z] }));
+  GLASS_WALLS.forEach((wall, i) => pieces.push({ bake: `glass:${i}`, at: wallCentre(wall) }));
   return pieces;
 }

@@ -48,13 +48,14 @@ const APPROACH_OFFSET: Vec2 = [1.1, 0];
 
 export const LANES: Record<Lane, number> = { back: -2.25, front: 2.4 };
 /** The aisle between the two benches that joins the lanes. */
-export const SPINE_X = 0;
+export const SPINE_X = -3.4;
 
 /** Rooms along the back wall; their fronts are at z = BACK_ROOMS_Z. */
 export const BACK_ROOMS_Z = -3.2;
 export const CEO_OFFICE = { minX: -12, maxX: -5, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: -7.4, doorWidth: 1.2 } as const;
 export const MEETING_ROOM = { minX: -5, maxX: 4, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: 2.6, doorWidth: 1.2 } as const;
-export const PANTRY = { minX: 4, maxX: 12, minZ: -8, maxZ: BACK_ROOMS_Z } as const;
+/** Glassed in like the others (D-132), its door toward the work row's right half. */
+export const PANTRY = { minX: 4, maxX: 12, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: 6.4, doorWidth: 1.2 } as const;
 /** The walkways between the zones. */
 export const CORRIDORS = {
   back: { minZ: BACK_ROOMS_Z, maxZ: -1.3 },
@@ -76,19 +77,22 @@ export interface Area {
  * reception (the approval desk) and the waiting lounge — by the entrance.
  */
 export const ZONES: Record<"research" | "editorial" | "growth" | "spare" | "lobby", Area> = {
-  research: { minX: -10.6, maxX: -1.4, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
-  // the flex desks and the editorial desk changed places (D-120): flex by the entrance, where
-  // people come and go; editorial in the front row, the wall behind it
-  spare: { minX: 1.2, maxX: 11.0, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
-  growth: { minX: -10.4, maxX: -3.2, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
+  research: { minX: -10.6, maxX: -3.8, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
+  // the flex desks and the editorial desk changed places (D-120): flex in the work row,
+  // editorial in the front row, the wall behind it; the flex desks a bench in line with
+  // research's across the aisle, behind the glass (D-132)
+  spare: { minX: -2.95, maxX: 4.0, minZ: CORRIDORS.back.maxZ, maxZ: CORRIDORS.front.minZ },
+  growth: { minX: -10.4, maxX: -3.8, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
   editorial: { minX: -2.6, maxX: 3.9, minZ: CORRIDORS.front.maxZ, maxZ: 6.6 },
   lobby: { minX: 4.2, maxX: ROOM.maxX, minZ: CORRIDORS.front.maxZ, maxZ: ROOM.maxZ },
 };
 
-/** The approval desk doubles as the reception counter. It stands just inside the entrance
- * (D-120), clear of the flex desks, turned like the CEO's desk: its counter faces the front
- * walkway that visitors come in by, and its chair is on the inside, toward the back of the room. */
-export const APPROVAL_DESK = { center: [9.7, 0] as Vec2, width: 2.6, depth: 0.9, approach: [9.7, 1.2] as Vec2 } as const;
+/** The approval desk doubles as the reception counter. It stands in the waiting area, just past
+ * the glass (D-132): the counter runs front to back and faces the lounge and the entrance, its
+ * chair on the inside, by the glass. ``turn`` is its rotation about y: its visitor side faces +x. */
+export const APPROVAL_DESK = { center: [5.7, 5.3] as Vec2, width: 2.2, depth: 0.9, turn: -Math.PI / 2, approach: [6.65, 5.3] as Vec2 } as const;
+/** The counter's footprint on the floor, x by z (it runs along z). */
+export const APPROVAL_FOOTPRINT: Vec2 = [APPROVAL_DESK.depth, APPROVAL_DESK.width];
 
 interface RoleSlots {
   zone: ZoneId;
@@ -98,8 +102,13 @@ interface RoleSlots {
   /** Desk centres; the first is the seat a single agent of this role gets. */
   desks: Vec2[];
   /** The desk turned round (D-119): its sitter faces the room's front (+z) — the CEO facing her
-   * office's door — instead of the back wall. */
-  turned?: boolean;
+   * office's door — instead of the back wall. One flag for every desk, or one per desk (a pair
+   * of desks facing each other, D-132). */
+  turned?: boolean | readonly boolean[];
+}
+
+function isTurned(slots: RoleSlots, index: number): boolean {
+  return Array.isArray(slots.turned) ? Boolean(slots.turned[index]) : Boolean(slots.turned);
 }
 
 const WORK_Z = 0;
@@ -110,7 +119,7 @@ export const SLOTS: Record<string, RoleSlots> = {
   // every member of the newsroom has a desk of her own (D-120), so no one takes another's
   news_intelligence: { zone: "research", lane: "front", bench: true, desks: [[-9.0, WORK_Z]] },
   researcher: { zone: "research", lane: "front", bench: true, desks: [[-6.8, WORK_Z]] },
-  analyst: { zone: "research", lane: "front", bench: true, desks: [[-4.6, WORK_Z], [-2.4, WORK_Z]] },
+  analyst: { zone: "research", lane: "front", bench: true, desks: [[-4.6, WORK_Z]] },
   // the editorial desk in the front row, in the order a story passes along it
   writer: { zone: "editorial", lane: "front", bench: false, desks: [[-1.8, FRONT_Z]] },
   editor: { zone: "editorial", lane: "front", bench: false, desks: [[0.4, FRONT_Z]] },
@@ -125,24 +134,81 @@ export const SLOTS: Record<string, RoleSlots> = {
 };
 
 /**
- * The server room along the left wall of the front row, beside the R&D desk (D-121, enlarged in
- * D-122): six racks that stand for the system itself, whose lights show whether it is running.
- * Glass on its two open sides, the door in the side toward the R&D desk; the racks stand against
- * the wall with their fronts to the glass (+x).
+ * The office divided on the line of the pantry's wall (x ≈ 4) by a glass wall the whole depth
+ * of the room, open where the two walkways cross it (D-132): the desks on one side; on the
+ * other, the waiting area with the reception in the front row, and in the work row three glass
+ * rooms — two small meeting rooms of one size, and the server room by the entrance, its
+ * racks the system itself (D-121). Their doors open onto the back walkway, inside the company,
+ * not onto the waiting area: what is discussed and kept there is not a visitor's to walk into.
  */
-export const SERVER_ROOM = { minX: ROOM.minX, maxX: -10.2, minZ: 3.95, maxZ: ROOM.maxZ, doorZ: 6.9, doorWidth: 0.9 } as const;
-export const SERVER_RACKS = { x: -11.6, zs: [4.45, 5.1, 5.75, 6.4, 7.05, 7.7], width: 0.6, depth: 0.6, height: 1.6 } as const;
+export const DIVIDER_X = 4.15;
+/** Their fronts stand just back from the walkway, so the entrance's doorway stays clear. */
+const ROOMS_FRONT_Z = CORRIDORS.front.minZ - 0.15;
+const ROOMS_BACK_Z = CORRIDORS.back.maxZ;
+/** Two small meeting rooms of one size, for two (a table on the diagonal, a chair at each end);
+ * what is left of the row goes to the server room. */
+const SMALL_ROOM_WIDTH = 2.3;
+export const SMALL_MEETING = { minX: DIVIDER_X, maxX: DIVIDER_X + SMALL_ROOM_WIDTH, minZ: ROOMS_BACK_Z, maxZ: ROOMS_FRONT_Z, doorX: DIVIDER_X + SMALL_ROOM_WIDTH / 2, doorWidth: 0.9 } as const;
+export const TALK_ROOM = { minX: SMALL_MEETING.maxX, maxX: SMALL_MEETING.maxX + SMALL_ROOM_WIDTH, minZ: ROOMS_BACK_Z, maxZ: ROOMS_FRONT_Z, doorX: SMALL_MEETING.maxX + SMALL_ROOM_WIDTH / 2, doorWidth: 0.9 } as const;
+export const SERVER_ROOM = { minX: TALK_ROOM.maxX, maxX: ROOM.maxX, minZ: ROOMS_BACK_Z, maxZ: ROOMS_FRONT_Z, doorX: 10.9, doorWidth: 0.7 } as const;
+/** Two rows of three, fronts facing each other across the aisle the door opens onto. */
+export const SERVER_RACKS = {
+  rows: [
+    { x: 11.55, facing: -1 },
+    { x: 10.25, facing: 1 },
+  ],
+  zs: [-0.6, 0.05, 0.7],
+  width: 0.6,
+  depth: 0.6,
+  height: 1.6,
+} as const;
 
-/** Desks for roles the floor plan does not know (a new domain's roles), first come first served. */
-export const SPARE: RoleSlots = { zone: "spare", lane: "front", bench: true, desks: [[2.2, WORK_Z], [4.4, WORK_Z], [6.6, WORK_Z]] };
+/** A glass wall (D-132): along x (``z`` fixed) or along z (``x`` fixed), with an optional door. */
+export interface GlassWall {
+  name: string;
+  axis: "x" | "z";
+  /** The fixed coordinate: z for a wall along x, x for a wall along z. */
+  at: number;
+  from: number;
+  to: number;
+  door?: { at: number; width: number };
+}
+
+export const GLASS_HEIGHT = 2.4;
+
+const back = (room: { doorX: number; doorWidth: number }) => ({ at: room.doorX, width: room.doorWidth });
+
+export const GLASS_WALLS: GlassWall[] = [
+  // the divider: the work row, and the front row where the planters were
+  { name: "divider glass", axis: "z", at: DIVIDER_X, from: CORRIDORS.back.maxZ, to: CORRIDORS.front.minZ },
+  { name: "divider glass (front row)", axis: "z", at: DIVIDER_X, from: CORRIDORS.front.maxZ, to: ROOM.maxZ },
+  // the three rooms: fronts closed, doors at the back
+  { name: "small meeting front", axis: "x", at: SMALL_MEETING.maxZ, from: SMALL_MEETING.minX, to: SMALL_MEETING.maxX },
+  { name: "small meeting back", axis: "x", at: SMALL_MEETING.minZ, from: SMALL_MEETING.minX, to: SMALL_MEETING.maxX, door: back(SMALL_MEETING) },
+  { name: "small meeting | talk", axis: "z", at: TALK_ROOM.minX, from: TALK_ROOM.minZ, to: TALK_ROOM.maxZ },
+  { name: "talk front", axis: "x", at: TALK_ROOM.maxZ, from: TALK_ROOM.minX, to: TALK_ROOM.maxX },
+  { name: "talk back", axis: "x", at: TALK_ROOM.minZ, from: TALK_ROOM.minX, to: TALK_ROOM.maxX, door: back(TALK_ROOM) },
+  { name: "talk | server", axis: "z", at: SERVER_ROOM.minX, from: SERVER_ROOM.minZ, to: SERVER_ROOM.maxZ },
+  { name: "server front", axis: "x", at: SERVER_ROOM.maxZ, from: SERVER_ROOM.minX, to: SERVER_ROOM.maxX },
+  { name: "server back", axis: "x", at: SERVER_ROOM.minZ, from: SERVER_ROOM.minX, to: SERVER_ROOM.maxX, door: back(SERVER_ROOM) },
+];
+
+/** Desks for roles the floor plan does not know (a new domain's roles), first come first served:
+ * a bench in line with research's, across the aisle that joins the walkways (D-132). */
+export const SPARE: RoleSlots = { zone: "spare", lane: "front", bench: true, desks: [[-2.2, WORK_Z], [0.0, WORK_Z], [2.2, WORK_Z]] };
 
 export const ROLES = Object.keys(SLOTS);
 
-/** The two bench tables of the work row (left: research, right: the flex desks). */
+/** The two bench tables of the work row, research's and the flex desks', in one line with the
+ * aisle between them (D-132). */
 export const BENCHES = [
-  { name: "research bench", minX: -9.75, maxX: -1.65, z: WORK_Z },
-  { name: "flex bench", minX: 1.45, maxX: 7.35, z: WORK_Z },
+  { name: "research bench", minX: -9.75, maxX: -3.85, z: WORK_Z },
+  { name: "flex bench", minX: -2.95, maxX: 2.95, z: WORK_Z },
 ] as const;
+
+/** The aisle from the back wall's walkway to the front of the room, through both rows, between
+ * research and the flex desks and between marketing and editorial (D-132): where people cross. */
+export const SPINE = { minX: -3.8, maxX: -2.95 } as const;
 
 export interface Seat {
   key: string;
@@ -165,8 +231,9 @@ export interface Seat {
 
 function seatAt(role: string, slots: RoleSlots, index: number): Seat {
   const [x, z] = slots.desks[index];
-  const turn = slots.turned ? Math.PI : 0;
-  const back = slots.turned ? -1 : 1; // which way the chair is from the desk
+  const turned = isTurned(slots, index);
+  const turn = turned ? Math.PI : 0;
+  const back = turned ? -1 : 1; // which way the chair is from the desk
   const chair: Vec2 = [x, z + back * CHAIR_OFFSET];
   const side = x + APPROACH_OFFSET[0] > ROOM.maxX - 1 ? -1 : 1;
   return {
@@ -177,7 +244,7 @@ function seatAt(role: string, slots: RoleSlots, index: number): Seat {
     bench: slots.bench,
     desk: [x, z],
     chair,
-    facing: slots.turned ? 0 : Math.PI,
+    facing: turned ? 0 : Math.PI,
     turn,
     screen: [x, DESK.height + 0.3, z - back * 0.18],
     approach: [chair[0] + side * APPROACH_OFFSET[0], chair[1] + APPROACH_OFFSET[1]],
@@ -286,7 +353,8 @@ export type DecorKind =
   | "ceo_shelf"
   | "ceo_sofa"
   | "planter"
-  | "server_racks";
+  | "server_racks"
+  | "small_meeting";
 
 export interface Decor {
   kind: DecorKind;
@@ -305,14 +373,24 @@ export const DECOR: Decor[] = [
   // work area: low shelves with plants along the left wall, palms and plants at the ends
   d("low_shelf", [-11.6, -0.2], [0.45, 2.2], QUARTER),
   d("palm", [-11.2, 2.4], [0.8, 0.8]),
-  d("plant", [11.4, -0.4], [0.6, 0.6]),
   // front area: a planter between marketing and the flex desks; the lobby by the entrance
-  d("plant", [-11.4, 3.5], [0.6, 0.6]),
-  d("planter", [-2.85, 4.9], [0.36, 1.6], QUARTER),
-  // low planters between the editorial desk and the waiting area (D-121)
-  d("planter", [4.15, 5.6], [0.36, 4.0], QUARTER),
-  // the server room's racks (D-121)
-  d("server_racks", [SERVER_RACKS.x, (SERVER_RACKS.zs[0] + SERVER_RACKS.zs.at(-1)!) / 2], [SERVER_RACKS.depth, SERVER_RACKS.zs.at(-1)! - SERVER_RACKS.zs[0] + SERVER_RACKS.width], -QUARTER),
+  // the left wall's front row is open again (the server room moved, D-132): a shelf, a plant
+  d("low_shelf", [-11.6, 6.9], [0.45, 1.8], QUARTER),
+  d("plant", [-11.4, 3.7], [0.6, 0.6]),
+  // (the planters between marketing and editorial, and along the waiting area, gave way to the
+  // aisle and the glass, D-132)
+  // the server room's racks (D-121), two rows facing each other by the entrance (D-132)
+  ...SERVER_RACKS.rows.map((row) =>
+    d(
+      "server_racks",
+      [row.x, (SERVER_RACKS.zs[0] + SERVER_RACKS.zs[SERVER_RACKS.zs.length - 1]) / 2],
+      [SERVER_RACKS.depth, SERVER_RACKS.zs[SERVER_RACKS.zs.length - 1] - SERVER_RACKS.zs[0] + SERVER_RACKS.width],
+      row.facing < 0 ? QUARTER : -QUARTER,
+    ),
+  ),
+  // the two small meeting rooms' tables, each with two chairs on the room's diagonal
+  d("small_meeting", [(SMALL_MEETING.minX + SMALL_MEETING.maxX) / 2, 0.1], [1.9, 1.9]),
+  d("small_meeting", [(TALK_ROOM.minX + TALK_ROOM.maxX) / 2, 0.1], [1.9, 1.9]),
   d("lounge", [10.3, 5.8], [3.2, 3.6]),
   d("plant", [11.5, 3.6], [0.6, 0.6]),
   // CEO office
@@ -349,16 +427,18 @@ export interface Label {
 
 export const LABELS: Label[] = [
   { text: "研究部", sub: "RESEARCH", at: [-6.0, 0, 2.0], width: 3.0, kind: "floor" },
-  { text: "彈性座位", sub: "FLEX DESKS", at: [4.4, 0, 2.0], width: 2.4, kind: "floor" },
-  { text: "接待", sub: "RECEPTION", at: [9.7, 0, 2.0], width: 1.8, kind: "floor" },
+  { text: "彈性座位", sub: "FLEX DESKS", at: [0.0, 0, 2.0], width: 2.2, kind: "floor" },
+  { text: "接待", sub: "RECEPTION", at: [7.4, 0, 3.8], width: 1.6, kind: "floor" },
   // behind the front desks' chairs: in front of the desks the desks would hide them
   { text: "研發部", sub: "R&D", at: [-9.0, 0, 6.3], width: 2.0, kind: "floor" },
   { text: "行銷部", sub: "MARKETING", at: [-5.7, 0, 6.3], width: 2.4, kind: "floor" },
   { text: "編輯部", sub: "EDITORIAL", at: [0.4, 0, 6.3], width: 2.4, kind: "floor" },
-  // over the server room's door, facing the R&D desk
-  { text: "機房", sub: "SERVER ROOM", at: [SERVER_ROOM.maxX + 0.08, 2.36, SERVER_ROOM.doorZ], width: 1.0, kind: "sign", facing: "x" },
+  // the rooms of the work row's nameplates, on their fronts (their doors are at the back, D-132)
+  { text: "小會議室 1", sub: "HUDDLE ROOM 1", at: [(SMALL_MEETING.minX + SMALL_MEETING.maxX) / 2, 2.36, SMALL_MEETING.maxZ + 0.08], width: 1.0, kind: "sign" },
+  { text: "小會議室 2", sub: "HUDDLE ROOM 2", at: [(TALK_ROOM.minX + TALK_ROOM.maxX) / 2, 2.36, TALK_ROOM.maxZ + 0.08], width: 1.0, kind: "sign" },
+  { text: "機房", sub: "SERVER ROOM", at: [(SERVER_ROOM.minX + SERVER_ROOM.maxX) / 2, 2.36, SERVER_ROOM.maxZ + 0.08], width: 1.0, kind: "sign" },
   { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: 2.6, kind: "floor" },
-  { text: "茶水間", sub: "PANTRY", at: [8.2, 0, -3.72], width: 2.4, kind: "floor" },
+  { text: "茶水間", sub: "PANTRY", at: [9.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "AUTORA", sub: "入口 ENTRANCE", at: [ROOM.maxX + 0.21, 2.6, (CORRIDORS.front.minZ + CORRIDORS.front.maxZ) / 2], width: 1.4, kind: "sign", facing: "x" },
@@ -368,6 +448,7 @@ export const LABELS: Label[] = [
 export const DOORS = [
   { name: "ceo door", x: CEO_OFFICE.doorX, width: CEO_OFFICE.doorWidth },
   { name: "meeting door", x: MEETING_ROOM.doorX, width: MEETING_ROOM.doorWidth },
+  { name: "pantry door", x: PANTRY.doorX, width: PANTRY.doorWidth },
 ] as const;
 
 // --- walking ----------------------------------------------------------------------------------
@@ -461,26 +542,42 @@ export function partitions(): Rect[] {
   const opening = (door: { doorX: number; doorWidth: number }) => [door.doorX - door.doorWidth / 2, door.doorX + door.doorWidth / 2];
   const [ceoL, ceoR] = opening(CEO_OFFICE);
   const [meetL, meetR] = opening(MEETING_ROOM);
+  const [pantryL, pantryR] = opening(PANTRY);
   const wall = (x: number, name: string): Rect => ({ name, minX: x - t, maxX: x + t, minZ: ROOM.minZ, maxZ: z - t });
   return [
     glass(CEO_OFFICE.minX, ceoL, "ceo glass (left of door)"),
     glass(ceoR, CEO_OFFICE.maxX - t, "ceo glass (right of door)"),
     glass(CEO_OFFICE.maxX + t, meetL, "meeting glass (left of door)"),
     glass(meetR, MEETING_ROOM.maxX - t, "meeting glass (right of door)"),
+    glass(MEETING_ROOM.maxX + t, pantryL, "pantry glass (left of door)"),
+    glass(pantryR, PANTRY.maxX, "pantry glass (right of door)"),
     wall(CEO_OFFICE.maxX, "wall ceo | meeting"),
     wall(MEETING_ROOM.maxX, "wall meeting | pantry"),
   ];
 }
 
-/** The server room's glass: its end (toward the corridor) and its side, with the door (D-122). */
-export function serverRoomWalls(): Rect[] {
-  const { minX, maxX, minZ, maxZ, doorZ, doorWidth } = SERVER_ROOM;
-  const t = WALL_HALF;
+/** A glass wall's stretches either side of its door (the whole wall when it has none). */
+export function glassSpans(wall: GlassWall): [number, number][] {
+  if (!wall.door) return [[wall.from, wall.to]];
   return [
-    { name: "server glass (end)", minX, maxX: maxX + t, minZ: minZ - t, maxZ: minZ + t },
-    { name: "server glass (side, before door)", minX: maxX - t, maxX: maxX + t, minZ: minZ + t, maxZ: doorZ - doorWidth / 2 },
-    { name: "server glass (side, after door)", minX: maxX - t, maxX: maxX + t, minZ: doorZ + doorWidth / 2, maxZ },
+    [wall.from, wall.door.at - wall.door.width / 2],
+    [wall.door.at + wall.door.width / 2, wall.to],
   ];
+}
+
+/** The glass walls of the work row as footprints (D-132), doors left open. */
+export function glassWallRects(): Rect[] {
+  const t = WALL_HALF;
+  return GLASS_WALLS.flatMap((wall) =>
+    glassSpans(wall).map(([from, to], i): Rect => {
+      const name = `${wall.name}${wall.door ? (i ? " (after door)" : " (before door)") : ""}`;
+      // the ends stop short of a crossing wall's footprint, so two walls meet without overlapping
+      const [a, b] = [from + t + 0.001, to - t - 0.001];
+      return wall.axis === "x"
+        ? { name, minX: a, maxX: b, minZ: wall.at - t, maxZ: wall.at + t }
+        : { name, minX: wall.at - t, maxX: wall.at + t, minZ: a, maxZ: b };
+    }),
+  );
 }
 
 /** Open door leaves: inside the room, along the hinge side of the opening. */
@@ -508,9 +605,9 @@ export function obstacles(): Rect[] {
     ...furniture,
     ...benches,
     ...decor,
-    rectAround(APPROVAL_DESK.center, APPROVAL_DESK.width, APPROVAL_DESK.depth, "approval desk"),
+    rectAround(APPROVAL_DESK.center, APPROVAL_FOOTPRINT[0], APPROVAL_FOOTPRINT[1], "approval desk"),
     ...partitions(),
-    ...serverRoomWalls(),
+    ...glassWallRects(),
     ...doorLeaves(),
   ];
 }
