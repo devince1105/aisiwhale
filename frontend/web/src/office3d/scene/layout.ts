@@ -445,7 +445,8 @@ const FLOOR_LABEL_WIDTH = 2.4;
 export const LABELS: Label[] = [
   { text: "研究部", sub: "RESEARCH", at: [LEFT_DESKS[1], 0, 2.0], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   { text: "彈性座位", sub: "FLEX DESKS", at: [RIGHT_DESKS[1], 0, 2.0], width: FLOOR_LABEL_WIDTH, kind: "floor" },
-  { text: "接待", sub: "RECEPTION", at: [7.4, 0, 3.8], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  // in front of the counter, where a visitor stands (D-133)
+  { text: "接待", sub: "RECEPTION", at: [APPROVAL_DESK.center[0] + 1.7, 0, APPROVAL_DESK.center[1]], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   // behind the front desks' chairs: in front of the desks the desks would hide them
   { text: "資訊部", sub: "IT", at: [LEFT_DESKS[0], 0, 7.2], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   { text: "行銷部", sub: "MARKETING", at: [(LEFT_DESKS[1] + LEFT_DESKS[2]) / 2, 0, 7.2], width: FLOOR_LABEL_WIDTH, kind: "floor" },
@@ -454,7 +455,8 @@ export const LABELS: Label[] = [
   { text: "小會議室 1", sub: "HUDDLE ROOM 1", at: [SMALL_MEETING.doorX, 2.36, SMALL_MEETING.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
   { text: "小會議室 2", sub: "HUDDLE ROOM 2", at: [TALK_ROOM.doorX, 2.36, TALK_ROOM.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
   { text: "機房", sub: "SERVER ROOM", at: [SERVER_ROOM.doorX, 2.36, SERVER_ROOM.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
-  { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  // at the lounge's sofas, on the side toward the room (D-133): it was left of them, by the counter
+  { text: "等候區", sub: "LOUNGE", at: [9.9, 0, 3.65], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   { text: "茶水間", sub: "PANTRY", at: [9.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
