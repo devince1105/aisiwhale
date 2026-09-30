@@ -1,16 +1,14 @@
-// Everything a reader sees (D-047): the site's type and its light or dark. Above the language's
-// layout on purpose — switching language re-renders that one in the browser, where an inline
-// script would not run; this one stays, and so does the reader's pick.
+// Everything a reader sees (D-047): the site's type and its light or dark. The reader's saved
+// pick is put on <html> before the first paint by the root layout's script (theme.ts); this root
+// follows it (globals.css), and the toggle writes the pick on it once it is made.
 import type { ReactNode } from "react";
 
 import { sans, serif } from "@/features/site/fonts";
-import { THEME_SCRIPT } from "@/features/site/theme";
 
 export default function SiteRoot({ children }: { children: ReactNode }) {
   return (
-    // data-theme is written by the script below before React loads: not a mismatch to report
+    // data-theme is written by the toggle once the page runs: not a mismatch to report
     <div data-site suppressHydrationWarning className={`${sans.variable} ${serif.variable} bg-surface font-reading text-ink`}>
-      <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       {children}
     </div>
   );

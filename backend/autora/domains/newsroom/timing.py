@@ -51,3 +51,57 @@ def vague_time_problems(versions: Iterable[Any]) -> list[str]:
                     f"placed later; {HOW}"
                 )
     return issues
+
+
+# --- a date without its year (D-138) ------------------------------------------------------------
+
+HAS_YEAR = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+ZH_MONTH = re.compile(r"(?<![\d年])(\d{1,2})\s*月(?:\s*(\d{1,2})\s*日)?")
+EN_MONTH = re.compile(
+    r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December"
+    r"|Jan\.|Feb\.|Mar\.|Apr\.|Jun\.|Jul\.|Aug\.|Sept?\.|Oct\.|Nov\.|Dec\.)(?:\s+\d{1,2}\b)?"
+)
+
+YEARLESS_HOW = (
+    "write its year — 2026年7月8日, July 8, 2026 — or, for a list, the year once in the "
+    "same sentence (2026年7月8日、24日及27日; July 8, 24 and 27, 2026)"
+)
+
+
+def _yearless(text: str) -> str | None:
+    """The first month or date a sentence names with no year anywhere in that sentence."""
+    for sentence in _sentences(text):
+        if HAS_YEAR.search(sentence):
+            continue
+        match = ZH_MONTH.search(sentence) or EN_MONTH.search(sentence)
+        if match:
+            return match.group(0).strip()
+    return None
+
+
+def _sentences(text: str) -> list[str]:
+    # Chinese ends a sentence with 。！？；; English with a full stop not inside a number
+    parts = re.split(r"(?<=[。！？；!?;])|(?<=[a-z\)\]\"”’]\.)\s+", text)
+    return [p for p in parts if p and p.strip()]
+
+
+def yearless_date_problems(versions: Iterable[Any]) -> list[str]:
+    """Every place a draft's own words name a month or a date without its year (D-138).
+
+    The most frequent thing an editor still sent back after D-083: 「7月8日」 or "July 8" with no
+    year, placeable today and not in a few months. A sentence that gives the year once covers the
+    other dates in it; a quote block says what was said; a title and summary sit next to the
+    article's date.
+    """
+    issues: list[str] = []
+    for version in versions:
+        # the body only: a title and summary are shown with the article's own date beside them
+        for index, block in enumerate(version.blocks, 1):
+            if block.type == "quote":
+                continue
+            if found := _yearless(block.text):
+                issues.append(
+                    f"{version.lang} block {index} ({block.type}): {found!r} has no year; "
+                    f"{YEARLESS_HOW}"
+                )
+    return issues

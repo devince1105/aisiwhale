@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from autora.domains.newsroom.articles import Block, LanguageVersion
-from autora.domains.newsroom.timing import vague_time_problems
+from autora.domains.newsroom.timing import vague_time_problems, yearless_date_problems
 
 CLAIM = uuid.uuid4()
 
@@ -51,3 +51,28 @@ def test_the_title_and_summary_too_in_either_language():
 
 def test_a_word_that_only_contains_one_is_not_refused():
     assert vague_time_problems([_version("en", "Todays", ("paragraph", "Todayville."))]) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["帳戶在7月8日交易。", "微軟7月發表的模型。", "It traded on July 8.",
+     "The Drift hack in April.", "The filing, released Sept. 22, showed trades."],
+)  # fmt: skip
+def test_a_date_without_its_year_is_refused(text):
+    [issue] = yearless_date_problems([_version("zh-TW", "標題", ("paragraph", text))])
+    assert "block 1 (paragraph)" in issue and "has no year" in issue
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["外資2026年9月24日賣超台股338億元。", "帳戶在2026年7月8日、7月24日及7月27日交易。",
+     "It traded on July 8, 24 and 27, 2026.", "過去3個月股價上漲。", "Prices may rise.",
+     "Shares rose 3.5%. The fund held 2.1 million.", "2026Q2的13F申報。"],
+)  # fmt: skip
+def test_a_year_in_the_sentence_or_no_date_passes(text):
+    assert yearless_date_problems([_version("zh-TW", "標題", ("paragraph", text))]) == []
+
+
+def test_a_quote_and_the_title_are_left_alone():
+    placed = _version("en", "Sept. 24: foreign selling", ("quote", "“In April we sold.”"))
+    assert yearless_date_problems([placed]) == []

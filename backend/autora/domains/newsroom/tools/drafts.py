@@ -42,7 +42,7 @@ from autora.domains.newsroom.models import (
 )
 from autora.domains.newsroom.policy import language_policy
 from autora.domains.newsroom.sources import SECTION, SECTIONS
-from autora.domains.newsroom.timing import vague_time_problems
+from autora.domains.newsroom.timing import vague_time_problems, yearless_date_problems
 from autora.infra.ids import uuid7
 from autora.runtime.events.catalog import ProducedRef
 from autora.runtime.events.outbox import emit
@@ -167,6 +167,8 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
         issues += advice_problems(args.versions, {row.id: row.claim_type for row in rows})
     # a period a reader can place (D-083): the editor's most frequent reason to send a draft back
     issues += vague_time_problems(args.versions)
+    # a month or a date without its year (D-138): what the editor still sent back most after D-083
+    issues += yearless_date_problems(args.versions)
     # English left in the Chinese, and languages that disagree on a year or a percentage (D-130):
     # the editor's next most frequent reasons, caught here for the price of a tool error
     issues += untranslated_problems(args.versions)

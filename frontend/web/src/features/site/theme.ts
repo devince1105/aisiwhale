@@ -4,9 +4,15 @@ export type Theme = "light" | "dark";
 
 export const THEME_KEY = "aisiwhale.theme";
 
-/** Run inline as the site root's first child, before anything is painted: the reader's pick is
- * on the page from the first frame, so a dark-mode reader never sees a white flash. */
-export const THEME_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");if(t==="light"||t==="dark")document.currentScript.parentElement.setAttribute("data-theme",t)}catch(e){}`;
+/** The attribute the page-load script sets on <html>, for the site's root to follow until the
+ * reader's own pick is on the root itself (globals.css). */
+export const HTML_THEME_ATTR = "data-site-theme";
+
+/** Run in <head> before anything is painted (next/script, beforeInteractive, in the root layout):
+ * the reader's pick is on the page from the first frame, so a dark-mode reader never sees a
+ * white flash. It marks <html>, not the site's root, which does not exist yet at that point — and
+ * a <script> rendered inside a React component would not run when React renders it again. */
+export const THEME_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");if(t==="light"||t==="dark")document.documentElement.setAttribute("${HTML_THEME_ATTR}",t)}catch(e){}`;
 
 /** The reader's saved pick, if any. */
 export function savedTheme(store: Pick<Storage, "getItem"> | null): Theme | null {
@@ -27,6 +33,7 @@ export function currentTheme(root: HTMLElement | null, prefersDark: boolean): Th
 
 export function applyTheme(root: HTMLElement | null, theme: Theme, store: Pick<Storage, "setItem"> | null) {
   root?.setAttribute("data-theme", theme);
+  root?.ownerDocument?.documentElement.setAttribute(HTML_THEME_ATTR, theme);
   try {
     store?.setItem(THEME_KEY, theme);
   } catch {

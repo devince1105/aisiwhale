@@ -222,14 +222,13 @@ describe("light and dark", () => {
     expect(root.getAttribute("data-theme")).toBe("dark");
   });
 
-  it("the page-load script applies the saved pick to the site, and survives no storage", () => {
-    const site = document.createElement("div");
-    const run = (storage: unknown) =>
-      new Function("localStorage", "document", THEME_SCRIPT)(storage, { currentScript: { parentElement: site } });
+  it("the page-load script puts the saved pick on <html> for the site, and survives no storage", () => {
+    const html = document.createElement("html");
+    const run = (storage: unknown) => new Function("localStorage", "document", THEME_SCRIPT)(storage, { documentElement: html });
     run({ getItem: () => "sepia" });
-    expect(site.hasAttribute("data-theme")).toBe(false);
+    expect(html.hasAttribute("data-site-theme")).toBe(false);
     run({ getItem: () => "dark" });
-    expect(site.getAttribute("data-theme")).toBe("dark");
+    expect(html.getAttribute("data-site-theme")).toBe("dark");
     expect(() => run(undefined)).not.toThrow();
   });
 

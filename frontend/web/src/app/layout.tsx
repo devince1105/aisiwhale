@@ -1,4 +1,7 @@
+import Script from "next/script";
 import type { ReactNode } from "react";
+
+import { THEME_SCRIPT } from "@/features/site/theme";
 
 import "./globals.css";
 import { Providers } from "./providers";
@@ -16,6 +19,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="zh-TW" suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
+        {/* the public site's saved light or dark, before the first paint (D-047) */}
+        <Script id="site-theme" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </body>
     </html>
   );
