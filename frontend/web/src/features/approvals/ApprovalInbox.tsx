@@ -122,7 +122,7 @@ function Card({
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                maxLength={2000}
+                maxLength={8000}
                 rows={2}
                 className="rounded-lg border border-line bg-canvas px-3 py-2"
               />

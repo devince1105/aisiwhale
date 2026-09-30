@@ -226,8 +226,8 @@ async def post_republish(
 
 
 class ReviseBody(BaseModel):
-    reason: str = Field(min_length=1, max_length=2000)
-    """What to change: the writer works from it."""
+    reason: str = Field(min_length=1, max_length=8000)
+    """What to change: the writer works from it (up to 8,000 characters, D-139)."""
 
 
 class RevisionStarted(BaseModel):

@@ -2178,7 +2178,7 @@
      "reason": {
       "anyOf": [
        {
-        "maxLength": 2000,
+        "maxLength": 8000,
         "type": "string"
        },
        {
@@ -5306,7 +5306,7 @@
    "ReviseBody": {
     "properties": {
      "reason": {
-      "maxLength": 2000,
+      "maxLength": 8000,
       "minLength": 1,
       "title": "Reason",
       "type": "string"

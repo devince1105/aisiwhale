@@ -96,3 +96,20 @@ async def test_errors(api, waiting):
         headers={"Authorization": ""},
     )
     assert unauthorised.status_code == 401
+
+
+async def test_a_reason_can_run_to_eight_thousand_characters(api, db_session, waiting):
+    """D-139: an operator's note to the writer can be long; all of it is kept, none cut."""
+    too_long = await api.post(
+        f"/api/approvals/{waiting['approval'].id}/decide",
+        json={"decision": "reject", "reason": "改" * 8001},
+    )
+    assert too_long.status_code == 422
+    note = "第3段：" + "改" * 7996
+    assert len(note) == 8000
+    response = await api.post(
+        f"/api/approvals/{waiting['approval'].id}/decide",
+        json={"decision": "reject", "reason": note},
+    )
+    assert response.status_code == 200
+    assert response.json()["reason"] == note

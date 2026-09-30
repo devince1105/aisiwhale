@@ -38,7 +38,8 @@ class ApprovalOut(BaseModel):
 class DecisionIn(BaseModel):
     decision: Literal["approve", "reject", "revise"]
     """``revise``: send it back with changes asked for (D-044); needs a ``reason``."""
-    reason: str | None = Field(default=None, max_length=2000)
+    reason: str | None = Field(default=None, max_length=8000)
+    """Up to 8,000 characters (D-139): what to change, all of it passed to the writer."""
 
 
 @router.get("")
