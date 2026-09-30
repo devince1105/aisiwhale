@@ -460,8 +460,6 @@ export const LABELS: Label[] = [
   { text: "機房", sub: "SERVER ROOM", at: [SERVER_ROOM.doorX, 2.36, SERVER_ROOM.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
   // at the lounge's sofas, on the side toward the room (D-133): it was left of them, by the counter
   { text: "等候區", sub: "LOUNGE", at: [9.9, 0, 3.65], width: FLOOR_LABEL_WIDTH, kind: "floor" },
-  // the way out, and to the building's restrooms beyond it (D-136)
-  { text: "洗手間・外出", sub: "WC · EXIT →", at: [10.3, 0, 2.4], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   { text: "茶水間", sub: "PANTRY", at: [9.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
