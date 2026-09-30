@@ -25,6 +25,7 @@ import { approvalLampSpot, lampSpot, MONITOR, screenSpots } from "../scene/furni
 import { allSeats, type Seat } from "../scene/layout";
 import { useTagsShown } from "../tags";
 import { useCues } from "../visual/CueRunner";
+import { LIFE_ICON } from "../visual/life";
 import { useVisualTracker } from "../visual/tracker";
 import { membersInRoom } from "./Agents";
 import { applyTag, lampColors, screenColor } from "./indicators";
@@ -152,10 +153,16 @@ export function DeskStatus() {
 
 function HeadTag({ member, seat }: { member: Member; seat: Seat }) {
   const tracker = useVisualTracker();
+  const cues = useCues();
   const badge = useRef<HTMLSpanElement>(null);
+  const doing = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLSpanElement>(null);
   const seen = useRef<{ version: number; el: HTMLElement | null }>({ version: -1, el: null });
   useFrame(() => {
+    // an idle moment's icon (D-136): what she is up to, beside a tag that still says 閒置
+    const target = cues?.queue.walk(member.id)?.cue.target;
+    const icon = target && "life" in target ? LIFE_ICON[target.life] : "";
+    if (doing.current && doing.current.textContent !== icon) doing.current.textContent = icon;
     const el = badge.current;
     // write when the state moved, or when <Html> rebuilt its DOM (a fresh, empty tag)
     if (!el || (tracker.version === seen.current.version && el === seen.current.el)) return;
@@ -168,6 +175,7 @@ function HeadTag({ member, seat }: { member: Member; seat: Seat }) {
         <span className="flex items-center gap-1 rounded-full bg-surface/90 py-0.5 pr-1 pl-2 text-xs font-medium whitespace-nowrap text-ink shadow">
           <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: ROLE_COLOR[member.role] ?? ROLE_COLOR.spare }} />
           {member.name}
+          <span ref={doing} aria-hidden />
           <span ref={badge} className="hidden" />
         </span>
         <span ref={bubble} hidden className="max-w-40 truncate rounded-md bg-surface/80 px-1.5 text-[11px] text-muted italic shadow-sm" />

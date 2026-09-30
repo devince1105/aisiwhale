@@ -5,13 +5,16 @@
 import { useFrame } from "@react-three/fiber";
 import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from "react";
 
-import { realtimeStore, serverNow, type RealtimeStoreState } from "@/stores/realtime";
+import { effectiveState, realtimeStore, serverNow, type RealtimeStoreState } from "@/stores/realtime";
 
 import type { Roster } from "../agents/roster";
 import { useRoster } from "../agents/roster";
-import { APPROVAL_DESK, doorOf, seatsForRole, walkPath, type Seat, type Vec2 } from "../scene/layout";
+import { APPROVAL_DESK, doorOf, pantrySpot, seatsForRole, serverSpot, walkPath, type Seat, type Vec2 } from "../scene/layout";
 import type { WalkCue } from "./cues";
 import { cuesFor, CueQueue } from "./director";
+import { LifeDirector } from "./life";
+import { ROLE_LABEL } from "./mapping";
+import { officeLog } from "./officeLog";
 
 /** Walking speed (m/s) and how long the courier stays at the other desk. */
 export const WALK_SPEED = 1.4;
@@ -51,13 +54,37 @@ export class CueDirector {
     const now = serverNow(state);
     for (const event of company.recentEvents) {
       if (event.seq === null || event.seq <= this.lastSeq) continue;
-      this.queue.apply(cuesFor(event, company.agents, now), this.clock());
+      const cues = cuesFor(event, company.agents, now);
+      this.queue.apply(cues, this.clock());
+      logWork(event, cues, company.agents);
     }
     this.lastSeq = company.lastSeq;
   }
 
   dispose(): void {
     this.unsubscribe();
+  }
+}
+
+/** The work, told short for the office log (D-136): a run started or finished, work carried. */
+function logWork(
+  event: { event_type: string; occurred_at: string; agent_id: string | null; payload: unknown },
+  cues: readonly { kind: string }[],
+  agents: Record<string, { display_name: string }>,
+): void {
+  const agentId = event.agent_id;
+  if (!agentId || !agents[agentId]) return;
+  const p = (event.payload ?? {}) as Record<string, unknown>;
+  const at = Date.parse(event.occurred_at);
+  const add = (text: string) => officeLog.getState().add({ at, agentId, text, kind: "work" });
+  if (event.event_type === "AGENT_RUN_STARTED") add(`開始工作${typeof p.task_name === "string" ? `：${p.task_name}` : ""}`);
+  if (event.event_type === "AGENT_RUN_COMPLETED") add("完成工作");
+  for (const cue of cues) {
+    if (cue.kind !== "walk") continue;
+    const target = (cue as WalkCue).target;
+    if ("place" in target) add("把稿子送到接待櫃檯，等您核准");
+    else if ("role" in target) add(`把工作交給${ROLE_LABEL[target.role] ?? target.role}`);
+    else if ("door" in target) add("把工作送到隔壁部門");
   }
 }
 
@@ -69,12 +96,43 @@ export interface Route {
   /** What the courier faces while handing over (the colleague's chair, the approval desk). */
   lookAt: Vec2;
   returnAfter: boolean;
+  /** How long it stays at the far end (D-136: a coffee lasts longer than a hand-over). */
+  dwellMs: number;
+  /** Whether a document is carried there (work) or nothing (an idle moment). */
+  carrying: boolean;
+}
+
+/** Where an idle moment goes (D-136), and what it faces there. */
+function lifeRoute(cue: WalkCue, from: Seat, roster: Pick<Roster, "members" | "seats">): { path: Vec2[]; lookAt: Vec2 } | null {
+  if (!("life" in cue.target)) return null;
+  const { life, peer, slot } = cue.target;
+  if (life === "stretch") {
+    // up behind the chair, a step back, and sit again
+    const back = from.turn ? -1 : 1;
+    return { path: [from.chair, [from.chair[0], from.chair[1] + back * 0.6]], lookAt: from.desk };
+  }
+  if (life === "chat") {
+    const seat = peer ? roster.seats.get(peer) : undefined;
+    if (!seat || seat.key === from.key) return null;
+    return { path: walkPath(from, seat), lookAt: seat.chair };
+  }
+  const place = life === "coffee" ? pantrySpot(slot) : serverSpot();
+  return { path: walkPath(from, place.target), lookAt: place.lookAt };
 }
 
 /** Where a walk goes and how long it takes (there and back, with the hand-over). */
 export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">): Route | null {
   const from = roster.seats.get(cue.agentId);
   if (!from) return null;
+  const dwellMs = cue.dwellMs ?? HANDOVER_MS;
+  const carrying = cue.carry === "document";
+  if ("life" in cue.target) {
+    const life = lifeRoute(cue, from, roster);
+    if (!life) return null;
+    const length = pathLength(life.path);
+    const walking = (length / WALK_SPEED) * 1000 * (cue.returnAfter ? 2 : 1);
+    return { path: life.path, length, durationMs: Math.round(walking + dwellMs), lookAt: life.lookAt, returnAfter: cue.returnAfter, dwellMs, carrying };
+  }
   let to: Seat | "approval" | { door: string };
   if ("place" in cue.target) to = "approval";
   else if ("door" in cue.target) to = { door: cue.target.door };
@@ -86,8 +144,7 @@ export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">
     to = seat;
   }
   const path = walkPath(from, to);
-  let length = 0;
-  for (let i = 1; i < path.length; i++) length += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  const length = pathLength(path);
   const walking = (length / WALK_SPEED) * 1000 * (cue.returnAfter ? 2 : 1);
   const lookAt =
     to === "approval"
@@ -95,7 +152,13 @@ export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">
       : "door" in to
         ? doorOf(to.door).point // it hands the work over at the room's door and comes back
         : to.chair;
-  return { path, length, durationMs: Math.round(walking + HANDOVER_MS), lookAt, returnAfter: cue.returnAfter };
+  return { path, length, durationMs: Math.round(walking + dwellMs), lookAt, returnAfter: cue.returnAfter, dwellMs, carrying };
+}
+
+function pathLength(path: readonly Vec2[]): number {
+  let length = 0;
+  for (let i = 1; i < path.length; i++) length += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+  return length;
 }
 
 const CueContext = createContext<CueDirector | null>(null);
@@ -107,13 +170,42 @@ declare global {
   }
 }
 
+/** How often the idle moments are looked at (ms). */
+const LIFE_EVERY = 2000;
+
 function Runner({ director }: { director: CueDirector }) {
   const roster = useRoster();
   const latest = useRef(roster);
   latest.current = roster;
   const probe = useRef("");
+  const life = useMemo(() => new LifeDirector(), []);
+  const lastLife = useRef(0);
   useFrame(() => {
-    director.queue.step(performance.now(), (cue) => routeFor(cue, latest.current)?.durationMs ?? null);
+    const now = performance.now();
+    if (now - lastLife.current >= LIFE_EVERY) {
+      lastLife.current = now;
+      // idle moments (D-136): only the idle get up, a couple at a time
+      const state = realtimeStore.getState();
+      const agents = state.company?.agents ?? {};
+      const at = serverNow(state);
+      const members = latest.current.members.filter((m) => latest.current.seats.has(m.id));
+      const walkingNow = (id: string) => Boolean(director.queue.walk(id)) || director.queue.queued(id).length > 0;
+      const away = members.filter((m) => {
+        const target = director.queue.walk(m.id)?.cue.target;
+        return target && "life" in target && target.life !== "stretch";
+      }).length;
+      const { cues, events } = life.tick(now, members, {
+        idle: (id) => {
+          const activity = agents[id]?.activity;
+          return !activity || effectiveState(activity, at) === "IDLE";
+        },
+        walking: walkingNow,
+        away,
+      });
+      if (cues.length) director.queue.apply(cues, now);
+      for (const e of events) officeLog.getState().add({ at: Date.now(), agentId: e.agentId, text: e.text, kind: "life" });
+    }
+    director.queue.step(now, (cue) => routeFor(cue, latest.current)?.durationMs ?? null);
     const walking = latest.current.members.filter((m) => director.queue.walk(m.id)).map((m) => m.id);
     const key = walking.join(",");
     if (key !== probe.current && typeof window !== "undefined") {

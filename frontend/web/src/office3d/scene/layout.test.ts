@@ -14,6 +14,8 @@ import {
   ENTRANCE,
   LABELS,
   obstacles,
+  pantrySpot,
+  serverSpot,
   ROLES,
   ROOM,
   seatsForRole,
@@ -161,6 +163,24 @@ describe("courier paths", () => {
     }
     expect([...new Set(problems)].slice(0, 10)).toEqual([]);
     expect(checked).toBe(seats.length * seats.length);
+  });
+
+  it("to the pantry's counter and the server room's aisle (D-136): through their doors, around everything", () => {
+    const problems: string[] = [];
+    const places = [0, 1, 2].map((slot) => ({ name: `pantry ${slot}`, ...pantrySpot(slot) }));
+    places.push({ name: "server room", ...serverSpot() });
+    for (const from of seats) {
+      for (const place of places) {
+        for (const { point, segment } of samples(walkPath(from, place.target))) {
+          if (!inRoom(point)) problems.push(`${from.key} -> ${place.name} leaves the room at ${point}`);
+          for (const rect of rects) {
+            if (segment === 0 && rect.name === `chair ${from.key}`) continue;
+            if (inside(point, rect, WALKER)) problems.push(`${from.key} -> ${place.name} hits ${rect.name} at ${point}`);
+          }
+        }
+      }
+    }
+    expect([...new Set(problems)].slice(0, 10)).toEqual([]);
   });
 
   it("starts at the chair, ends next to the target, and only turns at right angles", () => {

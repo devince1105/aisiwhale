@@ -37,6 +37,8 @@ describe("courier timeline", () => {
     durationMs: Math.round((6 / WALK_SPEED) * 2000 + HANDOVER_MS),
     lookAt: [5, 3],
     returnAfter: true,
+    dwellMs: HANDOVER_MS,
+    carrying: true,
   };
   const oneWay = (6 / WALK_SPEED) * 1000;
 

@@ -1,7 +1,7 @@
 // Where a courier is at a moment of its walk (T-408): out along the route carrying the document,
 // a pause at the other desk to hand it over (facing the colleague), and back empty-handed. Pure;
 // the route and its timing come from routeFor (T-407), so the queue and the walk agree.
-import { HANDOVER_MS, WALK_SPEED, type Route } from "../visual/CueRunner";
+import { WALK_SPEED, type Route } from "../visual/CueRunner";
 import type { Vec2 } from "../scene/layout";
 
 export type CourierPhase = "going" | "handover" | "returning" | "done";
@@ -35,17 +35,18 @@ export function along(path: readonly Vec2[], distance: number): { position: Vec2
 export function courierState(route: Route, elapsedMs: number): CourierState {
   const oneWayMs = (route.length / WALK_SPEED) * 1000;
   const end = route.path[route.path.length - 1];
+  const dwell = route.dwellMs;
   if (elapsedMs < oneWayMs) {
     const { position, heading } = along(route.path, (elapsedMs / 1000) * WALK_SPEED);
-    return { phase: "going", position, heading, carrying: true };
+    return { phase: "going", position, heading, carrying: route.carrying };
   }
-  if (elapsedMs < oneWayMs + HANDOVER_MS) {
-    return { phase: "handover", position: end, heading: headingOf(end, route.lookAt), carrying: elapsedMs < oneWayMs + HANDOVER_MS / 2 };
+  if (elapsedMs < oneWayMs + dwell) {
+    return { phase: "handover", position: end, heading: headingOf(end, route.lookAt), carrying: route.carrying && elapsedMs < oneWayMs + dwell / 2 };
   }
   // the walk ends when the queue ends it (route.durationMs), so both agree to the millisecond
   if (route.returnAfter && elapsedMs < route.durationMs) {
     const back = [...route.path].reverse();
-    const { position, heading } = along(back, ((elapsedMs - oneWayMs - HANDOVER_MS) / 1000) * WALK_SPEED);
+    const { position, heading } = along(back, ((elapsedMs - oneWayMs - dwell) / 1000) * WALK_SPEED);
     return { phase: "returning", position, heading, carrying: false };
   }
   return { phase: "done", position: route.returnAfter ? route.path[0] : end, heading: 0, carrying: false };

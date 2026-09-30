@@ -12,6 +12,7 @@ import { chooseMode, detectCapabilities, type Capabilities, type ModeReason, typ
 import { useRoster } from "./agents/roster";
 import { onOfficeKey } from "./interaction/picking";
 import { THEMES } from "./palette";
+import { OfficeLog } from "./OfficeLog";
 import { OfficeSettings } from "./OfficeSettings";
 import { terminalVars } from "./fallback/console";
 import { useOfficeTheme } from "./theme";
@@ -177,6 +178,8 @@ export function OfficeCanvas({
         onContextRestored={() => setLostAt(null)}
       />
       <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
+      {/* who did what, work and idle moments told apart (D-136) */}
+      {empty ? null : <OfficeLog />}
       {empty ? (
         <div
           role="status"

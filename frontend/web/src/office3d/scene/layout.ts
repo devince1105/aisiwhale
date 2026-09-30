@@ -472,7 +472,9 @@ export const DOORS = [
 
 // --- walking ----------------------------------------------------------------------------------
 
-export type WalkTarget = Seat | "approval" | { door: string };
+/** Where a walk ends: a seat, the approval desk, a department's door, or a spot somewhere in the
+ * office (D-136: the pantry, the server room), reached from ``lane`` through ``via`` in order. */
+export type WalkTarget = Seat | "approval" | { door: string } | { spot: Vec2; lane: Lane; via: Vec2[] };
 
 /**
  * Where a department is entered from the corridor: the middle of its edge, on the lane that
@@ -502,6 +504,7 @@ export function doorOf(zone: string): { point: Vec2; lane: Lane } {
 
 function approachOf(target: WalkTarget): { point: Vec2; lane: Lane } {
   if (target === "approval") return { point: APPROVAL_DESK.approach, lane: "front" };
+  if ("spot" in target) return { point: target.spot, lane: target.lane };
   if ("door" in target) return doorOf(target.door);
   return { point: target.approach, lane: target.lane };
 }
@@ -516,7 +519,12 @@ export function walkPath(from: Seat, to: WalkTarget): Vec2[] {
   // a seat in the room with a door is left and reached through it (D-119: the CEO's desk is by
   // her window, not in line with her door); a front-row seat by the aisle (D-133)
   const outOf = accessPath(from, start.point);
-  const into = typeof to === "object" && "key" in to ? accessPath(to, end.point) : null;
+  const into =
+    typeof to === "object" && "key" in to
+      ? accessPath(to, end.point)
+      : typeof to === "object" && "spot" in to
+        ? [...to.via].reverse() // reversed again below: lane → via → spot
+        : null;
   const points: Vec2[] = [from.chair, start.point, ...outOf, [(outOf.at(-1) ?? start.point)[0], LANES[start.lane]]];
   if (start.lane !== end.lane) points.push([SPINE_X, LANES[start.lane]], [SPINE_X, LANES[end.lane]]);
   const entry = into ? [...into].reverse() : [];
@@ -552,6 +560,28 @@ function doorway(approach: Vec2): Vec2[] {
     [CEO_OFFICE.doorX, inside],
     [CEO_OFFICE.doorX, BACK_ROOMS_Z + 0.5],
   ];
+}
+
+// --- the office's own places, for its people's idle moments (D-136) --------------------------
+
+/** At the pantry counter, where the coffee is: up the back walkway to its door, in, and to the
+ * counter; ``slot`` spreads two or three people along it. Faces the counter. */
+export function pantrySpot(slot = 0): { target: WalkTarget; lookAt: Vec2 } {
+  const x = PANTRY.doorX + ((slot % 3) - 1) * 0.55;
+  const counterZ = -6.8;
+  return {
+    target: { spot: [x, counterZ], lane: "back", via: [[PANTRY.doorX, BACK_ROOMS_Z - 0.5], [PANTRY.doorX, counterZ]] },
+    lookAt: [x, -7.65],
+  };
+}
+
+/** In the server room's aisle, between the two rows of racks, by its back door. */
+export function serverSpot(): { target: WalkTarget; lookAt: Vec2 } {
+  const x = SERVER_ROOM.doorX;
+  return {
+    target: { spot: [x, -0.3], lane: "back", via: [[x, SERVER_ROOM.minZ - 0.4], [x, SERVER_ROOM.minZ + 0.3]] },
+    lookAt: [SERVER_RACKS.rows[0].x, -0.3],
+  };
 }
 
 /** Axis-aligned footprints of everything a walker must go around (x/z rectangles). */

@@ -11,7 +11,14 @@
  * by whichever colleague is free — walking to a particular desk would draw a hand-over to
  * somebody who may never touch it.
  */
-export type WalkTarget = { role: string } | { place: "approval" } | { door: string };
+export type WalkTarget = { role: string } | { place: "approval" } | { door: string } | { life: LifeKind; peer?: string; slot?: number };
+
+/**
+ * An idle moment (D-136): what somebody with no work does between tasks — a coffee in the pantry,
+ * a word at a colleague's desk, a stretch behind the chair, IT's look at the server room. Never
+ * while working: a run starting takes them straight back (``abort_walks``).
+ */
+export type LifeKind = "coffee" | "chat" | "stretch" | "server";
 
 export type VisualCue =
   | {
@@ -20,7 +27,9 @@ export type VisualCue =
       target: WalkTarget;
       carry: "document" | "none";
       returnAfter: boolean;
-      /** The event that caused it (for dedupe and debugging). */
+      /** How long it stays at the other end (a hand-over's pause when not given). */
+      dwellMs?: number;
+      /** The event that caused it (for dedupe and debugging); 0 for an idle moment. */
       seq: number;
     }
   | { kind: "flash"; agentId: string; color: "red"; durationMs: number; seq: number }
@@ -34,5 +43,6 @@ export type EffectCue = Extract<VisualCue, { kind: "flash" | "screen_alert" }>;
 export const sameTarget = (a: WalkTarget, b: WalkTarget): boolean => {
   if ("role" in a) return "role" in b && a.role === b.role;
   if ("door" in a) return "door" in b && a.door === b.door;
+  if ("life" in a) return "life" in b && a.life === b.life && a.peer === b.peer;
   return "place" in b && a.place === b.place;
 };
