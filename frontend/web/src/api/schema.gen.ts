@@ -174,6 +174,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/articles/{article_id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Cover
+         * @description Take the cover off: the article shows none and marketing picks no other. 換一張 puts
+         *     one back.
+         */
+        delete: operations["delete_cover_api_articles__article_id__cover_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/articles/{article_id}/cover/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Swap Cover
+         * @description Show the next photo marketing's search found instead (no model call). On a published
+         *     article the site changes with it.
+         */
+        post: operations["swap_cover_api_articles__article_id__cover_swap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/articles/{article_id}/republish": {
         parameters: {
             query?: never;
@@ -1624,6 +1666,7 @@ export interface components {
              * Format: uuid
              */
             company_id: string;
+            cover?: components["schemas"]["CoverView"] | null;
             /** Distributions */
             distributions: components["schemas"]["DistributionView"][];
             /** Fact Checks */
@@ -2071,6 +2114,36 @@ export interface components {
             strong_sell: number;
             /** Total */
             readonly total: number;
+        };
+        /**
+         * CoverView
+         * @description The article's cover (D-142), as marketing chose it or a person swapped it.
+         */
+        CoverView: {
+            /** Alt */
+            alt: {
+                [key: string]: string;
+            };
+            /** Bytes */
+            bytes: number;
+            /** Credit */
+            credit: string;
+            /** Height */
+            height: number;
+            /** Library */
+            library: string;
+            /** Others */
+            others: number;
+            /** Page Url */
+            page_url: string;
+            /** Query */
+            query: string;
+            /** State */
+            state: string;
+            /** Url */
+            url: string;
+            /** Width */
+            width: number;
         };
         /** CycleDetail */
         CycleDetail: {
@@ -2897,6 +2970,7 @@ export interface components {
             company_id: string;
             /** Company Slug */
             company_slug: string;
+            cover?: components["schemas"]["PublicCover"] | null;
             /** Lang */
             lang: string;
             /** Langs */
@@ -2947,6 +3021,7 @@ export interface components {
              * Format: uuid
              */
             article_id: string;
+            cover?: components["schemas"]["PublicCover"] | null;
             /** Lang */
             lang: string;
             /** Path */
@@ -2996,6 +3071,26 @@ export interface components {
             text: string;
             /** Type */
             type: string;
+        };
+        /**
+         * PublicCover
+         * @description The article's cover photo (D-142): 1200x630 WebP, and whose it is.
+         */
+        PublicCover: {
+            /** Alt */
+            alt: string;
+            /** Credit */
+            credit: string;
+            /** Height */
+            height: number;
+            /** Library */
+            library: string;
+            /** Page Url */
+            page_url: string;
+            /** Url */
+            url: string;
+            /** Width */
+            width: number;
         };
         /** PublicDay */
         PublicDay: {
@@ -4400,6 +4495,72 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_cover_api_articles__article_id__cover_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    swap_cover_api_articles__article_id__cover_swap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverView"];
                 };
             };
             /** @description Validation Error */

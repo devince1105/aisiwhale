@@ -35,7 +35,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import (
@@ -66,6 +66,9 @@ FailedHook = Callable[[AsyncSession, Task], Awaitable[None]]
 """Called inside ``fail``/``abort``/``cancel`` after the task reached a terminal failure."""
 LinksHook = Callable[[AsyncSession, Task, AgentRun | None], Awaitable[list[dict[str, str]]]]
 """A domain's ``activity_links(task, run)``: ``[{"label": ..., "href": ...}]``."""
+
+
+_RUN_LOCK_NAMESPACE = 0x57_46_52  # int4 namespace distinct from the event and cost locks
 
 
 class TaskManagerError(Exception):
@@ -649,6 +652,23 @@ class TaskManager:
         )
 
     async def _locked_task(self, session: AsyncSession, claim: Claim) -> Task:
+        # A task of a workflow run finishes with every task of its run locked, all at once and
+        # before anything else (D-142). Finishing locks the siblings (the workflow engine unlocks
+        # what waited); done later, after this transaction has taken the company's event lock,
+        # it would wait for a sibling being claimed — whose claim waits for that event lock —
+        # or for a sibling finishing beside it (the cover beside the draft), and Postgres would
+        # abort one. The advisory lock makes two finishes of one run take turns.
+        if claim.task.workflow_run_id is not None:
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(:ns, hashtext(:run))"),
+                {"ns": _RUN_LOCK_NAMESPACE, "run": str(claim.task.workflow_run_id)},
+            )
+            await session.execute(
+                select(Task.id)
+                .where(Task.workflow_run_id == claim.task.workflow_run_id)
+                .order_by(Task.created_at, Task.id)
+                .with_for_update()
+            )
         task = await session.scalar(select(Task).where(Task.id == claim.task.id).with_for_update())
         if task is None or task.state != TaskState.RUNNING or task.lease_token != claim.token:
             raise LeaseLost(f"claim on task {claim.task.id} is no longer valid")

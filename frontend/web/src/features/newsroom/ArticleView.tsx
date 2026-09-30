@@ -4,7 +4,7 @@
 // links land here (?version=N, #fact-check, #distribution).
 import type { EventEnvelope } from "@autora/event-schema";
 import Link from "next/link";
-import { Fragment, useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 
 import { ARTICLE_STATE, claimNumbers, formatTime, label, orderedClaims, problems, type ArticleDetail } from "./model";
 import { Badge, ClaimList, Empty, EventList, NewsroomHeader, Section } from "./parts";
@@ -96,12 +96,15 @@ export function ArticleView({
   onLang,
   events,
   onSite,
+  cover,
 }: {
   article: ArticleDetail;
   lang: string;
   onLang: (lang: string) => void;
   events: readonly EventEnvelope[];
   onSite?: OnSite;
+  /** The cover and what a person can do with it (D-142: ``CoverPanel``). */
+  cover?: ReactNode;
 }) {
   const [state, tone] = label(ARTICLE_STATE, article.state);
   const primary = article.primary_lang;
@@ -133,6 +136,11 @@ export function ArticleView({
       </NewsroomHeader>
 
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
+      {cover ? (
+        <section aria-label="首圖" className="mb-6 rounded-lg border border-line p-4">
+          {cover}
+        </section>
+      ) : null}
 
       <nav aria-label="版本" className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">版本</span>

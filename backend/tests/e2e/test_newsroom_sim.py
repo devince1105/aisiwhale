@@ -185,7 +185,8 @@ async def test_the_demo_newsroom_publishes_a_story_from_its_feeds(committed, e2e
             assert verdict.passed, (claim.text, verdict.problems)
     # every agent ran, only the simulated model answered, every tool call finished
     assert {r.state for r in runs} == {"COMPLETED"}
-    assert len(runs) == 8  # research, analysis, 2 drafts, 2 reviews, final review, distribute
+    # research, analysis, 2 drafts, 2 reviews, final review, cover (D-142), distribute
+    assert len(runs) == 9
     assert model_providers == {"fake"}
     called = {e.payload["tool_call_id"] for e in tool_events if e.event_type == "TOOL_CALLED"}
     finished = {e.payload["tool_call_id"] for e in tool_events if e.event_type != "TOOL_CALLED"}

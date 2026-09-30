@@ -23,6 +23,7 @@ from autora.domains.newsroom.models import (
     ClaimEvidence,
     Distribution,
     Story,
+    StoryCover,
 )
 from autora.domains.newsroom.policy import AUTO_APPROVE_KEY
 from autora.domains.newsroom.workflow import TEMPLATE_NAME, start_story
@@ -101,6 +102,10 @@ class Newsroom:
         async with self.committed() as session:
             return await session.get(model, key)
 
+    async def get_where(self, model, *where):
+        async with self.committed() as session:
+            return await session.scalar(select(model).where(*where))
+
     async def article(self) -> Article:
         async with self.committed() as session:
             return await session.scalar(select(Article).where(Article.story_id == self.story.id))
@@ -138,10 +143,14 @@ async def test_a_story_goes_to_a_person_then_is_published_and_distributed(commit
     await room.worker.run_until_idle()
 
     tasks = await room.tasks()
-    for name in ("research", "analysis", "draft", "review", "chief_review"):
+    for name in ("research", "analysis", "draft", "review", "chief_review", "cover"):
         assert tasks[name][0].state == "SUCCEEDED", name
     assert tasks["approve"][0].state == "WAITING_APPROVAL"
     assert tasks["approve"][0].required_role == "human"
+    # marketing found the cover beside the draft, before the approval (D-142)
+    cover = await room.get_where(StoryCover, StoryCover.story_id == room.story.id)
+    assert cover is not None and (cover.width, cover.height) == (1200, 630)
+    assert tasks["cover"][0].output["photo_id"] == cover.provider_id
     assert tasks["publish"][0].state == tasks["distribute"][0].state == "PENDING"
     assert tasks["draft"][0].display_name == "撰稿：Lumen City microgrid"
     approval = await room.approval()
@@ -251,7 +260,8 @@ async def test_a_revision_round_then_approval(committed, e2e_settings):
     assert redraft.depends_on == [tasks["analysis"][0].id]
     # the final review waits for the second round, and approval for the final review
     assert tasks["chief_review"][0].depends_on == [second.id]
-    assert tasks["approve"][0].depends_on == [tasks["chief_review"][0].id]
+    # the approval waits for the chief and for the cover, found beside the draft (D-142)
+    assert tasks["approve"][0].depends_on == [tasks["chief_review"][0].id, tasks["cover"][0].id]
     assert tasks["approve"][0].state == "WAITING_APPROVAL"
     article = await room.article()
     assert article.revision_count == 1 and article.state == "IN_REVIEW"
@@ -545,7 +555,8 @@ async def test_the_chief_sends_it_back_and_it_comes_back_through_the_editor(
     assert redraft.input["params"]["issues"] == tasks["chief_review"][0].output["issues"]
     assert redraft.display_name.endswith("（總編退回第 2 輪）")
     assert tasks["approve"][0].state == "WAITING_APPROVAL"
-    assert tasks["approve"][0].depends_on == [tasks["chief_review"][1].id]
+    assert tasks["approve"][0].depends_on == [tasks["chief_review"][1].id, tasks["cover"][0].id]
+    assert len(tasks["cover"]) == 1  # a send-back does not look for another cover (D-142)
     article = await room.article()
     assert article.state == "IN_REVIEW" and article.revision_count == 1
     [asked] = await room.events("ARTICLE_REVISION_REQUESTED")

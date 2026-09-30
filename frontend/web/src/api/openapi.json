@@ -567,6 +567,16 @@
       "title": "Company Id",
       "type": "string"
      },
+     "cover": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CoverView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "distributions": {
       "items": {
        "$ref": "#/components/schemas/DistributionView"
@@ -1700,6 +1710,73 @@
      "total"
     ],
     "title": "Counts",
+    "type": "object"
+   },
+   "CoverView": {
+    "description": "The article's cover (D-142), as marketing chose it or a person swapped it.",
+    "properties": {
+     "alt": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Alt",
+      "type": "object"
+     },
+     "bytes": {
+      "title": "Bytes",
+      "type": "integer"
+     },
+     "credit": {
+      "title": "Credit",
+      "type": "string"
+     },
+     "height": {
+      "title": "Height",
+      "type": "integer"
+     },
+     "library": {
+      "title": "Library",
+      "type": "string"
+     },
+     "others": {
+      "title": "Others",
+      "type": "integer"
+     },
+     "page_url": {
+      "title": "Page Url",
+      "type": "string"
+     },
+     "query": {
+      "title": "Query",
+      "type": "string"
+     },
+     "state": {
+      "title": "State",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     },
+     "width": {
+      "title": "Width",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "state",
+     "url",
+     "width",
+     "height",
+     "bytes",
+     "alt",
+     "credit",
+     "library",
+     "page_url",
+     "query",
+     "others"
+    ],
+    "title": "CoverView",
     "type": "object"
    },
    "CycleDetail": {
@@ -3793,6 +3870,16 @@
       "title": "Company Slug",
       "type": "string"
      },
+     "cover": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PublicCover"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "lang": {
       "title": "Lang",
       "type": "string"
@@ -3926,6 +4013,16 @@
       "title": "Article Id",
       "type": "string"
      },
+     "cover": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PublicCover"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "lang": {
       "title": "Lang",
       "type": "string"
@@ -4057,6 +4154,50 @@
      "text"
     ],
     "title": "PublicBlock",
+    "type": "object"
+   },
+   "PublicCover": {
+    "description": "The article's cover photo (D-142): 1200x630 WebP, and whose it is.",
+    "properties": {
+     "alt": {
+      "title": "Alt",
+      "type": "string"
+     },
+     "credit": {
+      "title": "Credit",
+      "type": "string"
+     },
+     "height": {
+      "title": "Height",
+      "type": "integer"
+     },
+     "library": {
+      "title": "Library",
+      "type": "string"
+     },
+     "page_url": {
+      "title": "Page Url",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     },
+     "width": {
+      "title": "Width",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "url",
+     "width",
+     "height",
+     "alt",
+     "credit",
+     "library",
+     "page_url"
+    ],
+    "title": "PublicCover",
     "type": "object"
    },
    "PublicDay": {
@@ -7464,6 +7605,136 @@
      }
     ],
     "summary": "Set Article Access",
+    "tags": [
+     "newsroom"
+    ]
+   }
+  },
+  "/api/articles/{article_id}/cover": {
+   "delete": {
+    "description": "Take the cover off: the article shows none and marketing picks no other. 換一張 puts\none back.",
+    "operationId": "delete_cover_api_articles__article_id__cover_delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverView"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Delete Cover",
+    "tags": [
+     "newsroom"
+    ]
+   }
+  },
+  "/api/articles/{article_id}/cover/swap": {
+   "post": {
+    "description": "Show the next photo marketing's search found instead (no model call). On a published\narticle the site changes with it.",
+    "operationId": "swap_cover_api_articles__article_id__cover_swap_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverView"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Swap Cover",
     "tags": [
      "newsroom"
     ]

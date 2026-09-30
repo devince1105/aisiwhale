@@ -37,6 +37,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Company
+from autora.domains.newsroom.covers import cover_of
 from autora.domains.newsroom.figures import figures_named
 from autora.domains.newsroom.holdings import stocks_named
 from autora.domains.newsroom.models import (
@@ -46,9 +47,11 @@ from autora.domains.newsroom.models import (
     ArticleAccess,
     ArticleVersion,
     ClaimEvidence,
+    CoverState,
     Evidence,
     Source,
     SourceItem,
+    StoryCover,
     StoryItem,
     SupportType,
 )
@@ -88,6 +91,45 @@ class PublicNamedStock(BaseModel):
     name: str
 
 
+class PublicCover(BaseModel):
+    """The article's cover photo (D-142): 1200x630 WebP, and whose it is."""
+
+    url: str
+    width: int
+    height: int
+    alt: str
+    credit: str
+    """The photographer, as the library names them."""
+    library: str
+    page_url: str
+    """The photo's page at the library: the credit links there."""
+
+
+LIBRARY_NAME = {"pixabay": "Pixabay", "pexels": "Pexels"}
+
+
+def public_cover(row: StoryCover | None, lang: str) -> PublicCover | None:
+    if row is None or row.state != CoverState.ACTIVE:
+        return None
+    alt = row.alt.get(lang) or row.alt.get("en") or ""
+    return PublicCover(
+        url=row.url,
+        width=row.width,
+        height=row.height,
+        alt=str(alt),
+        credit=row.credit,
+        library=LIBRARY_NAME.get(row.provider, row.provider),
+        page_url=row.page_url,
+    )
+
+
+async def _covers(session: AsyncSession, story_ids: list[uuid.UUID]) -> dict[uuid.UUID, StoryCover]:
+    if not story_ids:
+        return {}
+    rows = await session.scalars(select(StoryCover).where(StoryCover.story_id.in_(story_ids)))
+    return {row.story_id: row for row in rows}
+
+
 class PublicArticleSummary(BaseModel):
     article_id: uuid.UUID
     lang: str
@@ -102,6 +144,7 @@ class PublicArticleSummary(BaseModel):
     """``free`` or ``members`` (D-025). On a list, this is what draws the badge."""
     section: str | None = None
     """One of ``SECTIONS`` (D-047), or None when none of its story's sources names one."""
+    cover: PublicCover | None = None
     stocks: list[PublicNamedStock] = []
     """What it names that has a chart, for quick links to it on the watchlist page: a 台股 or
     美股 story's stocks (D-077, D-078), a crypto, gold, futures or FX story's figures (D-079)."""
@@ -132,7 +175,10 @@ class PublicArticle(PublicArticleSummary):
 
 
 def _summary(
-    article: Article, version: ArticleVersion, section: str | None
+    article: Article,
+    version: ArticleVersion,
+    section: str | None,
+    cover: StoryCover | None = None,
 ) -> PublicArticleSummary:
     assert article.published_at is not None
     return PublicArticleSummary(
@@ -146,8 +192,17 @@ def _summary(
         published_at=article.published_at,
         revised_at=article.revised_at,
         section=section,
+        cover=public_cover(cover, version.lang),
         stocks=_named(version, section),
     )
+
+
+async def _summaries(session: AsyncSession, rows) -> list[PublicArticleSummary]:
+    covers = await _covers(session, [article.story_id for article, _, _ in rows])
+    return [
+        _summary(article, version, named, covers.get(article.story_id))
+        for article, version, named in rows
+    ]
 
 
 STOCK_SECTIONS = ("tw", "us", "ai")
@@ -253,7 +308,9 @@ async def published_article(
     body = preview(version.body) if locked else version.body
     newer, older = await _neighbours(session, lang, article)
     return PublicArticle(
-        **_summary(article, version, section).model_dump(),
+        **_summary(
+            article, version, section, await cover_of(session, article.story_id)
+        ).model_dump(),
         locked=locked,
         blocks=[PublicBlock(type=b["type"], text=b["text"]) for b in body],
         sources=[] if locked else list(sources.values()),
@@ -307,7 +364,7 @@ async def published_articles(
     )
     query = query.limit(min(max(limit, 1), MAX_LIST)).offset(max(offset, 0))
     rows = (await session.execute(query)).all()
-    return [_summary(article, version, named) for article, version, named in rows]
+    return await _summaries(session, rows)
 
 
 async def count_published_articles(
@@ -385,7 +442,7 @@ async def popular_articles(
         .limit(min(max(limit, 1), 10))
     )
     rows = (await session.execute(query)).all()
-    return [_summary(article, version, named) for article, version, named in rows]
+    return await _summaries(session, rows)
 
 
 class PublicDay(BaseModel):
@@ -440,7 +497,7 @@ async def published_articles_mentioning(
         .offset(max(offset, 0))
     )
     rows = (await session.execute(query)).all()
-    return [_summary(article, version, named) for article, version, named in rows]
+    return await _summaries(session, rows)
 
 
 async def count_articles_mentioning(

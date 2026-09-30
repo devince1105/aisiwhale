@@ -555,6 +555,50 @@ class Distribution(IdMixin, CreatedAtMixin, Base):
     run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agent_runs.id"))
 
 
+class CoverState(StrEnum):
+    ACTIVE = "active"
+    REMOVED = "removed"
+    """A person took it off: the article shows none, and marketing does not pick another."""
+
+
+class StoryCover(IdMixin, TimestampMixin, Base):
+    """An article's cover image (D-142): a photo from a free library, cut to 1200x630 WebP and
+    kept in the company's own storage. Chosen by marketing while the article is drafted, so it
+    is keyed by the story (the article may not exist yet); one per story, swapped in place.
+    ``candidates`` are the other photos marketing found, for a person to swap to without asking
+    the model again."""
+
+    __tablename__ = "story_covers"
+    __table_args__ = (
+        check_in("state", CoverState),
+        UniqueConstraint("story_id", name="uq_story_covers_story"),
+    )
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id"))
+    story_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("stories.id"))
+    state: Mapped[str] = mapped_column(server_default=CoverState.ACTIVE.value)
+    provider: Mapped[str]
+    """pixabay (pexels when its keys are issued again)."""
+    provider_id: Mapped[str]
+    page_url: Mapped[str]
+    """The photo's page at the library: the credit links there."""
+    credit: Mapped[str]
+    """Who took it, as the library names them."""
+    key: Mapped[str]
+    """Where the WebP is kept (the R2 object key, or the blob store's)."""
+    url: Mapped[str]
+    width: Mapped[int]
+    height: Mapped[int]
+    bytes: Mapped[int]
+    alt: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
+    """Per language: what the picture shows, for readers who cannot see it."""
+    photo: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
+    """The library's record of the photo shown (``covers.Photo``), to swap back to it."""
+    query: Mapped[str]
+    candidates: Mapped[list[Any]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("agent_runs.id"))
+
+
 class AnalyticsEventType(StrEnum):
     VIEW = "view"
     """The article's page was opened."""

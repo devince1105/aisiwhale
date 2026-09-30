@@ -245,6 +245,16 @@ export async function unpublishArticle(articleId: string, reason: string, api: A
   );
 }
 
+/** Show the next photo from marketing's search as the article's cover (D-142). */
+export async function swapCover(articleId: string, api: ApiClient = defaultApi) {
+  return unwrap(await api.POST("/api/articles/{article_id}/cover/swap", { params: { path: { article_id: articleId } } }));
+}
+
+/** Take the article's cover off (D-142); swapping puts one back. */
+export async function removeCover(articleId: string, api: ApiClient = defaultApi) {
+  return unwrap(await api.DELETE("/api/articles/{article_id}/cover", { params: { path: { article_id: articleId } } }));
+}
+
 /** Change a published article (D-045): the site keeps the published version until the new one. */
 export async function reviseArticle(articleId: string, reason: string, api: ApiClient = defaultApi) {
   return unwrap(

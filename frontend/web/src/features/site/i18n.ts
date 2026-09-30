@@ -19,6 +19,7 @@ const WORDS = {
     sources: "資料來源",
     published: "發布於",
     revised: "更新於",
+    photo: "圖片",
     allStories: "所有報導",
     all: "全部",
     sections: {
@@ -350,6 +351,7 @@ const WORDS = {
     sources: "Sources",
     published: "Published",
     revised: "Updated",
+    photo: "Photo",
     allStories: "All stories",
     all: "All",
     sections: {

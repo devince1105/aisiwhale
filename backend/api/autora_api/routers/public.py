@@ -85,6 +85,7 @@ from autora.domains.newsroom.site import (
     published_days,
     record_beacon,
 )
+from autora.infra.blobstore import BlobNotFound, InvalidBlobKey, LocalFSBlobStore
 from autora.infra.settings import get_settings
 from autora_api.deps import Session
 
@@ -98,6 +99,22 @@ Section = Literal[
 SessionCookie = Annotated[str | None, Cookie(alias=SESSION_COOKIE)]
 
 Lang = Annotated[str, Field(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)]
+
+
+@router.get("/api/public/covers/{story_id}/{name}", include_in_schema=False)
+async def get_cover(story_id: uuid.UUID, name: str) -> Response:
+    """A cover kept in the blob store (D-142: dev, without R2). With R2 the site loads covers
+    from the bucket's public address and this is never asked."""
+    if not name.endswith(".webp"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such cover")
+    blobs = LocalFSBlobStore(get_settings().blob_store_dir)
+    try:
+        data = await blobs.get(f"covers/{story_id}/{name}")
+    except (BlobNotFound, InvalidBlobKey):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such cover") from None
+    return Response(
+        data, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 
 @router.get("/api/public/articles")

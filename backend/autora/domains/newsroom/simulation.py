@@ -536,6 +536,54 @@ def _distribute(request: ModelRequest) -> FakeTurn:
     )
 
 
+def _cover(request: ModelRequest) -> FakeTurn:
+    """Search once with the story's first words, take the first photo (D-142)."""
+    first = _first_text(request)
+    story_id = _field(first, "Story id")
+    already = re.search(r"already has a cover \(photo ([^,]+),", first)
+    if already or "took this story's cover off" in first:
+        photo = already.group(1) if already else None
+        return FakeTurn(structured={"story_id": story_id, "photo_id": photo, "reason": "as it was"})
+    calls = _calls(request)
+    chosen = [out for name, _, r in calls if name == "set_cover" and (out := _output(r))]
+    if chosen:
+        return FakeTurn(
+            structured={
+                "story_id": story_id,
+                "photo_id": chosen[-1]["photo_id"],
+                "reason": "the first photo that shows the subject",
+            }
+        )
+    found = [out for name, _, r in calls if name == "search_images" and (out := _output(r))]
+    if not found:
+        words = re.findall(r"[A-Za-z]+", _field(first, "Story") or "") or ["finance"]
+        query = " ".join(words[:3]) if len(" ".join(words[:3])) >= 2 else "finance news"
+        return FakeTurn(
+            text="Looking for a cover photo.",
+            tool_uses=[FakeToolUse(name="search_images", input={"query": query})],
+        )
+    result = found[-1]
+    if not result["photos"]:
+        return FakeTurn(
+            structured={"story_id": story_id, "photo_id": None, "reason": "nothing found"}
+        )
+    return FakeTurn(
+        text="Taking the first one.",
+        tool_uses=[
+            FakeToolUse(
+                name="set_cover",
+                input={
+                    "story_id": story_id,
+                    "query": result["query"],
+                    "photo_id": result["photos"][0]["photo_id"],
+                    "alt_zh": "與報導主題相關的示意照片",
+                    "alt_en": "A photo illustrating the story's subject",
+                },
+            )
+        ],
+    )
+
+
 def _editorial_plan(request: ModelRequest) -> FakeTurn:
     """The simulated desk head: commission the best candidates, then say so.
 
@@ -642,4 +690,5 @@ _HANDLERS = {
     ("editor", "review"): _review,
     ("editor_in_chief", "chief_review"): _chief_review,
     ("marketing", "distribute"): _distribute,
+    ("marketing", "cover"): _cover,
 }

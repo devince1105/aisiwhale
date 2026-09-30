@@ -155,6 +155,42 @@ def build_page_fetcher(settings: Settings | None) -> PageFetcher:
     return FixtureFetcher(root, json.loads((root / "routes.json").read_text("utf-8")))
 
 
+def build_image_library(settings: Settings | None):
+    """Cover photos (D-142): Pixabay when ``TOOLS_PROFILE=live`` and it has a key; the drawn
+    fixtures otherwise; none when live without a key (articles then have no cover)."""
+    from autora.domains.newsroom.covers import FixtureLibrary, Pixabay
+
+    if settings is None or settings.tools_profile != "live":
+        return FixtureLibrary()
+    if settings.pixabay_api_key is None:
+        return None
+    return Pixabay(settings.pixabay_api_key.get_secret_value())
+
+
+def build_cover_store(settings: Settings | None, blobs: BlobStore):
+    """Where covers are kept: R2 when all its settings are there, else the blob store (dev)."""
+    from autora.domains.newsroom.covers import BlobCoverStore, R2Store
+
+    if settings is not None and settings.tools_profile == "live":
+        r2 = (
+            settings.r2_account_id,
+            settings.r2_access_key_id,
+            settings.r2_secret_access_key,
+            settings.r2_bucket,
+            settings.r2_public_base_url,
+        )
+        if all(r2):
+            assert settings.r2_access_key_id and settings.r2_secret_access_key
+            return R2Store(
+                account_id=str(settings.r2_account_id),
+                access_key_id=settings.r2_access_key_id.get_secret_value(),
+                secret_access_key=settings.r2_secret_access_key.get_secret_value(),
+                bucket=str(settings.r2_bucket),
+                public_base_url=str(settings.r2_public_base_url),
+            )
+    return BlobCoverStore(blobs)
+
+
 def build_scheduler(
     settings: Settings | None,
     session_factory: async_sessionmaker[AsyncSession],
@@ -305,6 +341,8 @@ def build_tools(
         embedder=build_embedder(settings),
         policy=policy,
         workflows=workflows,
+        images=build_image_library(settings),
+        cover_store=build_cover_store(settings, blobs),
     )
     return tools
 

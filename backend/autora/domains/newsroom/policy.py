@@ -117,6 +117,8 @@ ACTIONS = {
     "approve_article": "write",
     "publish_article": "write",
     "create_distribution": "write",
+    "search_images": "read",
+    "set_cover": "write",
     "spend_ad_budget": "write",
     "commission_story": "write",
 }
@@ -147,6 +149,8 @@ RULES: list[Rule] = [
         "marketing",
         limit=Limit(_article_published, over="deny", description="published articles only"),
     ),
+    *allow("search_images", "marketing"),
+    *allow("set_cover", "marketing"),  # D-142: the article's cover, before it is approved
     *allow(
         "spend_ad_budget",
         "marketing",

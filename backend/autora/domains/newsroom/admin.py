@@ -20,6 +20,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import AgentRun, Task, WorkflowRun
+from autora.domains.newsroom.covers import cover_of
 from autora.domains.newsroom.models import (
     AnalyticsDaily,
     Article,
@@ -32,9 +33,11 @@ from autora.domains.newsroom.models import (
     Source,
     SourceItem,
     Story,
+    StoryCover,
     StoryItem,
 )
 from autora.domains.newsroom.publisher import article_path
+from autora.domains.newsroom.site import LIBRARY_NAME
 
 CONTEXT = 80
 """Characters of evidence text shown before and after a quote."""
@@ -179,6 +182,24 @@ class DailyView(BaseModel):
     read_complete: int
 
 
+class CoverView(BaseModel):
+    """The article's cover (D-142), as marketing chose it or a person swapped it."""
+
+    state: str
+    """active | removed (a person took it off)."""
+    url: str
+    width: int
+    height: int
+    bytes: int
+    alt: dict[str, str]
+    credit: str
+    library: str
+    page_url: str
+    query: str
+    others: int
+    """How many other photos from the same search a person can swap to."""
+
+
 class ArticleDetail(ArticleSummary):
     story_title: str
     company_id: uuid.UUID
@@ -194,6 +215,25 @@ class ArticleDetail(ArticleSummary):
     distributions: list[DistributionView]
     analytics: list[DailyView]
     workflow_run_ids: list[uuid.UUID]
+    cover: CoverView | None = None
+
+
+def cover_view(row: StoryCover | None) -> CoverView | None:
+    if row is None:
+        return None
+    return CoverView(
+        state=row.state,
+        url=row.url,
+        width=row.width,
+        height=row.height,
+        bytes=row.bytes,
+        alt={k: str(v) for k, v in row.alt.items()},
+        credit=row.credit,
+        library=LIBRARY_NAME.get(row.provider, row.provider),
+        page_url=row.page_url,
+        query=row.query,
+        others=len(row.candidates),
+    )
 
 
 class SourceView(BaseModel):
@@ -518,6 +558,7 @@ async def article_detail(
     ).all()
     current = groups.get(article.current_draft_group_id) if article.current_draft_group_id else None
     return ArticleDetail(
+        cover=cover_view(await cover_of(session, article.story_id)),
         id=article.id,
         story_id=article.story_id,
         title=article.title,

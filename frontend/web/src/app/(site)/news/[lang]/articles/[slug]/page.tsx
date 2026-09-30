@@ -5,6 +5,7 @@ import { cache } from "react";
 
 import { fetchArticle } from "@/features/site/api";
 import { ArticleView } from "@/features/site/ArticleView";
+import { coverSrc } from "@/features/site/Cover";
 import { isLang, words } from "@/features/site/i18n";
 import { Sidebar } from "@/features/site/Sidebar";
 import { loadSidebar } from "@/features/site/sidebarData";
@@ -33,6 +34,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title: `${article.title} · ${words(lang).site}`,
     description: article.summary ?? undefined,
     alternates: { canonical: article.path, languages: article.langs },
+    // what Facebook, LINE and X show when the article is shared: its cover, 1200x630 (D-142)
+    openGraph: {
+      type: "article",
+      title: article.title,
+      description: article.summary ?? undefined,
+      publishedTime: article.published_at,
+      images: article.cover
+        ? [{ url: coverSrc(article.cover.url), width: article.cover.width, height: article.cover.height, alt: article.cover.alt }]
+        : undefined,
+    },
+    twitter: article.cover ? { card: "summary_large_image", images: [coverSrc(article.cover.url)] } : undefined,
   };
 }
 

@@ -127,8 +127,16 @@ TEMPLATE = WorkflowTemplate(
         NodeSpec("review", "審稿：{title}", "editor", depends_on=("draft",)),
         # the editor-in-chief's final review, before a person approves (D-110)
         NodeSpec("chief_review", "總編終審：{title}", "editor_in_chief", depends_on=("review",)),
+        # marketing finds the cover alongside the draft, so the approval shows it; outside every
+        # loop (nothing between draft and approve depends on it), so a send-back does not
+        # search again (D-142)
+        NodeSpec("cover", "找首圖：{title}", "marketing", depends_on=("analysis",)),
         NodeSpec(
-            "approve", "核准：{title}", "human", depends_on=("chief_review",), service=APPROVE
+            "approve",
+            "核准：{title}",
+            "human",
+            depends_on=("chief_review", "cover"),
+            service=APPROVE,
         ),
         NodeSpec("publish", "發布：{title}", "system", depends_on=("approve",), service=PUBLISH),
         NodeSpec("distribute", "推廣：{title}", "marketing", depends_on=("publish",)),

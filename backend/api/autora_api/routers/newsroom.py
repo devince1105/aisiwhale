@@ -10,6 +10,8 @@
 - POST /api/articles/{id}/unpublish               take a published article off the site (D-044)
 - POST /api/articles/{id}/republish               put it back
 - POST /api/articles/{id}/revise                  change a published article (D-045)
+- POST /api/articles/{id}/cover/swap              the next photo from the same search (D-142)
+- DELETE /api/articles/{id}/cover                 take the cover off
 - GET  /api/companies/{id}/sources                sources with how many items each brought
 - POST /api/companies/{id}/sources                add a source (starts the newsroom schedules)
 """
@@ -18,17 +20,25 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from autora.app import build_embedder
+from autora.app import build_cover_store, build_embedder, build_image_library
 from autora.company.workflows import StartWorkflowError, WorkflowNotAllowed
 from autora.db.models import Company, Project, ProjectState, WorkflowRun
-from autora.domains.newsroom import admin
-from autora.domains.newsroom.models import Article, ArticleAccess, SourceKind, Story, StoryState
+from autora.domains.newsroom import admin, covers
+from autora.domains.newsroom.models import (
+    Article,
+    ArticleAccess,
+    SourceKind,
+    Story,
+    StoryCover,
+    StoryState,
+)
 from autora.domains.newsroom.publisher import (
     NotAllowed,
     PublishError,
@@ -37,7 +47,10 @@ from autora.domains.newsroom.publisher import (
 )
 from autora.domains.newsroom.sources import SourceConfigError, add_source
 from autora.domains.newsroom.stories import StoryDesk, StoryError
+from autora.domains.newsroom.tools import covers as covers_tool
 from autora.domains.newsroom.workflow import start_article_revision, start_story
+from autora.infra.blobstore import LocalFSBlobStore
+from autora.infra.settings import get_settings
 from autora.runtime.fsm import IllegalTransition
 from autora_api.deps import Operator, RuntimeDep, Session
 
@@ -159,6 +172,53 @@ async def get_article(
     if article is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"article {article_id} not found")
     return article
+
+
+@lru_cache(maxsize=1)
+def cover_tools() -> tuple[covers.ImageLibrary | None, covers.CoverStore]:
+    """The library and the store the cover tools use (D-142), for a person's swap."""
+    settings = get_settings()
+    return build_image_library(settings), build_cover_store(
+        settings, LocalFSBlobStore(settings.blob_store_dir)
+    )
+
+
+async def _cover_of_article(session: Session, article_id: uuid.UUID) -> StoryCover:
+    article = await _article_of(session, article_id)
+    row = await covers.cover_of(session, article.story_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "this article has no cover")
+    return row
+
+
+@router.post("/api/articles/{article_id}/cover/swap")
+async def swap_cover(article_id: uuid.UUID, session: Session, _: Operator) -> admin.CoverView:
+    """Show the next photo marketing's search found instead (no model call). On a published
+    article the site changes with it."""
+    row = await _cover_of_article(session, article_id)
+    library, store = cover_tools()
+    if library is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, covers_tool.NO_LIBRARY)
+    try:
+        await covers.swap_cover(session, row, library=library, store=store)
+    except covers.CoverError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await session.commit()
+    view = admin.cover_view(row)
+    assert view is not None
+    return view
+
+
+@router.delete("/api/articles/{article_id}/cover")
+async def delete_cover(article_id: uuid.UUID, session: Session, _: Operator) -> admin.CoverView:
+    """Take the cover off: the article shows none and marketing picks no other. 換一張 puts
+    one back."""
+    row = await _cover_of_article(session, article_id)
+    await covers.remove_cover(session, row, store=cover_tools()[1])
+    await session.commit()
+    view = admin.cover_view(row)
+    assert view is not None
+    return view
 
 
 class ArticleAccessBody(BaseModel):

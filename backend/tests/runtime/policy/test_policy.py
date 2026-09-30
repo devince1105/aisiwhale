@@ -46,6 +46,8 @@ MATRIX = {
     "approve_article":      (D, D, D, D, D, D, D, D, D, D),
     "publish_article":      (D, D, D, D, D, D, D, D, D, D),
     "create_distribution":  (D, D, D, D, A, D, D, D, D, D),
+    "search_images":        (D, D, D, D, A, D, D, D, D, D),  # the cover (D-142)
+    "set_cover":            (D, D, D, D, A, D, D, D, D, D),
     "spend_ad_budget":      (D, D, D, D, A, D, D, D, D, D),
     "create_cycle_goal":    (D, D, D, D, D, D, A, D, D, D),
     "instantiate_workflow": (D, D, D, D, D, A, A, D, D, D),

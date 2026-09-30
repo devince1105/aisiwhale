@@ -147,6 +147,19 @@ class Settings(BaseSettings):
     charts (D-074). Without it a Taiwan page has days, weeks and months only. Its terms for a
     public site to be checked before the site is public."""
 
+    # --- Articles' cover images (D-142) ---
+    pixabay_api_key: SecretStr | None = None
+    """Pixabay, free: the photo library marketing picks an article's cover from. The key goes in
+    the query string, so no request URL is ever logged. Without it articles have no cover."""
+    r2_account_id: str | None = None
+    """Cloudflare R2, where the covers are kept: the account id (the S3 endpoint's host)."""
+    r2_access_key_id: SecretStr | None = None
+    r2_secret_access_key: SecretStr | None = None
+    r2_bucket: str | None = None
+    r2_public_base_url: str | None = None
+    """The bucket's public address (a custom domain or its r2.dev one), without a trailing slash.
+    Without the R2 settings covers are kept in the blob store and served by the API (dev)."""
+
     # --- Blob storage (T-210) ---
     blob_store_dir: Path = Path(__file__).resolve().parents[3] / "data" / "blobs"
     """LocalFS blob root. Relative paths resolve against the current directory."""

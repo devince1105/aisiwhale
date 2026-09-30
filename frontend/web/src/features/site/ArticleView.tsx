@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { PublicArticle } from "./api";
 import { listHref } from "./ArticleList";
 import { Beacon } from "./Beacon";
+import { CoverFigure } from "./Cover";
 import { StocksNamed } from "./StocksNamed";
 import { filterName, formatDate, isLang, isSection, LANG_NAMES, revisedOn, tagsOf, topicOf, words, type Lang } from "./i18n";
 import { MembersOnly } from "./MembersOnly";
@@ -75,6 +76,7 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
           </p>
         ) : null}
       </header>
+      {article.cover ? <CoverFigure cover={article.cover} lang={lang} /> : null}
 
       {/* Chinese reads best with room between the lines, and is never set in italics */}
       <div className="space-y-6 text-[1.0625rem] leading-[1.9] sm:text-lg">
