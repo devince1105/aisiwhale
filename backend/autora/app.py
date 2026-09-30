@@ -167,6 +167,38 @@ def build_image_library(settings: Settings | None):
     return Pixabay(settings.pixabay_api_key.get_secret_value())
 
 
+def build_image_viewer(settings: Settings | None):
+    """The vision model that looks at cover candidates (D-144): the company's own model, when it
+    is reached through an OpenAI-compatible API (OpenAI, Gemini, NVIDIA) and live; the fixture
+    viewer in tests; none otherwise (marketing then reads only the library's tags)."""
+    from autora.domains.newsroom.covers import FixtureViewer, ImageViewer
+
+    if settings is None or settings.tools_profile != "live":
+        return FixtureViewer()
+    model = settings.frontier_model_id
+    endpoints = {
+        "openai": (settings.openai_base_url, settings.openai_api_key, "max_completion_tokens"),
+        "gemini": (settings.gemini_base_url, settings.gemini_api_key, "max_tokens"),
+        "nvidia": (settings.nvidia_base_url, settings.nvidia_api_key, "max_tokens"),
+    }
+    if settings.model_provider not in endpoints or not model:
+        return None
+    base_url, key, max_tokens_field = endpoints[settings.model_provider]
+    price = settings.model_prices.get(model) or {}
+    if key is None:
+        return None
+    effort = settings.openai_reasoning_effort if settings.model_provider == "openai" else ""
+    return ImageViewer(
+        base_url=base_url,
+        api_key=key.get_secret_value(),
+        model=model,
+        price_in=price.get("input", 0),
+        price_out=price.get("output", 0),
+        extra_body={"reasoning_effort": effort} if effort else None,
+        max_tokens_field=max_tokens_field,
+    )
+
+
 def build_cover_store(settings: Settings | None, blobs: BlobStore):
     """Where covers are kept: R2 when all its settings are there, else the blob store (dev)."""
     from autora.domains.newsroom.covers import BlobCoverStore, R2Store
@@ -344,6 +376,7 @@ def build_tools(
         workflows=workflows,
         images=build_image_library(settings),
         cover_store=build_cover_store(settings, blobs),
+        image_viewer=build_image_viewer(settings),
     )
     return tools
 

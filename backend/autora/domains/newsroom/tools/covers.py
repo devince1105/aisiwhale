@@ -39,17 +39,32 @@ class SetCoverArgs(BaseModel):
     alt_en: str = Field(min_length=2, max_length=160, description="What it shows, in English.")
 
 
-def search_images_tool(library: covers.ImageLibrary | None) -> ToolFn:
+LOOKED_AT = 8
+"""How many of a search's results the viewer looks at (D-144): the ones marketing reads first."""
+
+
+def search_images_tool(
+    library: covers.ImageLibrary | None, viewer: covers.ImageViewer | covers.FixtureViewer | None
+) -> ToolFn:
     async def search_images(args: SearchImagesArgs, ctx: ToolContext) -> ToolResult:
         if library is None:
             raise covers.CoverError(NO_LIBRARY)
-        photos = await library.search(args.query, limit=10)
+        photos = await library.search(args.query, limit=LOOKED_AT)
+        looks, cost = await viewer.look(library, photos) if viewer else ({}, None)
+        taken = await covers.used_elsewhere(ctx.session, ctx.company_id, None, photos)
+        listed = []
+        for photo in photos:
+            item = photo.for_model(looks.get(photo.id))
+            if photo.id in taken:
+                item["taken"] = "another article's cover already: do not choose it"
+            listed.append(item)
         return ToolResult(
+            cost_usd=cost,
             output={
                 "query": args.query,
-                "photos": [p.for_model() for p in photos],
-                "note": "You cannot see the images: 'shows' is the library's description, 'kind' "
-                "says photo or illustration. "
+                "photos": listed,
+                "note": "'looks' is what a viewer saw in each image (trust it over 'shows', the "
+                "library's tags); 'kind' says photo or illustration. "
                 "None suitable: try other words, or report no cover.",
             },
             summary=f"{len(photos)} photos for {args.query!r} ({library.name})",
@@ -65,7 +80,7 @@ def set_cover_tool(library: covers.ImageLibrary | None, store: covers.CoverStore
         story = await ctx.session.get(Story, args.story_id)
         if story is None or story.company_id != ctx.company_id:
             raise covers.CoverError(f"no story {args.story_id} in this company")
-        found = await library.search(args.query, limit=10)
+        found = await library.search(args.query, limit=LOOKED_AT)
         photo = next((p for p in found if p.id == args.photo_id), None)
         if photo is None:
             raise covers.CoverError(
@@ -101,18 +116,21 @@ def set_cover_tool(library: covers.ImageLibrary | None, store: covers.CoverStore
 
 
 def register(
-    registry: ToolRegistry, library: covers.ImageLibrary | None, store: covers.CoverStore
+    registry: ToolRegistry,
+    library: covers.ImageLibrary | None,
+    store: covers.CoverStore,
+    viewer: covers.ImageViewer | covers.FixtureViewer | None = None,
 ) -> None:
     registry.tool(
         "search_images",
         description=(
             "Search the free photo library for an article's cover. English keywords; returns "
-            "each photo's id and what it shows (you cannot see the photo itself)."
+            "each image's id, the library's tags, and what the image looks like."
         ),
         side_effect="read",
         timeout_s=25.0,
         retryable=True,
-    )(search_images_tool(library))
+    )(search_images_tool(library, viewer))
     registry.tool(
         "set_cover",
         description=(

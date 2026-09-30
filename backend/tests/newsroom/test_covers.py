@@ -2,7 +2,9 @@
 taken off by a person; Pixabay's key never shows in an error."""
 
 import io
+import json
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import httpx
 import pytest
@@ -203,6 +205,100 @@ async def test_a_cover_is_set_swapped_and_taken_off(db_session, tmp_path):
             store=store,
             run_id=None,
         )
+    # another story may not take the photo this one shows (D-144)
+    other = Story(company_id=company.id, title="More chips", state="SELECTED")
+    db_session.add(other)
+    await db_session.flush()
+    assert await covers.used_elsewhere(db_session, company.id, other.id, found) == set()
     # a person's 換一張 puts one back
     await covers.swap_cover(db_session, row, library=library, store=store)
     assert row.state == CoverState.ACTIVE
+
+
+async def test_the_viewer_says_what_each_image_looks_like_and_what_it_cost():
+    # D-144: marketing reads what an image looks like, not only the library's tags
+    seen = {}
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen["body"] = body
+        images = [c for c in body["messages"][1]["content"] if c["type"] == "image_url"]
+        assert len(images) == 2 and all(i["image_url"]["detail"] == "low" for i in images)
+        assert images[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "images": [
+                                        {
+                                            "photo_id": photos[0].id,
+                                            "looks": "flat cartoon people at desks",
+                                            "style": "cartoon",
+                                            "dated": False,
+                                            "text_or_logo": "none",
+                                            "quality": "ok",
+                                        }
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ],
+                "usage": {"prompt_tokens": 1000, "completion_tokens": 500},
+            },
+        )
+
+    library = covers.FixtureLibrary()
+    photos = await library.search("ai workflow")
+    viewer = covers.ImageViewer(
+        base_url="https://model.test/v1",
+        api_key="k",
+        model="m",
+        price_in=0.2,
+        price_out=1.2,
+        max_tokens_field="max_completion_tokens",
+        client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
+    )
+    looks, cost = await viewer.look(library, photos[:2])
+    assert looks == {
+        photos[0].id: {
+            "looks": "flat cartoon people at desks",
+            "style": "cartoon",
+            "dated": False,
+            "text_or_logo": "none",
+            "quality": "ok",
+        }
+    }
+    assert cost == Decimal("0.0008")  # 1000 x 0.2 + 500 x 1.2, per million
+    assert seen["body"]["max_completion_tokens"] == 2000
+    assert photos[0].for_model(looks[photos[0].id])["looks"]["style"] == "cartoon"
+    # what it saw is kept: asking again about the same image costs nothing
+    again, cost = await viewer.look(library, photos[:1])
+    assert again and cost == 0
+
+
+async def test_two_articles_do_not_share_a_cover(db_session, tmp_path):
+    company = await unique_company(db_session, "covers")
+    first, second = (Story(company_id=company.id, title=t, state="SELECTED") for t in ("A", "B"))
+    db_session.add_all([first, second])
+    await db_session.flush()
+    library, store = covers.FixtureLibrary(), covers.BlobCoverStore(LocalFSBlobStore(tmp_path))
+    found = await library.search("financial report")
+    common = dict(
+        company_id=company.id,
+        candidates=found,
+        alt={},
+        query="financial report",
+        library=library,
+        store=store,
+        run_id=None,
+    )
+    await covers.set_cover(db_session, story_id=first.id, photo=found[0], **common)
+    assert await covers.used_elsewhere(db_session, company.id, second.id, found) == {found[0].id}
+    with pytest.raises(covers.CoverError, match="another article"):
+        await covers.set_cover(db_session, story_id=second.id, photo=found[0], **common)
+    await covers.set_cover(db_session, story_id=second.id, photo=found[1], **common)
