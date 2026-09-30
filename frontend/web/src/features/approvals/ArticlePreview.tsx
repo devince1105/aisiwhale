@@ -219,7 +219,6 @@ export function ArticlePreview({
     } catch {
       setCopy("failed");
     }
-    setTimeout(() => setCopy("idle"), 1500);
   };
   const latest = useQuery({ ...articleQuery(articleId), enabled: open });
   const versions = latest.data?.versions ?? [];
@@ -242,6 +241,9 @@ export function ArticlePreview({
         <button
           type="button"
           onClick={onCopy}
+          // the mark stays until the pointer or focus moves on: no timer on the screen (AC-S6)
+          onMouseLeave={() => setCopy("idle")}
+          onBlur={() => setCopy("idle")}
           aria-label={COPY_LABEL[copy]}
           title={COPY_LABEL[copy]}
           className={`rounded p-1 hover:bg-canvas ${copy === "failed" ? "text-danger" : copy === "done" ? "text-ok" : "text-muted hover:text-ink"}`}
