@@ -25,7 +25,7 @@ class SearchImagesArgs(BaseModel):
         min_length=2,
         max_length=100,
         description="Two to four plain English words for what the photo should show, e.g. "
-        "'microchip circuit board' or 'stock market chart'.",
+        "'processor chip' or 'stock market chart'.",
     )
 
 
@@ -48,7 +48,8 @@ def search_images_tool(library: covers.ImageLibrary | None) -> ToolFn:
             output={
                 "query": args.query,
                 "photos": [p.for_model() for p in photos],
-                "note": "You cannot see the photos: 'shows' is the library's description. "
+                "note": "You cannot see the images: 'shows' is the library's description, 'kind' "
+                "says photo or illustration. "
                 "None suitable: try other words, or report no cover.",
             },
             summary=f"{len(photos)} photos for {args.query!r} ({library.name})",

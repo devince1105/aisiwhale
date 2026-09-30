@@ -67,18 +67,21 @@ class Photo:
     height: int
     tags: str
     credit: str
+    kind: str = "photo"
+    """photo | illustration (a 3D render or digital art: most modern technology images are)."""
 
     def as_json(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
     def from_json(cls, value: dict[str, Any]) -> Photo:
-        return cls(**{k: value[k] for k in cls.__dataclass_fields__})
+        return cls(**{k: value[k] for k in cls.__dataclass_fields__ if k in value})
 
     def for_model(self) -> dict[str, Any]:
         """What marketing reads: no URLs (it cannot see the photo; it reads what it shows)."""
         return {
             "photo_id": self.id,
+            "kind": self.kind,
             "shows": self.tags,
             "size": f"{self.width}x{self.height}",
             "by": self.credit,
@@ -124,7 +127,9 @@ class Pixabay:
                 "key": self._key,
                 "q": query,
                 "lang": "en",
-                "image_type": "photo",
+                # photos and illustrations (a modern chip is mostly a 3D render); vectors are
+                # icons and clip art, filtered out below
+                "image_type": "all",
                 "orientation": "horizontal",
                 "min_width": WIDTH,
                 "safesearch": "true",
@@ -143,9 +148,10 @@ class Pixabay:
                 height=int(hit.get("imageHeight") or 0),
                 tags=str(hit.get("tags") or ""),
                 credit=str(hit.get("user") or "Pixabay"),
+                kind="illustration" if hit.get("type") == "illustration" else "photo",
             )
             for hit in (response.json().get("hits") or [])
-            if hit.get("largeImageURL")
+            if hit.get("largeImageURL") and not str(hit.get("type") or "").startswith("vector")
         ]
         self._cache[query.lower()] = (time.monotonic(), photos)
         return photos[:limit]

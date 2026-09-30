@@ -94,6 +94,7 @@ async def test_pixabay_is_read_and_its_key_never_reaches_an_error():
     def answer(request: httpx.Request) -> httpx.Response:
         assert request.url.params["key"] == "SECRET-KEY"
         assert request.url.params["min_width"] == "1200"
+        assert request.url.params["image_type"] == "all"
         return httpx.Response(
             200,
             json={
@@ -106,7 +107,24 @@ async def test_pixabay_is_read_and_its_key_never_reaches_an_error():
                         "imageHeight": 3000,
                         "tags": "wafer, chip, semiconductor",
                         "user": "someone",
-                    }
+                    },
+                    {
+                        "id": 43,
+                        "type": "illustration",
+                        "pageURL": "https://pixabay.com/illustrations/cpu-43/",
+                        "largeImageURL": "https://pixabay.com/get/43_1280.jpg",
+                        "imageWidth": 3840,
+                        "imageHeight": 2160,
+                        "tags": "processor, cpu, chip, 3d",
+                        "user": "renderer",
+                    },
+                    {
+                        "id": 44,
+                        "type": "vector/svg",
+                        "largeImageURL": "https://pixabay.com/get/44_1280.png",
+                        "tags": "cpu, icon",
+                        "user": "iconist",
+                    },
                 ]
             },
         )
@@ -114,7 +132,13 @@ async def test_pixabay_is_read_and_its_key_never_reaches_an_error():
     library = covers.Pixabay(
         "SECRET-KEY", client=httpx.AsyncClient(transport=httpx.MockTransport(answer))
     )
-    [photo] = await library.search("semiconductor wafer")
+    # photos and illustrations; vector icons and clip art left out
+    photo, render = await library.search("semiconductor wafer")
+    assert (render.id, render.kind, render.for_model()["kind"]) == (
+        "43",
+        "illustration",
+        "illustration",
+    )
     assert (photo.id, photo.credit, photo.tags) == ("42", "someone", "wafer, chip, semiconductor")
     assert "url" not in str(photo.for_model()).lower()  # the model reads what it shows
 

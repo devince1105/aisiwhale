@@ -2248,6 +2248,15 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - `R2_PUBLIC_BASE_URL=https://img.aisiwhale.com`。實測：上傳 159,834 bytes → 從 img.aisiwhale.com 讀回 200、`image/webp`、`cache-control: public, max-age=31536000, immutable`、內容相同 → 刪除後 404。重啟 API 與 worker。
 - 本機 DNS 仍暫存著網域建立前的「查無此名」，本機一時解析不到 img.aisiwhale.com（公共 DNS 1.1.1.1、8.8.8.8 都正常）；只影響這台電腦、暫存到期後自然恢復，讀者不受影響。
 
+## D-143：首圖的風格與商標
+
+- 第一次實際跑首圖（台積電 A16，使用者同意花一次模型費用）：行銷搜「microchip circuit board」，選了一張插件式零件的老電路板照片，US$0.0015。使用者：「古老的電晶體，完全不適合」，附參考圖（深藍發光的處理器）。
+- 原因：只搜照片（`image_type=photo`），而現代晶片的圖幾乎都是 3D 插圖；提示裡的例字又正是「microchip circuit board」。
+- 修改：搜尋包含插圖、排除向量圖示；每張結果告訴行銷是照片還是插圖；提示加上「現代、乾淨」的風格要求與避開過時的圖；例字改為「processor chip」「ai chip」。商標：報導對象公司自己的商標可以（使用者的判斷：新聞報導），其他品牌與人物仍不行。
+- 先用 Pixabay 免費比對了 8 張候選（對照表），確認插圖裡有使用者要的感覺。
+- 重跑 A16：三次搜尋（AI processor chip、glowing processor chip、semiconductor wafer chip），選 9328763「發光處理器晶片」3D 插圖，94 KB，US$0.00155；舊圖已從 R2 刪除。
+- 測試：Pixabay 解析加上插圖與向量圖的案例。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
