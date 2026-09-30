@@ -19,7 +19,7 @@
 //   z=0  │ [ni][res][ana] ║ [flex][flex][flex] ┃[room 1][room 2][server]│
 //        │ ═══════════════ front corridor (lane z=2.4) ═══════════ │
 //        │                                  ┃             entrance ◁ (T-413)
-//   z=4.6│ [mkt][mkt][IT]  ║ [wri][edi][eic] ┃ [reception]  lounge  │
+//   z=4.6│ [IT][mkt][mkt]  ║ [wri][edi][eic] ┃ [reception]  lounge  │
 //        │  (║ the aisle through both rows; ┃ the glass wall, D-132, D-133)
 //
 // Where things stand follows the usual feng-shui rules of an office (D-120): the CEO in the
@@ -27,7 +27,7 @@
 // by the entrance, where it sees who comes in without standing in the door's straight line, with
 // its chair behind the counter and open floor around it; the editorial desk, the newsroom's own,
 // in the front row with the wall at its back; and nothing in the entrance's line or doorway. IT
-// sits by the aisle in the front row, the quickest way to the server room's door (D-133).
+// sits in the front row beside marketing (D-133).
 //   z=8  └──────────────────────────────────────────────────────────┘
 //      x=-12                                                     x=12
 
@@ -138,11 +138,10 @@ export const SLOTS: Record<string, RoleSlots> = {
   writer: { zone: "editorial", lane: "front", bench: false, desks: [[RIGHT_DESKS[0], FRONT_Z]] },
   editor: { zone: "editorial", lane: "front", bench: false, desks: [[RIGHT_DESKS[1], FRONT_Z]] },
   editor_in_chief: { zone: "editorial", lane: "front", bench: false, desks: [[RIGHT_DESKS[2], FRONT_Z]] },
-  marketing: { zone: "growth", lane: "front", bench: false, desks: [[LEFT_DESKS[0], FRONT_Z], [LEFT_DESKS[1], FRONT_Z]] },
-  // IT (資訊部, D-133): the front row's desk by the aisle, beside marketing — straight up the aisle
-  // to the back walkway and along it to the server room's door, which it looks after; empty
-  // until the company has an engineer
-  engineer: { zone: "growth", lane: "front", bench: false, desks: [[LEFT_DESKS[2], FRONT_Z]] },
+  marketing: { zone: "growth", lane: "front", bench: false, desks: [[LEFT_DESKS[1], FRONT_Z], [LEFT_DESKS[2], FRONT_Z]] },
+  // IT (資訊部, D-133): the front row's first desk, by the left wall, beside marketing (the
+  // operator's choice); empty until the company has an engineer
+  engineer: { zone: "growth", lane: "front", bench: false, desks: [[LEFT_DESKS[0], FRONT_Z]] },
   // by the CEO office's window on the left wall, turned to face her door (D-119): seen from the
   // camera she is framed by the glass front, not hidden behind the door's frame
   ceo: { zone: "ceo", lane: "back", bench: false, desks: [[-10.4, -6.0]], turned: true },
@@ -434,24 +433,28 @@ export interface Label {
   at: Vec3;
   /** Width in metres (height is a quarter of it). */
   width: number;
-  /** Painted on the floor, or a sign facing +z (the glass fronts) or +x (the entrance). */
+  /** Painted on the floor, or a sign facing +z (the glass fronts), -z (over a door onto the back
+   * walkway, D-133) or +x (the entrance). */
   kind: "floor" | "sign";
-  facing?: "z" | "x";
+  facing?: "z" | "-z" | "x";
 }
 
+/** Every name painted on the floor is one size (D-133): the lettering scales with the width. */
+const FLOOR_LABEL_WIDTH = 2.4;
+
 export const LABELS: Label[] = [
-  { text: "研究部", sub: "RESEARCH", at: [LEFT_DESKS[1], 0, 2.0], width: 3.0, kind: "floor" },
-  { text: "彈性座位", sub: "FLEX DESKS", at: [RIGHT_DESKS[1], 0, 2.0], width: 2.2, kind: "floor" },
-  { text: "接待", sub: "RECEPTION", at: [7.4, 0, 3.8], width: 1.6, kind: "floor" },
+  { text: "研究部", sub: "RESEARCH", at: [LEFT_DESKS[1], 0, 2.0], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  { text: "彈性座位", sub: "FLEX DESKS", at: [RIGHT_DESKS[1], 0, 2.0], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  { text: "接待", sub: "RECEPTION", at: [7.4, 0, 3.8], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   // behind the front desks' chairs: in front of the desks the desks would hide them
-  { text: "行銷部", sub: "MARKETING", at: [(LEFT_DESKS[0] + LEFT_DESKS[1]) / 2, 0, 7.2], width: 2.4, kind: "floor" },
-  { text: "資訊部", sub: "IT", at: [LEFT_DESKS[2], 0, 7.2], width: 1.4, kind: "floor" },
-  { text: "編輯部", sub: "EDITORIAL", at: [RIGHT_DESKS[1], 0, 7.2], width: 2.4, kind: "floor" },
-  // the rooms of the work row's nameplates, on their fronts (their doors are at the back, D-132)
-  { text: "小會議室 1", sub: "HUDDLE ROOM 1", at: [(SMALL_MEETING.minX + SMALL_MEETING.maxX) / 2, 2.36, SMALL_MEETING.maxZ + 0.08], width: 1.0, kind: "sign" },
-  { text: "小會議室 2", sub: "HUDDLE ROOM 2", at: [(TALK_ROOM.minX + TALK_ROOM.maxX) / 2, 2.36, TALK_ROOM.maxZ + 0.08], width: 1.0, kind: "sign" },
-  { text: "機房", sub: "SERVER ROOM", at: [(SERVER_ROOM.minX + SERVER_ROOM.maxX) / 2, 2.36, SERVER_ROOM.maxZ + 0.08], width: 1.0, kind: "sign" },
-  { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: 2.6, kind: "floor" },
+  { text: "資訊部", sub: "IT", at: [LEFT_DESKS[0], 0, 7.2], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  { text: "行銷部", sub: "MARKETING", at: [(LEFT_DESKS[1] + LEFT_DESKS[2]) / 2, 0, 7.2], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  { text: "編輯部", sub: "EDITORIAL", at: [RIGHT_DESKS[1], 0, 7.2], width: FLOOR_LABEL_WIDTH, kind: "floor" },
+  // the work row's rooms' nameplates, over their doors on the back walkway's side (D-133)
+  { text: "小會議室 1", sub: "HUDDLE ROOM 1", at: [SMALL_MEETING.doorX, 2.36, SMALL_MEETING.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
+  { text: "小會議室 2", sub: "HUDDLE ROOM 2", at: [TALK_ROOM.doorX, 2.36, TALK_ROOM.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
+  { text: "機房", sub: "SERVER ROOM", at: [SERVER_ROOM.doorX, 2.36, SERVER_ROOM.minZ - 0.08], width: 1.0, kind: "sign", facing: "-z" },
+  { text: "等候區", sub: "LOUNGE", at: [6.4, 0, 7.05], width: FLOOR_LABEL_WIDTH, kind: "floor" },
   { text: "茶水間", sub: "PANTRY", at: [9.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },

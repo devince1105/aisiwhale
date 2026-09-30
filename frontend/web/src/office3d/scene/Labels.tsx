@@ -82,6 +82,14 @@ export function labelGeometry(labels: readonly Label[]): BufferGeometry {
         [x + w, fy, z + h],
         [x - w, fy, z + h],
       ];
+    } else if (label.facing === "-z") {
+      // read from behind (-z): over a door onto the back walkway (D-133)
+      corners = [
+        [x + w, y + h, z],
+        [x - w, y + h, z],
+        [x - w, y - h, z],
+        [x + w, y - h, z],
+      ];
     } else if (label.facing === "x") {
       corners = [
         [x, y + h, z + w],
