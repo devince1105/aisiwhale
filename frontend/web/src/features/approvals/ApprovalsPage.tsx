@@ -11,11 +11,7 @@ import {
   queryKeys,
   restartWorkflow,
 } from "@/api/queries";
-import {
-  CompanyScope,
-  withCompany,
-  type Company,
-} from "@/features/company/CompanyScope";
+import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 import { ConnectionBadge } from "@/features/dashboard/DashboardView";
 import { connectionModel } from "@/features/dashboard/model";
@@ -32,11 +28,7 @@ const NO_AGENTS: Record<string, AgentState> = {};
 
 /** /approvals: what the runtime is waiting for a human to decide. */
 export function ApprovalsPage() {
-  return (
-    <CompanyScope>
-      {(company) => <CompanyApprovals company={company} />}
-    </CompanyScope>
-  );
+  return <CompanyScope>{(company) => <CompanyApprovals company={company} />}</CompanyScope>;
 }
 
 function CompanyApprovals({ company }: { company: Company }) {
@@ -45,9 +37,7 @@ function CompanyApprovals({ company }: { company: Company }) {
   const approvals = useQuery(approvalsQuery(company.id, state));
   const failed = useQuery(failedWorkflowsQuery(company.id));
   const queryClient = useQueryClient();
-  const current = useRealtime((s) =>
-    s.company?.companyId === company.id ? s.company : null,
-  );
+  const current = useRealtime((s) => (s.company?.companyId === company.id ? s.company : null));
   const connection = useRealtime((s) => s.connection);
   const now = useNow();
   const agents = current?.agents ?? NO_AGENTS;
@@ -56,23 +46,14 @@ function CompanyApprovals({ company }: { company: Company }) {
     <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs tracking-widest text-muted uppercase">
-            Approvals
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold">
-            {company.name} 的審批收件匣
-          </h1>
+          <p className="text-xs tracking-widest text-muted uppercase">Approvals</p>
+          <h1 className="mt-1 text-2xl font-semibold">{company.name} 的審批收件匣</h1>
         </div>
         <div className="flex items-center gap-4">
-          <Link
-            href={withCompany("/admin/dashboard", company.id)}
-            className="text-sm text-accent underline"
-          >
+          <Link href={withCompany("/admin/dashboard", company.id)} className="text-sm text-accent underline">
             Dashboard
           </Link>
-          <ConnectionBadge
-            connection={connectionModel(connection, current !== null, now)}
-          />
+          <ConnectionBadge connection={connectionModel(connection, current !== null, now)} />
         </div>
       </header>
       <ApprovalInbox
@@ -82,17 +63,13 @@ function CompanyApprovals({ company }: { company: Company }) {
         loadError={approvals.error?.message ?? null}
         decide={(id, decision, reason) => decideApproval(id, decision, reason)}
         live={connection.status === "live"}
-        refresh={() =>
-          queryClient.invalidateQueries({ queryKey: ["approvals", company.id] })
-        }
+        refresh={() => queryClient.invalidateQueries({ queryKey: ["approvals", company.id] })}
         preview={(card) =>
-          card.article ? (
-            <ArticlePreview
+          card.article ? <ArticlePreview
               articleId={card.article.id}
               draftGroupId={card.article.draftGroupId}
               decision={card.state as ApprovalState}
-            />
-          ) : null
+            /> : null
         }
       />
       {/* the other thing the inbox is for: work that failed and could be run again (AC-9) */}
@@ -100,12 +77,11 @@ function CompanyApprovals({ company }: { company: Company }) {
         runs={failed.data}
         onRestart={async (runId) => {
           const result = await restartWorkflow(company.id, runId);
-          await queryClient.invalidateQueries({
-            queryKey: queryKeys.failedWorkflows(company.id),
-          });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.failedWorkflows(company.id) });
           return result;
         }}
       />
     </main>
   );
 }
+

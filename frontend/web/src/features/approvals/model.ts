@@ -7,8 +7,7 @@ import type { AgentState } from "@/realtime/reducer";
 import { personName } from "@/people";
 
 export type Approval = Schemas["ApprovalOut"];
-export type ApprovalState =
-  "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
+export type ApprovalState = "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
 /** ``revise``: send it back with what to change (D-044). */
 export type Decision = "approve" | "reject" | "revise";
 
@@ -35,11 +34,7 @@ const KIND_LABEL: Record<string, string> = {
   official_report: "名人交易申報",
 };
 
-const ACTOR_KIND: Record<string, string> = {
-  system: "系統",
-  human: "人員",
-  agent: "代理",
-};
+const ACTOR_KIND: Record<string, string> = { system: "系統", human: "人員", agent: "代理" };
 
 export interface ApprovalCard {
   id: string;
@@ -75,12 +70,8 @@ export interface OfficialReportCheck {
   stocks: string[];
 }
 
-function officialReport(
-  kind: string,
-  payload: Record<string, unknown>,
-): OfficialReportCheck | null {
-  if (kind !== "official_report" || typeof payload.report !== "string")
-    return null;
+function officialReport(kind: string, payload: Record<string, unknown>): OfficialReportCheck | null {
+  if (kind !== "official_report" || typeof payload.report !== "string") return null;
   const n = (v: unknown) => (typeof v === "number" ? v : 0);
   return {
     url: payload.report,
@@ -94,28 +85,18 @@ function officialReport(
   };
 }
 
-function actorName(
-  actor: Record<string, unknown> | null,
-  agents: Record<string, AgentState>,
-): string {
+function actorName(actor: Record<string, unknown> | null, agents: Record<string, AgentState>): string {
   if (!actor) return "—";
   const id = String(actor.id ?? "");
-  if (actor.kind === "agent")
-    return personName(agents[id]?.display_name) || `代理 ${id.slice(0, 8)}`;
+  if (actor.kind === "agent") return personName(agents[id]?.display_name) || `代理 ${id.slice(0, 8)}`;
   return `${ACTOR_KIND[String(actor.kind)] ?? String(actor.kind)} ${id}`.trim();
 }
 
 /** The article requests were once titled 「核准發布：…」, which read as if it had been; they are
  * requests (D-141), and the older rows are shown with the new word. */
-export function approvalCard(
-  approval: Approval,
-  agents: Record<string, AgentState>,
-  now: Date,
-): ApprovalCard {
+export function approvalCard(approval: Approval, agents: Record<string, AgentState>, now: Date): ApprovalCard {
   const payload = approval.payload as Record<string, unknown>;
-  const expiresMs = approval.expires_at
-    ? Date.parse(approval.expires_at) - now.getTime()
-    : null;
+  const expiresMs = approval.expires_at ? Date.parse(approval.expires_at) - now.getTime() : null;
   return {
     id: approval.id,
     state: approval.state,
@@ -124,16 +105,11 @@ export function approvalCard(
     summary: approval.summary.replace(/^核准發布：/, "申請發布："),
     requester: actorName(approval.requested_by, agents),
     details: payload.args ?? payload,
-    waiting: formatDuration(
-      Math.max(0, now.getTime() - Date.parse(approval.created_at)),
-    ),
+    waiting: formatDuration(Math.max(0, now.getTime() - Date.parse(approval.created_at))),
     expires: approval.expires_at
       ? {
           at: approval.expires_at,
-          in:
-            expiresMs !== null && expiresMs > 0
-              ? formatDuration(expiresMs)
-              : null,
+          in: expiresMs !== null && expiresMs > 0 ? formatDuration(expiresMs) : null,
           soon: expiresMs !== null && expiresMs < 60 * 60 * 1000,
         }
       : null,
@@ -144,19 +120,12 @@ export function approvalCard(
       typeof payload.article_id === "string"
         ? {
             id: payload.article_id,
-            draftGroupId:
-              typeof payload.draft_group_id === "string"
-                ? payload.draft_group_id
-                : null,
+            draftGroupId: typeof payload.draft_group_id === "string" ? payload.draft_group_id : null,
           }
         : null,
     officialReport: officialReport(approval.kind, payload),
     decision: approval.decided_at
-      ? {
-          by: actorName(approval.decided_by, agents),
-          at: approval.decided_at,
-          reason: approval.reason,
-        }
+      ? { by: actorName(approval.decided_by, agents), at: approval.decided_at, reason: approval.reason }
       : null,
   };
 }

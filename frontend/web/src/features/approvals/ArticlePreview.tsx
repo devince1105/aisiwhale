@@ -37,11 +37,8 @@ export function copyText(article: ArticleDetail, lang: string): string {
   const text = article.languages[lang];
   if (!text) return "";
   const mark: Record<string, string> = { heading: "## ", quote: "> " };
-  return [
-    text.title,
-    ...(text.summary ? [text.summary] : []),
-    ...text.blocks.map((b) => `${mark[b.type] ?? ""}${b.text}`),
-  ].join("\n\n");
+  const blocks = text.blocks.map((b) => `${mark[b.type] ?? ""}${b.text}`);
+  return [text.title, ...(text.summary ? [text.summary] : []), ...blocks].join("\n\n");
 }
 
 /**
@@ -49,21 +46,13 @@ export function copyText(article: ArticleDetail, lang: string): string {
  * (申請發布), its tab what was decided, and this line where the article stands now — a version
  * sent back is often published later as its revision, or dropped.
  */
-export function outcomeText(
-  decision: ApprovalState,
-  latest: ArticleDetail,
-  draftGroupId: string | null,
-): string {
+export function outcomeText(decision: ApprovalState, latest: ArticleDetail, draftGroupId: string | null): string {
   const decided = STATES.find((s) => s.id === decision)?.label ?? decision;
   const versions = latest.versions ?? [];
-  const mine =
-    versions.find((v) => v.draft_group_id === draftGroupId)?.version ?? null;
+  const mine = versions.find((v) => v.draft_group_id === draftGroupId)?.version ?? null;
   const newest = versions.reduce((n, v) => Math.max(n, v.version), 0);
   // a draft after a decision is the writer at work on the revision
-  const label =
-    latest.state === "DRAFT"
-      ? "寫手修改中"
-      : (ARTICLE_STATE[latest.state]?.[0] ?? latest.state);
+  const label = latest.state === "DRAFT" ? "寫手修改中" : (ARTICLE_STATE[latest.state]?.[0] ?? latest.state);
   let now = label;
   if (latest.state === "PUBLISHED") {
     const onSite = versions.find((v) => v.published)?.version ?? null;
@@ -75,22 +64,13 @@ export function outcomeText(
             ? `已發布（第 ${onSite} 版，這一版之後修改的）`
             : `已發布（網站上仍是較早的第 ${onSite} 版）`;
     }
-  } else if (latest.state === "IN_REVIEW" || latest.state === "DRAFT") {
-    if (mine !== null && newest > mine)
-      now = `${label}（修改後的第 ${newest} 版）`;
+  } else if ((latest.state === "IN_REVIEW" || latest.state === "DRAFT") && mine !== null && newest > mine) {
+    now = `${label}（修改後的第 ${newest} 版）`;
   }
   return `結果：${decided}・這篇目前：${now}`;
 }
 
-function Outcome({
-  articleId,
-  draftGroupId,
-  decision,
-}: {
-  articleId: string;
-  draftGroupId: string | null;
-  decision: ApprovalState;
-}) {
+function Outcome({ articleId, draftGroupId, decision }: { articleId: string; draftGroupId: string | null; decision: ApprovalState }) {
   const latest = useQuery(articleQuery(articleId));
   if (!latest.data) return null;
   return (
@@ -100,42 +80,20 @@ function Outcome({
   );
 }
 
-const COPY_LABEL = {
-  idle: "複製文章",
-  done: "已複製",
-  failed: "複製失敗",
-} as const;
+const COPY_LABEL = { idle: "複製文章", done: "已複製", failed: "複製失敗" } as const;
 
 function CopyIcon({ done }: { done: boolean }) {
-  return done ? (
+  const line = { fill: "none", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round" } as const;
+  return (
     <svg viewBox="0 0 20 20" className="size-4" aria-hidden>
-      <path
-        d="M4 10.5l4 4 8-9"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 20 20" className="size-4" aria-hidden>
-      <rect
-        x="7"
-        y="7"
-        width="10"
-        height="10"
-        rx="2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M13 4.5V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
+      {done ? (
+        <path d="M4 10.5l4 4 8-9" strokeWidth="2" {...line} />
+      ) : (
+        <>
+          <rect x="7" y="7" width="10" height="10" rx="2" strokeWidth="1.6" {...line} />
+          <path d="M13 4.5V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h.5" strokeWidth="1.6" {...line} />
+        </>
+      )}
     </svg>
   );
 }
@@ -145,11 +103,7 @@ const DIFF_STYLE: Record<DiffLine["op"], string> = {
   removed: "bg-danger/10 text-danger line-through decoration-danger/60",
   added: "bg-ok/10 text-ok",
 };
-const DIFF_MARK: Record<DiffLine["op"], string> = {
-  same: "",
-  removed: "－ ",
-  added: "＋ ",
-};
+const DIFF_MARK: Record<DiffLine["op"], string> = { same: "", removed: "－ ", added: "＋ " };
 
 export function ArticlePreviewView({
   draft,
@@ -166,26 +120,16 @@ export function ArticlePreviewView({
 }) {
   const [compare, setCompare] = useState(published !== null);
   const langs = Object.keys(draft.languages).sort(
-    (a, b) =>
-      Number(b === draft.primary_lang) - Number(a === draft.primary_lang) ||
-      a.localeCompare(b),
+    (a, b) => Number(b === draft.primary_lang) - Number(a === draft.primary_lang) || a.localeCompare(b),
   );
   const shownLang = draft.languages[lang] ? lang : langs[0];
   const version = draft.versions.find((v) => v.version === draft.shown);
-  const check = draft.fact_checks
-    .filter((f) => f.version === draft.shown)
-    .at(-1);
+  const check = draft.fact_checks.filter((f) => f.version === draft.shown).at(-1);
   const now = shownLang ? lines(draft, shownLang) : [];
-  const diff =
-    published && shownLang
-      ? diffParagraphs(lines(published, shownLang), now)
-      : null;
+  const diff = published && shownLang ? diffParagraphs(lines(published, shownLang), now) : null;
 
   return (
-    <div
-      data-testid="article-preview"
-      className="mt-3 grid gap-3 rounded-lg border border-line bg-canvas p-4 text-sm"
-    >
+    <div data-testid="article-preview" className="mt-3 grid gap-3 rounded-lg border border-line bg-canvas p-4 text-sm">
       <div className="flex flex-wrap items-center gap-3">
         {langs.map((l) => (
           <button
@@ -193,20 +137,14 @@ export function ArticlePreviewView({
             type="button"
             aria-pressed={l === shownLang}
             onClick={() => onLang(l)}
-            className={
-              l === shownLang ? "font-semibold underline" : "text-accent"
-            }
+            className={l === shownLang ? "font-semibold underline" : "text-accent"}
           >
             {LANG_NAME[l] ?? l}
           </button>
         ))}
         {diff ? (
           <label className="ml-auto flex items-center gap-1 text-muted">
-            <input
-              type="checkbox"
-              checked={compare}
-              onChange={(e) => setCompare(e.target.checked)}
-            />
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} />
             對照目前發布的版本
           </label>
         ) : null}
@@ -216,28 +154,19 @@ export function ArticlePreviewView({
         第 {draft.shown} 版
         {check ? (
           <span className={check.passed ? "text-ok" : "text-danger"}>
-            ・事實查核{check.passed ? "通過" : "未通過"}（檢查 {check.checked}{" "}
-            項{check.failed ? `，${check.failed} 項未過` : ""}）
+            ・事實查核{check.passed ? "通過" : "未通過"}（檢查 {check.checked} 項{check.failed ? `，${check.failed} 項未過` : ""}）
           </span>
         ) : (
           "・沒有事實查核紀錄"
         )}
-        {version?.change_summary
-          ? `・寫手說明：${version.change_summary}`
-          : null}
+        {version?.change_summary ? `・寫手說明：${version.change_summary}` : null}
       </p>
 
       {compare && diff ? (
         <div data-testid="article-diff" className="grid gap-2">
-          {changed(diff) ? null : (
-            <p className="text-muted">這個語言的內容和目前發布的版本相同。</p>
-          )}
+          {changed(diff) ? null : <p className="text-muted">這個語言的內容和目前發布的版本相同。</p>}
           {diff.map((line, i) => (
-            <p
-              key={i}
-              data-op={line.op}
-              className={`rounded px-1 leading-relaxed whitespace-pre-wrap ${DIFF_STYLE[line.op]}`}
-            >
+            <p key={i} data-op={line.op} className={`rounded px-1 leading-relaxed whitespace-pre-wrap ${DIFF_STYLE[line.op]}`}>
               {DIFF_MARK[line.op]}
               {line.text}
             </p>
@@ -246,10 +175,7 @@ export function ArticlePreviewView({
       ) : (
         <div data-testid="article-text" className="grid gap-2">
           {now.map((line, i) => (
-            <p
-              key={i}
-              className={`leading-relaxed whitespace-pre-wrap ${i === 0 ? "font-semibold" : ""}`}
-            >
+            <p key={i} className={`leading-relaxed whitespace-pre-wrap ${i === 0 ? "font-semibold" : ""}`}>
               {line}
             </p>
           ))}
@@ -257,10 +183,7 @@ export function ArticlePreviewView({
       )}
 
       <Link
-        href={withCompany(
-          `/admin/newsroom/articles/${draft.id}?version=${draft.shown}`,
-          draft.company_id,
-        )}
+        href={withCompany(`/admin/newsroom/articles/${draft.id}?version=${draft.shown}`, draft.company_id)}
         className="text-accent underline"
       >
         開啟完整文章頁（論點、引用出處、查核細節）
@@ -288,15 +211,9 @@ export function ArticlePreview({
   const onCopy = async () => {
     try {
       const head = await queryClient.fetchQuery(articleQuery(articleId));
-      const version =
-        head.versions.find((v) => v.draft_group_id === draftGroupId)?.version ??
-        head.shown;
-      const article = await queryClient.fetchQuery(
-        articleQuery(articleId, version),
-      );
-      const shown = article.languages[lang]
-        ? lang
-        : (Object.keys(article.languages)[0] ?? lang);
+      const version = head.versions.find((v) => v.draft_group_id === draftGroupId)?.version ?? head.shown;
+      const article = await queryClient.fetchQuery(articleQuery(articleId, version));
+      const shown = article.languages[lang] ? lang : (Object.keys(article.languages)[0] ?? lang);
       await navigator.clipboard.writeText(copyText(article, shown));
       setCopy("done");
     } catch {
@@ -306,39 +223,20 @@ export function ArticlePreview({
   };
   const latest = useQuery({ ...articleQuery(articleId), enabled: open });
   const versions = latest.data?.versions ?? [];
-  const submitted =
-    versions.find((v) => v.draft_group_id === draftGroupId)?.version ??
-    latest.data?.shown ??
-    null;
-  const onSite =
-    versions.find((v) => v.published && v.version !== submitted)?.version ??
-    null;
-  const draft = useQuery({
-    ...articleQuery(articleId, submitted),
-    enabled: open && submitted !== null,
-  });
-  const published = useQuery({
-    ...articleQuery(articleId, onSite),
-    enabled: open && onSite !== null,
-  });
+  const submitted = versions.find((v) => v.draft_group_id === draftGroupId)?.version ?? latest.data?.shown ?? null;
+  const onSite = versions.find((v) => v.published && v.version !== submitted)?.version ?? null;
+  const draft = useQuery({ ...articleQuery(articleId, submitted), enabled: open && submitted !== null });
+  const published = useQuery({ ...articleQuery(articleId, onSite), enabled: open && onSite !== null });
   const error = latest.error ?? draft.error ?? published.error;
   const ready = draft.data && (onSite === null || published.data);
 
   return (
     <div className="mt-2">
       {decision && decision !== "PENDING" ? (
-        <Outcome
-          articleId={articleId}
-          draftGroupId={draftGroupId}
-          decision={decision}
-        />
+        <Outcome articleId={articleId} draftGroupId={draftGroupId} decision={decision} />
       ) : null}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="text-sm text-accent underline"
-        >
+        <button type="button" onClick={() => setOpen(!open)} className="text-sm text-accent underline">
           {open ? "收合全文" : "展開全文"}
         </button>
         <button
@@ -356,9 +254,7 @@ export function ArticlePreview({
           {error.message}
         </p>
       ) : null}
-      {open && !error && !ready ? (
-        <p className="mt-2 text-sm text-muted">載入文章中…</p>
-      ) : null}
+      {open && !error && !ready ? <p className="mt-2 text-sm text-muted">載入文章中…</p> : null}
       {open && ready && draft.data ? (
         <ArticlePreviewView
           draft={draft.data}

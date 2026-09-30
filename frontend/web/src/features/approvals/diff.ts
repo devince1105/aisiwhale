@@ -13,22 +13,14 @@ export interface DiffLine {
   text: string;
 }
 
-export function diffParagraphs(
-  before: readonly string[],
-  after: readonly string[],
-): DiffLine[] {
+export function diffParagraphs(before: readonly string[], after: readonly string[]): DiffLine[] {
   const n = before.length;
   const m = after.length;
   // longest common subsequence, filled from the end so it can be read forwards
-  const lcs: number[][] = Array.from({ length: n + 1 }, () =>
-    new Array<number>(m + 1).fill(0),
-  );
+  const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      lcs[i][j] =
-        before[i] === after[j]
-          ? lcs[i + 1][j + 1] + 1
-          : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      lcs[i][j] = before[i] === after[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
     }
   }
   const out: DiffLine[] = [];
