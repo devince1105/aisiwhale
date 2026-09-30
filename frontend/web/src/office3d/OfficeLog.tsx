@@ -11,6 +11,16 @@ import { useRealtime } from "@/stores/realtime";
 import { useOfficeLog } from "./visual/officeLog";
 
 const SHOWN = 12;
+/** Folded to a button unless the viewer opened it (D-136), remembered in this browser. */
+const OPEN_KEY = "autora.officeLog";
+
+function readOpen(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(OPEN_KEY) === "open";
+  } catch {
+    return false;
+  }
+}
 
 function clock(at: number): string {
   return new Date(at).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Taipei" });
@@ -19,21 +29,31 @@ function clock(at: number): string {
 export function OfficeLog() {
   const lines = useOfficeLog();
   const agents = useRealtime((s) => s.company?.agents);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(readOpen);
+  const toggle = () => {
+    setOpen(!open);
+    try {
+      window.localStorage.setItem(OPEN_KEY, open ? "closed" : "open");
+    } catch {
+      // not remembered; it still opens until the page is left
+    }
+  };
   const name = (id: string) => personName(agents?.[id]?.display_name) || "同事";
   return (
     <section
       aria-label="辦公室動態"
-      className="pointer-events-auto absolute top-3 right-3 w-72 max-w-[calc(100%-4.5rem)] rounded-lg border border-line bg-surface/90 text-xs shadow-sm backdrop-blur"
+      className={`pointer-events-auto absolute top-3 right-3 rounded-lg border border-line bg-surface/90 text-xs shadow-sm backdrop-blur ${
+        open ? "w-72 max-w-[calc(100%-4.5rem)]" : ""
+      }`}
     >
       <button
         type="button"
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className="flex w-full items-center justify-between px-3 py-1.5 text-left font-medium text-ink"
       >
-        辦公室動態
-        <span aria-hidden className="text-muted">
+        {open ? "辦公室動態" : "動態"}
+        <span aria-hidden className="ml-2 text-muted">
           {open ? "−" : "+"}
         </span>
       </button>

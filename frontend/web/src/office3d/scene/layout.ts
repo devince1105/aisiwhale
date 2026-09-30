@@ -381,6 +381,9 @@ export interface Decor {
 const d = (kind: DecorKind, at: Vec2, size: Vec2, rotY = 0): Decor => ({ kind, at, size, rotY });
 const QUARTER = Math.PI / 2;
 
+/** The waiting area's sofa, armchairs and table (the lounge decor's centre). */
+const LOUNGE_AT: Vec2 = [10.3, 5.8];
+
 /** Fixed pieces that carry no state. Anything a walker could bump into is listed here. */
 export const DECOR: Decor[] = [
   // work area: low shelves with plants along the left wall, palms and plants at the ends
@@ -404,7 +407,7 @@ export const DECOR: Decor[] = [
   // the two small meeting rooms' tables, each with two chairs on the room's diagonal
   d("small_meeting", [(SMALL_MEETING.minX + SMALL_MEETING.maxX) / 2, 0.1], [1.9, 1.9]),
   d("small_meeting", [(TALK_ROOM.minX + TALK_ROOM.maxX) / 2, 0.1], [1.9, 1.9]),
-  d("lounge", [10.3, 5.8], [3.2, 3.6]),
+  d("lounge", LOUNGE_AT, [3.2, 3.6]),
   d("plant", [11.5, 3.6], [0.6, 0.6]),
   // CEO office
   d("ceo_shelf", [-8.0, -7.6], [2.2, 0.5]),
@@ -474,7 +477,7 @@ export const DOORS = [
 
 /** Where a walk ends: a seat, the approval desk, a department's door, or a spot somewhere in the
  * office (D-136: the pantry, the server room), reached from ``lane`` through ``via`` in order. */
-export type WalkTarget = Seat | "approval" | { door: string } | { spot: Vec2; lane: Lane; via: Vec2[] };
+export type WalkTarget = Seat | "approval" | { door: string } | { spot: Vec2; lane: Lane; via: Vec2[]; sit?: boolean };
 
 /**
  * Where a department is entered from the corridor: the middle of its edge, on the lane that
@@ -583,6 +586,25 @@ export function serverSpot(): { target: WalkTarget; lookAt: Vec2 } {
     lookAt: [SERVER_RACKS.rows[0].x, -0.3],
   };
 }
+
+/** A seat in the waiting area's lounge (D-136): the sofa's three (facing the room, -x) and the
+ * two armchairs (facing the sofa, +x). Reached down the lounge's open side and sat on. */
+export function loungeSeat(slot = 0): { target: WalkTarget; lookAt: Vec2 } {
+  const [cx, cz] = LOUNGE_AT;
+  const seats: { at: Vec2; from: number; lookAt: Vec2 }[] = [
+    { at: [cx + 1.05, cz - 0.61], from: cx + 0.65, lookAt: [cx, cz - 0.61] },
+    { at: [cx + 1.05, cz], from: cx + 0.65, lookAt: [cx, cz] },
+    { at: [cx + 1.05, cz + 0.61], from: cx + 0.65, lookAt: [cx, cz + 0.61] },
+    { at: [cx - 0.95, cz - 1.1], from: cx - 1.4, lookAt: [cx, cz - 1.1] },
+    { at: [cx - 0.95, cz + 1.1], from: cx - 1.4, lookAt: [cx, cz + 1.1] },
+  ];
+  const seat = seats[slot % seats.length];
+  return {
+    target: { spot: seat.at, lane: "front", via: [[seat.from, CORRIDORS.front.maxZ + 0.3], [seat.from, seat.at[1]]], sit: true },
+    lookAt: seat.lookAt,
+  };
+}
+export const LOUNGE_SEATS = 5;
 
 /** Axis-aligned footprints of everything a walker must go around (x/z rectangles). */
 export interface Rect {

@@ -93,8 +93,10 @@ export function AgentAvatar({
     }
     const step = active && walk.current?.route ? courierState(walk.current.route, now - active.startedAt) : null;
     if (step && step.phase !== "done") {
-      controller.setPose(step.phase === "handover" ? "stand" : "walk");
-      g?.position.set(step.position[0], 0, step.position[1]);
+      // at the far end: standing (a hand-over, a coffee), or sitting down (a lounge seat, D-136)
+      const seated = step.phase === "handover" && walk.current?.route?.sitting === true;
+      controller.setPose(seated ? "sit_idle" : step.phase === "handover" ? "stand" : "walk");
+      g?.position.set(step.position[0], seated ? SEAT_LIFT : 0, step.position[1]);
       if (g) g.rotation.y = step.heading;
       if (paper.current) paper.current.visible = step.carrying;
       controller.update(Math.min(dt, 0.1));

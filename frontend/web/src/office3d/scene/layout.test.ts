@@ -14,6 +14,8 @@ import {
   ENTRANCE,
   LABELS,
   obstacles,
+  LOUNGE_SEATS,
+  loungeSeat,
   pantrySpot,
   serverSpot,
   ROLES,
@@ -169,12 +171,15 @@ describe("courier paths", () => {
     const problems: string[] = [];
     const places = [0, 1, 2].map((slot) => ({ name: `pantry ${slot}`, ...pantrySpot(slot) }));
     places.push({ name: "server room", ...serverSpot() });
+    // the lounge's seats are sat on: walking into the lounge's own footprint is the point
+    for (let slot = 0; slot < LOUNGE_SEATS; slot++) places.push({ name: `lounge ${slot}`, ...loungeSeat(slot) });
     for (const from of seats) {
       for (const place of places) {
         for (const { point, segment } of samples(walkPath(from, place.target))) {
           if (!inRoom(point)) problems.push(`${from.key} -> ${place.name} leaves the room at ${point}`);
           for (const rect of rects) {
             if (segment === 0 && rect.name === `chair ${from.key}`) continue;
+            if (place.name.startsWith("lounge") && rect.name.startsWith("lounge")) continue;
             if (inside(point, rect, WALKER)) problems.push(`${from.key} -> ${place.name} hits ${rect.name} at ${point}`);
           }
         }

@@ -9,7 +9,7 @@ import { effectiveState, realtimeStore, serverNow, type RealtimeStoreState } fro
 
 import type { Roster } from "../agents/roster";
 import { useRoster } from "../agents/roster";
-import { APPROVAL_DESK, doorOf, pantrySpot, seatsForRole, serverSpot, walkPath, type Seat, type Vec2 } from "../scene/layout";
+import { APPROVAL_DESK, doorOf, loungeSeat, pantrySpot, seatsForRole, serverSpot, walkPath, type Seat, type Vec2 } from "../scene/layout";
 import type { WalkCue } from "./cues";
 import { cuesFor, CueQueue } from "./director";
 import { LifeDirector } from "./life";
@@ -100,6 +100,8 @@ export interface Route {
   dwellMs: number;
   /** Whether a document is carried there (work) or nothing (an idle moment). */
   carrying: boolean;
+  /** Whether it sits down at the far end (a lounge seat, D-136) rather than standing. */
+  sitting?: boolean;
 }
 
 /** Where an idle moment goes (D-136), and what it faces there. */
@@ -116,7 +118,7 @@ function lifeRoute(cue: WalkCue, from: Seat, roster: Pick<Roster, "members" | "s
     if (!seat || seat.key === from.key) return null;
     return { path: walkPath(from, seat), lookAt: seat.chair };
   }
-  const place = life === "coffee" ? pantrySpot(slot) : serverSpot();
+  const place = life === "coffee" ? pantrySpot(slot) : life === "lounge" ? loungeSeat(slot) : serverSpot();
   return { path: walkPath(from, place.target), lookAt: place.lookAt };
 }
 
@@ -131,7 +133,16 @@ export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">
     if (!life) return null;
     const length = pathLength(life.path);
     const walking = (length / WALK_SPEED) * 1000 * (cue.returnAfter ? 2 : 1);
-    return { path: life.path, length, durationMs: Math.round(walking + dwellMs), lookAt: life.lookAt, returnAfter: cue.returnAfter, dwellMs, carrying };
+    return {
+      path: life.path,
+      length,
+      durationMs: Math.round(walking + dwellMs),
+      lookAt: life.lookAt,
+      returnAfter: cue.returnAfter,
+      dwellMs,
+      carrying,
+      sitting: cue.target.life === "lounge",
+    };
   }
   let to: Seat | "approval" | { door: string };
   if ("place" in cue.target) to = "approval";

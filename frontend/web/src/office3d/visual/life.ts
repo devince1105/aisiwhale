@@ -38,6 +38,7 @@ const FIRST = [20_000, 4 * MINUTE] as const;
 const BETWEEN = [8 * MINUTE, 20 * MINUTE] as const;
 const RETRY = 30_000;
 const DWELL: Record<LifeKind, readonly [number, number]> = {
+  lounge: [40_000, 70_000],
   coffee: [25_000, 45_000],
   chat: [15_000, 30_000],
   stretch: [6_000, 10_000],
@@ -84,8 +85,8 @@ export class LifeDirector {
       let kind = pick(
         this.random,
         it
-          ? [["server", 0.4], ["coffee", 0.3], ["stretch", 0.2], ["chat", 0.1]]
-          : [["coffee", 0.4], ["chat", 0.35], ["stretch", 0.25]],
+          ? [["server", 0.4], ["coffee", 0.25], ["stretch", 0.15], ["chat", 0.1], ["lounge", 0.1]]
+          : [["coffee", 0.35], ["chat", 0.3], ["stretch", 0.2], ["lounge", 0.15]],
       );
       let peer: LifeMember | undefined;
       if (kind === "chat") {
@@ -99,7 +100,11 @@ export class LifeDirector {
       cues.push({
         kind: "walk",
         agentId: member.id,
-        target: { life: kind, peer: peer?.id, slot: kind === "coffee" ? Math.floor(this.random() * 3) : undefined },
+        target: {
+          life: kind,
+          peer: peer?.id,
+          slot: kind === "coffee" ? Math.floor(this.random() * 3) : kind === "lounge" ? Math.floor(this.random() * 5) : undefined,
+        },
         carry: "none",
         returnAfter: true,
         dwellMs: Math.round(between(this.random, DWELL[kind])),
@@ -113,7 +118,7 @@ export class LifeDirector {
   }
 }
 
-export const LIFE_ICON: Record<LifeKind, string> = { coffee: "☕", chat: "💬", stretch: "🙆", server: "🔧" };
+export const LIFE_ICON: Record<LifeKind, string> = { coffee: "☕", chat: "💬", stretch: "🙆", server: "🔧", lounge: "🛋️" };
 
 export function lifeText(kind: LifeKind, peer?: string): string {
   switch (kind) {
@@ -125,5 +130,7 @@ export function lifeText(kind: LifeKind, peer?: string): string {
       return "起身伸展一下";
     case "server":
       return "去機房巡一下";
+    case "lounge":
+      return "到等候區沙發坐一下";
   }
 }
