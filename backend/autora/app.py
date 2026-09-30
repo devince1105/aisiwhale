@@ -199,6 +199,22 @@ def build_image_viewer(settings: Settings | None):
     )
 
 
+def build_painter(settings: Settings | None):
+    """Gemini's image model for covers the library cannot give (D-145): live with a Gemini key;
+    the fixture painter in tests; none otherwise."""
+    from autora.domains.newsroom.covers import FixturePainter, GeminiPainter
+
+    if settings is None or settings.tools_profile != "live":
+        return FixturePainter()
+    if settings.gemini_api_key is None or not settings.cover_image_model:
+        return None
+    return GeminiPainter(
+        settings.gemini_api_key.get_secret_value(),
+        settings.cover_image_model,
+        settings.cover_image_usd,
+    )
+
+
 def build_cover_store(settings: Settings | None, blobs: BlobStore):
     """Where covers are kept: R2 when all its settings are there, else the blob store (dev)."""
     from autora.domains.newsroom.covers import BlobCoverStore, R2Store
@@ -377,6 +393,8 @@ def build_tools(
         images=build_image_library(settings),
         cover_store=build_cover_store(settings, blobs),
         image_viewer=build_image_viewer(settings),
+        painter=build_painter(settings),
+        generated_per_day=settings.cover_images_per_day if settings else 3,
     )
     return tools
 

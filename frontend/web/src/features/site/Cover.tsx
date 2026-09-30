@@ -26,9 +26,14 @@ export function CoverFigure({ cover, lang }: { cover: Cover; lang: Lang }) {
       />
       <figcaption className="mt-2 px-4 text-xs text-muted sm:px-0">
         {words(lang).photo}：
-        <a href={cover.page_url} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-ink hover:underline">
-          {cover.credit}／{cover.library}
-        </a>
+        {/* a generated cover (D-145) has no library page: its credit says what it is */}
+        {cover.page_url ? (
+          <a href={cover.page_url} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-ink hover:underline">
+            {cover.credit}／{cover.library}
+          </a>
+        ) : (
+          <span>{lang === "en" ? "AI-generated illustration" : cover.credit}</span>
+        )}
       </figcaption>
     </figure>
   );

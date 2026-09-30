@@ -34,7 +34,7 @@ from urllib.parse import quote
 
 import httpx
 from PIL import Image, ImageOps
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.domains.newsroom.models import CoverState, StoryCover
@@ -273,59 +273,71 @@ class ImageViewer:
     ) -> tuple[dict[str, dict[str, Any]], Decimal]:
         """What each photo looks like, by id, and what asking cost. A photo that cannot be
         downloaded, or a model that does not answer, is left out: marketing then has the tags."""
-        fresh = [p for p in photos if p.id not in self._seen]
-        cost = Decimal(0)
-        if fresh:
-            content: list[dict[str, Any]] = [{"type": "text", "text": "The candidates:"}]
-            for photo in fresh:
-                try:
-                    data = await library.download(photo, preview=True)
-                    url = self._thumbnail(data)
-                except (CoverError, OSError, Image.DecompressionBombError):
-                    continue
-                content += [
-                    {"type": "text", "text": f"photo_id {photo.id}:"},
-                    {"type": "image_url", "image_url": {"url": url, "detail": "low"}},
-                ]
-            body = {
-                "model": self._model,
-                "messages": [
-                    {"role": "system", "content": VIEW_PROMPT},
-                    {"role": "user", "content": content},
-                ],
-                "response_format": {"type": "json_object"},
-                self._max_tokens_field: 2000,
-                **self._extra,
-            }
+        images: list[tuple[str, bytes]] = []
+        for photo in photos:
+            if photo.id in self._seen:
+                continue
             try:
-                if self._client is not None:
-                    response = await self._client.post(
+                images.append((photo.id, await library.download(photo, preview=True)))
+            except CoverError:
+                continue
+        cost = await self._ask(images) if images else Decimal(0)
+        return {p.id: self._seen[p.id] for p in photos if p.id in self._seen}, cost
+
+    async def look_at(self, image_id: str, data: bytes) -> tuple[dict[str, Any] | None, Decimal]:
+        """What one image in hand looks like (a generated cover, D-145)."""
+        cost = await self._ask([(image_id, data)])
+        return self._seen.get(image_id), cost
+
+    async def _ask(self, images: list[tuple[str, bytes]]) -> Decimal:
+        content: list[dict[str, Any]] = [{"type": "text", "text": "The candidates:"}]
+        for image_id, data in images:
+            try:
+                url = self._thumbnail(data)
+            except (OSError, Image.DecompressionBombError):
+                continue
+            content += [
+                {"type": "text", "text": f"photo_id {image_id}:"},
+                {"type": "image_url", "image_url": {"url": url, "detail": "low"}},
+            ]
+        body = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": VIEW_PROMPT},
+                {"role": "user", "content": content},
+            ],
+            "response_format": {"type": "json_object"},
+            self._max_tokens_field: 2000,
+            **self._extra,
+        }
+        try:
+            if self._client is not None:
+                response = await self._client.post(
+                    self._url, json=body, headers=self._headers, timeout=90.0
+                )
+            else:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
                         self._url, json=body, headers=self._headers, timeout=90.0
                     )
-                else:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.post(
-                            self._url, json=body, headers=self._headers, timeout=90.0
-                        )
-                data = response.json() if response.status_code == 200 else {}
-            except (httpx.HTTPError, ValueError):
-                data = {}
-            usage = data.get("usage") or {}
-            cost = (
-                self._prices[0] * (usage.get("prompt_tokens") or 0)
-                + self._prices[1] * (usage.get("completion_tokens") or 0)
-            ) / Decimal(1_000_000)
-            try:
-                answer = json.loads(data["choices"][0]["message"]["content"])
-                for item in answer.get("images") or []:
-                    seen = {
-                        k: item.get(k)
-                        for k in ("looks", "style", "dated", "text_or_logo", "quality")
-                    }
-                    self._seen[str(item.get("photo_id"))] = seen
-            except (KeyError, IndexError, TypeError, ValueError):
-                pass
-        return {p.id: self._seen[p.id] for p in photos if p.id in self._seen}, cost
+            answer = response.json() if response.status_code == 200 else {}
+        except (httpx.HTTPError, ValueError):
+            answer = {}
+        usage = answer.get("usage") or {}
+        cost = (
+            self._prices[0] * (usage.get("prompt_tokens") or 0)
+            + self._prices[1] * (usage.get("completion_tokens") or 0)
+        ) / Decimal(1_000_000)
+        try:
+            said = json.loads(answer["choices"][0]["message"]["content"])
+            for item in said.get("images") or []:
+                seen = {
+                    k: item.get(k) for k in ("looks", "style", "dated", "text_or_logo", "quality")
+                }
+                self._seen[str(item.get("photo_id"))] = seen
+        except (KeyError, IndexError, TypeError, ValueError):
+            pass
+        return cost
 
 
 class FixtureViewer:
@@ -344,6 +356,103 @@ class FixtureViewer:
             }
             for p in photos
         }, Decimal(0)
+
+
+# --- generating one (D-145) ------------------------------------------------------------------
+
+GENERATED = "gemini"
+PAINT_RULES = (
+    " Style: a modern, clean editorial illustration for a finance news site, wide 16:9, rich but "
+    "not garish colour, one clear subject. Absolutely no text, letters, numbers, labels, logos, "
+    "watermarks or signatures, and no recognisable real person."
+)
+
+
+class Painter(Protocol):
+    name: str
+
+    async def paint(self, prompt: str) -> tuple[bytes, Decimal]: ...
+
+
+class GeminiPainter:
+    """Gemini's image model: one wide image per prompt, with the site's rules appended. Its key
+    goes in a header, never the URL. The cost is a set price per image (MODEL settings)."""
+
+    name = GENERATED
+    URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    def __init__(
+        self, key: str, model: str, usd_per_image: float, client: httpx.AsyncClient | None = None
+    ):
+        self._key = key
+        self.model = model
+        self._cost = Decimal(str(usd_per_image))
+        self._client = client
+
+    async def paint(self, prompt: str) -> tuple[bytes, Decimal]:
+        body = {
+            "contents": [{"parts": [{"text": prompt.strip() + PAINT_RULES}]}],
+            "generationConfig": {
+                "responseModalities": ["IMAGE"],
+                "imageConfig": {"aspectRatio": "16:9"},
+            },
+        }
+        url = self.URL.format(model=self.model)
+        headers = {"x-goog-api-key": self._key}
+        try:
+            if self._client is not None:
+                response = await self._client.post(url, json=body, headers=headers, timeout=120.0)
+            else:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url, json=body, headers=headers, timeout=120.0)
+        except httpx.HTTPError as exc:
+            raise LibraryError(f"gemini image: {type(exc).__name__}") from None
+        if response.status_code != 200:
+            raise CoverError(f"gemini image answered {response.status_code}")
+        for candidate in response.json().get("candidates") or []:
+            for part in (candidate.get("content") or {}).get("parts") or []:
+                inline = part.get("inlineData") or part.get("inline_data")
+                if inline and inline.get("data"):
+                    return base64.b64decode(inline["data"]), self._cost
+        raise CoverError("gemini image returned no image (it may have refused the prompt)")
+
+
+class FixturePainter:
+    name = GENERATED
+
+    async def paint(self, prompt: str) -> tuple[bytes, Decimal]:
+        out = io.BytesIO()
+        Image.new("RGB", (1344, 768), (20, 40, 90)).save(out, "PNG")
+        return out.getvalue(), Decimal(0)
+
+
+async def generated_today(session: AsyncSession, company_id: uuid.UUID) -> int:
+    """How many covers the company has generated since midnight UTC (the daily cap)."""
+    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return int(
+        await session.scalar(
+            select(func.count()).where(
+                StoryCover.company_id == company_id,
+                StoryCover.provider == GENERATED,
+                StoryCover.updated_at >= start,
+            )
+        )
+        or 0
+    )
+
+
+def generated_photo(prompt: str) -> Photo:
+    return Photo(
+        provider=GENERATED,
+        id=uuid.uuid4().hex[:12],
+        page_url="",
+        image_url="",
+        width=WIDTH,
+        height=HEIGHT,
+        tags=prompt[:300],
+        credit="AI 生成示意圖",
+        kind="generated",
+    )
 
 
 # --- storage ----------------------------------------------------------------------------------
@@ -509,9 +618,16 @@ def _key(story_id: uuid.UUID, photo: Photo) -> str:
 
 
 async def _store(
-    library: ImageLibrary, store: CoverStore, story_id: uuid.UUID, photo: Photo
+    library: ImageLibrary | None,
+    store: CoverStore,
+    story_id: uuid.UUID,
+    photo: Photo,
+    data: bytes | None = None,
 ) -> tuple[str, str, int, int, int]:
-    webp, width, height = cut_cover(await library.download(photo))
+    if data is None:
+        assert library is not None
+        data = await library.download(photo)
+    webp, width, height = cut_cover(data)
     key = _key(story_id, photo)
     url = await store.put(key, webp, "image/webp")
     return key, url, width, height, len(webp)
@@ -533,11 +649,13 @@ async def set_cover(
     candidates: list[Photo],
     alt: dict[str, str],
     query: str,
-    library: ImageLibrary,
+    library: ImageLibrary | None,
     store: CoverStore,
     run_id: uuid.UUID | None,
+    data: bytes | None = None,
 ) -> StoryCover:
-    """The story's cover is ``photo``; ``candidates`` are kept for a person to swap to."""
+    """The story's cover is ``photo``; ``candidates`` are kept for a person to swap to.
+    ``data``: the image itself (a generated one, D-145), else it is downloaded."""
     row = await cover_of(session, story_id)
     if row is not None and row.state == CoverState.REMOVED:
         raise CoverError("a person took this story's cover off: it gets none")
@@ -545,7 +663,7 @@ async def set_cover(
         return row  # the same photo again (a retried call)
     if await used_elsewhere(session, company_id, story_id, [photo]):
         raise CoverError(f"photo {photo.id} is another article's cover already: choose another")
-    key, url, width, height, size = await _store(library, store, story_id, photo)
+    key, url, width, height, size = await _store(library, store, story_id, photo, data)
     old = row.key if row is not None else None
     if row is None:
         row = StoryCover(company_id=company_id, story_id=story_id)

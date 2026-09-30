@@ -40,7 +40,14 @@ photo for the article about the story below, from a free photo library.
    trust "looks" over the tags, and skip what does not fit.
 2. Choose the one that fits best and set_cover it, with what it shows in Traditional Chinese and
    in English (one short sentence each, describing the image, not the news).
-3. Nothing fits after three searches: report no cover.
+The free library comes first, always: a library image that fits is better than any generated
+one. Try different words before giving up on it.
+3. Nothing fits after three searches (or what fits is another article's already): generate_cover
+   with an English prompt for an image that fits — the subject as a picture, composition, colour
+   and mood (e.g. "a sleek dark-blue 3D dashboard of portfolio holdings, glowing bar charts and
+   pie segments floating above a glass desk"). It costs more than a library photo, so only then.
+   If its "looks" shows text, a logo or a person, or it does not fit, generate once more; if
+   generation is not available, report no cover.
 
 Look: current and clean, like a finance site's lead image today. For technology, chips and AI,
 prefer a modern 3D illustration (a glowing processor, a chip on a dark circuit) over a photo of
@@ -85,7 +92,13 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
         lines.append("What the article will say:")
         lines += [f"- {text[:200]}" for text in claims]
     existing = await cover_of(session, story.id)
-    if existing is not None and existing.state == CoverState.REMOVED:
+    if (ctx.task.input.get("params") or {}).get("generate"):
+        # a person's request (D-145): the cover it has is replaced, and kept to swap back to
+        lines.append(
+            "A person asked for a generated cover for this story: skip the library and "
+            "generate_cover (it replaces the cover it has)."
+        )
+    elif existing is not None and existing.state == CoverState.REMOVED:
         lines.append("A person took this story's cover off: report no cover, do not search.")
     elif existing is not None:
         lines.append(
@@ -125,7 +138,7 @@ BEHAVIOR = AgentBehavior(
     capability="drafting",
     system_prompt=SYSTEM_PROMPT,
     output_model=CoverNote,
-    tools=("search_images", "set_cover"),
+    tools=("search_images", "set_cover", "generate_cover"),
     validators=(note_matches_the_cover,),
     max_steps=8,
     repair_limit=2,

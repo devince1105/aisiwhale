@@ -105,7 +105,8 @@ class PublicCover(BaseModel):
     """The photo's page at the library: the credit links there."""
 
 
-LIBRARY_NAME = {"pixabay": "Pixabay", "pexels": "Pexels"}
+LIBRARY_NAME = {"pixabay": "Pixabay", "pexels": "Pexels", "gemini": ""}
+"""A generated cover (D-145) names no library: its credit says what it is."""
 
 
 def public_cover(row: StoryCover | None, lang: str) -> PublicCover | None:

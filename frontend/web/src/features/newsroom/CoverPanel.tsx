@@ -36,9 +36,13 @@ export function CoverPanel({ articleId, cover }: { articleId: string; cover: Cov
           {shown ? (
             <>
               首圖・
-              <a href={cover.page_url} target="_blank" rel="noopener noreferrer" className="underline">
-                {cover.credit}／{cover.library}
-              </a>
+              {cover.page_url ? (
+                <a href={cover.page_url} target="_blank" rel="noopener noreferrer" className="underline">
+                  {cover.credit}／{cover.library}
+                </a>
+              ) : (
+                cover.credit
+              )}
               ・{Math.round(cover.bytes / 1000)} KB
             </>
           ) : (

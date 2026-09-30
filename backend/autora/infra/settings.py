@@ -151,6 +151,12 @@ class Settings(BaseSettings):
     pixabay_api_key: SecretStr | None = None
     """Pixabay, free: the photo library marketing picks an article's cover from. The key goes in
     the query string, so no request URL is ever logged. Without it articles have no cover."""
+    cover_image_model: str = "gemini-3.1-flash-image"
+    """Gemini's image model, for a cover the library cannot give (D-145; uses GEMINI_API_KEY)."""
+    cover_image_usd: float = Field(default=0.04, ge=0)
+    """What one generated image costs, recorded on the tool call."""
+    cover_images_per_day: int = Field(default=10, ge=0)
+    """At most this many generated covers a day per company (0: never generate)."""
     r2_account_id: str | None = None
     """Cloudflare R2, where the covers are kept: the account id (the S3 endpoint's host)."""
     r2_access_key_id: SecretStr | None = None

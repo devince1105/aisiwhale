@@ -8,6 +8,7 @@ from autora.domains.newsroom.covers import (
     FixtureViewer,
     ImageLibrary,
     ImageViewer,
+    Painter,
 )
 from autora.domains.newsroom.tools import (
     claims,
@@ -42,6 +43,8 @@ def register_tools(
     images: ImageLibrary | None = None,
     cover_store: CoverStore | None = None,
     image_viewer: ImageViewer | FixtureViewer | None = None,
+    painter: Painter | None = None,
+    generated_per_day: int = 0,
 ) -> None:
     search.register(registry, search_provider)
     evidence.register(registry, fetcher, blobs, embedder)
@@ -51,7 +54,14 @@ def register_tools(
     factcheck.register(registry, embedder)
     review.register(registry)
     distribution.register(registry)
-    covers.register(registry, images, cover_store or BlobCoverStore(blobs), image_viewer)
+    covers.register(
+        registry,
+        images,
+        cover_store or BlobCoverStore(blobs),
+        image_viewer,
+        painter,
+        generated_per_day,
+    )
     if policy is not None and workflows is not None:
         # what the editor-in-chief does: commission a story and put the desk to work (T-605b)
         commission.register(registry, policy, workflows)

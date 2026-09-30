@@ -119,6 +119,7 @@ ACTIONS = {
     "create_distribution": "write",
     "search_images": "read",
     "set_cover": "write",
+    "generate_cover": "write",
     "spend_ad_budget": "write",
     "commission_story": "write",
 }
@@ -151,6 +152,7 @@ RULES: list[Rule] = [
     ),
     *allow("search_images", "marketing"),
     *allow("set_cover", "marketing"),  # D-142: the article's cover, before it is approved
+    *allow("generate_cover", "marketing"),  # D-145: drawn, when the library has none
     *allow(
         "spend_ad_budget",
         "marketing",

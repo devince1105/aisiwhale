@@ -71,3 +71,15 @@ describe("the cover where a person decides", () => {
     expect(screen.getByText(/沒有找到合適的圖片/)).toBeTruthy();
   });
 });
+
+describe("a generated cover (D-145)", () => {
+  it("says it is an AI-generated illustration, with no library link", () => {
+    const generated = { ...COVER, alt: "儀表板", credit: "AI 生成示意圖", library: "", page_url: "" };
+    render(<CoverFigure cover={generated} lang="zh-TW" />);
+    expect(screen.getByTestId("article-cover").textContent).toContain("圖片：AI 生成示意圖");
+    expect(screen.queryByRole("link")).toBeNull();
+    cleanup();
+    render(<CoverFigure cover={generated} lang="en" />);
+    expect(screen.getByTestId("article-cover").textContent).toContain("AI-generated illustration");
+  });
+});

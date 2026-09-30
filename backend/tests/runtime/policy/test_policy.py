@@ -48,6 +48,7 @@ MATRIX = {
     "create_distribution":  (D, D, D, D, A, D, D, D, D, D),
     "search_images":        (D, D, D, D, A, D, D, D, D, D),  # the cover (D-142)
     "set_cover":            (D, D, D, D, A, D, D, D, D, D),
+    "generate_cover":       (D, D, D, D, A, D, D, D, D, D),  # D-145
     "spend_ad_budget":      (D, D, D, D, A, D, D, D, D, D),
     "create_cycle_goal":    (D, D, D, D, D, D, A, D, D, D),
     "instantiate_workflow": (D, D, D, D, D, A, A, D, D, D),

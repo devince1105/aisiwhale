@@ -1,6 +1,7 @@
 """D-142: an article's cover — cut to 1200x630 WebP, stored in R2 (Signature V4), swapped or
 taken off by a person; Pixabay's key never shows in an error."""
 
+import base64
 import io
 import json
 from datetime import UTC, datetime
@@ -302,3 +303,109 @@ async def test_two_articles_do_not_share_a_cover(db_session, tmp_path):
     with pytest.raises(covers.CoverError, match="another article"):
         await covers.set_cover(db_session, story_id=second.id, photo=found[0], **common)
     await covers.set_cover(db_session, story_id=second.id, photo=found[1], **common)
+
+
+async def test_gemini_draws_a_wide_image_with_the_site_rules_and_its_key_in_a_header():
+    # D-145: a cover the library cannot give
+    out = io.BytesIO()
+    Image.new("RGB", (1344, 768), (10, 20, 80)).save(out, "PNG")
+    seen = {}
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        seen["request"] = request
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {"text": "here"},
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/png",
+                                        "data": base64.b64encode(out.getvalue()).decode(),
+                                    }
+                                },
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    painter = covers.GeminiPainter(
+        "SECRET-KEY",
+        "gemini-3.1-flash-image",
+        0.04,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
+    )
+    data, cost = await painter.paint("a dark-blue 3D dashboard of portfolio holdings")
+    assert data == out.getvalue() and cost == Decimal("0.04")
+    request = seen["request"]
+    assert request.headers["x-goog-api-key"] == "SECRET-KEY" and "SECRET" not in str(request.url)
+    assert "gemini-3.1-flash-image:generateContent" in str(request.url)
+    body = json.loads(request.content)
+    assert body["generationConfig"]["imageConfig"]["aspectRatio"] == "16:9"
+    assert "no text" in body["contents"][0]["parts"][0]["text"]
+    assert covers.cut_cover(data)[1:] == (1200, 630)
+
+    refused = covers.GeminiPainter(
+        "SECRET-KEY",
+        "m",
+        0.04,
+        client=httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"candidates": []}))
+        ),
+    )
+    with pytest.raises(covers.CoverError, match="no image"):
+        await refused.paint("anything at all, twenty chars")
+
+
+async def test_a_generated_cover_is_the_cover_keeps_the_library_photos_and_has_a_daily_cap(
+    db_session, tmp_path
+):
+    from autora.domains.newsroom.tools.covers import GenerateCoverArgs, generate_cover_tool
+    from autora.runtime.actor import Actor
+    from autora.runtime.tools import ToolContext
+
+    company = await unique_company(db_session, "covers")
+    story = Story(company_id=company.id, title="13F", state="SELECTED")
+    db_session.add(story)
+    await db_session.flush()
+    library, store = covers.FixtureLibrary(), covers.BlobCoverStore(LocalFSBlobStore(tmp_path))
+    found = await library.search("financial report")
+    await covers.set_cover(
+        db_session,
+        company_id=company.id,
+        story_id=story.id,
+        photo=found[0],
+        candidates=found,
+        alt={},
+        query="financial report",
+        library=library,
+        store=store,
+        run_id=None,
+    )
+    ctx = ToolContext(
+        session=db_session,
+        company_id=company.id,
+        actor=Actor.system("test"),
+        tool_call_id="t",
+        idempotency_key="k",
+    )
+    args = GenerateCoverArgs(
+        story_id=story.id,
+        prompt="a sleek dark-blue 3D dashboard of portfolio holdings",
+        alt_zh="深藍色的持股儀表板",
+        alt_en="A dark-blue holdings dashboard",
+    )
+    tool = generate_cover_tool(covers.FixturePainter(), store, None, per_day=1)
+    result = await tool(args, ctx)
+    row = await covers.cover_of(db_session, story.id)
+    assert row.provider == "gemini" and row.credit == "AI 生成示意圖" and row.page_url == ""
+    assert (row.width, row.height) == (1200, 630) and result.output["photo_id"] == row.provider_id
+    # the library photo it replaced is first to swap back to
+    assert [c["id"] for c in row.candidates][:2] == [found[0].id, found[1].id]
+    with pytest.raises(covers.CoverError, match="today"):
+        await tool(args, ctx)
