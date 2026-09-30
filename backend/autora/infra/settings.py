@@ -151,8 +151,8 @@ class Settings(BaseSettings):
     pixabay_api_key: SecretStr | None = None
     """Pixabay, free: the photo library marketing picks an article's cover from. The key goes in
     the query string, so no request URL is ever logged. Without it articles have no cover."""
-    cover_image_model: str = "gemini-3.1-flash-image"
-    """Gemini's image model, for a cover the library cannot give (D-145; uses GEMINI_API_KEY)."""
+    cover_image_model: str = "gemini-3.1-flash-lite-image"
+    """Gemini's image model (Nano Banana 2 Lite), for a cover the library cannot give (D-145)."""
     cover_image_usd: float = Field(default=0.04, ge=0)
     """What one generated image costs, recorded on the tool call."""
     cover_images_per_day: int = Field(default=10, ge=0)

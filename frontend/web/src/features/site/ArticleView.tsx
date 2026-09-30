@@ -18,7 +18,8 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
   const section = isSection(article.section) ? article.section : null;
   const spoken = [article.title, ...(article.summary ? [article.summary] : []), ...article.blocks.map((b) => b.text)];
   return (
-    <article className="mx-auto max-w-2xl px-4 pt-6 pb-10">
+    // the column's full width beside the sidebar; narrower alone, so lines stay readable (D-146)
+    <article className="max-w-3xl pt-6 pb-10 lg:max-w-none">
       <nav aria-label="breadcrumb" className="text-sm text-muted print:hidden">
         <Link href={`/news/${lang}`} className="hover:text-ink">
           {w.site}

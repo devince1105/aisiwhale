@@ -58,7 +58,8 @@ export default async function Page({ params }: { params: Params }) {
   const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(article.published_at)).slice(0, 7);
   const sidebar = await loadSidebar(lang, { month });
   return (
-    <div className="mx-auto max-w-6xl lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-10 lg:px-4">
+    // the same box as the front page's (D-146): the article starts where the list does
+    <div className="mx-auto max-w-6xl px-4 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-10">
       <div className="min-w-0">
         <ArticleView article={article} lang={lang} />
       </div>
