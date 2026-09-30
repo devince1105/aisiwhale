@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from autora.company.events import TeamMessagePosted
 from autora.db.models import EventRecord
 from autora.runtime.actor import Actor
-from autora.runtime.events.outbox import emit, to_envelope
+from autora.runtime.events.outbox import emit, read_envelopes
 from autora.runtime.events.schema import EventEnvelope, new_event
 
 CORE_TYPES: tuple[str, ...] = (
@@ -73,7 +73,7 @@ async def team_feed(
         stmt = stmt.where(EventRecord.seq < before)
     rows = list(await session.scalars(stmt.order_by(EventRecord.seq.desc()).limit(limit + 1)))
     more = len(rows) > limit
-    return [to_envelope(row) for row in reversed(rows[:limit])], more
+    return read_envelopes(reversed(rows[:limit])), more
 
 
 async def post_message(

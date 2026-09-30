@@ -45,7 +45,7 @@ from autora.db.models import (
     TaskState,
 )
 from autora.runtime.activity import effective_state
-from autora.runtime.events.outbox import to_envelope
+from autora.runtime.events.outbox import read_envelopes
 from autora.runtime.events.schema import EventEnvelope
 
 FINISHED_TASK_WINDOW = timedelta(minutes=10)
@@ -281,4 +281,4 @@ async def _recent_events(
             .limit(RECENT_EVENTS)
         )
     ).all()
-    return [to_envelope(row) for row in reversed(rows)]
+    return read_envelopes(reversed(rows))

@@ -9,13 +9,20 @@ are assigned at insert time, so two concurrent transactions could otherwise comm
 order and a reader could skip the smaller seq forever. ``emit`` takes a transaction-scoped
 advisory lock per company before inserting, which makes commit order equal seq order within a
 company. Keep event-emitting transactions short: the lock is held until commit.
+
+Reading is tolerant, writing is strict: ``emit`` only takes a validated envelope, but a stored
+row may be one this process cannot validate (a newer worker wrote an event type an older API
+does not know yet). ``read_envelope``/``read_envelopes`` skip such rows and warn once per event,
+so one unknown event never takes down the snapshot, the team feed or the live stream (D-135).
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
+from pydantic import ValidationError
 from sqlalchemy import func, insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +33,10 @@ EVENTS_CHANNEL = "autora_events"
 EPHEMERAL_CHANNEL = "autora_ephemeral"
 EPHEMERAL_MAX_BYTES = 7900  # NOTIFY payloads must stay under 8000 bytes
 _LOCK_NAMESPACE = 0x41_55_54  # arbitrary int4 namespace for pg_advisory_xact_lock(int, int)
+_SKIPPED_MAX = 10_000
+
+log = logging.getLogger(__name__)
+_skipped: set[uuid.UUID] = set()  # events already warned about
 
 
 class EventEmitError(Exception):
@@ -107,6 +118,36 @@ def to_envelope(row: EventRecord) -> EventEnvelope:
     )
 
 
+def read_envelope(row: EventRecord) -> EventEnvelope | None:
+    """``to_envelope`` for reading the log: ``None`` for a row this process cannot validate."""
+    try:
+        return to_envelope(row)
+    except ValueError as error:  # pydantic's ValidationError is a ValueError
+        if row.id not in _skipped:
+            if len(_skipped) >= _SKIPPED_MAX:
+                _skipped.clear()
+            _skipped.add(row.id)
+            log.warning(
+                "skipped stored event %s (id %s, seq %s): %s",
+                row.event_type,
+                row.id,
+                row.seq,
+                _first_error(error),
+            )
+        return None
+
+
+def read_envelopes(rows: Iterable[EventRecord]) -> list[EventEnvelope]:
+    """The rows as envelopes, in order, leaving out the ones this process cannot validate."""
+    return [envelope for row in rows if (envelope := read_envelope(row)) is not None]
+
+
+def _first_error(error: ValueError) -> str:
+    if isinstance(error, ValidationError) and error.errors():
+        return error.errors()[0]["msg"]
+    return str(error)
+
+
 async def load_events(
     session: AsyncSession,
     company_id: uuid.UUID,
@@ -120,6 +161,46 @@ async def load_events(
     limit: int = 200,
 ) -> list[EventEnvelope]:
     """Events of one company with ``after_seq < seq <= until_seq``, ordered by seq."""
+    rows = await _event_rows(
+        session, company_id, after_seq, until_seq, event_types, agent_id, run_id,
+        correlation_id, limit,
+    )  # fmt: skip
+    return read_envelopes(rows)
+
+
+async def load_event_page(
+    session: AsyncSession,
+    company_id: uuid.UUID,
+    *,
+    after_seq: int = 0,
+    until_seq: int | None = None,
+    event_types: Sequence[str] | None = None,
+    agent_id: uuid.UUID | None = None,
+    run_id: uuid.UUID | None = None,
+    correlation_id: uuid.UUID | None = None,
+    limit: int = 200,
+) -> tuple[list[EventEnvelope], int, bool]:
+    """One page of ``load_events``: the events, the seq to continue after and whether there are
+    more. Paging follows the stored rows, so a skipped row neither ends nor repeats a page."""
+    rows = await _event_rows(
+        session, company_id, after_seq, until_seq, event_types, agent_id, run_id,
+        correlation_id, limit + 1,
+    )  # fmt: skip
+    page = rows[:limit]
+    return read_envelopes(page), page[-1].seq if page else after_seq, len(rows) > limit
+
+
+async def _event_rows(
+    session: AsyncSession,
+    company_id: uuid.UUID,
+    after_seq: int,
+    until_seq: int | None,
+    event_types: Sequence[str] | None,
+    agent_id: uuid.UUID | None,
+    run_id: uuid.UUID | None,
+    correlation_id: uuid.UUID | None,
+    limit: int,
+) -> list[EventRecord]:
     stmt = select(EventRecord).where(
         EventRecord.company_id == company_id, EventRecord.seq > after_seq
     )
@@ -133,5 +214,4 @@ async def load_events(
         stmt = stmt.where(EventRecord.run_id == run_id)
     if correlation_id is not None:
         stmt = stmt.where(EventRecord.correlation_id == correlation_id)
-    rows = await session.scalars(stmt.order_by(EventRecord.seq).limit(limit))
-    return [to_envelope(row) for row in rows]
+    return list(await session.scalars(stmt.order_by(EventRecord.seq).limit(limit)))

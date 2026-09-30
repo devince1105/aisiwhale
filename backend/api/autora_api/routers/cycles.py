@@ -31,7 +31,7 @@ from autora.db.models import (
     WorkflowRun,
 )
 from autora.infra.money import base_currency
-from autora.runtime.events.outbox import to_envelope
+from autora.runtime.events.outbox import read_envelopes
 from autora.runtime.events.schema import EventEnvelope
 from autora_api.deps import Operator, Session
 
@@ -219,4 +219,4 @@ async def _timeline(session: Session, cycle: Cycle) -> list[EventEnvelope]:
             .limit(TIMELINE_LIMIT)
         )
     ).all()
-    return [to_envelope(row) for row in rows]
+    return read_envelopes(rows)

@@ -3,6 +3,7 @@
 import uuid
 
 from tests.conftest import unique_company
+from tests.realtime.test_unknown_events import UNKNOWN, _goal, _unknown
 
 
 async def test_snapshot_endpoint(api, db_session):
@@ -38,3 +39,25 @@ async def test_cors_allows_the_web_app_only(api):
         "/api/companies", headers={"Origin": "https://evil.example", **preflight}
     )
     assert "access-control-allow-origin" not in other.headers
+
+
+async def test_an_event_this_api_does_not_know_is_left_out(api, db_session):
+    """D-135: a newer worker's event type must not take down the snapshot or the listings."""
+    company = await unique_company(db_session, "rt-unknown")
+    first = await _goal(db_session, company.id)
+    unknown = await _unknown(db_session, company.id)
+    last = await _goal(db_session, company.id)
+
+    snapshot = await api.get(f"/api/companies/{company.id}/realtime/snapshot")
+    assert snapshot.status_code == 200, snapshot.text
+    assert [e["seq"] for e in snapshot.json()["recent_events"]] == [first, last]
+
+    feed = await api.get(f"/api/companies/{company.id}/team/feed")
+    assert feed.status_code == 200, feed.text
+
+    events = await api.get("/api/events", params={"company_id": str(company.id), "limit": 2})
+    assert events.status_code == 200, events.text
+    page = events.json()
+    assert [e["seq"] for e in page["items"]] == [first]
+    assert (page["next_after"], page["has_more"]) == (unknown, True)
+    assert UNKNOWN not in {e["event_type"] for e in page["items"]}

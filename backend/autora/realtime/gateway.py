@@ -43,7 +43,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from autora.db.models import EventRecord
-from autora.runtime.events.outbox import EPHEMERAL_CHANNEL, EVENTS_CHANNEL, to_envelope
+from autora.runtime.events.outbox import (
+    EPHEMERAL_CHANNEL,
+    EVENTS_CHANNEL,
+    read_envelope,
+    read_envelopes,
+)
 
 log = logging.getLogger("autora.realtime")
 
@@ -207,8 +212,9 @@ class EventHub:
                 ).all()
             if not rows:
                 break
-            items = [to_envelope(row).model_dump(mode="json") for row in rows]
-            await connection.transport.send_json({"type": "EVENTS", "items": items})
+            items = [envelope.model_dump(mode="json") for envelope in read_envelopes(rows)]
+            if items:
+                await connection.transport.send_json({"type": "EVENTS", "items": items})
             connection.last_sent_seq = rows[-1].seq
             if len(rows) < self.batch_size:
                 break
@@ -291,7 +297,9 @@ class EventHub:
                 if not rows:
                     return delivered
                 for row in rows:
-                    message = {"type": "EVENT", **to_envelope(row).model_dump(mode="json")}
+                    if (envelope := read_envelope(row)) is None:
+                        continue  # not valid for this process; the cursor still moves past it
+                    message = {"type": "EVENT", **envelope.model_dump(mode="json")}
                     for connection in list(self._connections[company_id]):
                         connection.offer(message)
                     # Let senders drain between events: a burst must not overflow a socket
