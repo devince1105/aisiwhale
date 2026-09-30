@@ -382,7 +382,7 @@ async def approve_step(ctx: ServiceContext) -> None:
         await ctx.request_approval(
             kind=ARTICLE_APPROVAL,
             action=APPROVE_ACTION,
-            summary=f"核准發布：{article.title}"[:300],
+            summary=f"申請發布：{article.title}"[:300],
             payload={
                 "article_id": str(article.id),
                 "story_id": str(article.story_id),

@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -14,11 +21,21 @@ import { approvalCard, type Approval } from "./model";
 // A real pending approval: the echo writer's echo_note, with the company policy override
 // echo_note/writer = needs_approval (seed_echo.py --approval on), from GET /api/approvals.
 const [pending] = JSON.parse(
-  readFileSync(join(process.cwd(), "src/features/approvals/__fixtures__/pending.json"), "utf8"),
+  readFileSync(
+    join(process.cwd(), "src/features/approvals/__fixtures__/pending.json"),
+    "utf8",
+  ),
 ) as Approval[];
 const writerId = String(pending.requested_by.id);
 const agents = {
-  [writerId]: { id: writerId, role: "writer", display_name: "Wren", avatar_key: "default", activity: null, liveProgress: null },
+  [writerId]: {
+    id: writerId,
+    role: "writer",
+    display_name: "Wren",
+    avatar_key: "default",
+    activity: null,
+    liveProgress: null,
+  },
 } as Record<string, AgentState>;
 const NOW = new Date(Date.parse(pending.created_at) + 90_000);
 
@@ -41,7 +58,9 @@ describe("model", () => {
     expect(card.expires).toMatchObject({ at: pending.expires_at, soon: false });
     expect(card.expires!.in).toMatch(/小時/);
     // unknown agent: still says who, by id
-    expect(approvalCard(pending, {}, NOW).requester).toBe(`代理 ${writerId.slice(0, 8)}`);
+    expect(approvalCard(pending, {}, NOW).requester).toBe(
+      `代理 ${writerId.slice(0, 8)}`,
+    );
   });
 
   it("a decided one says by whom and why", () => {
@@ -88,32 +107,63 @@ describe("inbox", () => {
   }
 
   it("an article can be sent back, but only with what to change (D-044)", async () => {
-    const article = { ...pending, kind: "article", run_id: null, task_id: "t-approve" };
-    const { props, card } = setup({ cards: [approvalCard(article, agents, NOW)] });
-    const sendBack = within(card()).getByRole("button", { name: "退回修改" }) as HTMLButtonElement;
+    const article = {
+      ...pending,
+      kind: "article",
+      run_id: null,
+      task_id: "t-approve",
+    };
+    const { props, card } = setup({
+      cards: [approvalCard(article, agents, NOW)],
+    });
+    const sendBack = within(card()).getByRole("button", {
+      name: "退回修改",
+    }) as HTMLButtonElement;
     expect(sendBack.disabled).toBe(true);
-    expect(within(card()).getByRole("button", { name: "駁回（放棄這則）" })).toBeTruthy();
+    expect(
+      within(card()).getByRole("button", { name: "駁回（放棄這則）" }),
+    ).toBeTruthy();
 
-    fireEvent.change(within(card()).getByRole("textbox"), { target: { value: "標題不要用「狂加」" } });
+    fireEvent.change(within(card()).getByRole("textbox"), {
+      target: { value: "標題不要用「狂加」" },
+    });
     expect(sendBack.disabled).toBe(false);
     fireEvent.click(sendBack);
-    await waitFor(() => expect(within(card()).getByRole("status").textContent).toBe("已退回修改，等待更新…"));
-    expect(props.decide).toHaveBeenCalledWith(pending.id, "revise", "標題不要用「狂加」");
+    await waitFor(() =>
+      expect(within(card()).getByRole("status").textContent).toBe(
+        "已退回修改，等待更新…",
+      ),
+    );
+    expect(props.decide).toHaveBeenCalledWith(
+      pending.id,
+      "revise",
+      "標題不要用「狂加」",
+    );
   });
 
   it("a paused agent run is approved or rejected, never sent back", () => {
     const { card } = setup();
-    expect(within(card()).queryByRole("button", { name: "退回修改" })).toBeNull();
+    expect(
+      within(card()).queryByRole("button", { name: "退回修改" }),
+    ).toBeNull();
     expect(within(card()).getByRole("button", { name: "駁回" })).toBeTruthy();
   });
 
   it("approve: sent over REST, then the list changes when the event refreshes it", async () => {
     const { props, view, card } = setup();
     expect(within(card()).getByText(pending.summary)).toBeTruthy();
-    expect(within(card()).getByRole("link", { name: "執行軌跡" }).getAttribute("href")).toBe(`/admin/trace/${pending.run_id}`);
+    expect(
+      within(card())
+        .getByRole("link", { name: "執行軌跡" })
+        .getAttribute("href"),
+    ).toBe(`/admin/trace/${pending.run_id}`);
 
     fireEvent.click(within(card()).getByRole("button", { name: "核准" }));
-    await waitFor(() => expect(within(card()).getByRole("status").textContent).toBe("已送出核准，等待更新…"));
+    await waitFor(() =>
+      expect(within(card()).getByRole("status").textContent).toBe(
+        "已送出核准，等待更新…",
+      ),
+    );
     expect(props.decide).toHaveBeenCalledWith(pending.id, "approve", null);
     expect(within(card()).queryByRole("button", { name: "核准" })).toBeNull();
     expect(props.refresh).not.toHaveBeenCalled(); // live: the APPROVAL_APPROVED event will do it
@@ -124,10 +174,22 @@ describe("inbox", () => {
 
   it("reject with a reason", async () => {
     const { props, card } = setup();
-    fireEvent.change(within(card()).getByRole("textbox"), { target: { value: "  wrong topic " } });
+    fireEvent.change(within(card()).getByRole("textbox"), {
+      target: { value: "  wrong topic " },
+    });
     fireEvent.click(within(card()).getByRole("button", { name: "駁回" }));
-    await waitFor(() => expect(props.decide).toHaveBeenCalledWith(pending.id, "reject", "wrong topic"));
-    await waitFor(() => expect(within(card()).getByRole("status").textContent).toBe("已送出駁回，等待更新…"));
+    await waitFor(() =>
+      expect(props.decide).toHaveBeenCalledWith(
+        pending.id,
+        "reject",
+        "wrong topic",
+      ),
+    );
+    await waitFor(() =>
+      expect(within(card()).getByRole("status").textContent).toBe(
+        "已送出駁回，等待更新…",
+      ),
+    );
   });
 
   it("with the stream down, no event will come: refetch right away", async () => {
@@ -138,11 +200,20 @@ describe("inbox", () => {
 
   it("already decided elsewhere (409): says so and reloads", async () => {
     const decide = vi.fn(async () => {
-      throw new ApiError(409, "Conflict", `approval ${pending.id} is already APPROVED`, null);
+      throw new ApiError(
+        409,
+        "Conflict",
+        `approval ${pending.id} is already APPROVED`,
+        null,
+      );
     });
     const { props, card } = setup({ decide });
     fireEvent.click(within(card()).getByRole("button", { name: "核准" }));
-    await waitFor(() => expect(within(card()).getByRole("alert").textContent).toContain("已經被處理"));
+    await waitFor(() =>
+      expect(within(card()).getByRole("alert").textContent).toContain(
+        "已經被處理",
+      ),
+    );
     expect(props.refresh).toHaveBeenCalled();
     expect(within(card()).getByRole("button", { name: "核准" })).toBeTruthy(); // not marked as sent
   });
@@ -153,13 +224,25 @@ describe("inbox", () => {
     });
     const { props, card } = setup({ decide });
     fireEvent.click(within(card()).getByRole("button", { name: "駁回" }));
-    await waitFor(() => expect(within(card()).getByRole("alert").textContent).toBe("送出失敗：network down"));
+    await waitFor(() =>
+      expect(within(card()).getByRole("alert").textContent).toBe(
+        "送出失敗：network down",
+      ),
+    );
     expect(props.refresh).not.toHaveBeenCalled();
   });
 
   it("state tabs; decided lists have no buttons", () => {
-    const decided = { ...pending, state: "APPROVED", decided_by: { kind: "human", id: "operator" }, decided_at: pending.created_at } as Approval;
-    const { props } = setup({ state: "APPROVED", cards: [approvalCard(decided, agents, NOW)] });
+    const decided = {
+      ...pending,
+      state: "APPROVED",
+      decided_by: { kind: "human", id: "operator" },
+      decided_at: pending.created_at,
+    } as Approval;
+    const { props } = setup({
+      state: "APPROVED",
+      cards: [approvalCard(decided, agents, NOW)],
+    });
     expect(screen.queryByRole("button", { name: "核准" })).toBeNull();
     expect(screen.getByText(/人員 operator 於/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "已過期" }));

@@ -146,7 +146,7 @@ async def test_a_story_goes_to_a_person_then_is_published_and_distributed(commit
     assert tasks["draft"][0].display_name == "撰稿：Lumen City microgrid"
     approval = await room.approval()
     assert approval.kind == "article" and approval.action == "approve_article"
-    assert approval.state == "PENDING" and approval.summary.startswith("核准發布：")
+    assert approval.state == "PENDING" and approval.summary.startswith("申請發布：")
     article = await room.article()
     assert article.state == "IN_REVIEW" and approval.payload["article_id"] == str(article.id)
 
