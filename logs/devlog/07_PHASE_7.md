@@ -2333,6 +2333,11 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 使用者：「專案可以改名為 aisiwhale 嗎」→ 只改儲存庫名稱（程式裡的 `autora` 套件、`AUTORA_*` 設定、資料庫名不改，那會動到數百個檔案）。
 - `gh repo rename`：`devince1105/autora` → `devince1105/aisiwhale`（GitHub 自動把舊網址轉過去）；本機 `origin` 改指新網址；新聞室抓網頁時的 User-Agent 與部署計畫裡的網址同步更新。
 
+## R2 私有 bucket
+
+- 使用者建立 `aisiwhale-private`（APAC、不開公開網址）。第一次測試被拒（403 `AccessDenied`：金鑰有效但不能用這個 bucket）；使用者調整權杖後，同一把金鑰（`a73d48…`）可用。
+- 實測：寫入 4 KB、讀回相同、沒有金鑰的請求被拒（400）、刪除後讀不到；首圖 bucket `aisiwhale` 仍可讀寫。兩個 bucket 都沒有留下測試檔。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
