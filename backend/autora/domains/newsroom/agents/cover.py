@@ -94,7 +94,11 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
         lines.append("What the article will say:")
         lines += [f"- {text[:200]}" for text in claims]
     existing = await cover_of(session, story.id)
-    if (ctx.task.input.get("params") or {}).get("generate"):
+    params = ctx.task.input.get("params") or {}
+    if params.get("ask"):
+        # what a person asked of this cover, in their words (D-149)
+        lines.append(f"What the person asked for: {str(params['ask'])[:500]}")
+    if params.get("generate"):
         # a person's request (D-145): the cover it has is replaced, and kept to swap back to
         lines.append(
             "A person asked for a generated cover for this story: skip the library and "
