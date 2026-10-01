@@ -32,8 +32,6 @@ services:
         value: .aisiwhale.com
       - key: CORS_ORIGINS
         value: '["https://aisiwhale.com","https://www.aisiwhale.com"]'
-      - key: EMAIL_PROVIDER
-        value: resend
       - key: PAYUNI_RETURN_URL
         value: https://aisiwhale.com/news/zh-TW/membership/return
       - key: PAYUNI_NOTIFY_URL
@@ -56,6 +54,8 @@ services:
       - key: MODEL_PROVIDER
         sync: false
       - key: OPENAI_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY # the embeddings (EMBED_PROVIDER=nvidia)
         sync: false
       - key: GEMINI_API_KEY
         sync: false
@@ -92,6 +92,8 @@ services:
       - key: R2_ACCESS_KEY_ID
         sync: false
       - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: EMAIL_PROVIDER # resend once its sending domain is verified; console until then
         sync: false
       - key: RESEND_API_KEY
         sync: false
