@@ -101,3 +101,12 @@ def test_prod_requires_real_bearer_token(token):
         _load(database_url=VALID_URL, autora_env="prod", api_bearer_token="s3cret").autora_env
         == "prod"
     )
+
+
+def test_a_blank_variable_means_its_default(monkeypatch):
+    # D-153: a field left empty in Render's dashboard must not stop the API from starting
+    for name in ("MODEL_DAILY_CAP_USD", "OFFICIAL_TRADES_ENABLED", "FAST_MODEL_ID"):
+        monkeypatch.setenv(name, "")
+    s = _load(database_url=VALID_URL)
+    assert s.model_daily_cap_usd == 3 and s.official_trades_enabled is False
+    assert s.fast_model_id is None

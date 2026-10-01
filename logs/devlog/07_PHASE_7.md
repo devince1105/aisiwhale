@@ -2338,6 +2338,12 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 使用者建立 `aisiwhale-private`（APAC、不開公開網址）。第一次測試被拒（403 `AccessDenied`：金鑰有效但不能用這個 bucket）；使用者調整權杖後，同一把金鑰（`a73d48…`）可用。
 - 實測：寫入 4 KB、讀回相同、沒有金鑰的請求被拒（400）、刪除後讀不到；首圖 bucket `aisiwhale` 仍可讀寫。兩個 bucket 都沒有留下測試檔。
 
+## Render 設定前的檢查
+
+- 對照 `render.yaml` 要填的值與本機 `.env`：補上漏掉的 `NVIDIA_API_KEY`（嵌入用 NVIDIA）；`EMAIL_PROVIDER` 改為建立時填（Resend 網域未驗證前用 console）。
+- 發現：在 Render 留空的欄位（`MODEL_DAILY_CAP_USD`、`OFFICIAL_TRADES_ENABLED`）會讓設定驗證失敗、服務起不來。設定改為 `env_ignore_empty=True`（空值＝沒設定，用預設），加測試。全部後端測試 2,033 通過；1 項 WebSocket 心跳測試在滿載時逾時，單獨跑三次都通過。
+- 確認空的 Neon 上 worker 不會自己建立公司或啟動週期：第一次部署不會花模型費用。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
