@@ -62,7 +62,7 @@ from autora.domains.newsroom.tools.filings import PREDECESSORS
 from autora.domains.newsroom.workflow import staff_newsroom
 from autora.runtime.actor import Actor
 
-SLUG = "autora-finance"
+SLUG = "aisiwhale"  # was autora-finance (renamed 2026-10-01, D-154)
 NAME = "艾矽鯨"
 """AiSiWhale (D-043): 艾 (ài, as in AI), 矽 = silicon, 鯨 = the whales whose holdings it follows."""
 PROJECT = "持股動態與科技產業"

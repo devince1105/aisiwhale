@@ -92,7 +92,7 @@
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `https://api.aisiwhale.com` | **建置時**寫入；改了要重新部署 |
 | `API_INTERNAL_URL` | `https://api.aisiwhale.com` | 伺服器端用 |
-| `NEXT_PUBLIC_SITE_COMPANY`、`SITE_COMPANY` | 公司代號 | |
+| `NEXT_PUBLIC_SITE_COMPANY`、`SITE_COMPANY` | `aisiwhale` | 公司代號（原 `autora-finance`，D-154） |
 | `SITE_OPERATOR`、`SITE_OPERATOR_OWNER`、`SITE_CONTACT_EMAIL`、`SITE_CONTACT_PHONE` | 經營者資訊 | 個人資料只放 Vercel，不進 repo |
 | `SITE_MEMBERSHIP_OPEN` | | |
 

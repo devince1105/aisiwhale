@@ -23,7 +23,7 @@ function show(companies: unknown[]) {
   );
 }
 
-const FINANCE = { ...STAFFED, id: "c-finance", slug: "autora-finance", name: "Autora 財經", created_at: "2026-09-24T00:00:00Z" };
+const FINANCE = { ...STAFFED, id: "c-finance", slug: "aisiwhale", name: "Autora 財經", created_at: "2026-09-24T00:00:00Z" };
 
 afterEach(() => {
   cleanup();

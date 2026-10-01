@@ -1,11 +1,11 @@
 """Seed the investing newsroom: company, desks, project, real sources, no-advice policy (D-036).
 
-    python backend/scripts/seed_markets.py                        # "Autora 財經", autora-finance
+    python backend/scripts/seed_markets.py                        # "Autora 財經", aisiwhale
     python backend/scripts/seed_markets.py --name "新的名字"        # rename it (idempotent)
 
 The sources are the real web: the worker only reads them with ``TOOLS_PROFILE=live`` (and SEC
 only answers with ``FETCH_CONTACT_EMAIL`` set). Point the public site at it with
-``SITE_COMPANY=autora-finance`` and ``NEXT_PUBLIC_SITE_COMPANY=autora-finance``.
+``SITE_COMPANY=aisiwhale`` and ``NEXT_PUBLIC_SITE_COMPANY=aisiwhale``.
 """
 
 import argparse

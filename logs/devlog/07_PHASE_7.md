@@ -2350,6 +2350,11 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 要填的機密很多：分成 ① 啟動必要 5 個、② 上線前必要 9 個、③ 功能 12 個、④ 留空 3 個；第一次部署只填 ①（兩個服務各一份）。為了好抄，產生了只有使用者可讀、git 忽略的 `data/render-values.env`（已去掉行尾註解、`DATABASE_URL` 換成 Neon 的字串）；用完要刪。
 - 結果：`https://aisiwhale-api.onrender.com/health` 200；公開 API 回空清單（Neon 已建表）；管理 API 401；CORS 對 `https://aisiwhale.com` 允許含 cookie；WebSocket 錯誤權杖回 unauthorized。worker 狀態請使用者在 Render 確認。
 
+## D-154：公司代號改為 aisiwhale
+
+- 設定 Vercel 時使用者指出公司代號仍是 `autora-finance`。名稱早已是「艾矽鯨」，只差代號：本機資料庫 `update companies set slug='aisiwhale'`、`markets.SLUG`、`seed_markets.py`、前端 `.env.local`、兩個前端測試的假資料。重啟本機網站（`NEXT_PUBLIC_*` 在啟動時寫入）。
+- 確認：API 用新代號找到文章、舊代號空；首頁有文章連結；相關前後端測試通過。Neon 目前是空的，代號會隨資料搬家帶過去。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

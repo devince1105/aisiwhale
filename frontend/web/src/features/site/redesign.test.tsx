@@ -46,7 +46,7 @@ const ARTICLE: PublicArticle = {
   ...summary(1),
   company: "艾矽鯨",
   company_id: "c",
-  company_slug: "autora-finance",
+  company_slug: "aisiwhale",
   locked: false,
   blocks: [{ type: "paragraph", text: "段永平第二季出清台積電。" }],
   sources: [],
