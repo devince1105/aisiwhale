@@ -85,7 +85,7 @@ from autora.domains.newsroom.site import (
     published_days,
     record_beacon,
 )
-from autora.infra.blobstore import BlobNotFound, InvalidBlobKey, LocalFSBlobStore
+from autora.infra.blobstore import BlobNotFound, InvalidBlobKey, build_blob_store
 from autora.infra.settings import get_settings
 from autora_api.deps import Session
 
@@ -107,7 +107,7 @@ async def get_cover(story_id: uuid.UUID, name: str) -> Response:
     from the bucket's public address and this is never asked."""
     if not name.endswith(".webp"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such cover")
-    blobs = LocalFSBlobStore(get_settings().blob_store_dir)
+    blobs = build_blob_store(get_settings())
     try:
         data = await blobs.get(f"covers/{story_id}/{name}")
     except (BlobNotFound, InvalidBlobKey):

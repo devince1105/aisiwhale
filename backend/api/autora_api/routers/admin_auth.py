@@ -64,6 +64,7 @@ def _set_cookie(response: Response, token: str, settings: Settings) -> None:
         samesite="lax",
         secure=settings.site_base_url.startswith("https://"),
         path="/",
+        domain=settings.cookie_domain or None,
     )
 
 
@@ -122,9 +123,11 @@ async def me(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(session: Session, autora_admin: AdminCookie = None) -> Response:
+async def logout(
+    session: Session, settings: SettingsDep, autora_admin: AdminCookie = None
+) -> Response:
     await sign_out(session, autora_admin)
     await session.commit()
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie(ADMIN_COOKIE, path="/")
+    response.delete_cookie(ADMIN_COOKIE, path="/", domain=settings.cookie_domain or None)
     return response

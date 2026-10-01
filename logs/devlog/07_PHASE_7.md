@@ -2319,6 +2319,15 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 步驟：停 API、worker → `pg_dump -Fc` 20 MB＋65 張表筆數 → `docker-compose.yml` 換 `pgvector/pgvector:pg18`、新資料卷（18 的資料目錄在 `/var/lib/postgresql/18/docker`）→ `pg_restore --exit-on-error` → 65 張表筆數完全相同、`alembic` 檢查無差異 → 重啟，首頁與首圖正常。舊的 16 資料卷保留。
 - CI 兩處改為 pg18；全部後端測試在 18 上跑：2,015 項全部通過（6 分 37 秒）。
 
+## D-153：上線前的四項程式修改
+
+- 使用者決定先做程式修改，資料搬家等上線前再做。
+- (1) 共用 Blob：新增 `infra/s3.py`（從首圖模組搬出 Signature V4，加上 `R2Bucket` 的 put/get/head/delete），`R2BlobStore` 存私有 bucket；`build_blob_store` 依 `BLOB_R2_BUCKET` 選擇；worker、API（執行紀錄、首圖備援）、品牌標誌腳本都改走它。搬家腳本 `blobs_to_r2.py` 可重跑、跳過已存在的。合約測試加上 R2（用檢查簽章的假 S3），28 項通過。
+- (2) 資料庫網址：設定接受 `postgres://`／`postgresql://` 並改成 asyncpg；`connection_url` 把 `sslmode` 換成以 certifi 驗證憑證與主機名的 TLS、丟掉 `channel_binding`；Alembic 也改用同一個 `build_engine`。
+- (3) `COOKIE_DOMAIN`：讀者與管理員 cookie 的 domain，登入、登出都帶；測試確認 `Domain=.aisiwhale.com`、`Secure`、`HttpOnly`。
+- (4) `render.yaml`：API 與 Worker 共用一份環境變數清單（YAML 錨點），機密 `sync: false`，`API_BEARER_TOKEN` 由 Render 產生。
+- 驗證：以 render.yaml 的值加假機密、當作真的環境變數載入，正式設定通過；全部後端測試 2,032 項通過；lint 與分層規則通過。重啟 API 與 worker，本機照常。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

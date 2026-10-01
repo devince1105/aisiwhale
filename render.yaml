@@ -1,0 +1,120 @@
+# Render Blueprint (D-153): the API and the worker, in Singapore beside the Neon database.
+# Plan: logs/platform/17_DEPLOYMENT.md. Secrets are not here: Render asks for every
+# `sync: false` value when the Blueprint is first created, and keeps them in its dashboard.
+# Both services read the same variables (the list is written once and used twice).
+
+previews:
+  generation: off
+
+services:
+  - type: web
+    name: autora-api
+    runtime: python
+    region: singapore
+    plan: starter
+    branch: main
+    autoDeployTrigger: checksPass # only once CI is green
+    buildCommand: pip install -e backend
+    # the schema first, from the API's deploy (one place, before the new code serves anything)
+    preDeployCommand: cd backend && alembic upgrade head
+    startCommand: uvicorn --app-dir backend/api main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips '*'
+    healthCheckPath: /health
+    envVars: &env
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: AUTORA_ENV
+        value: prod
+      - key: TOOLS_PROFILE
+        value: live
+      - key: SITE_BASE_URL
+        value: https://aisiwhale.com
+      - key: COOKIE_DOMAIN
+        value: .aisiwhale.com
+      - key: CORS_ORIGINS
+        value: '["https://aisiwhale.com","https://www.aisiwhale.com"]'
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: PAYUNI_RETURN_URL
+        value: https://aisiwhale.com/news/zh-TW/membership/return
+      - key: PAYUNI_NOTIFY_URL
+        value: https://api.aisiwhale.com/api/payments/payuni/notify
+      - key: R2_BUCKET
+        value: aisiwhale
+      - key: R2_KEY_PREFIX
+        value: news/images
+      - key: R2_PUBLIC_BASE_URL
+        value: https://img.aisiwhale.com
+      - key: BLOB_R2_BUCKET
+        value: aisiwhale-private
+      # --- secrets and per-company values: asked for once, kept in Render ---
+      - key: DATABASE_URL # Neon, direct endpoint (no -pooler), as Neon gives it
+        sync: false
+      - key: API_BEARER_TOKEN
+        generateValue: true
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: MODEL_PROVIDER
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FRONTIER_MODEL_ID
+        sync: false
+      - key: FAST_MODEL_ID
+        sync: false
+      - key: MODEL_PRICES
+        sync: false
+      - key: MODEL_DAILY_CAP_USD
+        sync: false
+      - key: EMBED_PROVIDER
+        sync: false
+      - key: EMBED_MODEL_ID
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: FETCH_CONTACT_EMAIL
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TIINGO_API_KEY
+        sync: false
+      - key: FUGLE_API_KEY
+        sync: false
+      - key: PIXABAY_API_KEY
+        sync: false
+      - key: COVER_IMAGE_MODEL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: PAYUNI_ENV
+        sync: false
+      - key: PAYUNI_MER_ID
+        sync: false
+      - key: PAYUNI_HASH_KEY
+        sync: false
+      - key: PAYUNI_HASH_IV
+        sync: false
+      - key: OFFICIAL_TRADES_ENABLED
+        sync: false
+
+  - type: worker
+    name: autora-worker
+    runtime: python
+    region: singapore
+    plan: starter
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: pip install -e backend
+    startCommand: python backend/worker/main.py
+    envVars: *env

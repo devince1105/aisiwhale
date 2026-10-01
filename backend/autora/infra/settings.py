@@ -170,11 +170,18 @@ class Settings(BaseSettings):
     Without the R2 settings covers are kept in the blob store and served by the API (dev)."""
 
     # --- Blob storage (T-210) ---
+    blob_r2_bucket: str | None = None
+    """Production (D-153): a PRIVATE R2 bucket for agent traces and evidence snapshots, shared by
+    the API and the worker (uses R2_ACCOUNT_ID and its keys). Empty: the local directory below."""
     blob_store_dir: Path = Path(__file__).resolve().parents[3] / "data" / "blobs"
     """LocalFS blob root. Relative paths resolve against the current directory."""
 
     # --- Readers and the site (D-024, D-025) ---
     site_base_url: str = "http://localhost:3000"
+    cookie_domain: str | None = None
+    """Where the reader's and the admin's session cookies count (D-153): ``.aisiwhale.com`` when
+    the API (api.aisiwhale.com) sets them for the site (aisiwhale.com), so the site's server can
+    read them; empty: the API's host only (dev, where both are localhost)."""
     """Where the public site lives. Login links and payment returns point back into it."""
     email_provider: Literal["console", "resend"] = "console"
     """console: print the message (dev, tests, no network). resend: send it for real."""
@@ -204,6 +211,17 @@ class Settings(BaseSettings):
     """ADMIN_EMAILS as a JSON list: who may sign in to /admin with an emailed link (D-055).
     Checked on every request, so taking an address off the list ends its access at once. The
     API_BEARER_TOKEN still works beside it, for scripts, CI and the day email does not."""
+
+    @field_validator("database_url")
+    @classmethod
+    def _asyncpg_scheme(cls, value: str) -> str:
+        """Neon (and most hosts) give ``postgres://`` or ``postgresql://`` (D-153): the same
+        database, through asyncpg. Its ``sslmode`` is read by ``db.session.build_engine``."""
+        value = value.strip()
+        for plain in ("postgres://", "postgresql://"):
+            if value.startswith(plain):
+                return "postgresql+asyncpg://" + value[len(plain) :]
+        return value
 
     @field_validator("admin_emails")
     @classmethod

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import hmac
 import io
 import json
 import time
@@ -30,7 +29,6 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
-from urllib.parse import quote
 
 import httpx
 from PIL import Image, ImageOps
@@ -39,6 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.domains.newsroom.models import CoverState, StoryCover
 from autora.infra.blobstore import BlobStore
+from autora.infra.s3 import R2Bucket, S3Error, sigv4_headers  # noqa: F401 (sigv4_headers: tests)
 
 WIDTH, HEIGHT = 1200, 630
 QUALITIES = (80, 70, 60)
@@ -500,53 +499,9 @@ class CoverStore(Protocol):
     async def exists(self, key: str) -> bool: ...
 
 
-def sigv4_headers(
-    *,
-    method: str,
-    host: str,
-    path: str,
-    headers: dict[str, str],
-    payload_hash: str,
-    access_key: str,
-    secret_key: str,
-    region: str,
-    service: str = "s3",
-    now: datetime | None = None,
-) -> dict[str, str]:
-    """AWS Signature Version 4 for a request without a query string: the headers to send."""
-    now = now or datetime.now(UTC)
-    amz_date = now.strftime("%Y%m%dT%H%M%SZ")
-    day = amz_date[:8]
-    signed = {k.lower(): " ".join(v.split()) for k, v in headers.items()}
-    signed |= {"host": host, "x-amz-date": amz_date, "x-amz-content-sha256": payload_hash}
-    names = sorted(signed)
-    canonical = "\n".join(
-        [
-            method,
-            quote(path, safe="/-_.~"),
-            "",
-            "".join(f"{n}:{signed[n]}\n" for n in names),
-            ";".join(names),
-            payload_hash,
-        ]
-    )
-    scope = f"{day}/{region}/{service}/aws4_request"
-    to_sign = "\n".join(
-        ["AWS4-HMAC-SHA256", amz_date, scope, hashlib.sha256(canonical.encode()).hexdigest()]
-    )
-    key = f"AWS4{secret_key}".encode()
-    for part in (day, region, service, "aws4_request"):
-        key = hmac.new(key, part.encode(), hashlib.sha256).digest()
-    signature = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
-    return {k: v for k, v in signed.items() if k != "host"} | {
-        "authorization": (
-            f"AWS4-HMAC-SHA256 Credential={access_key}/{scope}, "
-            f"SignedHeaders={';'.join(names)}, Signature={signature}"
-        )
-    }
-
-
 class R2Store:
+    """Covers in a public R2 bucket: written signed, read through the bucket's public address."""
+
     def __init__(
         self,
         *,
@@ -558,51 +513,37 @@ class R2Store:
         prefix: str = "",
         client: httpx.AsyncClient | None = None,
     ):
-        self._host = f"{account_id}.r2.cloudflarestorage.com"
-        self._access = access_key_id
-        self._secret = secret_access_key
-        self._bucket = bucket
+        self._bucket = R2Bucket(
+            account_id=account_id,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            bucket=bucket,
+            prefix=prefix,
+            client=client,
+        )
         self._public = public_base_url.rstrip("/")
-        self._prefix = f"{prefix.strip('/')}/" if prefix.strip("/") else ""
+        self._prefix = self._bucket.prefix
         self._client = client
 
-    async def _send(self, method: str, key: str, data: bytes, headers: dict[str, str]) -> None:
-        path = f"/{self._bucket}/{self._prefix}{key}"
-        signed = sigv4_headers(
-            method=method,
-            host=self._host,
-            path=path,
-            headers=headers,
-            payload_hash=hashlib.sha256(data).hexdigest(),
-            access_key=self._access,
-            secret_key=self._secret,
-            region="auto",
-        )
-        url = f"https://{self._host}{quote(path, safe='/-_.~')}"
-        try:
-            if self._client is not None:
-                response = await self._client.request(method, url, content=data, headers=signed)
-            else:
-                async with httpx.AsyncClient() as client:
-                    response = await client.request(
-                        method, url, content=data, headers=signed, timeout=30.0
-                    )
-        except httpx.HTTPError as exc:
-            raise LibraryError(f"r2: {type(exc).__name__}") from None
-        if response.status_code not in (200, 204):
-            raise CoverError(f"r2 answered {response.status_code} to {method}")
-
     async def put(self, key: str, data: bytes, content_type: str) -> str:
-        await self._send(
-            "PUT",
-            key,
-            data,
-            {"content-type": content_type, "cache-control": "public, max-age=31536000, immutable"},
-        )
+        try:
+            await self._bucket.put(
+                key,
+                data,
+                {
+                    "content-type": content_type,
+                    "cache-control": "public, max-age=31536000, immutable",
+                },
+            )
+        except S3Error as exc:
+            raise (LibraryError if exc.retryable else CoverError)(str(exc)) from None
         return f"{self._public}/{self._prefix}{key}"
 
     async def delete(self, key: str) -> None:
-        await self._send("DELETE", key, b"", {})
+        try:
+            await self._bucket.delete(key)
+        except S3Error as exc:
+            raise CoverError(str(exc)) from None
 
     async def _read(self, method: str, key: str) -> httpx.Response | None:
         url = f"{self._public}/{self._prefix}{key}"

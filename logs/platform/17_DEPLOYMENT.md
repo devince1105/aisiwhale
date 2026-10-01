@@ -30,7 +30,7 @@
 
 > Vercel Hobby 條款不允許商業用途；網站有付費會員（D-025），正式收費前應改 Pro。
 
-## 3. 上線前要改的程式（由我做，使用者同意後）
+## 3. 上線前要改的程式（2026-10-01 已完成，D-153）
 
 1. **共用的 Blob 存放改到 R2**（必要）。現在代理的對話紀錄、證據快照存在本機磁碟（`LocalFSBlobStore`）：
    Render 的 API 與 Worker 是兩台機器、磁碟不共享，每次部署也會清空 → 後台看不到執行紀錄、代理中斷後無法續跑。
@@ -43,12 +43,19 @@
 4. **部署設定檔**：`render.yaml`（API、Worker、部署前執行 `alembic upgrade head`）；Vercel 專案設 Root Directory `frontend/web`。
 5. **自動化**：CI 通過後才部署（Render、Vercel 都可設「只部署 main 且 CI 綠燈」）。
 
+完成情形（D-153）：
+- §3.1：`infra/s3.py`（簽章與 R2 存取）、`R2BlobStore`、`build_blob_store`（設 `BLOB_R2_BUCKET` 就用私有 bucket）；所有讀寫 blob 的地方都改走它；上線當天用 `backend/scripts/blobs_to_r2.py --bucket aisiwhale-private` 搬本機 `data/blobs`（181 MB，可重跑）。
+- §3.2：`DATABASE_URL` 可直接貼 Neon 給的 `postgresql://…?sslmode=require&channel_binding=require`；程式自動改成 asyncpg 格式，`sslmode` 變成**驗證憑證**的 TLS（certifi），丟掉 asyncpg 不認得的 `channel_binding`；遷移也用同一套。
+- §3.3：`COOKIE_DOMAIN`（讀者與管理員的 cookie，登入與登出都帶）。
+- §3.4：根目錄 `render.yaml`（API Web Service＋Worker、新加坡、Starter、CI 綠燈才部署、部署前 `alembic upgrade head`、`/health`；43 個環境變數，機密標 `sync: false` 在建立時填）。
+- 以 render.yaml 的值加上假機密，模擬正式環境載入設定：通過。
+
 ## 4. 使用者要做的帳號設定（照順序）
 
 1. **Neon**：建立專案（Region：AWS Singapore），資料庫名 `autora`；記下**直連**連線字串（不是 pooled）。
 2. **Cloudflare R2**：另建一個**私有** bucket（例：`aisiwhale-private`，不開公開存取）給 §3.1；沿用現有 API 金鑰或另發一把只能讀寫這兩個 bucket 的。
-3. **Render**：連結 GitHub `devince1105/autora`，用 `render.yaml` 建立 API 與 Worker（Region：Singapore）；填 §5 的環境變數。
-4. **Vercel**：匯入同一個 repo，Root Directory `frontend/web`，填 §5 的環境變數；Production 分支 `main`。
+3. **Render**：New → Blueprint → 連結 GitHub `devince1105/autora`（讀根目錄的 `render.yaml`，自動建立 `autora-api` 與 `autora-worker`，新加坡）；畫面會列出所有 `sync: false` 的變數讓你填（§5），`API_BEARER_TOKEN` 自動產生。
+4. **Vercel**：匯入同一個 repo，Framework「Next.js」，Root Directory `frontend/web`（保留「Include files outside the root directory」，因為它用到 `frontend/event-schema`），Install Command 用預設（偵測到 pnpm workspace）；填 §5 的環境變數；Production 分支 `main`。
 5. **Cloudflare DNS**：
    - `aisiwhale.com`、`www` → Vercel（Vercel 會給 A／CNAME 記錄；Cloudflare 代理設「DNS only」灰雲，讓 Vercel 簽憑證）
    - `api` → Render 給的 `*.onrender.com`（CNAME，DNS only）

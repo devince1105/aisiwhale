@@ -36,8 +36,15 @@ def test_missing_database_url_fails_with_clear_message():
 
 def test_wrong_database_scheme_is_rejected():
     with pytest.raises(SettingsError) as exc:
-        _load(database_url="postgresql://u:p@localhost/db")
+        _load(database_url="mysql://u:p@localhost/db")
     assert "postgresql+asyncpg" in str(exc.value)
+
+
+def test_a_plain_postgres_url_is_taken_through_asyncpg():
+    # D-153: as Neon (and most hosts) give it
+    assert _load(database_url="postgresql://u:p@localhost/db").database_url == (
+        "postgresql+asyncpg://u:p@localhost/db"
+    )
 
 
 def test_defaults_are_safe_for_dev():

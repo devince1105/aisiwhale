@@ -372,12 +372,15 @@ def build_tools(
     from autora.company import tools as company_tools
     from autora.domains import echo
     from autora.domains.newsroom import tools as newsroom_tools
-    from autora.infra.blobstore import LocalFSBlobStore
+    from autora.infra.blobstore import LocalFSBlobStore, build_blob_store
     from autora.runtime.tools import ToolRegistry
 
     if blobs is None:
-        root = settings.blob_store_dir if settings else Path(tempfile.gettempdir()) / "autora-blobs"
-        blobs = LocalFSBlobStore(root)
+        blobs = (
+            build_blob_store(settings)
+            if settings
+            else LocalFSBlobStore(Path(tempfile.gettempdir()) / "autora-blobs")
+        )
     tools = ToolRegistry(session_factory)
     if commands is not None:
         company_tools.register_tools(tools, commands)
@@ -541,7 +544,7 @@ def build_worker(
     """
     from autora.company.cycle import maintenance_job as cycle_maintenance_job
     from autora.db.session import get_sessionmaker
-    from autora.infra.blobstore import LocalFSBlobStore
+    from autora.infra.blobstore import build_blob_store
     from autora.runtime.agent_runner import AgentRunner
     from autora.runtime.cost.guard import DbCostGuard
     from autora.runtime.models.factory import gateway_from_settings
@@ -554,7 +557,7 @@ def build_worker(
     companies = (
         company_ids if company_ids is not None else (frozenset(settings.worker_company_ids) or None)
     )
-    blobs = blobs or LocalFSBlobStore(settings.blob_store_dir)
+    blobs = blobs or build_blob_store(settings)
     gateway = gateway_from_settings(
         settings,
         session_factory,

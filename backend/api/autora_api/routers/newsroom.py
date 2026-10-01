@@ -49,7 +49,7 @@ from autora.domains.newsroom.sources import SourceConfigError, add_source
 from autora.domains.newsroom.stories import StoryDesk, StoryError
 from autora.domains.newsroom.tools import covers as covers_tool
 from autora.domains.newsroom.workflow import start_article_revision, start_story
-from autora.infra.blobstore import LocalFSBlobStore
+from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
 from autora.runtime.fsm import IllegalTransition
 from autora_api.deps import Operator, RuntimeDep, Session
@@ -178,9 +178,7 @@ async def get_article(
 def cover_tools() -> tuple[covers.ImageLibrary | None, covers.CoverStore]:
     """The library and the store the cover tools use (D-142), for a person's swap."""
     settings = get_settings()
-    return build_image_library(settings), build_cover_store(
-        settings, LocalFSBlobStore(settings.blob_store_dir)
-    )
+    return build_image_library(settings), build_cover_store(settings, build_blob_store(settings))
 
 
 async def _cover_of_article(session: Session, article_id: uuid.UUID) -> StoryCover:

@@ -24,6 +24,8 @@ dependencies = [
   "pypdf>=5,<7",
   # articles' cover images cut to 1200x630 WebP (D-142)
   "pillow>=11,<13",
+  # the roots a TLS connection to the managed database is checked against (D-153)
+  "certifi>=2024.2.2",
 ]
 
 [project.optional-dependencies]

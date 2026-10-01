@@ -85,3 +85,23 @@ async def test_signing_out_ends_the_session(site, mailbox):
 async def test_a_made_up_cookie_proves_nothing(site):
     site.cookies.set(SESSION_COOKIE, "not-a-real-session")
     assert (await site.get("/api/auth/me")).json() is None
+
+
+async def test_the_cookie_counts_on_the_site_s_domain_when_one_is_set(api, site, mailbox):
+    """D-153: api.aisiwhale.com sets it for aisiwhale.com, whose server must read it too."""
+    from autora.infra.settings import load_settings
+    from autora_api.deps import settings_dep
+
+    app = api._transport.app
+    base = app.dependency_overrides[settings_dep]()
+    app.dependency_overrides[settings_dep] = lambda: load_settings(
+        database_url=base.database_url,
+        api_bearer_token=base.api_bearer_token.get_secret_value(),
+        cookie_domain=".aisiwhale.com",
+        site_base_url="https://aisiwhale.com",
+    )
+    verified = await _sign_in(site, mailbox)
+    header = verified.headers["set-cookie"].lower()
+    assert "domain=.aisiwhale.com" in header and "secure" in header and "httponly" in header
+    out = await site.post("/api/auth/logout")
+    assert "domain=.aisiwhale.com" in out.headers["set-cookie"].lower()

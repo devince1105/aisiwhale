@@ -10,10 +10,10 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from autora.app import load_models
 from autora.db.base import Base
+from autora.db.session import build_engine
 from autora.infra.settings import get_settings
 
 load_models()
@@ -48,9 +48,8 @@ def _do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    section = config.get_section(config.config_ini_section, {})
-    section["sqlalchemy.url"] = _database_url()
-    connectable = async_engine_from_config(section, prefix="sqlalchemy.")
+    # the app's own engine: the same URL handling (Neon's sslmode, D-153)
+    connectable = build_engine(_database_url())
     async with connectable.connect() as connection:
         await connection.run_sync(_do_run_migrations)
     await connectable.dispose()

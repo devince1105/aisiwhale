@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from autora.db.models import AgentRun, AgentStep
-from autora.infra.blobstore import BlobNotFound, BlobStore, LocalFSBlobStore
+from autora.infra.blobstore import BlobNotFound, BlobStore, build_blob_store
 from autora.infra.settings import Settings
 from autora.runtime.trace import Trace, get_run_trace
 from autora_api.deps import Operator, Session, settings_dep
@@ -50,7 +50,7 @@ async def get_run(run_id: uuid.UUID, session: Session, _: Operator) -> RunOut:
 
 
 def blob_store_dep(settings: Annotated[Settings, Depends(settings_dep)]) -> BlobStore:
-    return LocalFSBlobStore(settings.blob_store_dir)
+    return build_blob_store(settings)
 
 
 @router.get("/{run_id}/trace")

@@ -22,7 +22,7 @@ import httpx
 
 from autora.app import build_cover_store
 from autora.domains.newsroom.brands import BRANDS, logo_key
-from autora.infra.blobstore import LocalFSBlobStore
+from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import load_settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,7 +62,7 @@ def _colour(hex_: str) -> str:
 
 async def run(force: bool) -> None:
     settings = load_settings()
-    store = build_cover_store(settings, LocalFSBlobStore(settings.blob_store_dir))
+    store = build_cover_store(settings, build_blob_store(settings))
     colours = {i["slug"]: i["hex"] for i in httpx.get(f"{ICONS}/data/simple-icons.json").json()}
     wanted = [b for b in BRANDS if b.simple_icons]
     missing = [b for b in BRANDS if not b.simple_icons]
