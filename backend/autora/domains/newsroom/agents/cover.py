@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.domains.newsroom.agents.marketing import ROLE
 from autora.domains.newsroom.agents.researcher import task_story_id
+from autora.domains.newsroom.brands import Brand
 from autora.domains.newsroom.covers import cover_of
 from autora.domains.newsroom.models import Claim, CoverState, Story
 from autora.runtime.behaviors import AgentBehavior, RunContext
@@ -46,6 +47,9 @@ one. Try different words before giving up on it.
    with an English prompt for an image that fits — the subject as a picture, composition, colour
    and mood (e.g. "a sleek dark-blue 3D dashboard of portfolio holdings, glowing bar charts and
    pie segments floating above a glass desk"). It costs more than a library photo, so only then.
+   When the context offers logos, a cover about a company or a coin is better with its real logo:
+   pass its slug in brands (the official logo goes to the image model as a reference) and say in
+   the prompt where it sits — on a coin, a chip, a screen, a glass sign. Never another brand.
    Cryptocurrency symbols (Bitcoin's ₿, Ethereum's diamond, $) may appear: ask for the ones of
    the coins the story is about, so a stablecoin story does not look like one about Bitcoin. If
    its "looks" shows text, a company logo or a person, or it does not fit, generate once more; if
@@ -93,6 +97,13 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
     if claims:
         lines.append("What the article will say:")
         lines += [f"- {text[:200]}" for text in claims]
+    offered = await _logos_offered(session, story)
+    if offered:
+        lines.append(
+            "Logos you may draw into a generated cover (the story is about them; pass their "
+            "slugs as brands, at most three, and say where each goes): "
+            + ", ".join(f"{b.slug} ({b.name})" for b in offered)
+        )
     existing = await cover_of(session, story.id)
     params = ctx.task.input.get("params") or {}
     if params.get("ask"):
@@ -112,6 +123,14 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
             f"{existing.query!r}): report that photo, do not search again."
         )
     return "\n".join(lines)
+
+
+async def _logos_offered(session: AsyncSession, story: Story) -> list[Brand]:
+    """The brands the story names (D-150). One without a kept logo is refused by the tool,
+    which says so: marketing then leaves it out."""
+    from autora.domains.newsroom.tools.covers import story_brands
+
+    return await story_brands(session, story)
 
 
 async def note_matches_the_cover(

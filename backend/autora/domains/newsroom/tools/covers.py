@@ -11,9 +11,10 @@ from __future__ import annotations
 import uuid
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
-from autora.domains.newsroom import covers
-from autora.domains.newsroom.models import Story
+from autora.domains.newsroom import brands, covers
+from autora.domains.newsroom.models import Claim, Story
 from autora.runtime.events.catalog import ProducedRef
 from autora.runtime.tools import ToolContext, ToolFn, ToolRegistry, ToolResult
 
@@ -127,6 +128,19 @@ class GenerateCoverArgs(BaseModel):
         min_length=2, max_length=120, description="What it shows, in Traditional Chinese."
     )
     alt_en: str = Field(min_length=2, max_length=160, description="What it shows, in English.")
+    brands: list[str] = Field(
+        default=[],
+        max_length=3,
+        description="Logos to draw in, by slug, from those the context offers (the story's own "
+        "companies and coins); say in the prompt where each goes.",
+    )
+
+
+async def story_brands(session, story: Story) -> list[brands.Brand]:
+    """The brands the story names (D-150): its title, summary, angle and claims."""
+    texts = [story.title, story.summary or "", story.angle or ""]
+    texts += (await session.scalars(select(Claim.text).where(Claim.story_id == story.id))).all()
+    return brands.named("\n".join(texts))
 
 
 def generate_cover_tool(
@@ -145,7 +159,18 @@ def generate_cover_tool(
             raise covers.CoverError(
                 f"today's {per_day} generated covers are used: take a library photo or none"
             )
-        data, cost = await painter.paint(args.prompt)
+        allowed = {b.slug: b for b in await story_brands(ctx.session, story)}
+        references = []
+        for slug in dict.fromkeys(args.brands):
+            if slug not in allowed:
+                raise covers.CoverError(
+                    f"{slug!r} is not a brand this story is about: use only the ones offered"
+                )
+            logo = await store.fetch(brands.logo_key(slug))
+            if logo is None:
+                raise covers.CoverError(f"no logo is kept for {slug!r}: leave it out")
+            references.append((allowed[slug].name, logo))
+        data, cost = await painter.paint(args.prompt, references)
         photo = covers.generated_photo(args.prompt)
         previous = await covers.cover_of(ctx.session, story.id)
         # the library photos found before stay, for a person to swap back to

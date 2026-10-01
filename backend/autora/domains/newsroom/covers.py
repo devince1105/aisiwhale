@@ -373,10 +373,19 @@ PAINT_RULES = (
 )
 
 
+LOGO_RULES = (
+    " The attached images are the official logos of what the story is about: draw each exactly as "
+    "given — same shape, proportions and colours, crisp and legible, not redrawn or altered — on "
+    "the surface the description puts it (a coin, a chip, a screen, a sign); no other logo."
+)
+
+
 class Painter(Protocol):
     name: str
 
-    async def paint(self, prompt: str) -> tuple[bytes, Decimal]: ...
+    async def paint(
+        self, prompt: str, references: list[tuple[str, bytes]] | None = None
+    ) -> tuple[bytes, Decimal]: ...
 
 
 class GeminiPainter:
@@ -394,9 +403,21 @@ class GeminiPainter:
         self._cost = Decimal(str(usd_per_image))
         self._client = client
 
-    async def paint(self, prompt: str) -> tuple[bytes, Decimal]:
+    async def paint(
+        self, prompt: str, references: list[tuple[str, bytes]] | None = None
+    ) -> tuple[bytes, Decimal]:
+        """``references``: (name, PNG) of the logos to draw in (D-150), shown to the model as
+        images so it copies the real mark instead of imagining one."""
+        parts: list[dict[str, Any]] = [
+            {"text": prompt.strip() + PAINT_RULES + (LOGO_RULES if references else "")}
+        ]
+        for name, png in references or []:
+            parts += [
+                {"text": f"Official logo of {name}:"},
+                {"inlineData": {"mimeType": "image/png", "data": base64.b64encode(png).decode()}},
+            ]
         body = {
-            "contents": [{"parts": [{"text": prompt.strip() + PAINT_RULES}]}],
+            "contents": [{"parts": parts}],
             "generationConfig": {
                 "responseModalities": ["IMAGE"],
                 "imageConfig": {"aspectRatio": "16:9"},
@@ -425,7 +446,9 @@ class GeminiPainter:
 class FixturePainter:
     name = GENERATED
 
-    async def paint(self, prompt: str) -> tuple[bytes, Decimal]:
+    async def paint(
+        self, prompt: str, references: list[tuple[str, bytes]] | None = None
+    ) -> tuple[bytes, Decimal]:
         out = io.BytesIO()
         Image.new("RGB", (1344, 768), (20, 40, 90)).save(out, "PNG")
         return out.getvalue(), Decimal(0)
@@ -469,6 +492,12 @@ class CoverStore(Protocol):
         ...
 
     async def delete(self, key: str) -> None: ...
+
+    async def fetch(self, key: str) -> bytes | None:
+        """What is kept under ``key`` (a brand's logo, D-150), or None."""
+        ...
+
+    async def exists(self, key: str) -> bool: ...
 
 
 def sigv4_headers(
@@ -575,6 +604,24 @@ class R2Store:
     async def delete(self, key: str) -> None:
         await self._send("DELETE", key, b"", {})
 
+    async def _read(self, method: str, key: str) -> httpx.Response | None:
+        url = f"{self._public}/{self._prefix}{key}"
+        try:
+            if self._client is not None:
+                return await self._client.request(method, url, timeout=30.0)
+            async with httpx.AsyncClient() as client:
+                return await client.request(method, url, timeout=30.0)
+        except httpx.HTTPError:
+            return None
+
+    async def fetch(self, key: str) -> bytes | None:
+        response = await self._read("GET", key)
+        return response.content if response is not None and response.status_code == 200 else None
+
+    async def exists(self, key: str) -> bool:
+        response = await self._read("HEAD", key)
+        return response is not None and response.status_code == 200
+
 
 class BlobCoverStore:
     """Dev without R2: the blob store keeps it and ``GET /api/public/covers/{key}`` serves it."""
@@ -590,6 +637,18 @@ class BlobCoverStore:
 
     async def delete(self, key: str) -> None:
         await self._blobs.delete(key)
+
+    async def fetch(self, key: str) -> bytes | None:
+        try:
+            return await self._blobs.get(key)
+        except Exception:  # noqa: BLE001 - not there (or not a valid key): no logo
+            return None
+
+    async def exists(self, key: str) -> bool:
+        try:
+            return await self._blobs.exists(key)
+        except Exception:  # noqa: BLE001
+            return False
 
 
 # --- the story's cover ------------------------------------------------------------------------

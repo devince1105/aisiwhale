@@ -440,3 +440,81 @@ async def test_a_generated_image_is_looked_at_closely():
     assert looked["text_or_logo"] == "Ethereum symbol"
     [image] = [c for c in sent["body"]["messages"][1]["content"] if c["type"] == "image_url"]
     assert image["image_url"]["detail"] == "high"
+
+
+def test_the_brands_a_story_names():
+    # D-150: in Chinese, by ticker, as a whole word in its own case
+    from autora.domains.newsroom.brands import named
+
+    def slugs(text):
+        return [b.slug for b in named(text)]
+
+    assert slugs("減持輝達逾五成、出清台積電，新建倉阿里巴巴") == ["nvidia", "tsmc", "alibaba"]
+    assert slugs("Circle與Tether凍結穩定幣") == ["circle", "tether"]
+    assert slugs("Bitcoin ETF 與 ETH") == ["bitcoin", "ethereum"]
+    assert slugs("an arm of the firm, a meta-analysis, an x-ray") == []
+
+
+async def test_a_generated_cover_draws_the_story_s_own_logos_and_no_other(db_session, tmp_path):
+    from autora.domains.newsroom.tools.covers import GenerateCoverArgs, generate_cover_tool
+    from autora.runtime.actor import Actor
+    from autora.runtime.tools import ToolContext
+
+    company = await unique_company(db_session, "covers")
+    story = Story(company_id=company.id, title="Circle與Tether凍結被盜的穩定幣", state="SELECTED")
+    db_session.add(story)
+    await db_session.flush()
+    blobs = LocalFSBlobStore(tmp_path)
+    store = covers.BlobCoverStore(blobs)
+    await blobs.put("brand/tether.png", b"tether-png")
+    asked = {}
+
+    class Recording(covers.FixturePainter):
+        async def paint(self, prompt, references=None):
+            asked["references"] = references
+            return await super().paint(prompt, references)
+
+    ctx = ToolContext(
+        session=db_session,
+        company_id=company.id,
+        actor=Actor.system("test"),
+        tool_call_id="t",
+        idempotency_key="k",
+    )
+    tool = generate_cover_tool(Recording(), store, None, per_day=5)
+
+    def args(*slugs):
+        return GenerateCoverArgs(
+            story_id=story.id,
+            prompt="two coins on a dark glass table, one bearing the Tether logo",
+            alt_zh="兩枚硬幣",
+            alt_en="Two coins",
+            brands=list(slugs),
+        )
+
+    await tool(args("tether"), ctx)
+    assert asked["references"] == [("Tether", b"tether-png")]
+    with pytest.raises(covers.CoverError, match="not a brand this story is about"):
+        await tool(args("bitcoin"), ctx)
+    with pytest.raises(covers.CoverError, match="no logo is kept"):
+        await tool(args("circle"), ctx)  # named, but no logo kept here
+
+
+async def test_gemini_is_shown_the_logos_as_images():
+    seen = {}
+    out = io.BytesIO()
+    Image.new("RGB", (64, 36)).save(out, "PNG")
+
+    def answer(request):
+        seen["body"] = json.loads(request.content)
+        part = {"inlineData": {"data": base64.b64encode(out.getvalue()).decode()}}
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [part]}}]})
+
+    painter = covers.GeminiPainter(
+        "k", "m", 0.04, client=httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    )
+    await painter.paint("two coins on a table", [("Tether", b"PNG-BYTES")])
+    parts = seen["body"]["contents"][0]["parts"]
+    assert "official logos" in parts[0]["text"]
+    assert parts[1] == {"text": "Official logo of Tether:"}
+    assert base64.b64decode(parts[2]["inlineData"]["data"]) == b"PNG-BYTES"
