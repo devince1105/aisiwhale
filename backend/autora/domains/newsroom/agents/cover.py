@@ -46,9 +46,9 @@ one. Try different words before giving up on it.
    with an English prompt for an image that fits — the subject as a picture, composition, colour
    and mood (e.g. "a sleek dark-blue 3D dashboard of portfolio holdings, glowing bar charts and
    pie segments floating above a glass desk"). It costs more than a library photo, so only then.
-   Coins and tokens in a prompt are plain: never a cryptocurrency's symbol (a stablecoin story is
-   not Bitcoin's or Ethereum's). If its "looks" shows text, a logo, a crypto symbol or a person,
-   or it does not fit, generate once more; if
+   Cryptocurrency symbols (Bitcoin's ₿, Ethereum's diamond, $) may appear: ask for the ones of
+   the coins the story is about, so a stablecoin story does not look like one about Bitcoin. If
+   its "looks" shows text, a company logo or a person, or it does not fit, generate once more; if
    generation is not available, report no cover.
 
 Look: current and clean, like a finance site's lead image today. For technology, chips and AI,

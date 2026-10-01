@@ -367,10 +367,9 @@ class FixtureViewer:
 GENERATED = "gemini"
 PAINT_RULES = (
     " Style: a modern, clean editorial illustration for a finance news site, wide 16:9, rich but "
-    "not garish colour, one clear subject. Absolutely no text, letters, numbers, labels, logos, "
-    "watermarks or signatures, no recognisable real person, and no symbol of any cryptocurrency, "
-    "company or product (no Bitcoin \u20bf, no Ethereum diamond, no $ on coins): coins and tokens "
-    "are plain and unmarked."
+    "not garish colour, one clear subject. Absolutely no text, letters, numbers, labels, "
+    "company logos, watermarks or signatures, and no recognisable real person (symbols of "
+    "cryptocurrencies may appear when asked for)."
 )
 
 
