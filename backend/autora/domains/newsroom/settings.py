@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from autora.infra.settings import env_file
 
-USER_AGENT = "AutoraNewsroom/0.1 (+https://github.com/devince1105/autora)"
+USER_AGENT = "AutoraNewsroom/0.1 (+https://github.com/devince1105/aisiwhale)"
 """How the newsroom introduces itself to the sites it polls.
 
 A feed publisher's operator reads this, so it should say which of this software's businesses is

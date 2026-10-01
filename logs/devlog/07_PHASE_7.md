@@ -2328,6 +2328,11 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - (4) `render.yaml`：API 與 Worker 共用一份環境變數清單（YAML 錨點），機密 `sync: false`，`API_BEARER_TOKEN` 由 Render 產生。
 - 驗證：以 render.yaml 的值加假機密、當作真的環境變數載入，正式設定通過；全部後端測試 2,032 項通過；lint 與分層規則通過。重啟 API 與 worker，本機照常。
 
+## 儲存庫改名為 aisiwhale
+
+- 使用者：「專案可以改名為 aisiwhale 嗎」→ 只改儲存庫名稱（程式裡的 `autora` 套件、`AUTORA_*` 設定、資料庫名不改，那會動到數百個檔案）。
+- `gh repo rename`：`devince1105/autora` → `devince1105/aisiwhale`（GitHub 自動把舊網址轉過去）；本機 `origin` 改指新網址；新聞室抓網頁時的 User-Agent 與部署計畫裡的網址同步更新。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
