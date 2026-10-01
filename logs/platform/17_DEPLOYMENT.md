@@ -54,7 +54,7 @@
 
 1. **Neon**：建立專案（Region：AWS Singapore），資料庫名 `autora`；記下**直連**連線字串（不是 pooled）。
 2. **Cloudflare R2**：另建一個**私有** bucket（例：`aisiwhale-private`，不開公開存取）給 §3.1；沿用現有 API 金鑰或另發一把只能讀寫這兩個 bucket 的。
-3. **Render**：New → Blueprint → 連結 GitHub `devince1105/aisiwhale`（讀根目錄的 `render.yaml`，自動建立 `autora-api` 與 `autora-worker`，新加坡）；畫面會列出所有 `sync: false` 的變數讓你填（§5），`API_BEARER_TOKEN` 自動產生。
+3. **Render**：New → Blueprint → 連結 GitHub `devince1105/aisiwhale`（讀根目錄的 `render.yaml`，自動建立 `aisiwhale-api` 與 `aisiwhale-worker`，新加坡）；畫面會列出所有 `sync: false` 的變數讓你填（§5），`API_BEARER_TOKEN` 自動產生。
 4. **Vercel**：匯入同一個 repo，Framework「Next.js」，Root Directory `frontend/web`（保留「Include files outside the root directory」，因為它用到 `frontend/event-schema`），Install Command 用預設（偵測到 pnpm workspace）；填 §5 的環境變數；Production 分支 `main`。
 5. **Cloudflare DNS**：
    - `aisiwhale.com`、`www` → Vercel（Vercel 會給 A／CNAME 記錄；Cloudflare 代理設「DNS only」灰雲，讓 Vercel 簽憑證）

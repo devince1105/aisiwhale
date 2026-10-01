@@ -8,7 +8,7 @@ previews:
 
 services:
   - type: web
-    name: autora-api
+    name: aisiwhale-api
     runtime: python
     region: singapore
     plan: starter
@@ -111,7 +111,7 @@ services:
         sync: false
 
   - type: worker
-    name: autora-worker
+    name: aisiwhale-worker
     runtime: python
     region: singapore
     plan: starter
