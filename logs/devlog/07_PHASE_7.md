@@ -2344,6 +2344,12 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 發現：在 Render 留空的欄位（`MODEL_DAILY_CAP_USD`、`OFFICIAL_TRADES_ENABLED`）會讓設定驗證失敗、服務起不來。設定改為 `env_ignore_empty=True`（空值＝沒設定，用預設），加測試。全部後端測試 2,033 通過；1 項 WebSocket 心跳測試在滿載時逾時，單獨跑三次都通過。
 - 確認空的 Neon 上 worker 不會自己建立公司或啟動週期：第一次部署不會花模型費用。
 
+## Render 上線（API 與 worker）
+
+- 使用者先誤入「單一 Web Service」手動表單（Build Command 是 requirements.txt、沒有啟動指令與變數），改用 Blueprint；服務改名為 `aisiwhale-api`、`aisiwhale-worker`。
+- 要填的機密很多：分成 ① 啟動必要 5 個、② 上線前必要 9 個、③ 功能 12 個、④ 留空 3 個；第一次部署只填 ①（兩個服務各一份）。為了好抄，產生了只有使用者可讀、git 忽略的 `data/render-values.env`（已去掉行尾註解、`DATABASE_URL` 換成 Neon 的字串）；用完要刪。
+- 結果：`https://aisiwhale-api.onrender.com/health` 200；公開 API 回空清單（Neon 已建表）；管理 API 401；CORS 對 `https://aisiwhale.com` 允許含 cookie；WebSocket 錯誤權杖回 unauthorized。worker 狀態請使用者在 Render 確認。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

@@ -121,6 +121,7 @@
 - 家用網路擋 5432；手機熱點可連（從本機 174 ms／查詢；從 Render 新加坡會是個位數毫秒）。資料搬家要在熱點下做。
 - 本機 Python（python.org 版）沒有系統憑證：本機連 Neon 要用 `certifi` 的憑證（或執行 Applications/Python 3.12/Install Certificates.command）；雲端不受影響。
 - 本機與 CI 已升級到 Postgres 18（D-152）。
+- Render Blueprint 建立 `aisiwhale-api` 與 `aisiwhale-worker`（新加坡、Starter），先只填啟動必要的 5 個機密（`DATABASE_URL`、`TAVILY_API_KEY`、三個 R2）。API 在 `https://aisiwhale-api.onrender.com`：`/health` 200、公開 API 連到 Neon（部署前遷移已建表，回空清單）、管理 API 無權杖 401、CORS 允許 `https://aisiwhale.com` 含 cookie、WebSocket 連得上（錯誤權杖回 unauthorized）。上線前要補第 ② ③ 類變數（模型、嵌入、管理員、首圖、行情、金流、Email）。
 - R2 私有 bucket `aisiwhale-private`（APAC，未開公開網址）已建立；API 金鑰（`a73d48…`）的權限涵蓋 `aisiwhale` 與 `aisiwhale-private`。實測：寫入、讀回相同、沒有金鑰的請求被拒（400）、刪除後讀不到；首圖 bucket 照常可讀寫。
 
 ## 8. 待決定
