@@ -124,6 +124,14 @@
 - Render Blueprint 建立 `aisiwhale-api` 與 `aisiwhale-worker`（新加坡、Starter），先只填啟動必要的 5 個機密（`DATABASE_URL`、`TAVILY_API_KEY`、三個 R2）。API 在 `https://aisiwhale-api.onrender.com`：`/health` 200、公開 API 連到 Neon（部署前遷移已建表，回空清單）、管理 API 無權杖 401、CORS 允許 `https://aisiwhale.com` 含 cookie、WebSocket 連得上（錯誤權杖回 unauthorized）。上線前要補第 ② ③ 類變數（模型、嵌入、管理員、首圖、行情、金流、Email）。
 - R2 私有 bucket `aisiwhale-private`（APAC，未開公開網址）已建立；API 金鑰（`a73d48…`）的權限涵蓋 `aisiwhale` 與 `aisiwhale-private`。實測：寫入、讀回相同、沒有金鑰的請求被拒（400）、刪除後讀不到；首圖 bucket 照常可讀寫。
 
+## 7.2 上線（2026-10-01 晚）
+
+- **網域**：`aisiwhale.com`、`www` → Vercel（CNAME `adc91c2b90e38b1a.vercel-dns-017.com`），`api` → Render（CNAME `aisiwhale-api.onrender.com`），全部橘雲、SSL/TLS Full (strict)。先灰雲等 Vercel／Render 自行簽 Let's Encrypt／Google 憑證，再改橘雲。Cloudflare 原產地證書用不到（Vercel、Render 都不能上傳），已撤銷。`news.aisiwhale.com` 不做；要做也只用 Cloudflare 301 轉到 `www…/news`。Bot Fight Mode 不可開（會擋 PayUni 通知）。
+- **Render ②③ 類變數**：Blueprint 的 `sync: false` 會先建好空欄位，「Add from .env」遇到同名會報 Duplicate key；做法是先刪掉空的那幾列、同一次編輯裡再貼上。
+- **資料搬家（§6 選 A）**：暫停 Render worker → 停本機 worker → 容器內 `pg_dump -Fc --no-owner --no-acl` → 手機熱點下 `pg_restore --clean --if-exists --no-owner --no-acl --single-transaction`，用 `-L` 清單略過 `vector` 擴充與其註解（Neon 已有，重建需擁有者權限，一個錯就整筆回滾）→ 65 張表逐表筆數與本機相同。私有 blob 4443 個（197 MB）走 443 埠，家用網路即可上傳。
+- **Vercel**：`NEXT_PUBLIC_API_URL` 若建成 Secret 類型，改值會被擋（公開前綴不得為 Secret），要刪掉重建為 Config；改完 Redeploy 且不用建置快取。驗證：瀏覽器端 JS 內嵌 `api.aisiwhale.com`、從 `www` 跨網域帶 cookie 讀 API 200、文章頁首圖從 `img.aisiwhale.com` 載入。
+- 本機 worker 自此停用；本機資料庫不再是正式資料。
+
 ## 8. 待決定
 
 - §6 選 A 或 B。
