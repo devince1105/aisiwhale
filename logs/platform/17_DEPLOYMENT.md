@@ -1,0 +1,116 @@
+# 17 雲端部署計畫（Vercel ＋ Render ＋ Neon ＋ Cloudflare）
+
+2026-10-01 草擬（D-151）。使用者選定：後端 Render 新加坡、資料庫 Neon 新加坡、前端 Vercel、DNS／圖片 Cloudflare。
+本文件只是計畫：**開帳號、付費、改 DNS、上線都由使用者確認後才做**。
+
+## 1. 架構
+
+| 元件 | 放在哪 | 說明 |
+|---|---|---|
+| 網站＋後台（Next.js 16） | **Vercel** | `aisiwhale.com`、`www.aisiwhale.com` |
+| API（FastAPI，含 WebSocket） | **Render** Web Service，新加坡 | `api.aisiwhale.com`；`/health` 健康檢查 |
+| Worker（代理、排程、每日週期） | **Render** Background Worker，新加坡 | 必須一直開著；排程在它裡面跑（沒有外部 cron） |
+| Postgres＋pgvector | **Neon**，新加坡（aws-ap-southeast-1） | 用**直連端點**（不用 `-pooler`），見 §3.2 |
+| DNS、首圖、品牌標誌 | **Cloudflare** | R2 已在用：`img.aisiwhale.com` |
+| Email | Resend | 寄信網域需驗證 `aisiwhale.com` |
+| 金流 | PayUni | 回呼網址改成正式網域 |
+
+同一區域（新加坡）放 API、Worker、資料庫，查詢不跨海；台灣讀者到 Vercel 走最近的邊緣節點。
+
+## 2. 估計費用（每月，以 2026 年中的價目為準，開帳號前再確認）
+
+| 項目 | 方案 | 約 |
+|---|---|---|
+| Render API | Starter（512 MB） | US$7 |
+| Render Worker | Starter（512 MB）；代理多時可能要 Standard（2 GB，US$25） | US$7–25 |
+| Neon | Launch（依用量；小型約 US$5–20） | US$5–20 |
+| Vercel | Hobby 免費（**不可商用**）；有付費會員就要 Pro US$20 | US$0–20 |
+| Cloudflare | DNS 免費；R2 10 GB 內免費 | ~US$0 |
+| 合計 | | **約 US$20–70** ＋模型與資料 API 用量 |
+
+> Vercel Hobby 條款不允許商業用途；網站有付費會員（D-025），正式收費前應改 Pro。
+
+## 3. 上線前要改的程式（由我做，使用者同意後）
+
+1. **共用的 Blob 存放改到 R2**（必要）。現在代理的對話紀錄、證據快照存在本機磁碟（`LocalFSBlobStore`）：
+   Render 的 API 與 Worker 是兩台機器、磁碟不共享，每次部署也會清空 → 後台看不到執行紀錄、代理中斷後無法續跑。
+   做法：新增 `R2BlobStore`（沿用已寫好的 Signature V4），存在 R2 的私有路徑（例如另一個私有 bucket `aisiwhale-private`），**不能**放在公開的圖片 bucket。
+2. **資料庫連線**：Neon 給的網址是 `postgres://…?sslmode=require`，要改成 `postgresql+asyncpg://…?ssl=require`。
+   用**直連端點**：即時推播用 `LISTEN`，且 asyncpg 預設會用 prepared statement，兩者都不能經過 Neon 的連線池（PgBouncer transaction mode）。
+   每個程序最多 10 條連線（pool 5＋overflow 5），API＋Worker 約 20 條，在 Neon 限額內。
+3. **讀者登入 cookie 跨子網域**：cookie 由 API（`api.aisiwhale.com`）設定，目前沒有 `domain`，只屬於 API 網域；
+   網站伺服器端渲染文章時讀不到 → 會員文章永遠顯示成未登入。新增設定 `COOKIE_DOMAIN=.aisiwhale.com`，讀者與管理員 cookie 都帶上。
+4. **部署設定檔**：`render.yaml`（API、Worker、部署前執行 `alembic upgrade head`）；Vercel 專案設 Root Directory `frontend/web`。
+5. **自動化**：CI 通過後才部署（Render、Vercel 都可設「只部署 main 且 CI 綠燈」）。
+
+## 4. 使用者要做的帳號設定（照順序）
+
+1. **Neon**：建立專案（Region：AWS Singapore），資料庫名 `autora`；記下**直連**連線字串（不是 pooled）。
+2. **Cloudflare R2**：另建一個**私有** bucket（例：`aisiwhale-private`，不開公開存取）給 §3.1；沿用現有 API 金鑰或另發一把只能讀寫這兩個 bucket 的。
+3. **Render**：連結 GitHub `devince1105/autora`，用 `render.yaml` 建立 API 與 Worker（Region：Singapore）；填 §5 的環境變數。
+4. **Vercel**：匯入同一個 repo，Root Directory `frontend/web`，填 §5 的環境變數；Production 分支 `main`。
+5. **Cloudflare DNS**：
+   - `aisiwhale.com`、`www` → Vercel（Vercel 會給 A／CNAME 記錄；Cloudflare 代理設「DNS only」灰雲，讓 Vercel 簽憑證）
+   - `api` → Render 給的 `*.onrender.com`（CNAME，DNS only）
+   - `img` → R2（已完成）
+6. **Resend**：驗證寄信網域 `aisiwhale.com`（加 SPF／DKIM 記錄），`EMAIL_FROM` 改成 `艾矽鯨 <news@aisiwhale.com>` 之類。
+7. **PayUni**：後台的回呼網址改成 §5 的正式網址（先用 sandbox 測一筆）。
+
+## 5. 環境變數
+
+### Render：API 與 Worker 共用（建議用 Render 的 Environment Group）
+
+| 變數 | 值 |
+|---|---|
+| `AUTORA_ENV` | `prod` |
+| `DATABASE_URL` | `postgresql+asyncpg://…@…neon.tech/autora?ssl=require`（直連） |
+| `API_BEARER_TOKEN` | 新的長亂數（不可沿用開發用的） |
+| `ADMIN_EMAILS` | 管理員信箱（JSON 陣列） |
+| `SITE_BASE_URL` | `https://aisiwhale.com` |
+| `CORS_ORIGINS` | `["https://aisiwhale.com","https://www.aisiwhale.com"]` |
+| `COOKIE_DOMAIN` | `.aisiwhale.com`（§3.3 新增） |
+| 模型 | `MODEL_PROVIDER`、`OPENAI_API_KEY`、`FRONTIER_MODEL_ID`、`FAST_MODEL_ID`、`MODEL_PRICES`、`MODEL_DAILY_CAP_USD` |
+| 嵌入 | `EMBED_PROVIDER`、`EMBED_MODEL_ID`（＋其金鑰） |
+| 工具 | `TOOLS_PROFILE=live`、`TAVILY_API_KEY`、`FETCH_CONTACT_EMAIL` |
+| 行情 | `FRED_API_KEY`、`FINNHUB_API_KEY`、`TIINGO_API_KEY`、`FUGLE_API_KEY` |
+| 首圖 | `PIXABAY_API_KEY`、`GEMINI_API_KEY`、`COVER_IMAGE_MODEL`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_KEY_PREFIX`、`R2_PUBLIC_BASE_URL` |
+| 私有 Blob | `BLOB_R2_BUCKET`（§3.1 新增） |
+| Email | `EMAIL_PROVIDER=resend`、`RESEND_API_KEY`、`EMAIL_FROM` |
+| 金流 | `PAYUNI_ENV`、`PAYUNI_MER_ID`、`PAYUNI_HASH_KEY`、`PAYUNI_HASH_IV`、`PAYUNI_RETURN_URL=https://aisiwhale.com/news/zh-TW/membership/return`、`PAYUNI_NOTIFY_URL=https://api.aisiwhale.com/api/payments/payuni/notify` |
+| 其他 | `OFFICIAL_TRADES_ENABLED`、`WORKER_CONCURRENCY` |
+
+### Vercel
+
+| 變數 | 值 | 備註 |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://api.aisiwhale.com` | **建置時**寫入；改了要重新部署 |
+| `API_INTERNAL_URL` | `https://api.aisiwhale.com` | 伺服器端用 |
+| `NEXT_PUBLIC_SITE_COMPANY`、`SITE_COMPANY` | 公司代號 | |
+| `SITE_OPERATOR`、`SITE_OPERATOR_OWNER`、`SITE_CONTACT_EMAIL`、`SITE_CONTACT_PHONE` | 經營者資訊 | 個人資料只放 Vercel，不進 repo |
+| `SITE_MEMBERSHIP_OPEN` | | |
+
+## 6. 資料搬家
+
+選一種（建議 A）：
+- **A. 搬現有資料**：`pg_dump`（本機 docker）→ `pg_restore` 到 Neon；文章、題材、首圖紀錄、會員都保留。本機 `data/blobs` 依 §3.1 上傳到私有 bucket。
+- **B. 全新開始**：Neon 上跑 migration、建立公司；舊文章不帶過去。
+
+## 7. 上線順序
+
+1. 程式修改（§3）合併、CI 綠燈。
+2. Neon 建好 → 本機對 Neon 跑 `alembic upgrade head` → 搬資料（§6）。
+3. Render 建 API（先用 `*.onrender.com` 網址）→ `/health` 正常、WebSocket 連得上。
+4. Render 建 Worker → 看 log 有 scheduler tick、沒有錯誤。**本機的 worker 要停掉**，避免兩邊同時跑同一家公司。
+5. Vercel 部署（先用 `*.vercel.app` 預覽網址，`CORS_ORIGINS` 暫時加上它）。
+6. 全部驗收：首頁、文章、首圖、登入信、後台審批、辦公室即時畫面、PayUni sandbox 一筆。
+7. 切 DNS（§4.5）→ 改 `SITE_BASE_URL`、`CORS_ORIGINS` 成正式網域 → 重驗一次。
+8. 觀察一個完整的每日週期（14:00）。
+
+**回退**：DNS 指回原處；Render／Vercel 都可一鍵回到上一版；資料庫有 Neon 的時間點還原。
+
+## 8. 待決定
+
+- §6 選 A 或 B。
+- Vercel Hobby 或 Pro（有收費就要 Pro）。
+- Worker 先用 Starter（512 MB）觀察記憶體，不夠再升級。
+- 正式上線前：Tiingo、Finnhub、富果的商用方案（D-059、D-061、D-074 已註記）。
