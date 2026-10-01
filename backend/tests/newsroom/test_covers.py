@@ -277,6 +277,8 @@ async def test_the_viewer_says_what_each_image_looks_like_and_what_it_cost():
     assert cost == Decimal("0.0008")  # 1000 x 0.2 + 500 x 1.2, per million
     assert seen["body"]["max_completion_tokens"] == 2000
     assert photos[0].for_model(looks[photos[0].id])["looks"]["style"] == "cartoon"
+    # not an image: nothing is sent, nothing fails
+    assert await viewer.look_at("broken", b"not an image") == (None, 0)
     # what it saw is kept: asking again about the same image costs nothing
     again, cost = await viewer.look(library, photos[:1])
     assert again and cost == 0
@@ -409,3 +411,32 @@ async def test_a_generated_cover_is_the_cover_keeps_the_library_photos_and_has_a
     assert [c["id"] for c in row.candidates][:2] == [found[0].id, found[1].id]
     with pytest.raises(covers.CoverError, match="today"):
         await tool(args, ctx)
+
+
+async def test_a_generated_image_is_looked_at_closely():
+    # D-147: a small symbol (a crypto logo on a wallet) is missed at low detail
+    sent = {}
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent["body"] = json.loads(request.content)
+        said = {
+            "images": [{"photo_id": "g", "looks": "a wallet", "text_or_logo": "Ethereum symbol"}]
+        }
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(said)}}], "usage": {}},
+        )
+
+    viewer = covers.ImageViewer(
+        base_url="https://model.test/v1",
+        api_key="k",
+        model="m",
+        price_in=0.2,
+        price_out=1.2,
+        client=httpx.AsyncClient(transport=httpx.MockTransport(answer)),
+    )
+    data, cost = await covers.FixturePainter().paint("a wallet")
+    looked, _ = await viewer.look_at("g", data)
+    assert looked["text_or_logo"] == "Ethereum symbol"
+    [image] = [c for c in sent["body"]["messages"][1]["content"] if c["type"] == "image_url"]
+    assert image["image_url"]["detail"] == "high"

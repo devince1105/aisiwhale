@@ -229,8 +229,8 @@ looks. Be plain and specific. Reply with only a JSON object:
 {"images": [{"photo_id": "<id>", "looks": "<one sentence: what is in the picture and how it is
 drawn or shot>", "style": "photo | 3d render | flat illustration | cartoon | clip art or icons |
 chart graphic | other", "dated": <true if it looks old-fashioned: old electronics, retro, 2000s
-stock art, binary-digit backdrops>, "text_or_logo": "<none, or which words, logo or brand is
-visible>", "quality": "high | ok | poor"}]}"""
+stock art, binary-digit backdrops>, "text_or_logo": "<none, or which words, logo, brand or
+cryptocurrency symbol (Bitcoin, Ethereum...) is visible>", "quality": "high | ok | poor"}]}"""
 
 
 class ImageViewer:
@@ -260,10 +260,10 @@ class ImageViewer:
         self._seen: dict[str, dict[str, Any]] = {}
 
     @staticmethod
-    def _thumbnail(data: bytes) -> str:
+    def _thumbnail(data: bytes, size: int = 512) -> str:
         with Image.open(io.BytesIO(data)) as image:
             small = ImageOps.exif_transpose(image).convert("RGB")
-            small.thumbnail((512, 512))
+            small.thumbnail((size, size))
             out = io.BytesIO()
             small.save(out, "JPEG", quality=80)
         return "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode()
@@ -286,20 +286,24 @@ class ImageViewer:
 
     async def look_at(self, image_id: str, data: bytes) -> tuple[dict[str, Any] | None, Decimal]:
         """What one image in hand looks like (a generated cover, D-145)."""
-        cost = await self._ask([(image_id, data)])
+        # one image, looked at closely: a small symbol (a crypto logo on a wallet) is missed at
+        # low detail, and a generated image is where the model slips them in
+        cost = await self._ask([(image_id, data)], detail="high")
         return self._seen.get(image_id), cost
 
-    async def _ask(self, images: list[tuple[str, bytes]]) -> Decimal:
+    async def _ask(self, images: list[tuple[str, bytes]], detail: str = "low") -> Decimal:
         content: list[dict[str, Any]] = [{"type": "text", "text": "The candidates:"}]
         for image_id, data in images:
             try:
-                url = self._thumbnail(data)
+                url = self._thumbnail(data, 1200 if detail == "high" else 512)
             except (OSError, Image.DecompressionBombError):
                 continue
             content += [
                 {"type": "text", "text": f"photo_id {image_id}:"},
-                {"type": "image_url", "image_url": {"url": url, "detail": "low"}},
+                {"type": "image_url", "image_url": {"url": url, "detail": detail}},
             ]
+        if len(content) == 1:
+            return Decimal(0)  # nothing that could be opened: nothing to ask
         body = {
             "model": self._model,
             "messages": [
@@ -364,7 +368,9 @@ GENERATED = "gemini"
 PAINT_RULES = (
     " Style: a modern, clean editorial illustration for a finance news site, wide 16:9, rich but "
     "not garish colour, one clear subject. Absolutely no text, letters, numbers, labels, logos, "
-    "watermarks or signatures, and no recognisable real person."
+    "watermarks or signatures, no recognisable real person, and no symbol of any cryptocurrency, "
+    "company or product (no Bitcoin \u20bf, no Ethereum diamond, no $ on coins): coins and tokens "
+    "are plain and unmarked."
 )
 
 

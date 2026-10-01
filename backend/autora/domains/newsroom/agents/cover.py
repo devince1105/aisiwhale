@@ -46,7 +46,9 @@ one. Try different words before giving up on it.
    with an English prompt for an image that fits — the subject as a picture, composition, colour
    and mood (e.g. "a sleek dark-blue 3D dashboard of portfolio holdings, glowing bar charts and
    pie segments floating above a glass desk"). It costs more than a library photo, so only then.
-   If its "looks" shows text, a logo or a person, or it does not fit, generate once more; if
+   Coins and tokens in a prompt are plain: never a cryptocurrency's symbol (a stablecoin story is
+   not Bitcoin's or Ethereum's). If its "looks" shows text, a logo, a crypto symbol or a person,
+   or it does not fit, generate once more; if
    generation is not available, report no cover.
 
 Look: current and clean, like a finance site's lead image today. For technology, chips and AI,
