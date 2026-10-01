@@ -10,7 +10,7 @@
 | 網站＋後台（Next.js 16） | **Vercel** | `aisiwhale.com`、`www.aisiwhale.com` |
 | API（FastAPI，含 WebSocket） | **Render** Web Service，新加坡 | `api.aisiwhale.com`；`/health` 健康檢查 |
 | Worker（代理、排程、每日週期） | **Render** Background Worker，新加坡 | 必須一直開著；排程在它裡面跑（沒有外部 cron） |
-| Postgres＋pgvector | **Neon**，新加坡（aws-ap-southeast-1） | 用**直連端點**（不用 `-pooler`），見 §3.2 |
+| Postgres 18＋pgvector | **Neon**，新加坡（aws-ap-southeast-1） | 用**直連端點**（不用 `-pooler`），見 §3.2；本機與 CI 也是 18（D-152） |
 | DNS、首圖、品牌標誌 | **Cloudflare** | R2 已在用：`img.aisiwhale.com` |
 | Email | Resend | 寄信網域需驗證 `aisiwhale.com` |
 | 金流 | PayUni | 回呼網址改成正式網域 |
@@ -107,6 +107,13 @@
 8. 觀察一個完整的每日週期（14:00）。
 
 **回退**：DNS 指回原處；Render／Vercel 都可一鍵回到上一版；資料庫有 Neon 的時間點還原。
+
+## 7.1 已完成（2026-10-01）
+
+- Neon 專案 `aisiwhale`、分支 `production`、資料庫 `aisiwhale`（PostgreSQL 18.6、pgvector 0.8.6），直連字串在 `.env` 的 `NEON_DATABASE_URL`（尚未取代 `DATABASE_URL`）。
+- 家用網路擋 5432；手機熱點可連（從本機 174 ms／查詢；從 Render 新加坡會是個位數毫秒）。資料搬家要在熱點下做。
+- 本機 Python（python.org 版）沒有系統憑證：本機連 Neon 要用 `certifi` 的憑證（或執行 Applications/Python 3.12/Install Certificates.command）；雲端不受影響。
+- 本機與 CI 已升級到 Postgres 18（D-152）。
 
 ## 8. 待決定
 

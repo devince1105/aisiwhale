@@ -2312,6 +2312,13 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 交給子代理盤點部署相關的事實，找到四個在雲端會出問題的地方：本機 Blob 磁碟（API 與 Worker 不共享、部署會清空）、Neon 連線池不支援 LISTEN 與 prepared statement、cookie 只屬於 API 網域（網站讀不到會員狀態）、沒有部署前 migration。
 - 計畫寫在 `logs/platform/17_DEPLOYMENT.md`：架構、費用、要改的程式、使用者要做的帳號設定、各服務的環境變數、資料搬家、上線順序與回退、待決定事項。只是計畫，未開帳號或部署。
 
+## D-152：本機與 CI 升級到 Postgres 18
+
+- Neon 連線：家用網路擋 5432（使用者的終端機與這個工作階段都逾時）；參考 nanguado-shop，發現它用 Neon 的 serverless 驅動走 HTTPS 443，Autora 需要真正的 Postgres 連線（LISTEN、advisory lock、交易），所以部署後從 Render 連即可，只有資料搬家要用熱點。熱點下連上 Neon：PostgreSQL 18.6、pgvector 0.8.6、資料庫 `aisiwhale`、空的；本機 Python 需用 certifi 的憑證。
+- Neon 是 18、本機與 CI 是 16，使用者選把本機升到 18。
+- 步驟：停 API、worker → `pg_dump -Fc` 20 MB＋65 張表筆數 → `docker-compose.yml` 換 `pgvector/pgvector:pg18`、新資料卷（18 的資料目錄在 `/var/lib/postgresql/18/docker`）→ `pg_restore --exit-on-error` → 65 張表筆數完全相同、`alembic` 檢查無差異 → 重啟，首頁與首圖正常。舊的 16 資料卷保留。
+- CI 兩處改為 pg18；全部後端測試在 18 上跑：2,015 項全部通過（6 分 37 秒）。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

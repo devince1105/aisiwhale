@@ -2,7 +2,8 @@ name: autora
 
 services:
   db:
-    image: pgvector/pgvector:pg16
+    # Postgres 18, as on Neon (D-152); the pg16 volume (autora-db-data) is kept as a backup
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_USER: autora
       POSTGRES_PASSWORD: autora
@@ -10,7 +11,8 @@ services:
     ports:
       - "${AUTORA_DB_PORT:-5434}:5432"
     volumes:
-      - autora-db-data:/var/lib/postgresql/data
+      # 18's image keeps its data under /var/lib/postgresql/18/docker: mount the parent
+      - autora-db-data-18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U autora -d autora"]
       interval: 2s
@@ -71,5 +73,6 @@ services:
       - api
 
 volumes:
-  autora-db-data:
+  autora-db-data:      # Postgres 16 (until D-152): kept, not mounted
+  autora-db-data-18:
   autora-blobs:
