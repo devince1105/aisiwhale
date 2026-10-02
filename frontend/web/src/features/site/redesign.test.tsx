@@ -364,3 +364,19 @@ describe("外匯: the bank's rates a click away (D-072)", () => {
     expect(await fetchFigure("jpytwd", { baseUrl: "http://api", fetch: down })).toBeNull();
   });
 });
+
+describe("the language button (D-164)", () => {
+  it("is a flag and a short name, and opens the editions with theirs", async () => {
+    const { LanguageMenu } = await import("./LanguageMenu");
+    nav.pathname = "/news/zh-TW/watchlist";
+    nav.search = "s=us:MSFT";
+    render(<LanguageMenu lang="zh-TW" />);
+    const button = screen.getByRole("button", { name: "語言" });
+    expect(button.textContent).toBe("台");
+    expect(button.querySelector('[data-flag="tw"]')).not.toBeNull();
+    fireEvent.click(button);
+    const english = screen.getByRole("link", { name: "English" });
+    expect(english.querySelector('[data-flag="us"]')).not.toBeNull();
+    expect(english.getAttribute("href")).toBe("/news/en/watchlist?s=us%3AMSFT");
+  });
+});

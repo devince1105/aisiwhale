@@ -10,6 +10,9 @@ export const LANG_NAMES: Record<Lang, string> = { "zh-TW": "中文", en: "Englis
 /** As the language menu names each (D-087): its script, as a newspaper names its editions. */
 export const LANG_LABELS: Record<Lang, string> = { "zh-TW": "繁體中文", en: "English" };
 
+/** The language button's own short name, beside its flag (D-164). */
+export const LANG_SHORT: Record<Lang, string> = { "zh-TW": "台", en: "En" };
+
 const WORDS = {
   "zh-TW": {
     site: "艾矽鯨",
