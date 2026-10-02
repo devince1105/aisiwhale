@@ -9,6 +9,7 @@ import { assignSeats } from "../scene/layout";
 import { CueDirector, HANDOVER_MS, routeFor, WALK_SPEED } from "./CueRunner";
 import type { VisualCue, WalkCue } from "./cues";
 import { CUE_TTL_MS, cuesFor, CueQueue, FLASH_MS, MAX_WALKS_QUEUED } from "./director";
+import { officeLog } from "./officeLog";
 
 // A randomised real runtime history (T-302 contract fixture).
 const fixture = JSON.parse(readFileSync(join(process.cwd(), "src/realtime/__fixtures__/contract.json"), "utf8")) as {
@@ -179,6 +180,20 @@ describe("CueDirector (store -> queue)", () => {
     clock = 5;
     director.queue.step(clock, () => 1000);
     expect(director.queue.walk(done.agent_id as string)?.cue).toMatchObject({ target: { role: handoffRoles(handed)[0] }, seq });
+    director.dispose();
+  });
+
+  it("the office log is the company's: it is emptied when the office shows nobody or someone else (D-155)", () => {
+    const store = createRealtimeStore();
+    store.getState().hydrate(fixture.snapshot_before);
+    const director = new CueDirector(store, () => 0);
+    officeLog.getState().add({ at: 0, agentId: "someone", text: "a line of this company's", kind: "work" });
+    store.getState().reset();
+    expect(officeLog.getState().lines).toEqual([]);
+    store.getState().hydrate(fixture.snapshot_before);
+    officeLog.getState().add({ at: 0, agentId: "someone", text: "again", kind: "work" });
+    store.getState().hydrate({ ...fixture.snapshot_before, company_id: "01a0b700-0000-7000-8000-0000000000ff" });
+    expect(officeLog.getState().lines).toEqual([]);
     director.dispose();
   });
 });

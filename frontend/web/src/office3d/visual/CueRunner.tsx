@@ -49,13 +49,17 @@ export class CueDirector {
 
   private onState(state: RealtimeStoreState): void {
     const company = state.company;
+    // The office log is the company's too: another company's lines (the public demo's, D-155, or
+    // the one picked before) must not stay on screen once the office shows someone else.
     if (!company) {
+      if (this.companyId !== null) officeLog.getState().clear();
       this.companyId = null;
       this.queue.clear();
       return;
     }
     if (company.companyId !== this.companyId) {
       // a snapshot is history, not news: nothing to animate
+      if (this.companyId !== null) officeLog.getState().clear();
       this.companyId = company.companyId;
       this.lastSeq = company.lastSeq;
       this.queue.clear();

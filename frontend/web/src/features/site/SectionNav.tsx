@@ -11,12 +11,14 @@ import { listHref } from "./links";
 import { LanguageMenu } from "./LanguageMenu";
 import { filterName, isFilter, isSection, topicOf, TOPICS, type Lang, type Topic, words } from "./i18n";
 
-type Current = Topic | "all" | "watchlist" | null;
+type Current = Topic | "all" | "watchlist" | "office" | null;
 
 /** Which tab is current: on the front page, its tab (a section's is the tab it is under) or
- * "all"; on the watchlist page, the watchlist's (D-063); on any other page, none. */
+ * "all"; on the watchlist page, the watchlist's (D-063); on the demo office, its own (D-155); on
+ * any other page, none. */
 export function currentSection(lang: Lang, pathname: string, section: string | null): Current {
   if (pathname === `/news/${lang}/watchlist`) return "watchlist";
+  if (pathname === `/news/${lang}/office`) return "office";
   if (pathname !== `/news/${lang}`) return null;
   if (!isFilter(section)) return "all";
   return isSection(section) ? topicOf(section) : section;
@@ -24,11 +26,13 @@ export function currentSection(lang: Lang, pathname: string, section: string | n
 
 function Tabs({ lang, current }: { lang: Lang; current: Current }) {
   const w = words(lang);
-  const tabs: [Topic | "watchlist" | null, string][] = [
+  const tabs: [Topic | "watchlist" | "office" | null, string][] = [
     [null, w.all],
     ...TOPICS.map((t): [Topic, string] => [t, filterName(lang, t)]),
     // the reader's own list, last: not a section of the news, but where they go next (D-063)
     ["watchlist", w.watch.link],
+    // how the stories are made (D-155): a demo of the newsroom at work
+    ["office", w.office.link],
   ];
   return (
     // px-1: with each tab's own px-3, the first label sits on the column's edge, under the masthead
@@ -38,7 +42,7 @@ function Tabs({ lang, current }: { lang: Lang; current: Current }) {
         return (
           <li key={id ?? "all"} className="shrink-0">
             <Link
-              href={id === "watchlist" ? `/news/${lang}/watchlist` : listHref(lang, id)}
+              href={id === "watchlist" || id === "office" ? `/news/${lang}/${id}` : listHref(lang, id)}
               aria-current={here ? "page" : undefined}
               className={`block border-b-2 px-3 py-2.5 text-sm whitespace-nowrap ${
                 here ? "border-ink font-semibold text-ink" : "border-transparent text-muted hover:text-ink"

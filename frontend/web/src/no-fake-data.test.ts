@@ -62,11 +62,28 @@ describe("the screen invents nothing (AC-S6)", () => {
     // position, frame by frame. It changes where the figures are, never what they are.
     // And the stock search's wait for a word rather than every letter (D-061): it only delays
     // when the API is asked; the results are the API's.
-    const named = ["features/site/PaymentDone.tsx:", "features/site/drift.ts:", "features/site/Watchlist.tsx:"];
+    // And the public site's demo office (D-155), the one place a timer *does* move the store: it
+    // plays a scripted office to visitors, made-up people labelled 示範畫面 on the page. It
+    // invents what it shows on purpose, so it is kept out of the back office (see the test below).
+    const named = [
+      "features/site/PaymentDone.tsx:",
+      "features/site/drift.ts:",
+      "features/site/Watchlist.tsx:",
+      "features/demo-office/player.ts:",
+    ];
     expect(hits(timers, "features").filter((hit) => !named.some((file) => hit.startsWith(file)))).toEqual([]);
     expect(hits(timers, "features/site/PaymentDone.tsx")).toHaveLength(1);
     expect(hits(timers, "features/site/drift.ts")).toHaveLength(2); // the first frame and the next
     expect(hits(timers, "features/site/Watchlist.tsx")).toHaveLength(1);
+    expect(hits(timers, "features/demo-office/player.ts")).toHaveLength(1);
+  });
+
+  it("the demo office is the public site's alone: nothing outside it plays its script", () => {
+    const users = hits(/demo-office/).filter(
+      (hit) => !hit.startsWith("features/demo-office/") && !hit.startsWith("app/(site)/news/[lang]/office/"),
+    );
+    // comments that name the decision are fine; an import is not
+    expect(users.filter((hit) => /\bfrom\s+["']/.test(hit))).toEqual([]);
   });
 
   it("the socket's own timers are the connection's, and are listed here by name", () => {
