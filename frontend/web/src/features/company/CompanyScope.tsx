@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { ApiError, type Schemas } from "@/api/client";
 import { companiesQuery } from "@/api/queries";
+import { SITE_COMPANY } from "@/config";
 import { storeToken } from "@/features/auth/TokenGate";
 
 export type Company = Schemas["CompanyOut"];
@@ -17,7 +18,9 @@ const message = (text: string, alert = false) => (
 );
 
 /**
- * The company an admin page shows: ?company=<id>, or — with none asked for — the first company
+ * The company an admin page shows: ?company=<id>, or — with none asked for — the one last shown
+ * in this browser, else this site's own company (SITE_COMPANY: the demo companies brought along
+ * with the data are older, and a new browser would open on one of them), else the first company
  * that has agents (a company nobody works at shows an empty office; old test companies linger in
  * a developer's database). Renders loading, error and "no company" states itself; a 401 goes back
  * to the token form.
@@ -29,6 +32,7 @@ export function CompanyScope({ children }: { children: (company: Company) => Rea
   const company = requested
     ? companies.data?.find((c) => c.id === requested)
     : (companies.data?.find((c) => c.id === last) ??
+      companies.data?.find((c) => c.slug === SITE_COMPANY) ??
       companies.data?.find((c) => c.agents > 0) ??
       companies.data?.[0]);
   useEffect(() => {

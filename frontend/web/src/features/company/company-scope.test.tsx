@@ -9,6 +9,7 @@ import { CompanyScope, withCompany } from "./CompanyScope";
 
 let search = "";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search) }));
+vi.mock("@/config", async (original) => ({ ...(await original<object>()), SITE_COMPANY: "aisiwhale" }));
 
 const EMPTY = { id: "c-empty", slug: "smoke-old", name: "舊的 smoke", type: "newsroom", mission: null, status: "active", created_at: "2026-09-17T00:00:00Z", agents: 0 };
 const STAFFED = { id: "c-newsroom", slug: "newsroom-demo", name: "流明日報", type: "newsroom", mission: null, status: "active", created_at: "2026-09-19T00:00:00Z", agents: 5 };
@@ -35,6 +36,11 @@ describe("the company a page shows", () => {
   it("prefers one with agents when the URL does not say", () => {
     show([EMPTY, STAFFED]);
     expect(screen.getByText("流明日報")).toBeTruthy();
+  });
+
+  it("a new browser opens on this site's own company, not an older demo one with agents", () => {
+    show([EMPTY, STAFFED, FINANCE]);
+    expect(screen.getByText("Autora 財經")).toBeTruthy();
   });
 
   it("still shows the only company there is, empty or not", () => {
