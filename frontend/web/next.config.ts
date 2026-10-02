@@ -9,12 +9,16 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: Boolean(process.env.NEXT_DIST_DIR) },
   // The back office moved under /admin (D-054); old bookmarks and the activity links already
   // stored in the database still say /dashboard, /newsroom/..., so they are sent on.
+  // /admin itself has no page: it opens the dashboard, which sends a signed-out visitor to login.
   async redirects() {
-    return ADMIN_PAGES.map((page) => ({
-      source: `/${page}/:rest*`,
-      destination: `/admin/${page}/:rest*`,
-      permanent: false,
-    }));
+    return [
+      { source: "/admin", destination: "/admin/dashboard", permanent: false },
+      ...ADMIN_PAGES.map((page) => ({
+        source: `/${page}/:rest*`,
+        destination: `/admin/${page}/:rest*`,
+        permanent: false,
+      })),
+    ];
   },
 };
 
