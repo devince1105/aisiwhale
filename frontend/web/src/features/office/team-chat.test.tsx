@@ -111,6 +111,21 @@ describe("the group's messages (D-109)", () => {
     expect(quiet.type === "notice" && quiet.link?.href).toBe("/admin/approvals");
   });
 
+  it("an article nobody decided in a day: the CEO takes it, and says what she decided (D-157)", () => {
+    const withCeo = { ...AGENTS, k1: agent("k1", "ceo", "Rinka｜凜花") };
+    const taken = chatItem(event("APPROVAL_DELEGATED", { kind: "article", ref_type: "task", ref_id: "t9", task_id: "t10" }), withCeo)!;
+    expect(taken.type === "message" && [taken.speaker, taken.text, taken.link?.href]).toEqual([
+      expect.objectContaining({ kind: "agent", role: "ceo", name: "凜花" }),
+      "有一篇等了一天沒有人決定，我來看看。您現在決定也可以。",
+      "/admin/approvals",
+    ]);
+    const ceo = { actor: { kind: "agent", id: "k1" } } as never;
+    const approved = chatItem(event("APPROVAL_APPROVED", { kind: "article", reason: "查核通過，值得發布。" }, ceo), withCeo)!;
+    expect(approved.type === "message" && [approved.text, approved.tone]).toEqual(["我核准發布這篇：查核通過，值得發布。", "ok"]);
+    const rejected = chatItem(event("APPROVAL_REJECTED", { kind: "article", reason: "已過時效。" }, ceo), withCeo)!;
+    expect(rejected.type === "message" && [rejected.text, rejected.tone]).toEqual(["這篇我決定不發：已過時效。", "danger"]);
+  });
+
   it("days and times in Taipei", () => {
     const now = new Date("2026-09-29T03:00:00Z");
     expect(dayLabel("2026-09-29T01:00:00Z", now)).toBe("今天");

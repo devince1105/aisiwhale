@@ -54,9 +54,9 @@ def register(runtime: RuntimeParts) -> None:
     runtime.approvals.on_decided(
         workflow.APPROVE_ACTION, workflow.on_article_decided(runtime.policy)
     )
-    # full automation (D-156): an article nobody objected to within a day is published
-    runtime.approvals.approve_when_unanswered(
-        workflow.APPROVE_ACTION, workflow.approve_article_when_unanswered
+    # full automation (D-157): an article nobody approved within a day, the CEO decides
+    runtime.approvals.delegate_when_unanswered(
+        workflow.APPROVE_ACTION, workflow.delegate_article_to_ceo(runtime.workflows)
     )
     # a person checked a transcribed transaction report: on the stock pages, or never (D-051)
     runtime.approvals.on_decided(official_trades.APPROVAL_ACTION, official_trades.on_report_decided)

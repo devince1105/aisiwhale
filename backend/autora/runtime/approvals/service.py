@@ -22,13 +22,17 @@ cannot be decided, so without one the task — and the article behind it — wai
 nobody could make, its workflow RUNNING for days and the operator's count of pending approvals
 at zero. The renewal is the reminder: it is asked again, and heard again in the team group.
 
-**Unless silence is consent** (D-156): a domain may say, per action, that an approval nobody has
-answered by its expiry is approved instead (``approve_when_unanswered(action, rule)``; the rule
-decides per approval, e.g. from a company policy). The decision is then the system's, recorded as
-``system:approvals`` with the reason, so it never reads as a person's. If the domain's hook refuses
-it (the article is no longer fit to approve), the approval expires and is asked again as before.
+**Unless someone is asked to decide instead** (D-157, replacing D-156's "silence is consent"):
+a domain may say, per action, who decides an approval nobody answered by its expiry
+(``delegate_when_unanswered(action, delegate)``: the hook starts that agent's task — the domain
+picks whom — and returns its id, or declines). The approval stays PENDING meanwhile, for a
+short window more: a person may still decide, and whoever decides first wins (the delegate's
+task is cancelled, or its tool told the approval was already decided). The delegate decides
+through ``decide_delegated`` — approve or reject, with a reason, recorded as that agent. If it
+declines, fails, or does not decide in the window, the approval expires and is asked again
+(D-131), and is not delegated again.
 
-Only humans decide — or, past the deadline and only where a domain allows it, nobody objecting.
+Only humans decide — or, past the deadline, the agent a domain named for it.
 Automatic approval (policy flag) is a PolicyEngine decision, not an approval.
 
 A domain can act on a decision in the same transaction (T-514): ``on_decided(action, hook)``
@@ -64,11 +68,13 @@ DecisionOutcome = Literal["approve", "reject", "revise"]
 DecisionHook = Callable[
     [AsyncSession, Approval, DecisionOutcome, Actor, str | None], Awaitable[None]
 ]
-UnansweredRule = Callable[[AsyncSession, Approval], Awaitable[bool]]
-"""Whether an approval of this action that nobody answered in time is approved (D-156)."""
+DelegateHook = Callable[[AsyncSession, Approval], Awaitable[uuid.UUID | None]]
+"""Start the task of whoever decides an approval nobody answered (D-157): its id, or None."""
 
-UNANSWERED = Actor.system("approvals")
-UNANSWERED_REASON = "nobody objected before the deadline"
+DELEGATE_WINDOW = timedelta(hours=6)
+"""How long the delegate has, before the approval expires and a person is asked again."""
+
+_TASK_DONE = {TaskState.SUCCEEDED, TaskState.FAILED, TaskState.CANCELLED}
 
 
 class ApprovalError(Exception):
@@ -81,19 +87,18 @@ class ApprovalService:
     default_expiry: timedelta = DEFAULT_EXPIRY
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
     hooks: dict[str, DecisionHook] = field(default_factory=dict)
-    unanswered: dict[str, UnansweredRule] = field(default_factory=dict)
+    delegates: dict[str, DelegateHook] = field(default_factory=dict)
 
     def on_decided(self, action: str, hook: DecisionHook) -> None:
         if action in self.hooks:
             raise ApprovalError(f"a decision hook for {action!r} is already registered")
         self.hooks[action] = hook
 
-    def approve_when_unanswered(self, action: str, rule: UnansweredRule) -> None:
-        """Approvals of ``action`` still pending at their expiry are approved, where ``rule``
-        says so (D-156); the rest expire and are asked again."""
-        if action in self.unanswered:
-            raise ApprovalError(f"an unanswered rule for {action!r} is already registered")
-        self.unanswered[action] = rule
+    def delegate_when_unanswered(self, action: str, delegate: DelegateHook) -> None:
+        """Approvals of ``action`` still pending at their expiry go to ``delegate`` (D-157)."""
+        if action in self.delegates:
+            raise ApprovalError(f"a delegate for {action!r} is already registered")
+        self.delegates[action] = delegate
 
     # --- requesting ------------------------------------------------------------------------
 
@@ -200,6 +205,33 @@ class ApprovalService:
             raise ApprovalError("only a human can decide an approval")
         return await self._decide(session, approval_id, outcome=outcome, actor=actor, reason=reason)
 
+    async def decide_delegated(
+        self,
+        session: AsyncSession,
+        approval_id: uuid.UUID,
+        *,
+        outcome: Literal["approve", "reject"],
+        actor: Actor,
+        reason: str,
+        task_id: uuid.UUID,
+    ) -> Approval:
+        """The delegate's decision (D-157): only the agent whose task the approval went to, only
+        approve or reject, always with a reason. A person who decided first wins: this raises
+        ``already ...`` then."""
+        if actor.kind != "agent":
+            raise ApprovalError("a delegated decision is an agent's")
+        if outcome not in ("approve", "reject"):
+            raise ApprovalError("a delegate approves or rejects; sending back is a person's")
+        if not reason.strip():
+            raise ApprovalError("a delegated decision says why")
+        approval = await session.get(Approval, approval_id, with_for_update=True)
+        if approval is None:
+            raise ApprovalError(f"approval {approval_id} not found")
+        marker = (approval.payload or {}).get("delegated") or {}
+        if approval.action not in self.delegates or marker.get("task_id") != str(task_id):
+            raise ApprovalError(f"approval {approval_id} was not delegated to this task")
+        return await self._decide(session, approval_id, outcome=outcome, actor=actor, reason=reason)
+
     async def _decide(
         self,
         session: AsyncSession,
@@ -215,6 +247,7 @@ class ApprovalService:
         if approval.state != ApprovalState.PENDING:
             raise ApprovalError(f"approval {approval_id} is already {approval.state}")
 
+        await self._release_delegate(session, approval, decided_by=actor)
         approved = outcome == "approve"
         returned = outcome == "revise"
         if returned:
@@ -284,7 +317,8 @@ class ApprovalService:
 
     async def expire_due(self, session: AsyncSession) -> list[uuid.UUID]:
         """Mark overdue approvals EXPIRED. Their tasks keep waiting (D-001), under a new approval
-        (D-131, ``renew_waiting``)."""
+        (D-131, ``renew_waiting``) — unless the action has a delegate, which gets it first
+        (D-157); a delegate that failed, or ran out of time, gives it back to a person."""
         now = self.clock()
         due = (
             await session.scalars(
@@ -293,9 +327,14 @@ class ApprovalService:
                 .with_for_update(skip_locked=True)
             )
         ).all()
+        expired: list[Approval] = []
         for approval in due:
-            if await self._approve_unanswered(session, approval):
+            if await self._delegate(session, approval):
                 continue
+            expired.append(approval)
+        expired += await self._failed_delegations(session, skip={a.id for a in due})
+        for approval in expired:
+            await self._release_delegate(session, approval, decided_by=None)
             await APPROVAL_FSM.transition(
                 session, approval, ApprovalState.EXPIRED, actor=Actor.system("approvals")
             )
@@ -308,31 +347,81 @@ class ApprovalService:
                 actor=Actor.system("approvals"),
             )
         await self.renew_waiting(session)
-        return [a.id for a in due]
+        return [a.id for a in expired]
 
-    async def _approve_unanswered(self, session: AsyncSession, approval: Approval) -> bool:
-        """Approve an approval nobody answered, where its action's rule allows it (D-156). In a
-        savepoint: a hook that refuses (the article changed meanwhile) leaves it to expire."""
-        rule = self.unanswered.get(approval.action or "")
-        if rule is None or not await rule(session, approval):
+    async def _delegate(self, session: AsyncSession, approval: Approval) -> bool:
+        """Hand an unanswered approval to its action's delegate (D-157), once per approval chain.
+        In a savepoint: a delegate that declines or fails leaves it to expire."""
+        delegate = self.delegates.get(approval.action or "")
+        payload = approval.payload or {}
+        if delegate is None or "delegated" in payload or payload.get("delegated_before"):
             return False
-        approval_id = approval.id  # the rollback below expires the row's attributes
+        approval_id = approval.id  # a rollback below expires the row's attributes
         try:
             async with session.begin_nested():
-                await self._decide(
+                task_id = await delegate(session, approval)
+                if task_id is None:
+                    return False
+                approval.payload = {
+                    **payload,
+                    "delegated": {"task_id": str(task_id), "at": self.clock().isoformat()},
+                }
+                approval.expires_at = self.clock() + DELEGATE_WINDOW
+                await self._emit(
                     session,
-                    approval_id,
-                    outcome="approve",
-                    actor=UNANSWERED,
-                    reason=UNANSWERED_REASON,
+                    approval,
+                    ev.ApprovalDelegated(
+                        kind=approval.kind,
+                        ref_type=approval.ref_type,
+                        ref_id=approval.ref_id,
+                        task_id=task_id,
+                    ),
+                    actor=Actor.system("approvals"),
                 )
-        except Exception:  # noqa: BLE001 - any refusal means: ask a person again instead
-            log.warning(
-                "approval %s: not approved unanswered, so it expires", approval_id, exc_info=True
-            )
+        except Exception:  # noqa: BLE001 - a delegate that cannot start: a person decides
+            log.warning("approval %s: could not be delegated", approval_id, exc_info=True)
             await session.refresh(approval)
             return False
         return True
+
+    async def _failed_delegations(
+        self, session: AsyncSession, *, skip: set[uuid.UUID]
+    ) -> list[Approval]:
+        """Delegated approvals still pending whose delegate's task ended without deciding."""
+        pending = (
+            await session.scalars(
+                select(Approval)
+                .where(
+                    Approval.state == ApprovalState.PENDING,
+                    Approval.payload.has_key("delegated"),
+                )
+                .with_for_update(skip_locked=True)
+            )
+        ).all()
+        out = []
+        for approval in pending:
+            if approval.id in skip:
+                continue
+            task = await session.get(Task, uuid.UUID(approval.payload["delegated"]["task_id"]))
+            if task is None or task.state in _TASK_DONE:
+                out.append(approval)
+        return out
+
+    async def _release_delegate(
+        self, session: AsyncSession, approval: Approval, *, decided_by: Actor | None
+    ) -> None:
+        """The approval is settled by someone other than its delegate (a person, or the clock):
+        stop the delegate's task if it is still going."""
+        marker = (approval.payload or {}).get("delegated")
+        if not marker:
+            return
+        task = await session.get(Task, uuid.UUID(marker["task_id"]), with_for_update=True)
+        if task is None or task.state in _TASK_DONE:
+            return
+        if decided_by is not None and decided_by.kind == "agent":
+            return  # the delegate deciding: its own task finishes by itself
+        reason = "decided by a person" if decided_by is not None else "no decision in time"
+        await self.task_manager.cancel(session, task, reason=reason)
 
     async def renew_waiting(self, session: AsyncSession) -> list[uuid.UUID]:
         """Ask again for every task still waiting on an approval nobody can decide any more (its
@@ -363,7 +452,7 @@ class ApprovalService:
                 task_id=latest.task_id,
                 run_id=latest.run_id,
                 action=latest.action,
-                payload=latest.payload or {},
+                payload=_after_delegation(latest.payload or {}),
                 summary=latest.summary,
                 requested_by=Actor.system("approvals"),
                 expires_after=None,
@@ -456,3 +545,12 @@ class ApprovalService:
                 run_id=approval.run_id,
             ),
         )
+
+
+def _after_delegation(payload: dict[str, Any]) -> dict[str, Any]:
+    """A renewed approval's payload: no live delegation, but remembering there was one, so it is
+    not delegated a second time (D-157)."""
+    if "delegated" not in payload:
+        return payload
+    rest = {k: v for k, v in payload.items() if k != "delegated"}
+    return {**rest, "delegated_before": True}

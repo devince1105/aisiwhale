@@ -375,6 +375,17 @@ class ApprovalExpired(EventPayload):
     ref_id: uuid.UUID
 
 
+@event("APPROVAL_DELEGATED")
+class ApprovalDelegated(EventPayload):
+    """Nobody decided in time: an agent decides instead (D-157), while a person still may."""
+
+    kind: ApprovalKind
+    ref_type: str
+    ref_id: uuid.UUID
+    task_id: uuid.UUID
+    """The delegate's task."""
+
+
 @event("POLICY_DENIED")
 class PolicyDenied(EventPayload):
     action: str

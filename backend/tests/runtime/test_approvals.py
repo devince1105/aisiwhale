@@ -390,50 +390,142 @@ async def _waiting_task(world, session, action):
     )
 
 
-async def test_unanswered_is_approved_only_where_a_domain_says_so(db_session, world):
-    # D-156: silence is consent for the actions a domain names, and only those
+def _delegating(world, session, *, start=True):
+    """Register a delegate for ``delegated`` that starts a writer's task (or declines)."""
+    started: list[Task] = []
+
+    async def delegate(session, approval):
+        if not start:
+            return None
+        task = await _task(world, session, name="decide", role="writer")
+        started.append(task)
+        return task.id
+
+    world["approvals"].delegate_when_unanswered("delegated", delegate)
+    return started
+
+
+async def test_unanswered_goes_to_the_delegate_and_stays_open(db_session, world):
+    # D-157: nobody decided in time — the delegate is asked, and a person still may decide
     approvals = world["approvals"]
-
-    async def yes(session, approval):
-        return True
-
-    approvals.approve_when_unanswered("consented", yes)
-    task, consented = await _waiting_task(world, db_session, "consented")
+    started = _delegating(world, db_session)
+    task, approval = await _waiting_task(world, db_session, "delegated")
     other_task, other = await _waiting_task(world, db_session, "other")
 
     world["clock"].now += timedelta(hours=25)
-    assert await approvals.expire_due(db_session) == [consented.id, other.id]
+    assert await approvals.expire_due(db_session) == [other.id]  # only the other one expired
 
-    consented = await _reload(db_session, Approval, consented.id)
-    assert consented.state == "APPROVED"
-    assert consented.decided_by == {"kind": "system", "id": "approvals"}
-    assert (await _reload(db_session, Task, task.id)).state == "SUCCEEDED"
+    approval = await _reload(db_session, Approval, approval.id)
+    assert approval.state == "PENDING"
+    assert approval.payload["delegated"]["task_id"] == str(started[0].id)
+    assert approval.expires_at == world["clock"].now + timedelta(hours=6)
+    delegated = await db_session.scalar(
+        select(EventRecord.payload).where(
+            EventRecord.event_type == "APPROVAL_DELEGATED",
+            EventRecord.company_id == world["company"].id,
+        )
+    )
+    assert delegated["task_id"] == str(started[0].id)
     assert (await _reload(db_session, Approval, other.id)).state == "EXPIRED"
-    assert (await _reload(db_session, Task, other_task.id)).state == "WAITING_APPROVAL"
-    # and a person still may not be impersonated: decide() remains a human's
+    assert (await _reload(db_session, Task, task.id)).state == "WAITING_APPROVAL"
+
+    # the delegate decides, as itself, with a reason
+    writer = Actor.agent(world["agents"]["w1"].id)
+    with pytest.raises(ApprovalError, match="says why"):
+        await approvals.decide_delegated(
+            db_session,
+            approval.id,
+            outcome="approve",
+            actor=writer,
+            reason=" ",
+            task_id=started[0].id,
+        )
+    with pytest.raises(ApprovalError, match="not delegated to this task"):
+        await approvals.decide_delegated(
+            db_session, approval.id, outcome="approve", actor=writer, reason="ok", task_id=task.id
+        )
+    with pytest.raises(ApprovalError, match="an agent's"):
+        await approvals.decide_delegated(
+            db_session,
+            approval.id,
+            outcome="approve",
+            actor=OPERATOR,
+            reason="ok",
+            task_id=started[0].id,
+        )
+    await approvals.decide_delegated(
+        db_session,
+        approval.id,
+        outcome="approve",
+        actor=writer,
+        reason="sound",
+        task_id=started[0].id,
+    )
+    approval = await _reload(db_session, Approval, approval.id)
+    assert approval.state == "APPROVED" and approval.decided_by == writer.as_json()
+    assert (await _reload(db_session, Task, task.id)).state == "SUCCEEDED"
+    # decide() is still a person's alone
     with pytest.raises(ApprovalError, match="only a human"):
-        await approvals.decide(db_session, other.id, outcome="approve", actor=Actor.system("x"))
+        await approvals.decide(db_session, other.id, outcome="approve", actor=writer)
 
 
-async def test_unanswered_but_refused_by_the_domain_expires_and_is_asked_again(db_session, world):
+async def test_a_person_deciding_first_stops_the_delegate(db_session, world):
     approvals = world["approvals"]
-
-    async def yes(session, approval):
-        return True
-
-    async def refuse(session, approval, outcome, actor, reason):
-        raise RuntimeError("the article changed while it waited")
-
-    approvals.approve_when_unanswered("refused", yes)
-    approvals.on_decided("refused", refuse)
-    task, approval = await _waiting_task(world, db_session, "refused")
-
+    started = _delegating(world, db_session)
+    _, approval = await _waiting_task(world, db_session, "delegated")
     world["clock"].now += timedelta(hours=25)
     await approvals.expire_due(db_session)
 
+    await approvals.decide(db_session, approval.id, outcome="reject", actor=OPERATOR, reason="no")
+    assert (await _reload(db_session, Task, started[0].id)).state == "CANCELLED"
+    with pytest.raises(ApprovalError, match="already REJECTED"):
+        await approvals.decide_delegated(
+            db_session,
+            approval.id,
+            outcome="approve",
+            actor=Actor.agent(world["agents"]["w1"].id),
+            reason="too late",
+            task_id=started[0].id,
+        )
+
+
+async def test_a_delegate_that_declines_fails_or_runs_out_gives_it_back_once(db_session, world):
+    approvals = world["approvals"]
+    started = _delegating(world, db_session)
+    task, approval = await _waiting_task(world, db_session, "delegated")
+    world["clock"].now += timedelta(hours=25)
+    await approvals.expire_due(db_session)
+
+    # the delegate's task ends without deciding: expired at once, a person asked again
+    await world["tm"].cancel(db_session, started[0], reason="the run failed")
+    assert await approvals.expire_due(db_session) == [approval.id]
     assert (await _reload(db_session, Approval, approval.id)).state == "EXPIRED"
-    assert (await _reload(db_session, Task, task.id)).state == "WAITING_APPROVAL"
     again = await db_session.scalar(
         select(Approval).where(Approval.task_id == task.id, Approval.state == "PENDING")
     )
-    assert again is not None and again.id != approval.id
+    assert "delegated" not in again.payload and again.payload["delegated_before"] is True
+
+    # ... and the renewed one is not delegated a second time
+    world["clock"].now += timedelta(hours=25)
+    assert await approvals.expire_due(db_session) == [again.id]
+    assert len(started) == 1
+
+
+async def test_a_delegate_that_declines_leaves_it_to_a_person(db_session, world):
+    approvals = world["approvals"]
+    _delegating(world, db_session, start=False)
+    task, approval = await _waiting_task(world, db_session, "delegated")
+    world["clock"].now += timedelta(hours=25)
+    assert await approvals.expire_due(db_session) == [approval.id]
+    assert (await _reload(db_session, Task, task.id)).state == "WAITING_APPROVAL"
+
+
+async def test_a_delegate_out_of_time_is_stopped(db_session, world):
+    approvals = world["approvals"]
+    started = _delegating(world, db_session)
+    _, approval = await _waiting_task(world, db_session, "delegated")
+    world["clock"].now += timedelta(hours=25)
+    await approvals.expire_due(db_session)
+    world["clock"].now += timedelta(hours=7)
+    assert await approvals.expire_due(db_session) == [approval.id]
+    assert (await _reload(db_session, Task, started[0].id)).state == "CANCELLED"

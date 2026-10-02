@@ -187,9 +187,9 @@ async def approve_article(
     article_id: uuid.UUID,
     actor: Actor,
     reason: str | None = None,
-    unanswered: bool = False,
+    delegated: bool = False,
 ) -> Article:
-    """``unanswered``: the system approving because nobody answered in time (D-156)."""
+    """``delegated``: the CEO deciding an approval nobody answered in time (D-157)."""
     article = await _article(session, company_id, article_id)
     if article.state in (ArticleState.APPROVED, ArticleState.PUBLISHED):
         return article  # already decided
@@ -198,7 +198,7 @@ async def approve_article(
     passed = await _fact_check_passed(session, article)
     if not passed:
         raise PublishError("the current draft has no passed fact-check")
-    facts = {"fact_check_passed": passed, "unanswered": unanswered}
+    facts = {"fact_check_passed": passed, "delegated": delegated}
     await _allowed(session, policy, actor, "approve_article", article, facts)
     await ARTICLE_FSM.transition(
         session, article, ArticleState.APPROVED, actor=actor, reason=reason
@@ -214,10 +214,12 @@ async def reject_article(
     article_id: uuid.UUID,
     actor: Actor,
     reason: str,
+    delegated: bool = False,
 ) -> Article:
     """A person turns the article down: it is REJECTED and its story DROPPED — or, for a
-    revision of a published article, the revision is dropped and the article is what it was."""
-    if actor.kind != "human":
+    revision of a published article, the revision is dropped and the article is what it was.
+    ``delegated``: the CEO, deciding an approval nobody answered (D-157), may too."""
+    if actor.kind != "human" and not (delegated and actor.kind == "agent"):
         raise NotAllowed("reject_article", "deny", "only a person rejects an article")
     article = await _article(session, company_id, article_id)
     if article.published_group_id is not None:

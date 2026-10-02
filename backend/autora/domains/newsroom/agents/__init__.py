@@ -2,13 +2,14 @@
 
 T-605b: the editor-in-chief, who decides what the desk covers; T-506: the researcher; T-507:
 the analyst; T-509: the writer; T-511: the editor; D-110: the editor-in-chief's final review;
-T-513: marketing; D-142: marketing's cover.
+T-513: marketing; D-142: marketing's cover; D-157: the CEO, on an article nobody approved.
 """
 
 from __future__ import annotations
 
 from autora.domains.newsroom.agents import (
     analyst,
+    ceo_approval,
     chief_review,
     cover,
     editor,
@@ -30,6 +31,7 @@ BEHAVIORS = (
     chief_review.BEHAVIOR,
     marketing.BEHAVIOR,
     cover.BEHAVIOR,
+    ceo_approval.BEHAVIOR,
 )
 
 

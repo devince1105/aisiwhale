@@ -76,12 +76,18 @@ function Card({
           {pending ? `已等待 ${card.waiting}` : null}
           {pending && card.expires?.in ? (
             <span className={card.expires.soon ? "text-warn" : undefined}>
-              ・{card.expires.in}後{card.expires.then === "approve" ? "自動核准" : "過期"}
+              ・{card.expires.in}後{card.expires.then === "ceo" ? "交由執行長決定" : "過期"}
             </span>
           ) : null}
         </p>
       </div>
       <h3 className="mt-1 font-medium break-words">{card.summary}</h3>
+      {card.withCeo ? (
+        // D-157: nobody decided in a day, so the CEO is reading it; the operator still may
+        <p className="mt-1 text-xs text-warn" data-testid="with-ceo">
+          執行長正在審閱這篇（您現在決定也可以，以先決定的為準）
+        </p>
+      ) : null}
       {card.article && preview ? (
         preview(card)
       ) : card.officialReport ? (

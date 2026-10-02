@@ -489,6 +489,64 @@ def _chief_review(request: ModelRequest) -> FakeTurn:
     )
 
 
+# --- the CEO, on an article nobody approved (D-157) ---------------------------------------------
+
+
+def _decide_unanswered(request: ModelRequest) -> FakeTurn:
+    """The simulated CEO: read the draft, then approve — or, for a demo, reject (``ceo_reject``)
+    or fail outright (``ceo_fail``), which hands the approval back to a person."""
+    demo = _demo(request)
+    first = _first_text(request)
+    approval_id = _field(first, "Approval id")
+    article_id = _field(first, "Article id")
+    if demo.get("ceo_fail"):
+        # a reply that cannot pass: it claims a decision without taking one (like editor_fails)
+        return FakeTurn(
+            structured={"approval_id": approval_id, "decision": "approve", "reason": "看起來不錯"}
+        )
+    calls = _calls(request)
+    if not any(name == "read_draft" for name, _, _ in calls):
+        return FakeTurn(
+            text="Reading the draft before deciding.",
+            tool_uses=[FakeToolUse(name="read_draft", input={"article_id": article_id})],
+        )
+    decided = [
+        out
+        for name, _, result in calls
+        if name == "decide_unanswered_article" and (out := _output(result))
+    ]
+    if not decided:
+        args = (
+            {"decision": "reject", "reason": "這篇已經過了時效，不再發布。"}
+            if demo.get("ceo_reject")
+            else {"decision": "approve", "reason": "查核通過、內容平衡，值得發布。"}
+        )
+        return FakeTurn(
+            text="Deciding.",
+            tool_uses=[
+                FakeToolUse(
+                    name="decide_unanswered_article", input={"approval_id": approval_id, **args}
+                )
+            ],
+        )
+    out = decided[-1]
+    if "already_decided" in out:
+        return FakeTurn(
+            structured={
+                "approval_id": approval_id,
+                "decision": "already_decided",
+                "reason": f"already {out['already_decided']}",
+            }
+        )
+    return FakeTurn(
+        structured={
+            "approval_id": approval_id,
+            "decision": "approve" if out["state"] == "APPROVED" else "reject",
+            "reason": out["reason"],
+        }
+    )
+
+
 # --- marketing (T-513) ------------------------------------------------------------------------
 
 _VERSION = re.compile(r"^\[([\w-]+)\] Title: (.+)$", re.MULTILINE)
@@ -691,4 +749,5 @@ _HANDLERS = {
     ("editor_in_chief", "chief_review"): _chief_review,
     ("marketing", "distribute"): _distribute,
     ("marketing", "cover"): _cover,
+    ("ceo", "decide_unanswered"): _decide_unanswered,
 }

@@ -17,7 +17,7 @@ from autora.db.models import AgentRun, Task
 from autora.domains.newsroom.models import Article, ArticleVersion
 
 STORY_TASKS = {"research": ("題材與來源", ""), "analysis": ("題材的主張", "#claims")}
-ARTICLE_TASKS = {"draft", "review", "distribute"}
+ARTICLE_TASKS = {"draft", "review", "distribute", "decide_unanswered"}
 
 
 def _story_id(task: Task) -> uuid.UUID | None:

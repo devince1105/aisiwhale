@@ -40,8 +40,14 @@ describe("model", () => {
     });
     expect(card.expires).toMatchObject({ at: pending.expires_at, soon: false, then: "expire" });
     expect(card.expires!.in).toMatch(/小時/);
-    // an article nobody objects to is approved at the deadline (D-156); other requests expire
-    expect(approvalCard({ ...pending, action: "approve_article" }, agents, NOW).expires!.then).toBe("approve");
+    expect(card.withCeo).toBe(false);
+    // an article nobody decided goes to the CEO at the deadline (D-157); other requests expire,
+    // and so does one she already had
+    const article = { ...pending, action: "approve_article" };
+    expect(approvalCard(article, agents, NOW).expires!.then).toBe("ceo");
+    const withHer = approvalCard({ ...article, payload: { delegated: { task_id: "t" } } }, agents, NOW);
+    expect(withHer).toMatchObject({ withCeo: true, expires: { then: "expire" } });
+    expect(approvalCard({ ...article, payload: { delegated_before: true } }, agents, NOW).expires!.then).toBe("expire");
     // unknown agent: still says who, by id
     expect(approvalCard(pending, {}, NOW).requester).toBe(`代理 ${writerId.slice(0, 8)}`);
   });

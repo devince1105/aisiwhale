@@ -46,9 +46,11 @@ export interface ApprovalCard {
   /** What will run once approved: the tool's arguments, else the whole payload. */
   details: unknown;
   waiting: string;
-  /** When the deadline is, and what happens then: an article nobody objected to is approved
-   * (D-156); anything else expires and is asked again (D-131). */
-  expires: { at: string; in: string | null; soon: boolean; then: "approve" | "expire" } | null;
+  /** When the deadline is, and what happens then: an article nobody decided goes to the CEO
+   * (D-157); anything else — or one she already had — expires and is asked again (D-131). */
+  expires: { at: string; in: string | null; soon: boolean; then: "ceo" | "expire" } | null;
+  /** The CEO is deciding it now (D-157); a person still may, and whoever is first counts. */
+  withCeo: boolean;
   taskId: string | null;
   runId: string | null;
   /** A decision task (an article to approve) can be sent back; a paused agent run cannot. */
@@ -113,9 +115,10 @@ export function approvalCard(approval: Approval, agents: Record<string, AgentSta
           at: approval.expires_at,
           in: expiresMs !== null && expiresMs > 0 ? formatDuration(expiresMs) : null,
           soon: expiresMs !== null && expiresMs < 60 * 60 * 1000,
-          then: approval.action === "approve_article" ? "approve" : "expire",
+          then: approval.action === "approve_article" && !payload.delegated && !payload.delegated_before ? "ceo" : "expire",
         }
       : null,
+    withCeo: approval.state === "PENDING" && Boolean(payload.delegated),
     taskId: approval.task_id,
     runId: approval.run_id,
     canSendBack: Boolean(approval.task_id) && !approval.run_id,

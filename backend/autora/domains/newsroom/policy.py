@@ -4,10 +4,10 @@ D-001: publishing needs a human approval by default. ``approve_article`` by the 
 approval after a passed fact-check) is only allowed when the company policy
 ``newsroom.auto_approve_if_fact_check_passed`` is true; otherwise it needs a human.
 
-D-156: or when the human had the chance and let it pass — an article's approval that nobody
-answered before it expired (24 h) is approved by the system, while the company policy
-``newsroom.approve_when_unanswered`` is on (the default; false brings back "expire and ask again").
-A passed fact-check is still required either way.
+D-157: an article's approval nobody answered in 24 hours goes to the CEO, who approves or rejects
+it (``approve_article`` by the ``ceo`` role, only for an approval delegated to her, only with a
+passed fact-check), while the company policy ``newsroom.ceo_decides_when_unanswered`` is on (the
+default; false brings back "expire and ask a person again").
 """
 
 from __future__ import annotations
@@ -21,12 +21,12 @@ from autora.company import policy as company_policy
 from autora.runtime.policy import Limit, PolicyEngine, Rule, allow
 
 AUTO_APPROVE_KEY = "newsroom.auto_approve_if_fact_check_passed"
-APPROVE_WHEN_UNANSWERED_KEY = "newsroom.approve_when_unanswered"
+CEO_DECIDES_WHEN_UNANSWERED_KEY = "newsroom.ceo_decides_when_unanswered"
 
 
-def approves_when_unanswered(policies: Mapping[str, Any]) -> bool:
-    """D-156: on unless the company has turned it off."""
-    return policies.get(APPROVE_WHEN_UNANSWERED_KEY, True) is not False
+def ceo_decides_when_unanswered(policies: Mapping[str, Any]) -> bool:
+    """D-157: on unless the company has turned it off."""
+    return policies.get(CEO_DECIDES_WHEN_UNANSWERED_KEY, True) is not False
 
 
 # D-002: which languages articles are written and published in (company policy, not code)
@@ -90,15 +90,20 @@ WRITERS_AND_READERS = (
 
 
 def _auto_approve_enabled(args, facts, policies: Mapping[str, Any]) -> str | None:
-    if facts.get("unanswered") is True and approves_when_unanswered(policies):
-        if facts.get("fact_check_passed") is True:
-            return None
-        return "fact-check has not passed"
     if policies.get(AUTO_APPROVE_KEY) is True:
         if facts.get("fact_check_passed") is True:
             return None
         return "fact-check has not passed"
     return f"{AUTO_APPROVE_KEY} is off (D-001: a human approves publication)"
+
+
+def _delegated_to_the_ceo(args, facts, policies: Mapping[str, Any]) -> str | None:
+    """D-157: the CEO approves only an article whose approval was delegated to her."""
+    if facts.get("delegated") is not True:
+        return "the CEO decides only an approval nobody answered (D-157)"
+    if facts.get("fact_check_passed") is not True:
+        return "fact-check has not passed"
+    return None
 
 
 def _article_published(args, facts, policies) -> str | None:
@@ -131,6 +136,7 @@ ACTIONS = {
     "accept_draft": "write",
     "final_review": "write",  # the editor-in-chief's (D-110)
     "approve_article": "write",
+    "decide_unanswered_article": "write",  # D-157: the CEO, on an article nobody approved
     "publish_article": "write",
     "create_distribution": "write",
     "search_images": "read",
@@ -160,6 +166,12 @@ RULES: list[Rule] = [
         "system",
         limit=Limit(_auto_approve_enabled, over="needs_approval", description="auto-approval"),
     ),
+    *allow(
+        "approve_article",
+        "ceo",
+        limit=Limit(_delegated_to_the_ceo, over="deny", description="delegated approvals only"),
+    ),
+    *allow("decide_unanswered_article", "ceo"),
     *allow("publish_article", "system"),  # the Publisher service, after APPROVED
     *allow(
         "create_distribution",

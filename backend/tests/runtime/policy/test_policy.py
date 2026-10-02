@@ -43,7 +43,8 @@ MATRIX = {
     "request_revision":     (D, D, D, A, D, D, D, D, D, D),
     "accept_draft":         (D, D, D, A, D, D, D, D, D, D),
     "final_review":         (D, D, D, D, D, A, D, D, D, D),  # the chief's final review (D-110)
-    "approve_article":      (D, D, D, D, D, D, D, D, D, D),
+    "approve_article":      (D, D, D, D, D, D, D, D, D, D),  # the CEO's, delegated only (D-157)
+    "decide_unanswered_article": (D, D, D, D, D, D, A, D, D, D),  # the CEO (D-157)
     "publish_article":      (D, D, D, D, D, D, D, D, D, D),
     "create_distribution":  (D, D, D, D, A, D, D, D, D, D),
     "search_images":        (D, D, D, D, A, D, D, D, D, D),  # the cover (D-142)

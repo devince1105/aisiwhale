@@ -313,6 +313,20 @@ export const ApprovalApprovedV1Event = z.object({
   payload: ApprovalApprovedV1Payload,
 });
 
+export const ApprovalDelegatedV1Payload = z.object({
+  kind: z.string(),
+  ref_type: z.string(),
+  ref_id: z.uuid(),
+  task_id: z.uuid(),
+});
+export type ApprovalDelegatedV1Payload = z.infer<typeof ApprovalDelegatedV1Payload>;
+export const ApprovalDelegatedV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("APPROVAL_DELEGATED"),
+  schema_version: z.literal(1),
+  payload: ApprovalDelegatedV1Payload,
+});
+
 export const ApprovalExpiredV1Payload = z.object({
   kind: z.string(),
   ref_type: z.string(),
@@ -1607,6 +1621,7 @@ export const EventEnvelope = z.discriminatedUnion("event_type", [
   AgentWorkingV1Event,
   AnalyticsDailyUpdatedV1Event,
   ApprovalApprovedV1Event,
+  ApprovalDelegatedV1Event,
   ApprovalExpiredV1Event,
   ApprovalRejectedV1Event,
   ApprovalRequestedV1Event,
@@ -1725,6 +1740,7 @@ export const EVENT_TYPES = [
   "AGENT_WORKING",
   "ANALYTICS_DAILY_UPDATED",
   "APPROVAL_APPROVED",
+  "APPROVAL_DELEGATED",
   "APPROVAL_EXPIRED",
   "APPROVAL_REJECTED",
   "APPROVAL_REQUESTED",

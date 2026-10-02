@@ -1190,6 +1190,43 @@
         }
       }
     },
+    "APPROVAL_DELEGATED": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "Nobody decided in time: an agent decides instead (D-157), while a person still may.",
+          "properties": {
+            "kind": {
+              "title": "Kind",
+              "type": "string"
+            },
+            "ref_type": {
+              "title": "Ref Type",
+              "type": "string"
+            },
+            "ref_id": {
+              "format": "uuid",
+              "title": "Ref Id",
+              "type": "string"
+            },
+            "task_id": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ref_type",
+            "ref_id",
+            "task_id"
+          ],
+          "title": "ApprovalDelegated",
+          "type": "object"
+        }
+      }
+    },
     "APPROVAL_EXPIRED": {
       "1": {
         "persistence": "persisted",

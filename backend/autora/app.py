@@ -398,6 +398,7 @@ def build_tools(
         image_viewer=build_image_viewer(settings),
         painter=build_painter(settings),
         generated_per_day=settings.cover_images_per_day if settings else 3,
+        approvals=commands.approvals if commands is not None else None,
     )
     return tools
 

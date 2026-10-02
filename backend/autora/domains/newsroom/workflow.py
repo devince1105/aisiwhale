@@ -37,11 +37,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from autora.company.agents import hire_agent
 from autora.company.organization import role_by_key
 from autora.company.workflows import StartWorkflowError, start_workflow
-from autora.db.models import Agent, AgentStatus, Approval, WorkflowRun
+from autora.db.models import Agent, AgentStatus, Approval, Task, WorkflowRun
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom import organization, personas
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
-from autora.domains.newsroom.policy import approves_when_unanswered
+from autora.domains.newsroom.policy import ceo_decides_when_unanswered
 from autora.domains.newsroom.publisher import (
     NotAllowed,
     PublishError,
@@ -219,9 +219,20 @@ REVISION_TEMPLATE = WorkflowTemplate(
 editor-in-chief's and a person's sending back — except that there is no analysis to go back to."""
 
 
+UNANSWERED_TEMPLATE_NAME = "newsroom.unanswered_approval_v1"
+UNANSWERED_TASK = "decide_unanswered"
+
+UNANSWERED_TEMPLATE = WorkflowTemplate(
+    name=UNANSWERED_TEMPLATE_NAME,
+    nodes=(NodeSpec(UNANSWERED_TASK, "代為終審：{title}", "ceo", max_attempts=2),),
+)
+"""D-157: the CEO decides an article nobody approved in 24 hours."""
+
+
 def register_templates(templates: TemplateRegistry) -> None:
     templates.register(TEMPLATE)
     templates.register(REVISION_TEMPLATE)
+    templates.register(UNANSWERED_TEMPLATE)
 
 
 # --- staffing ---------------------------------------------------------------------------------
@@ -439,7 +450,7 @@ async def publish_step(ctx: ServiceContext) -> None:
 
 def on_article_decided(policy: PolicyEngine):
     """A person's decision on an ``approve_article`` approval approves, sends back (D-044) or
-    rejects the article. The system's is only ever "approve", when nobody answered (D-156)."""
+    rejects the article. An agent's is the CEO's, on an approval nobody answered (D-157)."""
 
     async def hook(
         session: AsyncSession, approval: Approval, outcome: str, actor: Actor, reason: str | None
@@ -453,7 +464,7 @@ def on_article_decided(policy: PolicyEngine):
                 article_id=article_id,
                 actor=actor,
                 reason=reason,
-                unanswered=actor.kind == "system",
+                delegated=actor.kind == "agent",
             )
         elif outcome == "revise":
             await return_article(
@@ -470,11 +481,52 @@ def on_article_decided(policy: PolicyEngine):
                 article_id=article_id,
                 actor=actor,
                 reason=reason or "rejected at approval",
+                delegated=actor.kind == "agent",
             )
 
     return hook
 
 
-async def approve_article_when_unanswered(session: AsyncSession, approval: Approval) -> bool:
-    """D-156: an article's approval nobody answered is approved, unless the company said not to."""
-    return approves_when_unanswered(await get_policies(session, approval.company_id))
+def delegate_article_to_ceo(workflows: WorkflowEngine):
+    """D-157: an article's approval nobody answered goes to the CEO — a one-task workflow in the
+    article's own project, so its cost is the newsroom's. None (a person is asked again) when the
+    company turned this off or has no CEO at work."""
+
+    async def delegate(session: AsyncSession, approval: Approval) -> uuid.UUID | None:
+        if not ceo_decides_when_unanswered(await get_policies(session, approval.company_id)):
+            return None
+        ceo = await session.scalar(
+            select(Agent.id).where(
+                Agent.company_id == approval.company_id,
+                Agent.role == "ceo",
+                Agent.status == AgentStatus.ACTIVE.value,
+            )
+        )
+        waiting = await session.get(Task, approval.task_id) if approval.task_id else None
+        if ceo is None or waiting is None:
+            return None
+        article = await session.get(Article, uuid.UUID(approval.payload["article_id"]))
+        if article is None:
+            return None
+        origin = (
+            await session.get(WorkflowRun, waiting.workflow_run_id)
+            if waiting.workflow_run_id
+            else None
+        )
+        demo = (origin.params or {}).get("demo") if origin is not None else None
+        _, tasks = await workflows.instantiate(
+            session,
+            UNANSWERED_TEMPLATE_NAME,
+            company_id=approval.company_id,
+            project_id=waiting.project_id,
+            params={
+                "approval_id": str(approval.id),
+                "article_id": str(article.id),
+                "story_id": str(article.story_id),
+                "title": article.title[:80],
+            }
+            | ({"demo": demo} if demo else {}),
+        )
+        return tasks[UNANSWERED_TASK].id
+
+    return delegate

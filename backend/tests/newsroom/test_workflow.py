@@ -26,7 +26,7 @@ from autora.domains.newsroom.models import (
     Story,
     StoryCover,
 )
-from autora.domains.newsroom.policy import APPROVE_WHEN_UNANSWERED_KEY, AUTO_APPROVE_KEY
+from autora.domains.newsroom.policy import AUTO_APPROVE_KEY, CEO_DECIDES_WHEN_UNANSWERED_KEY
 from autora.domains.newsroom.workflow import TEMPLATE_NAME, start_story
 from autora.runtime.actor import Actor
 from tests.conftest import unique_company
@@ -38,7 +38,7 @@ ROLES = ("researcher", "analyst", "writer", "editor", "editor_in_chief", "market
 class Newsroom:
     """A staffed company with a selected story, its workflow started, and a worker."""
 
-    async def start(self, committed, settings, *, auto_approve=False, demo=None):
+    async def start(self, committed, settings, *, auto_approve=False, demo=None, ceo=False):
         self.committed = committed
         self.runtime = build_runtime()
         async with committed() as session:
@@ -52,7 +52,7 @@ class Newsroom:
             session.add(project)
             await session.flush()
             self.agents = {}
-            for role in ROLES:
+            for role in ROLES + (("ceo",) if ceo else ()):
                 agent = await hire_agent(
                     session,
                     company_id=self.company.id,
@@ -220,42 +220,109 @@ async def test_with_automatic_approval_nobody_is_asked(committed, e2e_settings):
 
 
 async def _past_its_deadline(room) -> Approval:
-    """Nobody answered: move the article's approval past its expiry, then let expiry run."""
-    approval = await room.approval()
+    """Nobody answered: move the article's latest approval past its expiry; let expiry run."""
+    approve = (await room.tasks())["approve"][0]
     async with room.committed() as session:
-        row = await session.get(Approval, approval.id)
+        row = await session.scalar(
+            select(Approval)
+            .where(Approval.task_id == approve.id)
+            .order_by(Approval.created_at.desc())
+            .limit(1)
+        )
         row.expires_at = datetime.now(UTC) - timedelta(minutes=1)
         await room.runtime.approvals.expire_due(session)
         await session.commit()
-    return approval
+    return row
 
 
-async def test_an_article_nobody_answered_for_a_day_is_published(committed, e2e_settings):
-    # D-156: full automation — the operator had a day to object, and did not
-    room = await Newsroom().start(committed, e2e_settings)
+async def _ceo_task(room) -> Task | None:
+    return await room.get_where(
+        Task, Task.company_id == room.company.id, Task.name == "decide_unanswered"
+    )
+
+
+async def test_an_article_nobody_answered_for_a_day_the_ceo_approves(committed, e2e_settings):
+    # D-157: full automation — a day without a person's decision, and the CEO decides
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
     await room.worker.run_until_idle()
     approval = await _past_its_deadline(room)
+    assert (await room.get(Approval, approval.id)).state == "PENDING"  # a person still may
+    ceo_task = await _ceo_task(room)
+    assert ceo_task is not None and ceo_task.required_role == "ceo"
+    assert ceo_task.display_name == f"代為終審：{(await room.article()).title}"
 
+    await room.worker.run_until_idle()
     decided = await room.get(Approval, approval.id)
     assert decided.state == "APPROVED"
-    assert decided.decided_by == {"kind": "system", "id": "approvals"}  # never a person's name
-    assert decided.reason == "nobody objected before the deadline"
-    await room.worker.run_until_idle()
-    tasks = await room.tasks()
-    assert all(t.state == "SUCCEEDED" for ts in tasks.values() for t in ts)
+    assert decided.decided_by == {"kind": "agent", "id": str(room.agents["ceo"].id)}
+    assert decided.reason == "查核通過、內容平衡，值得發布。"
+    assert (await room.get(Task, ceo_task.id)).state == "SUCCEEDED"
     [approved] = await room.events("ARTICLE_APPROVED")
-    assert approved.payload["by"] == "system"
+    assert approved.payload["by"] == "agent"
     assert (await room.article()).state == "PUBLISHED"
 
 
-async def test_with_silence_not_consent_it_is_asked_again(committed, e2e_settings):
-    # the company can turn D-156 off: then D-001 and D-131 as before — expire, ask again, wait
-    room = await Newsroom().start(committed, e2e_settings)
+async def test_the_ceo_may_reject_it(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, ceo=True, demo={"ceo_reject": True})
+    await room.worker.run_until_idle()
+    approval = await _past_its_deadline(room)
+    await room.worker.run_until_idle()
+    assert (await room.get(Approval, approval.id)).state == "REJECTED"
+    assert (await room.article()).state == "REJECTED"
+    assert (await room.get(Story, room.story.id)).state == "DROPPED"
+
+
+async def test_a_person_deciding_while_the_ceo_reads_wins(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
+    await room.worker.run_until_idle()
+    await _past_its_deadline(room)
+    await room.decide("approve", reason="I got to it")  # before the worker runs the CEO
+    assert (await room.get(Task, (await _ceo_task(room)).id)).state == "CANCELLED"
+    await room.worker.run_until_idle()
+    assert (await room.approval()).decided_by == OPERATOR.as_json()
+    assert (await room.article()).state == "PUBLISHED"
+
+
+async def test_a_ceo_who_cannot_decide_hands_it_back_to_a_person(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, ceo=True, demo={"ceo_fail": True})
+    await room.worker.run_until_idle()
+    approval = await _past_its_deadline(room)
+    ceo_task = await _ceo_task(room)
+    for _ in range(ceo_task.max_attempts):  # each failed attempt waits for its retry: skip ahead
+        async with committed() as session:
+            row = await session.get(Task, ceo_task.id)
+            row.available_at = datetime.now(UTC)
+            await session.commit()
+        await room.worker.run_until_idle()
+    assert (await room.get(Task, ceo_task.id)).state == "FAILED"
+    async with committed() as session:
+        assert await room.runtime.approvals.expire_due(session) == [approval.id]
+        await session.commit()
+    approve = (await room.tasks())["approve"][0]
+    assert approve.state == "WAITING_APPROVAL"
+    again = await room.get_where(
+        Approval, Approval.task_id == approve.id, Approval.state == "PENDING"
+    )
+    assert again is not None and again.payload["delegated_before"] is True
+    assert (await room.article()).state == "IN_REVIEW"
+
+
+async def test_without_a_ceo_a_person_is_asked_again(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings)  # no CEO hired
+    await room.worker.run_until_idle()
+    approval = await _past_its_deadline(room)
+    assert (await room.get(Approval, approval.id)).state == "EXPIRED"
+    assert await _ceo_task(room) is None
+
+
+async def test_with_the_ceo_kept_out_it_is_asked_again(committed, e2e_settings):
+    # the company can turn D-157 off: then D-001 and D-131 as before — expire, ask again, wait
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
     async with committed() as session:
         await upsert_policy(
             session,
             room.company.id,
-            APPROVE_WHEN_UNANSWERED_KEY,
+            CEO_DECIDES_WHEN_UNANSWERED_KEY,
             False,
             updated_by=OPERATOR.as_json(),
         )
@@ -264,6 +331,7 @@ async def test_with_silence_not_consent_it_is_asked_again(committed, e2e_setting
     approval = await _past_its_deadline(room)
 
     assert (await room.get(Approval, approval.id)).state == "EXPIRED"
+    assert await _ceo_task(room) is None
     approve = (await room.tasks())["approve"][0]
     assert approve.state == "WAITING_APPROVAL"
     again = await room.get_where(

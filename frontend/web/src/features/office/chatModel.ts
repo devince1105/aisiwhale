@@ -19,6 +19,7 @@ export const CHAT_TYPES = new Set([
   "APPROVAL_REJECTED",
   "APPROVAL_RETURNED",
   "APPROVAL_EXPIRED",
+  "APPROVAL_DELEGATED",
   "ARTICLE_PUBLISHED",
   "ARTICLE_REJECTED",
   "WORKFLOW_RUN_COMPLETED",
@@ -59,8 +60,9 @@ export const ROLE_NAME: Record<string, string> = {
   business: "商業開發",
 };
 
-/** Whose work an event is, when no agent is on it: the approval is the editor-in-chief's to ask. */
-const VOICE: Record<string, string> = { APPROVAL_REQUESTED: "editor_in_chief" };
+/** Whose work an event is, when no agent is on it: the approval is the editor-in-chief's to ask;
+ * one nobody answered is the CEO's to take (D-157). */
+const VOICE: Record<string, string> = { APPROVAL_REQUESTED: "editor_in_chief", APPROVAL_DELEGATED: "ceo" };
 
 export type Speaker =
   | { kind: "agent"; id: string | null; name: string; role: string; avatarKey?: string }
@@ -162,17 +164,20 @@ export function chatItem(
     case "APPROVAL_REQUESTED":
       return say(`${clip(s(p.summary) ?? "有一件事", 160)}，請您核准。`, "warn", { approvalRef: s(p.ref_id) ?? undefined });
     case "APPROVAL_APPROVED":
-      // nobody objected in time (D-156): the system's, and it says why
-      return notice(
-        event.actor.kind === "human" ? "你核准了" : event.actor.id === "approvals" ? "期限內沒有人反對，已自動核准" : "已自動核准",
-        "ok",
-      );
+      // the CEO, on an article nobody decided (D-157): she says so, and why
+      if (event.actor.kind === "agent") return say(`我核准發布${which}${s(p.reason) ? `：${clip(s(p.reason)!, 80)}` : "。"}`, "ok", { link: draft });
+      return notice(event.actor.kind === "human" ? "你核准了" : "已自動核准", "ok");
     case "APPROVAL_REJECTED":
+      if (event.actor.kind === "agent") return say(`${which}我決定不發${s(p.reason) ? `：${clip(s(p.reason)!, 80)}` : "。"}`, "danger", { link: draft });
       return notice(`${event.actor.kind === "human" ? "你退回了" : "已退回"}${s(p.reason) ? `：${clip(s(p.reason)!, 60)}` : ""}`, "danger");
     case "APPROVAL_RETURNED":
       return notice(`${event.actor.kind === "human" ? "你退回修改" : "已退回修改"}${s(p.reason) ? `：${clip(s(p.reason)!, 60)}` : ""}`, "warn");
     case "APPROVAL_EXPIRED":
       return notice("審批逾期了", "warn");
+    case "APPROVAL_DELEGATED":
+      return say("有一篇等了一天沒有人決定，我來看看。您現在決定也可以。", "warn", {
+        link: { href: "/admin/approvals", label: "看審批" },
+      });
     case "ARTICLE_PUBLISHED":
       return notice(`${p.revision === true ? "修改版已發布" : "已發布"}${title ? which : "到網站"}`, "ok", s(p.url) ? { href: s(p.url)!, label: "看文章" } : undefined);
     case "ARTICLE_REJECTED":

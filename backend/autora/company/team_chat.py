@@ -30,6 +30,7 @@ CORE_TYPES: tuple[str, ...] = (
     "APPROVAL_REJECTED",
     "APPROVAL_RETURNED",
     "APPROVAL_EXPIRED",
+    "APPROVAL_DELEGATED",  # nobody decided in time: the CEO takes it (D-157)
     "WORKFLOW_RUN_COMPLETED",
     "WORKFLOW_RUN_FAILED",
     "AGENT_RUN_FAILED",

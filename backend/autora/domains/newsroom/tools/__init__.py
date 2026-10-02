@@ -11,6 +11,7 @@ from autora.domains.newsroom.covers import (
     Painter,
 )
 from autora.domains.newsroom.tools import (
+    approval,
     claims,
     commission,
     covers,
@@ -25,6 +26,7 @@ from autora.domains.newsroom.tools import (
 from autora.infra.blobstore import BlobStore
 from autora.infra.http import PageFetcher
 from autora.infra.search import SearchProvider
+from autora.runtime.approvals import ApprovalService
 from autora.runtime.dag import WorkflowEngine
 from autora.runtime.models.embeddings import Embedder
 from autora.runtime.policy import PolicyEngine
@@ -45,6 +47,7 @@ def register_tools(
     image_viewer: ImageViewer | FixtureViewer | None = None,
     painter: Painter | None = None,
     generated_per_day: int = 0,
+    approvals: ApprovalService | None = None,
 ) -> None:
     search.register(registry, search_provider)
     evidence.register(registry, fetcher, blobs, embedder)
@@ -62,6 +65,9 @@ def register_tools(
         painter,
         generated_per_day,
     )
+    if approvals is not None:
+        # the CEO's decision on an article nobody approved in time (D-157)
+        approval.register(registry, approvals)
     if policy is not None and workflows is not None:
         # what the editor-in-chief does: commission a story and put the desk to work (T-605b)
         commission.register(registry, policy, workflows)
