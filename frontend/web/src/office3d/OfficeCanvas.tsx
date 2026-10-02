@@ -215,7 +215,9 @@ export function OfficeCanvas({
         onContextLost={() => setLostAt(generation)}
         onContextRestored={() => setLostAt(null)}
         onReady={() => setReadyAt(generation)}
-        onProgress={(percent) => setModels({ generation, percent })}
+        onProgress={(percent) =>
+          setModels((was) => (was?.generation === generation && was.percent === percent ? was : { generation, percent }))
+        }
       />
       {readyAt !== generation && !lost && !empty ? (
         <Loading3D percent={loadingPercent(models?.generation === generation ? models.percent : null, false)} />

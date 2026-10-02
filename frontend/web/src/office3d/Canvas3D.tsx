@@ -69,7 +69,11 @@ function ReadyWatch({ onReady, onProgress }: { onReady?: () => void; onProgress?
   const active = useProgress((s) => s.active);
   const total = useProgress((s) => s.total);
   const progress = useProgress((s) => s.progress);
-  useEffect(() => onProgress?.(progress), [progress, onProgress]);
+  // Reported when the number changes, never because the page re-rendered: the page re-renders on
+  // each report and hands down a new callback, and reacting to that would never stop.
+  const report = useRef(onProgress);
+  report.current = onProgress;
+  useEffect(() => report.current?.(progress), [progress]);
   const frames = useRef(0);
   const done = useRef(false);
   const born = useRef<number | null>(null);

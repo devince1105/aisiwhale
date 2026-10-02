@@ -177,6 +177,10 @@ describe("OfficeCanvas", () => {
     expect(screen.getByTestId("office-loading").textContent).toContain("54%");
     act(() => seen.props!.onProgress!(100));
     expect(bar()).toBe("98");
+    // the same number again is not news: no re-render, so the scene is not handed a new callback
+    const before = seen.props!.onProgress;
+    act(() => seen.props!.onProgress!(100));
+    expect(seen.props!.onProgress).toBe(before);
     act(() => seen.props!.onReady!());
     expect(screen.queryByTestId("office-loading")).toBeNull();
     // to 2D and back: a new canvas, which has to load again
