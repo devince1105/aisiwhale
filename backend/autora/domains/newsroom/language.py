@@ -70,3 +70,64 @@ def script_problems(lang: str, *, title: str, summary: str | None = None) -> lis
             "rather than repeating the other version's"
         ]
     return []
+
+
+# --- Taiwan's Traditional Chinese (D-167) ---------------------------------------------------------
+
+SIMPLIFIED_ONLY = frozenset(
+    "们这说为时国会发经来对开从关过实现产业电话问题门见长车东应级际总资进运处还张转价币场"
+    "报动项务计设华银证买卖涨亿万与并将达预显数网络软视频规则统济贸税类购认观点难须选举战区链导"
+    "体内汇储债权较头单历综调让讯语词种样闻么没当图层边园标环态势额补库营销险损亏"
+)
+"""Characters written only in Simplified Chinese — each has a different Traditional form (们→們,
+这→這, 币→幣…). None of them belongs in a zh-TW article: a story taken from a mainland source
+that keeps one has not been rewritten, only copied. Left out on purpose, because Traditional
+Chinese uses them too: 后 (皇后), 几 (茶几), 据 (拮据), 准 (批准), 里, 台, 干, 面."""
+
+MAINLAND_TERMS: dict[str, str] = {
+    "特朗普": "川普",
+    "英偉達": "輝達",
+    "美聯儲": "聯準會",
+    "聯儲局": "聯準會",
+    "芯片": "晶片",
+    "通脹": "通膨",
+    "加息": "升息",
+    "軟件": "軟體",
+    "視頻": "影片",
+    "服務器": "伺服器",
+    "內存": "記憶體",
+    "網絡": "網路",
+    "默認": "預設",
+    "營銷": "行銷",
+    "信息": "資訊",
+    "納斯達克": "那斯達克",
+    "回調": "回檔",
+    "谷歌": "Google",
+}
+"""Mainland usage, written in Traditional characters, and Taiwan's own word for it. Only terms
+that mean the same in a finance story either way: 程序 is left out (in Taiwan it is a procedure,
+not a program), so is 數據 (both sides write it)."""
+
+
+def is_taiwan_chinese(lang: str) -> bool:
+    return lang.lower() in ("zh-tw", "zh-hant", "zh-hant-tw")
+
+
+def taiwan_usage_problems(lang: str, texts: list[str]) -> list[str]:
+    """What in a zh-TW version is not Taiwan's Chinese (D-167): Simplified characters, and
+    mainland terms, each with what to write instead. Empty for any other language."""
+    if not is_taiwan_chinese(lang):
+        return []
+    joined = "\n".join(texts)
+    issues = []
+    simplified = sorted({c for c in joined if c in SIMPLIFIED_ONLY})
+    if simplified:
+        shown = "、".join(simplified[:12])
+        issues.append(
+            f"{lang}: Simplified characters ({shown}) — write it in Traditional Chinese, as used "
+            "in Taiwan; quotes from a mainland source too"
+        )
+    for term, taiwan in MAINLAND_TERMS.items():
+        if term in joined:
+            issues.append(f"{lang}: 「{term}」 is mainland usage — write 「{taiwan}」")
+    return issues

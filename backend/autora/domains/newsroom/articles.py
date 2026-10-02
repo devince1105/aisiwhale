@@ -26,7 +26,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from autora.domains.newsroom.language import script_problems
+from autora.domains.newsroom.language import script_problems, taiwan_usage_problems
 from autora.domains.newsroom.models import ArticleState, ClaimStatus, StoryState
 from autora.domains.newsroom.policy import LanguagePolicy
 from autora.domains.newsroom.quotes import MAX_QUOTE
@@ -133,6 +133,9 @@ def check_draft(
         # the writer's own words are in the language they claim to be (D-002); the body may
         # quote its sources in theirs, so it is not counted
         issues.extend(script_problems(version.lang, title=version.title, summary=version.summary))
+        # and a zh-TW version is Taiwan's Chinese, all of it — quotes included (D-167)
+        texts = [version.title, version.summary or "", *(block.text for block in version.blocks)]
+        issues.extend(taiwan_usage_problems(version.lang, texts))
         for index, block in enumerate(version.blocks, 1):
             where = f"{version.lang} block {index} ({block.type})"
             if block.type == "heading" and block.claim_ids:

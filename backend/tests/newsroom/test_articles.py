@@ -99,6 +99,15 @@ def test_broken_drafts_say_why(versions, message):
     assert any(message in issue for issue in issues), issues
 
 
+def test_a_zh_tw_draft_copied_from_a_mainland_source_is_sent_back(  # D-167
+):
+    copied = version("zh-TW", C1)
+    copied.blocks[1].text = "特朗普表示比特币回调"
+    issues = check([copied, version("en", C1)])
+    assert any("Simplified characters" in issue for issue in issues), issues
+    assert any("「川普」" in issue for issue in issues), issues
+
+
 def test_every_problem_is_reported_at_once_and_state_matters():
     other_story = {C1: ClaimFacts(uuid.uuid4(), "UNVERIFIED"), C2: ClaimFacts(STORY, "REJECTED")}
     long_quote = LanguageVersion(

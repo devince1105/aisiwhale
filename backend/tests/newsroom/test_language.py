@@ -59,3 +59,33 @@ def test_a_chinese_version_written_in_english_is_refused():
 def test_the_body_is_not_judged_here():
     """An article may quote its sources at length in their language; the signature says so."""
     assert "body" not in script_problems.__code__.co_varnames
+
+
+# --- Taiwan's Traditional Chinese (D-167) --------------------------------------------------------
+
+from autora.domains.newsroom.language import SIMPLIFIED_ONLY, taiwan_usage_problems  # noqa: E402
+
+
+def test_simplified_characters_are_named_and_refused_in_zh_tw():
+    [issue] = taiwan_usage_problems("zh-TW", ["比特币回调逼近8.4万美元之际"])
+    assert "Simplified characters" in issue
+    for character in "币调万际":
+        assert character in issue
+
+
+def test_mainland_terms_are_named_with_taiwan_s_own_word():
+    issues = taiwan_usage_problems("zh-TW", ["特朗普談英偉達芯片，美聯儲恐再加息"])
+    assert "zh-TW: 「特朗普」 is mainland usage — write 「川普」" in issues
+    assert any("「輝達」" in i for i in issues) and any("「晶片」" in i for i in issues)
+    assert any("「聯準會」" in i for i in issues) and any("「升息」" in i for i in issues)
+
+
+def test_taiwan_s_chinese_passes_including_words_both_scripts_share():
+    text = "川普談輝達晶片，聯準會恐再升息；皇后區房市拮据，批准茶几里程碑，臺灣干預市場的方面"
+    assert taiwan_usage_problems("zh-TW", [text]) == []
+    # the characters left out because Traditional Chinese uses them too
+    assert not set("后几据准里台干面") & SIMPLIFIED_ONLY
+
+
+def test_only_zh_tw_is_held_to_it():
+    assert taiwan_usage_problems("en", ["特朗普 said"]) == []

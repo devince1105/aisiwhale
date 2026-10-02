@@ -73,6 +73,13 @@ Rules:
    units (7,535萬、1.57億美元) and no English words ("traction", "million"). A company's English
    name is the one it uses itself; if unsure, keep its Chinese name and its stock code
    (雙鴻 3324) rather than guessing.
+13. The Chinese is Taiwan's Traditional Chinese, all of it — the title, every paragraph, and the
+   quotes too: a quote from a mainland (Simplified) source is written out in Traditional
+   characters, and a story from such a source is rewritten, not copied. Use Taiwan's words:
+   川普 (not 特朗普), 輝達 (not 英偉達), 聯準會 (not 美聯儲), 晶片 (not 芯片), 通膨 (not 通脹),
+   升息 (not 加息), 軟體, 影片, 伺服器, 記憶體, 網路, 資訊, 行銷, 那斯達克, 回檔 (a pullback, not
+   回調), 殖利率 for a bond's yield. write_draft refuses Simplified characters and these mainland
+   terms, and names what to write instead.
 9. An institution's market view (an asset manager's outlook or commentary) is reported as theirs:
    the title and first paragraph say who (貝萊德, 先鋒…), which publication and its date; every
    view in the article is written as that institution's, never as the site's own call. Every
