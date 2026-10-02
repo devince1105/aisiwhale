@@ -4,6 +4,7 @@ taken off by a person; Pixabay's key never shows in an error."""
 import base64
 import io
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -518,3 +519,44 @@ async def test_gemini_is_shown_the_logos_as_images():
     assert "official logos" in parts[0]["text"]
     assert parts[1] == {"text": "Official logo of Tether:"}
     assert base64.b64decode(parts[2]["inlineData"]["data"]) == b"PNG-BYTES"
+
+
+async def test_a_swap_after_the_library_links_expired_looks_the_photo_up_again(
+    db_session, tmp_path
+):
+    # Pixabay's image links last about a day; a person swaps a week later (409, "answered 400")
+    company = await unique_company(db_session, "covers")
+    story = Story(company_id=company.id, title="Chips", state="SELECTED")
+    db_session.add(story)
+    await db_session.flush()
+    store = covers.BlobCoverStore(LocalFSBlobStore(tmp_path))
+
+    class Expiring(covers.FixtureLibrary):
+        """Links handed out by an earlier search no longer download; a new search's do."""
+
+        def __init__(self):
+            self.searches = 0
+
+        async def search(self, query, *, limit=10):
+            self.searches += 1
+            found = await super().search(query, limit=limit)
+            return [replace(p, image_url=f"{p.image_url}?s={self.searches}") for p in found]
+
+        async def download(self, photo, *, preview=False):
+            if not photo.image_url.endswith(f"?s={self.searches}"):
+                raise covers.LibraryError("pixabay image answered 400")
+            return await super().download(photo, preview=preview)
+
+    library = Expiring()
+    found = await library.search("semiconductor wafer")
+    row = await covers.set_cover(
+        db_session, company_id=company.id, story_id=story.id, photo=found[0],
+        candidates=found, alt={}, query="semiconductor wafer", library=library,
+        store=store, run_id=None,
+    )  # fmt: skip
+    library.searches += 1  # a day later: every link handed out so far has expired
+
+    await covers.swap_cover(db_session, row, library=library, store=store)
+    assert row.provider_id == found[1].id  # the same photo, with a fresh link
+    assert library.searches == 3
+    assert all(c["image_url"].endswith("?s=3") for c in row.candidates)

@@ -686,14 +686,33 @@ async def swap_cover(
     session: AsyncSession, row: StoryCover, *, library: ImageLibrary, store: CoverStore
 ) -> StoryCover:
     """The next photo from the same search, chosen by a person: no model call. The one it
-    replaces goes to the end of the list, so swapping on comes back round to it."""
+    replaces goes to the end of the list, so swapping on comes back round to it.
+
+    The candidates were found when the cover was chosen, and a library's image links do not
+    last (Pixabay's: about a day). One that no longer downloads is looked up again — the same
+    search, the same photo by its id, with a fresh link — and the list is refreshed with it."""
     others = [Photo.from_json(c) for c in row.candidates]
     taken = await used_elsewhere(session, row.company_id, row.story_id, others)
     free = [i for i, p in enumerate(others) if p.id not in taken]
     if not free:
         raise CoverError("no other photo from this search: nothing to swap to")
     photo = others[free[0]]
-    key, url, width, height, size = await _store(library, store, row.story_id, photo)
+    try:
+        data = await library.download(photo)
+    except LibraryError:
+        fresh = {p.id: p for p in await library.search(row.query, limit=20)}
+        if photo.id not in fresh:
+            raise CoverError(
+                "this photo is no longer in the library's search: choose the cover again"
+            ) from None
+        others = [fresh.get(p.id, p) for p in others]
+        photo = others[free[0]]
+        row.candidates = [p.as_json() for p in others]
+        shown = Photo.from_json(row.photo) if row.photo else None
+        if shown is not None and shown.id in fresh:  # it goes back on the list: a fresh link too
+            row.photo = fresh[shown.id].as_json()
+        data = await library.download(photo)
+    key, url, width, height, size = await _store(library, store, row.story_id, photo, data)
     old = row.key
     rest = [c for i, c in enumerate(row.candidates) if i != free[0]]
     row.candidates = [*rest, row.photo] if row.photo else rest
