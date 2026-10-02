@@ -380,3 +380,15 @@ describe("the language button (D-164)", () => {
     expect(english.getAttribute("href")).toBe("/news/en/watchlist?s=us%3AMSFT");
   });
 });
+
+describe("the other language keeps the reader where they are (D-168)", () => {
+  it("on an article, the same article; elsewhere the same page, its query kept", async () => {
+    const { inOtherLanguage } = await import("./LanguageMenu");
+    expect(inOtherLanguage("/news/zh-TW/articles/bitcoin-etf-1a2b3c", "", "zh-TW", "en")).toBe(
+      "/news/en/articles/bitcoin-etf-1a2b3c",
+    );
+    expect(inOtherLanguage("/news/en/articles/x", "", "en", "zh-TW")).toBe("/news/zh-TW/articles/x");
+    expect(inOtherLanguage("/news/zh-TW", "section=tw", "zh-TW", "en")).toBe("/news/en?section=tw");
+    expect(inOtherLanguage("/admin/office", "", "zh-TW", "en")).toBe("/news/en");
+  });
+});

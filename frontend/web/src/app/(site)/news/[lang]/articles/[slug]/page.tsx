@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { fetchArticle } from "@/features/site/api";
 import { membershipOpen } from "@/features/site/membership";
 import { ArticleView } from "@/features/site/ArticleView";
 import { coverSrc } from "@/features/site/Cover";
-import { isLang, words } from "@/features/site/i18n";
+import { isLang, LANGS, words } from "@/features/site/i18n";
 import { Sidebar } from "@/features/site/Sidebar";
 import { loadSidebar } from "@/features/site/sidebarData";
 
@@ -53,7 +53,15 @@ export default async function Page({ params }: { params: Params }) {
   const { lang, slug } = await params;
   if (!isLang(lang)) notFound();
   const article = await load(lang, slug, await readerCookie());
-  if (!article) notFound();
+  if (!article) {
+    // switched here from the other language, but this one was not published in it (D-168): on to
+    // this language's front page rather than a page that says nothing is here
+    const elsewhere = await Promise.all(
+      LANGS.filter((other) => other !== lang).map((other) => load(other, slug, "")),
+    );
+    if (elsewhere.some(Boolean)) redirect(`/news/${lang}`);
+    notFound();
+  }
   // the front page's sidebar beside the article on a wide screen (D-088); its calendar opens on
   // the article's month
   const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date(article.published_at)).slice(0, 7);

@@ -4,8 +4,9 @@
 // flag alone, "[flag] ⌄", opens the others, each named in full (D-164). The button says which
 // language it is in words too, for a screen reader. The flags are drawn, not emoji:
 // Windows shows a flag emoji as two letters. The other language keeps the reader where they are —
-// the same tab, day, page or stock — except on an article, which may not be published in it:
-// that goes to the other language's front page (the article's own page links its translations).
+// the same tab, day, page or stock, and on an article the same article (D-168): its versions share
+// one slug, and the company publishes in both languages. One that is not in the other language
+// after all sends the reader on to that language's front page (the article page does that).
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useId, useRef, useState } from "react";
@@ -53,7 +54,7 @@ export function Flag({ lang, className = "" }: { lang: Lang; className?: string 
 /** The same page in ``other``: its path and query, with the language swapped. */
 export function inOtherLanguage(pathname: string, search: string, lang: Lang, other: Lang): string {
   const prefix = `/news/${lang}`;
-  if (!pathname.startsWith(prefix) || pathname.startsWith(`${prefix}/articles/`)) return `/news/${other}`;
+  if (!pathname.startsWith(prefix)) return `/news/${other}`;
   return `/news/${other}${pathname.slice(prefix.length)}${search ? `?${search}` : ""}`;
 }
 
