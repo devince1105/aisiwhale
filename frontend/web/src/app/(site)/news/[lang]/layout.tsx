@@ -40,14 +40,14 @@ export default async function SiteLayout({
           </Link>
           <p className="mt-1.5 text-xs whitespace-nowrap text-muted">{w.tagline}</p>
         </div>
-        {/* the reader's controls, top right, in one row: the language, light or dark, and who
+        {/* the reader's controls, top right, in one row: light or dark, the language, and who
             they are (D-163; the language was at the sections bar's end, D-087) */}
         <span className="flex shrink-0 items-center gap-1 text-sm print:hidden">
+          <ThemeToggle lang={lang} />
           {/* the query string is read in the browser, to keep it when the language changes */}
           <Suspense fallback={null}>
             <LanguageMenu lang={lang} />
           </Suspense>
-          <ThemeToggle lang={lang} />
           <MemberBadge lang={lang} />
         </span>
       </header>
