@@ -1,0 +1,5 @@
+{"articles": [
+  {"url": "https://www.example-news.test/tsmc-2nm?utm_source=gdelt", "url_mobile": "", "title": "TSMC starts 2nm volume production in Kaohsiung", "seendate": "20261002T081500Z", "socialimage": "", "domain": "example-news.test", "language": "English", "sourcecountry": "United States"},
+  {"url": "https://www.example-tw.test/news/123", "url_mobile": "", "title": "台積電高雄廠 2 奈米量產", "seendate": "20261002T060000Z", "socialimage": "", "domain": "example-tw.test", "language": "Chinese", "sourcecountry": "Taiwan"},
+  {"url": "not a link", "title": "dropped", "seendate": "20261002T060000Z"}
+]}

@@ -23,6 +23,13 @@ Its sources, and why each is set up the way it is:
 - **機構觀點** (D-057): what the ten largest asset managers publish about the markets — their own
   free outlooks and commentaries, reported as theirs ("貝萊德表示…"), never as the site's advice.
   Ten firms in two searches, once a day over a week of results: about 60 credits a month.
+- **證交所重大訊息** (D-169): the exchange's own record of what listed companies announce —
+  the AI supply chain's and the largest companies' announcements whatever they are about, and
+  anyone's take-over, merger or buy-back. Free, every two hours (the dataset is the latest
+  trading day's), the record itself (``primary``).
+- **GDELT** (D-169): English news worldwide, free and without credits — Taiwan's tech industry
+  as reported from Taiwan, and the AI chip race on a few news sites whose pages can be read.
+  Only in English: a query in Chinese finds English pages that GDELT translated, not 中文 news.
 
 Scion Asset Management (Michael Burry) is on the list the user chose, but its last 13F was filed
 on 2025-11-03: it may never produce another story. Kept, because a filing would be news.
@@ -211,6 +218,44 @@ TW_NEWS = (
 COMMODITY_NEWS = ("reuters.com", "kitco.com", "mining.com", "spglobal.com", "iea.org")
 """Commodity news and data in English: Reuters, Kitco, Mining.com, S&P Global, the IEA."""
 
+TWSE_WATCH = (
+    *("2330", "2317", "2454", "2382", "2308"),  # the market strip's (TW_STOCKS)
+    *("3231", "6669", "2357", "2376", "3711", "2303", "2345", "3017", "3661", "3443", "2395"),
+    *("2412", "2881", "2882", "2891"),
+)
+"""Companies whose every announcement is taken: the AI supply chain (緯創, 緯穎, 華碩, 技嘉,
+日月光投控, 聯電, 智邦, 奇鋐, 世芯-KY, 創意, 研華) and the largest (中華電, 富邦金, 國泰金,
+中信金)."""
+TWSE_EVENTS = (
+    *("公開收購", "併購", "吸收合併", "合併契約", "合併基準日", "股份轉換"),
+    *("買回本公司股份", "庫藏股", "下市"),
+)
+"""Announcements taken from any listed company: who is buying whom, and who buys back its own.
+Not 「合併」 alone: every monthly revenue report is 「合併營收」."""
+
+
+def _gdelt(name: str, query: str, section: str) -> MarketSource:
+    return MarketSource(
+        name=f"GDELT：{name}",
+        kind="gdelt",
+        trust_level=Decimal("0.5"),
+        language="en",
+        config={"query": query, "timespan": "6h", "maxrecords": 20, SECTION: section},
+        poll_interval_seconds=3 * 3600,
+    )
+
+
+GDELT_READABLE = (
+    "cnbc.com",
+    "apnews.com",
+    "techcrunch.com",
+    "theverge.com",
+    "tomshardware.com",
+    "theregister.com",
+    "focustaiwan.tw",
+)
+"""News sites whose articles a program can read (no paywall)."""
+
 SOURCES: tuple[MarketSource, ...] = (
     _investor("巴菲特", "Berkshire Hathaway", "0001067983"),
     # Pershing Square Capital Management (CIK 1336528) filed only a 13F-NT for 2026-06-30: its
@@ -227,6 +272,33 @@ SOURCES: tuple[MarketSource, ...] = (
     _figure("川普（Donald J. Trump）", "0000947033"),
     _search("Trump OGE 278-T periodic transaction report stocks bonds", "figures", "en"),
     _search("Pelosi periodic transaction report stock trades disclosure", "figures", "en"),
+    MarketSource(
+        name="證交所重大訊息",
+        kind="twse_announcements",
+        trust_level=Decimal("0.95"),
+        language="zh-TW",
+        config={
+            "codes": list(TWSE_WATCH),
+            "keywords": list(TWSE_EVENTS),
+            PRIMARY: True,
+            MAX_AGE_DAYS: 3,
+            SECTION: "tw",
+        },
+        poll_interval_seconds=2 * 3600,
+    ),
+    _gdelt(
+        "台灣科技業（英文報導）",
+        '(TSMC OR Foxconn OR MediaTek OR Taiex OR "Taiwan stocks" OR semiconductor)'
+        " sourcecountry:taiwan sourcelang:english",
+        "tw",
+    ),
+    _gdelt(
+        "AI 晶片與資料中心",
+        '(Nvidia OR TSMC OR "AI chips" OR "data center") ('
+        + " OR ".join(f"domainis:{d}" for d in GDELT_READABLE)
+        + ") sourcelang:english",
+        "ai",
+    ),
     _press("NVIDIA Newsroom", "https://nvidianews.nvidia.com/releases.xml"),
     _press("OpenAI News", "https://openai.com/news/rss.xml"),
     _press("Google AI Blog", "https://blog.google/technology/ai/rss/"),

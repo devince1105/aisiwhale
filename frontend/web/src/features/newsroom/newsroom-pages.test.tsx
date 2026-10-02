@@ -12,7 +12,7 @@ import { articleQuery, queryKeys, storiesQuery, workflowEventsQuery } from "@/ap
 import { ArticlesView } from "./ArticlesView";
 import { ArticleView } from "./ArticleView";
 import { claimNumbers, orderedClaims, problems, type ArticleDetail, type ClaimView, type StoryDetail } from "./model";
-import { AddSourceForm, SourcesView } from "./SourcesView";
+import { AddSourceForm, SourcesView, sourceConfig } from "./SourcesView";
 import { StoriesView } from "./StoriesView";
 import { StoryView } from "./StoryView";
 
@@ -365,6 +365,12 @@ describe("sources", () => {
     expect(onAdd.mock.calls[0]).toEqual([
       expect.objectContaining({ name: "Watchlist", kind: "url_list", url: null, config: { urls: ["https://a.test/1", "https://a.test/2"] } }),
     ]);
+  });
+
+  it("the exchange's announcements by stock code, GDELT by a query (D-169)", () => {
+    expect(sourceConfig("twse_announcements", " 2330  2317\n")).toEqual({ codes: ["2330", "2317"] });
+    expect(sourceConfig("gdelt", " Nvidia sourcelang:english ")).toEqual({ query: "Nvidia sourcelang:english" });
+    expect(sourceConfig("rss", "https://x.test/feed")).toEqual({});
   });
 
   it("shows why a source was refused", async () => {

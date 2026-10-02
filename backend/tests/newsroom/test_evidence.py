@@ -16,7 +16,7 @@ import autora.domains.newsroom as newsroom
 from autora.app import build_embedder
 from autora.db.models import Company, EventRecord
 from autora.domains.newsroom.extract import decode, extract
-from autora.domains.newsroom.models import Evidence, Source
+from autora.domains.newsroom.models import Evidence, Source, SourceItem
 from autora.domains.newsroom.sources import SourcePoller
 from autora.domains.newsroom.tools import evidence as evidence_tools
 from autora.infra.blobstore import LocalFSBlobStore
@@ -200,6 +200,38 @@ async def test_fetch_url_captures_evidence_with_its_snapshot(kit):
     assert captured.payload["source_id"] == str(source.id)
     assert captured.run_id == evidence.run_id and captured.agent_id is not None
     assert evidence.task_id is not None
+
+
+async def test_an_exchange_announcement_is_evidence_in_its_own_words(kit):
+    # D-169: TWSE's announcements have no page a GET can read; the item keeps the text
+    committed, company = kit["committed"], kit["company"]
+    async with committed() as session:
+        source = Source(
+            company_id=company.id,
+            name="證交所重大訊息",
+            kind="twse_announcements",
+            config={"codes": ["2330"]},
+            status="paused",
+        )
+        session.add(source)
+        await session.flush()
+        fetcher = FixtureFetcher(FIXTURES, json.loads((FIXTURES / "routes.json").read_text()))
+        outcome = await SourcePoller(fetcher=fetcher, search=FixtureSearchProvider([])).poll(
+            session, source
+        )
+        [item_id] = outcome.new_item_ids
+        url = (await session.get(SourceItem, item_id)).url
+        await session.commit()
+
+    result = await kit["call"]("fetch_url", {"url": url})
+    assert result.ok, result.message
+    assert result.output["excerpt"].startswith("台積電（2330）重大訊息：代子公司公告取得機器設備")
+    async with committed() as session:
+        evidence = await session.get(Evidence, uuid.UUID(result.output["evidence_id"]))
+    assert evidence.url == url and evidence.source_id == source.id
+    assert evidence.language == "zh-TW" and "交易總金額：新台幣120億元" in evidence.extracted_text
+    again = await kit["call"]("fetch_url", {"url": url})
+    assert again.output["reused"] is True
 
 
 async def test_the_same_page_the_same_day_is_reused(kit):

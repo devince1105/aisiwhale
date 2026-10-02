@@ -6,5 +6,7 @@
   "https://analysis.fixtures.autora.test/microgrid-costs": "pages/microgrid-costs.html",
   "https://blog.fixtures.autora.test/harbor-residents": "pages/harbor-residents.html",
   "https://app.fixtures.autora.test/dashboard": "pages/needs-javascript.html",
-  "https://city.fixtures.autora.test/reports/microgrid.pdf": "pages/report.pdf"
+  "https://city.fixtures.autora.test/reports/microgrid.pdf": "pages/report.pdf",
+  "https://openapi.twse.com.tw/v1/opendata/t187ap04_L": "feeds/twse-announcements.json",
+  "https://api.gdeltproject.org/api/v2/doc/doc": "feeds/gdelt-artlist.json"
 }

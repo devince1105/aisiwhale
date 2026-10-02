@@ -12,6 +12,10 @@ stored again; either way the call ``produced`` the evidence, so an agent's "Sour
 What cannot become evidence fails the call without a retry: non-text content (PDFs, images),
 pages with no readable text (often ones that need JavaScript), private addresses.
 
+D-169: a TWSE material announcement has no page a GET can read. Its source item keeps the
+announcement's whole text, and ``fetch_url`` on that item's URL captures the text from the item
+instead of fetching — the evidence is the exchange's own words, as polled.
+
 T-503: a new snapshot is also split into chunks (``chunks.py``) and the chunks are embedded
 (the ``embed`` binding) *before* anything is written, so the company's event lock is never held
 while waiting for the embedding service. If embedding fails the evidence is still captured; its
@@ -35,7 +39,14 @@ from autora.db.vector import HalfVector
 from autora.domains.newsroom.chunks import chunk_text
 from autora.domains.newsroom.events import EvidenceCaptured
 from autora.domains.newsroom.extract import extract
-from autora.domains.newsroom.models import EMBED_DIM, Evidence, EvidenceChunk, SourceItem
+from autora.domains.newsroom.models import (
+    EMBED_DIM,
+    Evidence,
+    EvidenceChunk,
+    Source,
+    SourceItem,
+    SourceKind,
+)
 from autora.domains.newsroom.sources import canonical_url
 from autora.infra.blobstore import BlobStore
 from autora.infra.http import PageFetcher
@@ -241,6 +252,23 @@ def fetch_url_tool(
 ) -> ToolFn:
     async def fetch_url(args: FetchUrlArgs, ctx: ToolContext) -> ToolResult:
         url = canonical_url(args.url)
+        kept = await _announcement(ctx, url)
+        if kept is not None:
+            evidence, reused = await capture_text(
+                ctx,
+                url=url,
+                final_url=url,
+                title=kept.title,
+                content_type="text/plain; charset=utf-8",
+                language="zh-TW",
+                text=kept.summary or kept.title,
+                truncated=False,
+                snapshot=(kept.summary or kept.title).encode(),
+                blobs=blobs,
+                embedder=embedder,
+                now=clock(),
+            )
+            return _captured(evidence, reused)
         page = await fetcher.fetch(args.url)
         if not _textual(page.content_type):
             raise EvidenceError(
@@ -266,26 +294,47 @@ def fetch_url_tool(
             embedder=embedder,
             now=clock(),
         )
-        output = {
-            "evidence_id": str(evidence.id),
-            "url": evidence.url,
-            "title": evidence.title,
-            "chars": len(evidence.extracted_text),
-            "truncated": evidence.truncated,
-            "reused": reused,
-            "excerpt": evidence.extracted_text[:EXCERPT],
-            "note": READ_NOTE,
-        }
+        result = _captured(evidence, reused)
         if args.render:
-            output["render"] = "not available: the page was read without running JavaScript"
-        return ToolResult(
-            output=output,
-            summary=("reused" if reused else "captured")
-            + f" evidence {evidence.id} ({len(evidence.extracted_text)} chars)",
-            produced=[ProducedRef(type="evidence", id=evidence.id)],
-        )
+            result.output["render"] = "not available: the page was read without running JavaScript"
+        return result
 
     return fetch_url
+
+
+async def _announcement(ctx: ToolContext, url: str) -> SourceItem | None:
+    """The company's item at ``url`` from a source whose items keep their own text (D-169)."""
+    return await ctx.session.scalar(
+        select(SourceItem)
+        .join(Source, Source.id == SourceItem.source_id)
+        .where(
+            SourceItem.company_id == ctx.company_id,
+            SourceItem.url == url,
+            Source.kind == SourceKind.TWSE_ANNOUNCEMENTS.value,
+            SourceItem.summary.is_not(None),
+        )
+        .order_by(SourceItem.created_at)
+        .limit(1)
+    )
+
+
+def _captured(evidence: Evidence, reused: bool) -> ToolResult:
+    output = {
+        "evidence_id": str(evidence.id),
+        "url": evidence.url,
+        "title": evidence.title,
+        "chars": len(evidence.extracted_text),
+        "truncated": evidence.truncated,
+        "reused": reused,
+        "excerpt": evidence.extracted_text[:EXCERPT],
+        "note": READ_NOTE,
+    }
+    return ToolResult(
+        output=output,
+        summary=("reused" if reused else "captured")
+        + f" evidence {evidence.id} ({len(evidence.extracted_text)} chars)",
+        produced=[ProducedRef(type="evidence", id=evidence.id)],
+    )
 
 
 def search_evidence_tool(embedder: Embedder) -> ToolFn:

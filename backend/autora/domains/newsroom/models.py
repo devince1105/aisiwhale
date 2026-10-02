@@ -32,6 +32,14 @@ class SourceKind(StrEnum):
     """``config.urls``: pages to watch; each becomes an item once."""
     SEARCH_QUERY = "search_query"
     """``config.query`` (and optional ``k``, ``recency_days``) run through web_search's provider."""
+    TWSE_ANNOUNCEMENTS = "twse_announcements"
+    """The Taiwan Stock Exchange's material announcements of listed companies (重大訊息, D-169),
+    optionally only ``config.codes`` or those whose subject has one of ``config.keywords``. An
+    announcement has no page of its own to fetch: its item keeps the full text, and ``fetch_url``
+    on the item's URL makes that text the evidence."""
+    GDELT = "gdelt"
+    """``config.query`` run through the GDELT DOC API (D-169): articles from news sites worldwide,
+    newest first; each item links the article itself."""
 
 
 class SourceStatus(StrEnum):

@@ -25,7 +25,7 @@ import hashlib
 import re
 import uuid
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -36,6 +36,14 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
+from autora.domains.newsroom.datafeeds import (
+    GDELT_GAP_SECONDS,
+    TWSE_URL,
+    GdeltBusy,
+    gdelt_url,
+    parse_gdelt,
+    parse_twse_announcements,
+)
 from autora.domains.newsroom.events import SourceItemDiscovered, SourcePaused, SourcePolled
 from autora.domains.newsroom.feeds import FeedEntry, FeedError, parse_feed
 from autora.domains.newsroom.models import Source, SourceItem, SourceKind, SourceStatus
@@ -170,6 +178,27 @@ def _validate(kind: SourceKind, url: str | None, config: dict[str, Any]) -> None
             or not all(isinstance(d, str) and d and "/" not in d for d in domains)
         ):
             raise SourceConfigError("config.domains must be a list of site names (example.com)")
+    elif kind is SourceKind.TWSE_ANNOUNCEMENTS:
+        for key in ("codes", "keywords"):
+            given = config.get(key)
+            if given is not None and (
+                not isinstance(given, list)
+                or not all(isinstance(v, str) and v.strip() for v in given)
+            ):
+                raise SourceConfigError(f"config.{key} must be a list of words")
+        codes = config.get("codes") or []
+        if not all(c.strip().isalnum() and len(c.strip()) <= 6 for c in codes):
+            raise SourceConfigError("config.codes are stock codes (2330)")
+    elif kind is SourceKind.GDELT:
+        query = config.get("query")
+        if not isinstance(query, str) or not query.strip():
+            raise SourceConfigError("a gdelt source needs config.query")
+        most = config.get("maxrecords", 25)
+        if not isinstance(most, int) or isinstance(most, bool) or not 1 <= most <= 250:
+            raise SourceConfigError("config.maxrecords must be 1-250")
+        span = config.get("timespan", "1d")
+        if not isinstance(span, str) or not re.fullmatch(r"\d+(min|h|d|w|m)", span):
+            raise SourceConfigError("config.timespan is like 15min, 6h, 1d, 1w")
     age = config.get(MAX_AGE_DAYS)
     if age is not None and (not isinstance(age, int) or isinstance(age, bool) or age < 1):
         raise SourceConfigError("config.max_age_days must be a whole number of days, 1 or more")
@@ -269,6 +298,8 @@ class _Gathered:
     entries: list[FeedEntry]
     cost_usd: Decimal | None = None
     error: str | None = None
+    busy: bool = False
+    """The source asked to be asked less often (GDELT): not a failure towards pausing it."""
 
 
 @dataclass(frozen=True)
@@ -291,6 +322,11 @@ class SourcePoller:
     concurrency: int = 4
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
     actor: Actor = field(default_factory=lambda: Actor.system("newsroom.poller"))
+    gdelt_gap_seconds: float = GDELT_GAP_SECONDS
+    """GDELT takes one request every five seconds from an address: its sources wait their turn
+    (D-169)."""
+    _gdelt_turn: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _gdelt_last: float = field(default=float("-inf"), init=False, repr=False)
 
     async def poll_due(self, session: AsyncSession, company_id: uuid.UUID) -> list[PollOutcome]:
         now = self.clock()
@@ -332,6 +368,17 @@ class SourcePoller:
             if source.kind == SourceKind.RSS:
                 page = await self.fetcher.fetch(source.url or "")
                 return _Gathered(parse_feed(page.body))
+            if source.kind == SourceKind.TWSE_ANNOUNCEMENTS:
+                page = await self.fetcher.fetch(source.url or TWSE_URL)
+                return _Gathered(
+                    parse_twse_announcements(
+                        page.body,
+                        codes=source.config.get("codes") or (),
+                        keywords=source.config.get("keywords") or (),
+                    )
+                )
+            if source.kind == SourceKind.GDELT:
+                return _Gathered(await self._gdelt(source))
             if source.kind == SourceKind.URL_LIST:
                 # a URL is its own id and title: written two ways, it is still one page
                 urls = dict.fromkeys(canonical_url(u) for u in source.config.get("urls", []))
@@ -361,8 +408,23 @@ class SourcePoller:
                 for r in response.results
             ]
             return _Gathered(entries, cost_usd=response.cost_usd or None)
+        except GdeltBusy as exc:
+            return _Gathered([], error=f"{type(exc).__name__}: {exc}", busy=True)
         except (FetchError, FeedError, SearchError) as exc:
             return _Gathered([], error=f"{type(exc).__name__}: {exc}"[:500])
+
+    async def _gdelt(self, source: Source) -> list[FeedEntry]:
+        loop = asyncio.get_running_loop()
+        async with self._gdelt_turn:
+            wait = self._gdelt_last + self.gdelt_gap_seconds - loop.time()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            try:
+                page = await self.fetcher.fetch(gdelt_url(source.config))
+            finally:
+                self._gdelt_last = loop.time()
+        entries = parse_gdelt(page.body)
+        return [replace(e, external_id=canonical_url(e.url)) for e in entries]
 
     async def _apply(
         self, session: AsyncSession, source: Source, gathered: _Gathered, now: datetime
@@ -370,7 +432,8 @@ class SourcePoller:
         source.last_polled_at = now
         source.next_poll_at = now + timedelta(seconds=source.poll_interval_seconds)
         if gathered.error is not None:
-            source.consecutive_failures += 1
+            if not gathered.busy:
+                source.consecutive_failures += 1
             source.last_error = gathered.error
             await self._emit(
                 session,

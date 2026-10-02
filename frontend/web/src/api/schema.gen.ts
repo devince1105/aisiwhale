@@ -3719,7 +3719,7 @@ export interface components {
          * SourceKind
          * @enum {string}
          */
-        SourceKind: "rss" | "url_list" | "search_query";
+        SourceKind: "rss" | "url_list" | "search_query" | "twse_announcements" | "gdelt";
         /** SourceView */
         SourceView: {
             /** Config */

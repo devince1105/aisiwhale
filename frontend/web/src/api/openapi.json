@@ -5814,7 +5814,9 @@
     "enum": [
      "rss",
      "url_list",
-     "search_query"
+     "search_query",
+     "twse_announcements",
+     "gdelt"
     ],
     "title": "SourceKind",
     "type": "string"

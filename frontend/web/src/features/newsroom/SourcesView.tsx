@@ -8,7 +8,13 @@ import type { NewSource } from "@/api/queries";
 import { formatTime, type SourceView } from "./model";
 import { Badge, Empty } from "./parts";
 
-const KINDS: Record<string, string> = { rss: "RSS / Atom", url_list: "網址清單", search_query: "搜尋" };
+const KINDS: Record<string, string> = {
+  rss: "RSS / Atom",
+  url_list: "網址清單",
+  search_query: "搜尋",
+  twse_announcements: "證交所重大訊息",
+  gdelt: "GDELT",
+};
 
 export function SourcesView({ sources }: { sources: readonly SourceView[] | undefined }) {
   if (!sources) return <Empty>載入中…</Empty>;
@@ -32,6 +38,23 @@ export function SourcesView({ sources }: { sources: readonly SourceView[] | unde
   );
 }
 
+const TARGETS: Record<NewSource["kind"], string> = {
+  rss: "Feed 網址",
+  url_list: "網址（空白或換行分隔）",
+  search_query: "搜尋字詞",
+  twse_announcements: "股票代號（空白分隔，例：2330 2317）",
+  gdelt: "GDELT 查詢（英文，例：Nvidia sourcelang:english）",
+};
+
+/** What each kind of source needs in its config (D-169: GDELT a query, TWSE the codes). */
+export function sourceConfig(kind: NewSource["kind"], target: string): Record<string, unknown> {
+  const words = target.split(/\s+/).filter(Boolean);
+  if (kind === "url_list") return { urls: words };
+  if (kind === "search_query" || kind === "gdelt") return { query: target.trim() };
+  if (kind === "twse_announcements") return { codes: words };
+  return {};
+}
+
 export function AddSourceForm({ onAdd }: { onAdd: (source: NewSource) => Promise<unknown> }) {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<NewSource["kind"]>("rss");
@@ -45,13 +68,12 @@ export function AddSourceForm({ onAdd }: { onAdd: (source: NewSource) => Promise
     event.preventDefault();
     setBusy(true);
     setError(null);
-    const lines = target.split(/\s+/).filter(Boolean);
     try {
       await onAdd({
         name,
         kind,
         url: kind === "rss" ? target.trim() : null,
-        config: kind === "url_list" ? { urls: lines } : kind === "search_query" ? { query: target.trim() } : {},
+        config: sourceConfig(kind, target),
         trust_level: trust,
         language: language || null,
         poll_interval_seconds: 3600,
@@ -82,7 +104,7 @@ export function AddSourceForm({ onAdd }: { onAdd: (source: NewSource) => Promise
         </select>
       </label>
       <label className="grid gap-1 sm:col-span-2">
-        {kind === "rss" ? "Feed 網址" : kind === "url_list" ? "網址（空白或換行分隔）" : "搜尋字詞"}
+        {TARGETS[kind]}
         <textarea required rows={kind === "url_list" ? 3 : 1} value={target} onChange={(e) => setTarget(e.target.value)} className="rounded border border-line bg-canvas px-2 py-1" />
       </label>
       <label className="grid gap-1">
