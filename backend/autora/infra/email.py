@@ -37,6 +37,8 @@ class Message:
     subject: str
     text: str
     html: str | None = None
+    reply_to: str | None = None
+    """Where a reply goes, when not to the sender (D-165: a reader's message, answered to them)."""
 
 
 class Sender(Protocol):
@@ -80,6 +82,8 @@ class ResendSender:
         }
         if message.html:
             payload["html"] = message.html
+        if message.reply_to:
+            payload["reply_to"] = message.reply_to
         client = self.client or httpx.AsyncClient(timeout=self.timeout_seconds)
         try:
             response = await client.post(

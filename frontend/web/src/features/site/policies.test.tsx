@@ -29,27 +29,27 @@ const PERSON = operator({
 
 describe("who runs the site", () => {
   it("defaults to the brand and its address, and leaves a person's details to the environment", () => {
-    expect(operator({})).toEqual({ brand: "Nanguado", owner: null, email: "service@nanguado.com", phone: null });
+    expect(operator({})).toEqual({ brand: "Nanguado", owner: null, email: "service@aisiwhale.com", phone: null });
     expect(operator({ SITE_OPERATOR_OWNER: "  ", SITE_CONTACT_PHONE: "" }).owner).toBeNull();
   });
 
-  it("is on every page's footer, with the four links — the plans and the refunds before they open too (D-161)", () => {
-    render(<SiteFooter lang="zh-TW" operator={PERSON} />);
+  it("is on every page's footer: the plans and policies (D-161) and 聯絡我們, no operator's details (D-165)", () => {
+    render(<SiteFooter lang="zh-TW" />);
     const footer = screen.getByTestId("site-footer");
-    expect(footer.textContent).toContain("經營者：Nanguado（王小明）");
-    expect(footer.textContent).toContain("02-1234-5678");
+    expect(footer.textContent).not.toContain("經營者");
+    expect(footer.textContent).not.toContain("@");
     const hrefs = Array.from(footer.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual([
       "/news/zh-TW/pricing",
       "/news/zh-TW/terms",
       "/news/zh-TW/privacy",
       "/news/zh-TW/refund",
-      "mailto:service@nanguado.com",
+      "/news/zh-TW/contact",
     ]);
   });
 
   it("says once, for every page, what the site's figures are and are not (D-097)", () => {
-    render(<SiteFooter lang="zh-TW" operator={PERSON} />);
+    render(<SiteFooter lang="zh-TW" />);
     const said = screen.getByTestId("site-disclaimer").textContent!;
     expect(said.startsWith("免責聲明：")).toBe(true);
     for (const part of ["AI 新聞室", "公開申報", "Finnhub", "AI 判讀", "不構成投資建議"]) expect(said).toContain(part);
@@ -66,12 +66,13 @@ describe("who runs the site", () => {
     expect(membershipOpen({ SITE_MEMBERSHIP_OPEN: " TRUE " })).toBe(true);
   });
 
-  it("says nothing it was not given", () => {
-    render(<SiteFooter lang="en" operator={operator({})} />);
-    const text = screen.getByTestId("site-footer").textContent!;
-    expect(text).toContain("Operated by: Nanguado");
-    expect(text).not.toContain("Phone");
-    expect(text).not.toContain("(");
+  it("in English too, the footer says Contact us; the operator's details stay with the policies (D-165)", () => {
+    render(<SiteFooter lang="en" />);
+    const footer = screen.getByTestId("site-footer");
+    expect(footer.textContent).not.toContain("Operated by");
+    expect(screen.getByRole("link", { name: "Contact us" }).getAttribute("href")).toBe("/news/en/contact");
+    // what the policies name when nothing is configured: the site's own inbox, no phone
+    expect(operator({})).toEqual({ brand: "Nanguado", owner: null, email: "service@aisiwhale.com", phone: null });
   });
 });
 

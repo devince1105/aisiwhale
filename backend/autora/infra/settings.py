@@ -189,6 +189,8 @@ class Settings(BaseSettings):
     """console: print the message (dev, tests, no network). resend: send it for real."""
     resend_api_key: SecretStr | None = None
     email_from: str = "AiSiWhale <onboarding@resend.dev>"
+    contact_inbox: str = "service@aisiwhale.com"
+    """Where the site's 聯絡我們 form sends readers' messages (D-165)."""
 
     # --- Payments: PAYUNi (D-024) ---
     payuni_env: Literal["sandbox", "production"] = "sandbox"

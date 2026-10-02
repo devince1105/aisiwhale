@@ -1677,6 +1677,72 @@
     "title": "CompanySnapshot",
     "type": "object"
    },
+   "ContactMessage": {
+    "properties": {
+     "company": {
+      "default": "",
+      "maxLength": 100,
+      "title": "Company",
+      "type": "string"
+     },
+     "email": {
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Email",
+      "type": "string"
+     },
+     "lang": {
+      "default": "zh-TW",
+      "enum": [
+       "zh-TW",
+       "en"
+      ],
+      "title": "Lang",
+      "type": "string"
+     },
+     "message": {
+      "maxLength": 4000,
+      "minLength": 10,
+      "title": "Message",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "phone": {
+      "default": "",
+      "maxLength": 30,
+      "title": "Phone",
+      "type": "string"
+     },
+     "topic": {
+      "default": "other",
+      "enum": [
+       "membership",
+       "content",
+       "partnership",
+       "other"
+      ],
+      "title": "Topic",
+      "type": "string"
+     },
+     "website": {
+      "default": "",
+      "title": "Website",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "email",
+     "message"
+    ],
+    "title": "ContactMessage",
+    "type": "object"
+   },
    "Counts": {
     "properties": {
      "buy": {
@@ -11300,6 +11366,45 @@
      }
     },
     "summary": "Get Article",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/contact": {
+   "post": {
+    "operationId": "send_message_api_public_contact_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ContactMessage"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Send Message",
     "tags": [
      "public"
     ]

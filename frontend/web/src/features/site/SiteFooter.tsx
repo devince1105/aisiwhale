@@ -1,17 +1,15 @@
-// Every public page ends with who runs the site and where its policies are (D-034). A payment
-// provider reviewing the site looks here first, and so does a reader deciding whether to pay.
+// Every public page ends with where the site's policies are and how to reach it (D-034, D-165).
+// Who runs it — the operator's name, address and phone — is in the terms of service, where the
+// law asks for it and a payment provider's reviewer reads it; the footer has 聯絡我們 instead.
 import Link from "next/link";
 
-import type { Operator } from "./operator";
 import { words, type Lang } from "./i18n";
 
 export function SiteFooter({
   lang,
-  operator,
   marketSources = [],
 }: {
   lang: Lang;
-  operator: Operator;
   /** Whose figures the market strip shows, to credit them (D-048; CoinGecko asks it). */
   marketSources?: string[];
 }) {
@@ -23,6 +21,7 @@ export function SiteFooter({
     ["terms", w.terms],
     ["privacy", w.privacy],
     ["refund", w.refund],
+    ["contact", w.contactLink],
   ] as const;
   return (
     <footer data-testid="site-footer" className="mt-12 border-t border-line bg-canvas print:hidden">
@@ -38,25 +37,6 @@ export function SiteFooter({
             </Link>
           ))}
         </nav>
-        <p className="mt-3">
-          {w.operator}
-          {w.sep}
-          {operator.brand}
-          {operator.owner ? w.aside(operator.owner) : null}
-        </p>
-        <p>
-          {w.contact}
-          {w.sep}
-          <a href={`mailto:${operator.email}`} className="underline">{operator.email}</a>
-          {operator.phone ? (
-            <>
-              {" ・ "}
-              {w.phone}
-              {w.sep}
-              {operator.phone}
-            </>
-          ) : null}
-        </p>
         {marketSources.length ? (
           <p className="mt-3 text-xs">{w.marketsCredit(marketSources.map((s) => w.sourceNames[s] ?? s))}</p>
         ) : null}

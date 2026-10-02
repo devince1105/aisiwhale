@@ -37,6 +37,14 @@ async def test_it_sends_what_resend_expects():
     }
 
 
+async def test_a_reply_goes_where_the_message_says(caplog):
+    # D-165: a reader's message to the site is answered to the reader, not to the site
+    seen: list[httpx.Request] = []
+    message = Message(to="service@aisiwhale.com", subject="s", text="t", reply_to="r@example.com")
+    await _sender(200, {"id": "e2"}, seen).send(message)
+    assert json.loads(seen[0].content)["reply_to"] == "r@example.com"
+
+
 async def test_a_refusal_says_why_in_the_error_and_the_server_log(caplog):
     """The first real send failed with only "(403)" to go on; Resend had said why."""
     reason = "The nanguado.com domain is not verified. Please, add and verify your domain"

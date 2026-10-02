@@ -21,7 +21,7 @@ export function operator(env: Record<string, string | undefined> = process.env):
   return {
     brand: field(env.SITE_OPERATOR) ?? "Nanguado",
     owner: field(env.SITE_OPERATOR_OWNER),
-    email: field(env.SITE_CONTACT_EMAIL) ?? "service@nanguado.com",
+    email: field(env.SITE_CONTACT_EMAIL) ?? "service@aisiwhale.com",
     phone: field(env.SITE_CONTACT_PHONE),
   };
 }

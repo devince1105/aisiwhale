@@ -1058,6 +1058,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_api_public_contact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/events": {
         parameters: {
             query?: never;
@@ -2104,6 +2121,42 @@ export interface components {
              * @default []
              */
             trimmed: string[];
+        };
+        /** ContactMessage */
+        ContactMessage: {
+            /**
+             * Company
+             * @default
+             */
+            company: string;
+            /** Email */
+            email: string;
+            /**
+             * Lang
+             * @default zh-TW
+             * @enum {string}
+             */
+            lang: "zh-TW" | "en";
+            /** Message */
+            message: string;
+            /** Name */
+            name: string;
+            /**
+             * Phone
+             * @default
+             */
+            phone: string;
+            /**
+             * Topic
+             * @default other
+             * @enum {string}
+             */
+            topic: "membership" | "content" | "partnership" | "other";
+            /**
+             * Website
+             * @default
+             */
+            website: string;
         };
         /** Counts */
         Counts: {
@@ -6240,6 +6293,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicArticle"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_api_public_contact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactMessage"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

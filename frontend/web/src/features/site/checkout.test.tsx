@@ -255,3 +255,33 @@ describe("before membership opens (D-161)", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/checkout"))).toBe(false);
   });
 });
+
+describe("聯絡我們 (D-165)", () => {
+  it("asks what is needed first, then who is asking, and sends it to the API", async () => {
+    const { ContactForm } = await import("./ContactForm");
+    const fetchMock = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => new Response(null, { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ContactForm lang="zh-TW" />);
+    const legends = Array.from(document.querySelectorAll("legend")).map((l) => l.textContent);
+    expect(legends).toEqual(["請幫助我們了解你的需求", "你的聯絡資訊"]);
+    fireEvent.change(screen.getByLabelText("請說明你的問題或需求"), { target: { value: "想請問月繳可以開發票嗎？" } });
+    fireEvent.click(screen.getByLabelText("合作與廣告"));
+    fireEvent.change(screen.getByLabelText("姓名"), { target: { value: "王小明" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "reader@example.com" } });
+    expect(screen.getByRole("link", { name: "隱私權政策" }).getAttribute("href")).toBe("/news/zh-TW/privacy");
+    fireEvent.click(screen.getByRole("button", { name: "送出" }));
+    expect(await screen.findByTestId("contact-sent")).toBeTruthy();
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/api\/public\/contact$/);
+    expect(JSON.parse(String(init!.body))).toMatchObject({ name: "王小明", topic: "partnership", website: "", lang: "zh-TW" });
+  });
+
+  it("says try later when too many were sent", async () => {
+    const { sendContact } = await import("./ContactForm");
+    const busy = vi.fn(async () => new Response(null, { status: 429 })) as unknown as typeof fetch;
+    const body = { name: "a", email: "a@b.c", phone: "", company: "", topic: "other" as const, message: "0123456789", lang: "zh-TW" as const, website: "" };
+    expect(await sendContact(body, busy)).toBe("busy");
+    const down = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
+    expect(await sendContact(body, down)).toBe("failed");
+  });
+});

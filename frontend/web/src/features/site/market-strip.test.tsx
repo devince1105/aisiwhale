@@ -85,12 +85,11 @@ describe("the market strip", () => {
   });
 
   it("the footer credits whose figures are shown, and nobody when none are", () => {
-    const operator = { brand: "Nanguado", owner: null, email: "service@example.test", phone: null };
-    const { rerender } = render(<SiteFooter lang="zh-TW" operator={operator} marketSources={["TWSE", "CoinGecko"]} />);
+    const { rerender } = render(<SiteFooter lang="zh-TW" marketSources={["TWSE", "CoinGecko"]} />);
     const footer = screen.getByTestId("site-footer").textContent;
     expect(footer).toContain("市場資料：臺灣證券交易所、CoinGecko。");
     expect(footer).not.toContain("FRED");
-    rerender(<SiteFooter lang="zh-TW" operator={operator} />);
+    rerender(<SiteFooter lang="zh-TW" />);
     expect(screen.getByTestId("site-footer").textContent).not.toContain("CoinGecko");
   });
 

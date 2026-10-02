@@ -10,7 +10,6 @@ import { MarketStrip } from "@/features/site/MarketStrip";
 import { MemberBadge } from "@/features/site/MemberBadge";
 import { isLang, words } from "@/features/site/i18n";
 import { LanguageMenu } from "@/features/site/LanguageMenu";
-import { operator } from "@/features/site/operator";
 import { SectionNav } from "@/features/site/SectionNav";
 import { SiteName } from "@/features/site/SiteName";
 import { SiteFooter } from "@/features/site/SiteFooter";
@@ -53,7 +52,7 @@ export default async function SiteLayout({
       </header>
       <SectionNav lang={lang} />
       <main className="flex-1">{children}</main>
-      <SiteFooter lang={lang} operator={operator()} marketSources={[...new Set(quotes.map((q) => q.source))]} />
+      <SiteFooter lang={lang} marketSources={[...new Set(quotes.map((q) => q.source))]} />
     </div>
   );
 }

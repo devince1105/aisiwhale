@@ -17,6 +17,7 @@ from autora_api.routers import (
     approvals,
     auth,
     companies,
+    contact,
     cycles,
     events,
     finance,
@@ -84,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(public.router)
     app.include_router(auth.router)
     app.include_router(admin_auth.router)
+    app.include_router(contact.router)
     app.include_router(payments.router)
     app.include_router(watchlist.router)
     app.include_router(newsroom.router)
