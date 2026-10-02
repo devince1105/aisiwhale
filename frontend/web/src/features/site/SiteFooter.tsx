@@ -8,25 +8,22 @@ import { words, type Lang } from "./i18n";
 export function SiteFooter({
   lang,
   operator,
-  membershipOpen = false,
   marketSources = [],
 }: {
   lang: Lang;
   operator: Operator;
-  membershipOpen?: boolean;
   /** Whose figures the market strip shows, to credit them (D-048; CoinGecko asks it). */
   marketSources?: string[];
 }) {
   const w = words(lang);
-  // while everything is free there is nothing to price and nothing to refund (D-035)
-  const links = (
-    [
-      ["pricing", w.pricing, membershipOpen],
-      ["terms", w.terms, true],
-      ["privacy", w.privacy, true],
-      ["refund", w.refund, membershipOpen],
-    ] as const
-  ).filter(([, , shown]) => shown);
+  // the plans are shown before they can be bought (D-161), and so is what a refund would be: a
+  // payment provider's reviewer reads both before the store opens
+  const links = [
+    ["pricing", w.pricing],
+    ["terms", w.terms],
+    ["privacy", w.privacy],
+    ["refund", w.refund],
+  ] as const;
   return (
     <footer data-testid="site-footer" className="mt-12 border-t border-line bg-canvas print:hidden">
       <div className="mx-auto max-w-6xl px-4 py-8 text-sm text-muted">

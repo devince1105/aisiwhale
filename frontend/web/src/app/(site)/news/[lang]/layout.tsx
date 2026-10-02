@@ -9,7 +9,6 @@ import { fetchMarkets } from "@/features/site/api";
 import { MarketStrip } from "@/features/site/MarketStrip";
 import { MemberBadge } from "@/features/site/MemberBadge";
 import { isLang, words } from "@/features/site/i18n";
-import { membershipOpen } from "@/features/site/membership";
 import { operator } from "@/features/site/operator";
 import { SectionNav } from "@/features/site/SectionNav";
 import { SiteName } from "@/features/site/SiteName";
@@ -49,7 +48,7 @@ export default async function SiteLayout({
       </header>
       <SectionNav lang={lang} />
       <main className="flex-1">{children}</main>
-      <SiteFooter lang={lang} operator={operator()} membershipOpen={membershipOpen()} marketSources={[...new Set(quotes.map((q) => q.source))]} />
+      <SiteFooter lang={lang} operator={operator()} marketSources={[...new Set(quotes.map((q) => q.source))]} />
     </div>
   );
 }

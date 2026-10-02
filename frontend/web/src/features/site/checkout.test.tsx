@@ -234,3 +234,18 @@ describe("持股觀察 (D-159)", () => {
     expect(screen.queryByTestId("members-only")).toBeNull();
   });
 });
+
+describe("before membership opens (D-161)", () => {
+  it("shows what will be sold and at what price, and 即將開放 where the button would be", async () => {
+    const fetchMock = vi.fn<(url: RequestInfo | URL) => Promise<Response>>(async () => new Response(JSON.stringify({ amount: "30.000000", currency: "TWD", interval: "month", available: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" open={false} />);
+    openPlans();
+    await waitFor(() => expect(screen.getByTestId("members-only").textContent).toContain("NT$30"));
+    const buttons = screen.getAllByRole("button", { name: "即將開放" }) as HTMLButtonElement[];
+    expect(buttons.length).toBeGreaterThan(0);
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+    expect(screen.getByRole("status").textContent).toContain("即將開放");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/checkout"))).toBe(false);
+  });
+});

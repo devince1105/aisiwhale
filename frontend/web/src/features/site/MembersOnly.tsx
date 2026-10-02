@@ -23,11 +23,14 @@ export function MembersOnly({
   path,
   company,
   lock = "members",
+  open = true,
 }: {
   lang: Lang;
   path: string;
   company?: string;
   lock?: Lock;
+  /** Membership can be bought (D-161); otherwise the plans show their prices and 即將開放. */
+  open?: boolean;
 }) {
   const w = words(lang);
   const loginHref = `/news/${lang}/login?next=${encodeURIComponent(path)}`;
@@ -56,7 +59,7 @@ export function MembersOnly({
           <p className="mt-2 text-center text-muted">{w.membersOnlyWhy}</p>
           {plans ? (
             <div className="mt-4">
-              <PlanPicker lang={lang} loginHref={loginHref} company={company} />
+              <PlanPicker lang={lang} loginHref={loginHref} company={company} open={open} />
             </div>
           ) : (
             <button type="button" onClick={() => setPlans(true)} className={`mt-4 ${button}`}>

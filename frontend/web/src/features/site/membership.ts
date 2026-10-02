@@ -7,12 +7,13 @@
 // for them. Keep them equal to what ``scripts/seed_membership.py`` puts on sale.
 import type { Interval } from "./checkout";
 
-export const MEMBERSHIP_PRICES_TWD: Record<Interval, number> = { month: 30, year: 330 };
+export const MEMBERSHIP_PRICES_TWD: Record<Interval, number> = { month: 30, year: 300 };
 export const MEMBERSHIP_CURRENCY = "TWD";
 
-/** Whether membership is on sale at all (D-035). Off until the operator turns it on: the site
- * starts free, and a pricing page for something nobody can buy would only confuse. Read on the
- * server at build time, like the operator's details. */
+/** Whether membership can be bought (D-035). Off until the operator turns it on. Off is not
+ * hidden (D-161): the plans and their prices are shown with 即將開放 in place of the button, so a
+ * payment provider's reviewer — and a reader — sees what will be sold, and at what price. Read
+ * on the server at build time, like the operator's details. */
 export function membershipOpen(env: Record<string, string | undefined> = process.env): boolean {
   return env.SITE_MEMBERSHIP_OPEN?.trim().toLowerCase() === "true";
 }

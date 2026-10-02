@@ -157,7 +157,7 @@ describe("the article page", () => {
     expect(notice.textContent).toContain("VIP 會員專屬報導"); // D-159
     // one button first, as on a paper's site; the plans are behind it
     fireEvent.click(within(notice).getByRole("button", { name: "我要成為 VIP 會員看全文" }));
-    expect(notice.textContent).toContain("NT$330"); // which dollar, said once and from one place
+    expect(notice.textContent).toContain("NT$300"); // which dollar, said once and from one place
     expect(notice.textContent).toContain("NT$30");
     expect(notice.textContent).toContain("已經是 VIP 會員？");
     const link = within(notice).getByRole("link", { name: "登入" });

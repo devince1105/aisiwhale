@@ -30,7 +30,18 @@ export function yearlySaving(month: number, year: number): number | null {
   return Math.round(((twelve - year) / twelve) * 100);
 }
 
-export function PlanPicker({ lang, loginHref, company }: { lang: Lang; loginHref: string; company?: string }) {
+/** ``open`` false (D-161): the plans and their prices, and 即將開放 where the button would be. */
+export function PlanPicker({
+  lang,
+  loginHref,
+  company,
+  open = true,
+}: {
+  lang: Lang;
+  loginHref: string;
+  company?: string;
+  open?: boolean;
+}) {
   const w = words(lang);
   const [offers, setOffers] = useState<Offers | null>(null);
   const [state, setState] = useState<State>("idle");
@@ -70,7 +81,7 @@ export function PlanPicker({ lang, loginHref, company }: { lang: Lang; loginHref
   };
   const amount = (interval: Interval) => Number(offers?.[interval]?.amount ?? MEMBERSHIP_PRICES_TWD[interval]);
   const saving = shown.length === 2 ? yearlySaving(amount("month"), amount("year")) : null;
-  const note = state === "unavailable" ? w.membersSoon : state === "failed" ? w.membersFailed : null;
+  const note = !open || state === "unavailable" ? w.membersSoon : state === "failed" ? w.membersFailed : null;
 
   return (
     <div>
@@ -94,11 +105,11 @@ export function PlanPicker({ lang, loginHref, company }: { lang: Lang; loginHref
             <button
               type="button"
               onClick={() => void buy(interval)}
-              disabled={state === "starting"}
+              disabled={!open || state === "starting"}
               aria-describedby={note ? "plan-note" : undefined}
               className="mt-4 rounded-lg bg-accent px-4 py-2 font-medium text-canvas disabled:opacity-60"
             >
-              {state === "starting" && chosen === interval ? w.membersStarting : w.planChoose[interval]}
+              {!open ? w.planSoon : state === "starting" && chosen === interval ? w.membersStarting : w.planChoose[interval]}
             </button>
           </li>
         ))}

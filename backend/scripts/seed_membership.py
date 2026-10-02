@@ -1,6 +1,6 @@
 """Put a membership on sale, so the paywall has something to sell (T-702, D-024/D-025/D-034).
 
-    python backend/scripts/seed_membership.py                       # NT$30 a month, NT$330 a year
+    python backend/scripts/seed_membership.py                       # NT$30 a month, NT$300 a year
     python backend/scripts/seed_membership.py --year 360            # a different yearly price
     python backend/scripts/seed_membership.py --month 0             # stop selling a month
     python backend/scripts/seed_membership.py --company other-slug
@@ -93,7 +93,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--company", default=DEFAULT_SLUG, help="the company's slug")
     parser.add_argument("--month", default="30", help="what a month costs; 0 stops selling it")
-    parser.add_argument("--year", default="330", help="what a year costs; 0 stops selling it")
+    parser.add_argument("--year", default="300", help="what a year costs; 0 stops selling it")
     args = parser.parse_args()
     amounts = {
         PriceInterval.MONTH: Decimal(args.month),
