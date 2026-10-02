@@ -87,10 +87,11 @@ export function demoSnapshot(script: Script, at: Date): unknown {
 
 /** A script event as the stream would deliver it, happening at `at`. */
 export function stamp(event: ScriptEvent, script: Script, seq: number, at: Date): unknown {
-  const { t: _t, du, ...rest } = event;
+  const { du, ...rest } = event;
   const payload = du === undefined ? rest.payload : { ...rest.payload, display_until: new Date(at.getTime() + du).toISOString() };
   return {
     ...rest,
+    t: undefined, // the script's own timing, not part of an event
     seq,
     schema_version: 1,
     company_id: script.company_id,
