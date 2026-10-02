@@ -10,7 +10,7 @@ import { CoverFigure } from "./Cover";
 import { StocksNamed } from "./StocksNamed";
 import { filterName, formatDate, isLang, isSection, LANG_NAMES, revisedOn, tagsOf, topicOf, words, type Lang } from "./i18n";
 import { MembersOnly } from "./MembersOnly";
-import { ListenButton, PrintButton } from "./ReadingTools";
+import { ListenButton, PrintButton, TOOL_BUTTON } from "./ReadingTools";
 
 /** ``membersOpen``: membership can be bought (D-161); the page passes ``membershipOpen()``. */
 export function ArticleView({
@@ -52,7 +52,30 @@ export function ArticleView({
         ) : null}
       </nav>
       <header className="mt-6 mb-10">
-        {section ? <p className="mb-3 text-sm font-semibold text-accent">{w.sections[section]}</p> : null}
+        {/* D-170: the section on the left, what a reader can do with the article on the right —
+            another language first (a reader who needs it looks for it), then listen, then print */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {section ? <p className="text-sm font-semibold text-accent">{w.sections[section]}</p> : <span />}
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            {others.map(([other, path]) => (
+              <Link
+                key={other}
+                href={path}
+                hrefLang={other}
+                title={`${w.readIn}${LANG_NAMES[other as Lang]}`}
+                className={TOOL_BUTTON}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+                </svg>
+                {LANG_NAMES[other as Lang]}
+              </Link>
+            ))}
+            <ListenButton lang={lang} texts={spoken} />
+            <PrintButton lang={lang} />
+          </div>
+        </div>
         <h1 className="font-display text-3xl leading-snug font-bold sm:text-4xl sm:leading-tight">{article.title}</h1>
         {article.summary ? <p className="mt-4 text-lg leading-relaxed text-muted">{article.summary}</p> : null}
         <p className="mt-5 text-sm text-muted">
@@ -71,20 +94,6 @@ export function ArticleView({
           ) : null}
         </p>
         <StocksNamed stocks={article.stocks} lang={lang} />
-        <div className="mt-4 flex flex-wrap gap-2 print:hidden">
-          <ListenButton lang={lang} texts={spoken} />
-          <PrintButton lang={lang} />
-        </div>
-        {others.length ? (
-          <p className="mt-3 text-sm print:hidden">
-            {w.readIn}{" "}
-            {others.map(([other, path]) => (
-              <Link key={other} href={path} hrefLang={other} className="mr-2 text-accent underline">
-                {LANG_NAMES[other as Lang]}
-              </Link>
-            ))}
-          </p>
-        ) : null}
       </header>
       {article.cover ? <CoverFigure cover={article.cover} lang={lang} /> : null}
 
