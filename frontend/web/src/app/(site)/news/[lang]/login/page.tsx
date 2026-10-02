@@ -2,9 +2,10 @@
 // address is — the page must not become a way to ask who reads here.
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 
-import { requestLink } from "@/features/site/auth";
+import { SITE_COMPANY } from "@/config";
+import { fetchMe, requestLink } from "@/features/site/auth";
 import { isLang, words, type Lang } from "@/features/site/i18n";
 
 type State = "idle" | "sending" | "sent" | "failed";
@@ -22,6 +23,26 @@ export default function LoginPage({
   const w = words(language);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<State>("idle");
+  const onwards = next?.startsWith("/") ? next : `/news/${language}`;
+
+  // Already signed in — or just signed in from the link, in another tab, while this one waited:
+  // there is nothing to ask for here, so go on (a full load, so the header knows too).
+  useEffect(() => {
+    let live = true;
+    const check = () =>
+      fetchMe(SITE_COMPANY)
+        .then((me) => live && me && window.location.replace(onwards))
+        .catch(() => undefined);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    void check();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      live = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [onwards]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

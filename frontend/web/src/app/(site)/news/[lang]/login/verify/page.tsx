@@ -4,9 +4,11 @@
 // refresh, a browser prefetch) do not get along: the second call finds the link used and would
 // say "this no longer works" to somebody who is, in fact, signed in. So the exchange happens
 // once per token, and a failure asks who is signed in before believing it.
+//
+// It then loads the next page afresh rather than navigating in place: the header asked who was
+// signed in when this page opened — nobody, yet — and a client-side move keeps that answer.
 "use client";
 
-import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 
 import { fetchMe, verify } from "@/features/site/auth";
@@ -23,7 +25,6 @@ export default function VerifyPage({
   const { token, next } = use(searchParams);
   const language: Lang = isLang(lang) ? lang : "zh-TW";
   const w = words(language);
-  const router = useRouter();
   const [failed, setFailed] = useState(false);
   const tried = useRef<string | null>(null);
 
@@ -36,13 +37,13 @@ export default function VerifyPage({
     tried.current = token;
     const onwards = next?.startsWith("/") ? next : `/news/${language}`;
     verify(token)
-      .then(() => router.replace(onwards))
+      .then(() => window.location.replace(onwards))
       .catch(async () => {
         const me = await fetchMe().catch(() => null);
-        if (me) router.replace(onwards);
+        if (me) window.location.replace(onwards);
         else setFailed(true);
       });
-  }, [token, next, language, router]);
+  }, [token, next, language]);
 
   return (
     <section className="mx-auto max-w-md px-4 py-12">

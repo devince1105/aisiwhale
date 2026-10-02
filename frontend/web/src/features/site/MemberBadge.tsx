@@ -16,13 +16,22 @@ export function MemberBadge({ lang }: { lang: Lang }) {
   const w = words(lang);
   const [{ status, me }, setState] = useState<State>({ status: "loading", me: null });
 
+  // Asked again whenever the tab comes back into view: the link in the inbox signs the reader in
+  // in another tab, and this one, still saying "sign in", would otherwise wait for a reload.
   useEffect(() => {
     let live = true;
-    fetchMe(SITE_COMPANY)
-      .then((answer) => live && setState({ status: "ready", me: answer }))
-      .catch(() => live && setState({ status: "ready", me: null }));
+    const ask = () =>
+      fetchMe(SITE_COMPANY)
+        .then((answer) => live && setState({ status: "ready", me: answer }))
+        .catch(() => live && setState({ status: "ready", me: null }));
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void ask();
+    };
+    void ask();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       live = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

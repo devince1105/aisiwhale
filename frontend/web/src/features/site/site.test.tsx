@@ -213,6 +213,15 @@ describe("the header's member badge", () => {
     expect(screen.queryByRole("button", { name: "登出" })).toBeNull();
   });
 
+  it("asks again when the tab comes back: the link may have signed the reader in elsewhere", async () => {
+    answer(null);
+    render(<MemberBadge lang="zh-TW" />);
+    await screen.findByTestId("sign-in");
+    answer({ reader_id: "r", email: "reader@example.com", member_until: null });
+    fireEvent(document, new Event("visibilitychange"));
+    expect((await screen.findByTestId("avatar")).textContent).toBe("R");
+  });
+
   it("says when the membership runs out", async () => {
     answer({ reader_id: "r", email: "reader@example.com", member_until: "2027-09-23T00:00:00Z" });
     render(<MemberBadge lang="zh-TW" />);
