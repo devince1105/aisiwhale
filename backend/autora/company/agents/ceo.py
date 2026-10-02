@@ -115,6 +115,15 @@ class CycleReview(BaseModel):
 
 # --- what it is told ----------------------------------------------------------------------------
 
+BEFORE_PAUSING = """Before pausing (D-162), read a project's numbers for what they are:
+- `awaiting_approval` is work the project finished that waits for a person's decision. It is
+  output, held by the person — not output the project failed to make. A project with work
+  awaiting approval is not paused for publishing or producing nothing; if that is what stands
+  between it and its results, say approvals are the bottleneck instead.
+- `failed_tasks` counts the last day only. Old failures are not a reason.
+- A cycle that cost a small fraction of the project's budget is not "inefficient" on cost alone.
+Pause only for a problem you can name in its current numbers, and name them in the reason."""
+
 SYSTEM_PROMPT = """You are the chief executive of an autonomous company.
 
 You decide what the company is in, what each business may spend, and which work matters most.
@@ -131,7 +140,8 @@ Your only tool is submit_command. Use it for everything you decide:
 - AllocateBudget {amount, period, business_unit_id|project_id} — money for one scope, in the
   snapshot's `capital.currency`; every amount you read and write is in that currency
 - PauseProject {project_id, reason} — stop work that is not paying for itself; a person must
-  approve it, so the reason says which numbers and why (the work goes on until they decide)
+  approve it, so the reason (in the payload; required) says which numbers and why (the work goes
+  on until they decide). See "Before pausing" below
 - KillProject {project_id, reason} — a person must approve it
 - UpdateStrategy {summary} — a person must approve it
 
@@ -141,7 +151,9 @@ result. A refusal is an answer, not a failure: adapt and continue.
 Then write your plan. It must say what you actually asked for — the commands you submitted are
 checked against it. Do not write an allocation you did not submit.
 
-Be brief. A cycle with three clear goals beats one with ten."""
+Be brief. A cycle with three clear goals beats one with ten.
+
+%(before_pausing)s"""
 
 
 REVIEW_PROMPT = """You are the chief executive of an autonomous company, reviewing the cycle
@@ -157,6 +169,8 @@ paused for having no revenue while the site is free.
 
 Automatic pausing by kill criteria is not your job and happens without you — do not repeat it,
 and do not argue with it.
+
+%(before_pausing)s
 
 You also decide what the company might do next. The snapshot lists its open opportunities with
 their evidence, their proposals and what exploring them has cost so far. For each one you care
@@ -375,7 +389,8 @@ def behaviors(snapshots: SnapshotBuilder | None = None) -> tuple[AgentBehavior, 
             role=ROLE,
             task_name=PLAN,
             capability="reasoning",
-            system_prompt=SYSTEM_PROMPT % {"max_goals": MAX_GOALS},
+            system_prompt=SYSTEM_PROMPT
+            % {"max_goals": MAX_GOALS, "before_pausing": BEFORE_PAUSING},
             output_model=CyclePlan,
             tools=("submit_command",),
             validators=(goals_are_measurable, projects_are_real_and_running, said_what_it_did),
@@ -389,7 +404,7 @@ def behaviors(snapshots: SnapshotBuilder | None = None) -> tuple[AgentBehavior, 
             role=ROLE,
             task_name=REVIEW,
             capability="reasoning",
-            system_prompt=REVIEW_PROMPT,
+            system_prompt=REVIEW_PROMPT % {"before_pausing": BEFORE_PAUSING},
             output_model=CycleReview,
             tools=("submit_command",),
             validators=(

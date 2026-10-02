@@ -433,3 +433,34 @@ async def test_killed_projects_are_not_in_front_of_the_decision(db_session):
     snapshot = await _builder().build(db_session, company.id, now=NOW)
 
     assert [p.name for p in snapshot.portfolio[0].projects] == ["live one"]
+
+
+async def test_a_project_shows_recent_failures_and_work_awaiting_a_person(db_session):
+    """D-162: failures of the last day, not since it began; finished work held for approval."""
+    from autora.db.models import Task
+
+    company, (media,) = await _company(db_session)
+    project = await _project(db_session, company, media)
+    now = datetime.now(UTC)
+
+    def task(name, state, updated):
+        return Task(
+            company_id=company.id, project_id=project.id, name=name, display_name=name,
+            required_role="writer", state=state, updated_at=updated, created_at=updated,
+        )  # fmt: skip
+
+    db_session.add_all(
+        [
+            task("old_failure", "FAILED", now - timedelta(days=5)),
+            task("new_failure", "FAILED", now - timedelta(hours=2)),
+            task("approve", "WAITING_APPROVAL", now - timedelta(hours=3)),
+        ]
+    )
+    await db_session.flush()
+
+    snapshot = await _builder().build(db_session, company.id, now=NOW)
+
+    (line,) = snapshot.portfolio[0].projects
+    assert line.failed_tasks == 1
+    assert line.awaiting_approval == 1
+    assert line.open_tasks == 1  # the one waiting is still open

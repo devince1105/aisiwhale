@@ -4145,6 +4145,11 @@ export interface components {
         };
         /** ProjectLine */
         autora__company__snapshot__ProjectLine: {
+            /**
+             * Awaiting Approval
+             * @default 0
+             */
+            awaiting_approval: number;
             /** Budget Remaining */
             budget_remaining?: string | null;
             /**

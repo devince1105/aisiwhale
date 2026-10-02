@@ -29,6 +29,12 @@ from autora.runtime.tools import ToolContext, ToolRegistry, ToolResult
 
 TOOL = "submit_command"
 
+WITH_REASON = frozenset({"PauseProject", "ResumeProject", "KillProject"})
+"""Commands whose payload carries a reason: the call's own ``reason`` fills it when it is empty."""
+NEEDS_REASON = frozenset({"PauseProject", "KillProject"})
+"""An agent stopping work must say why (D-162): a person approves it on that reason alone. A
+person pausing from the back office may leave it out; this is the agents' door only."""
+
 Decision = Literal["done", "refused", "awaiting_approval"]
 
 
@@ -57,13 +63,26 @@ def register_tools(registry: ToolRegistry, bus: CommandBus) -> None:
                 output={"decision": "refused", "reason": str(unknown)},
                 summary=f"{args.command}: not a command this company knows",
             )
+        payload = dict(args.payload)
+        said = (args.reason or "").strip()
+        if said and not str(payload.get("reason") or "").strip() and spec.name in WITH_REASON:
+            # the call's own reason is the one a person reads on the approval (D-162)
+            payload["reason"] = said
+        if spec.name in NEEDS_REASON and not str(payload.get("reason") or "").strip():
+            return ToolResult(
+                output={
+                    "decision": "refused",
+                    "reason": f"{spec.name} needs a reason a person can judge: which numbers, why",
+                },
+                summary=f"{spec.name}: refused (no reason)",
+            )
         role = None
         if ctx.agent_id is not None:
             role = await ctx.session.scalar(select(Agent.role).where(Agent.id == ctx.agent_id))
         result = await bus.submit(
             ctx.session,
             spec.name,
-            args.payload,
+            payload,
             company_id=ctx.company_id,
             actor=ctx.actor,
             role=role,

@@ -672,3 +672,48 @@ async def test_the_review_summary_says_what_it_looked_at(db_session):
         summary="A quiet day.",
     )
     assert "1 opportunity(s) looked at" in review_behavior.summarize(review)
+
+
+async def test_an_agent_pausing_work_must_say_why(committed, world):
+    """D-162: a person approves a pause on its reason alone; "no reason given" is no reason."""
+    company, agent = world
+    async with committed() as session:
+        project = Project(
+            company_id=company.id,
+            name="newsroom",
+            state=ProjectState.ACTIVE.value,
+            kill_criteria={"max_cost_usd": 10},
+        )
+        session.add(project)
+        await session.commit()
+    tools = ToolRegistry(committed)
+    register_tools(tools, _bus())
+
+    bare = await tools.invoke(
+        "submit_command",
+        {"command": "PauseProject", "payload": {"project_id": str(project.id)}},
+        company_id=company.id, actor=Actor.agent(agent.id), tool_call_id="call_1",
+        agent_id=agent.id,
+    )  # fmt: skip
+    assert bare.ok and bare.output["decision"] == "refused"
+    assert "needs a reason" in bare.output["reason"]
+
+    # the call's own reason is the one the approval shows, when the payload has none
+    said = await tools.invoke(
+        "submit_command",
+        {
+            "command": "PauseProject",
+            "payload": {"project_id": str(project.id)},
+            "reason": "two cycles, no output and nothing awaiting approval",
+        },
+        company_id=company.id, actor=Actor.agent(agent.id), tool_call_id="call_2",
+        agent_id=agent.id,
+    )  # fmt: skip
+    assert said.ok and said.output["decision"] != "refused"
+    async with committed() as session:
+        record = await session.scalar(
+            select(CommandRecord).where(
+                CommandRecord.company_id == company.id, CommandRecord.command == "PauseProject"
+            )
+        )
+        assert record.payload["reason"] == "two cycles, no output and nothing awaiting approval"

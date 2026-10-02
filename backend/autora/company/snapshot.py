@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -106,6 +106,11 @@ class ProjectLine(BaseModel):
     kill_criteria: dict[str, Any] | None = None
     open_tasks: int = 0
     failed_tasks: int = 0
+    """Tasks that failed in the last day (D-162) — not since the project began: a count that only
+    grows reads as a project that keeps failing long after the failures were fixed."""
+    awaiting_approval: int = 0
+    """Finished work waiting for a person's decision (D-162): output the project has made, held
+    until someone approves it — not output it failed to make."""
 
 
 class ProductLine(BaseModel):
@@ -446,11 +451,15 @@ class SnapshotBuilder:
                     kill_criteria=project.kill_criteria,
                     open_tasks=counts[0],
                     failed_tasks=counts[1],
+                    awaiting_approval=counts[2],
                 )
             )
         return lines
 
-    async def _task_counts(self, session: AsyncSession, project_id: uuid.UUID) -> tuple[int, int]:
+    async def _task_counts(
+        self, session: AsyncSession, project_id: uuid.UUID
+    ) -> tuple[int, int, int]:
+        """Open, failed in the last day, and waiting for a person's approval."""
         row = (
             await session.execute(
                 select(
@@ -463,11 +472,15 @@ class SnapshotBuilder:
                             ]
                         )
                     ),
-                    func.count().filter(Task.state == TaskState.FAILED.value),
+                    func.count().filter(
+                        Task.state == TaskState.FAILED.value,
+                        Task.updated_at >= func.now() - timedelta(days=1),
+                    ),
+                    func.count().filter(Task.state == TaskState.WAITING_APPROVAL.value),
                 ).where(Task.project_id == project_id)
             )
         ).one()
-        return int(row[0]), int(row[1])
+        return int(row[0]), int(row[1]), int(row[2])
 
     async def _last_cycle(
         self, session: AsyncSession, company_id: uuid.UUID, cycle: Cycle | None

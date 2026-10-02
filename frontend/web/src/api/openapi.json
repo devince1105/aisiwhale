@@ -6940,6 +6940,11 @@
    },
    "autora__company__snapshot__ProjectLine": {
     "properties": {
+     "awaiting_approval": {
+      "default": 0,
+      "title": "Awaiting Approval",
+      "type": "integer"
+     },
      "budget_remaining": {
       "anyOf": [
        {
