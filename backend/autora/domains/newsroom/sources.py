@@ -47,7 +47,7 @@ from autora.domains.newsroom.datafeeds import (
 from autora.domains.newsroom.events import SourceItemDiscovered, SourcePaused, SourcePolled
 from autora.domains.newsroom.feeds import FeedEntry, FeedError, parse_feed
 from autora.domains.newsroom.models import Source, SourceItem, SourceKind, SourceStatus
-from autora.infra.http import FetchError, PageFetcher
+from autora.infra.http import FetchError, FetchUnavailable, PageFetcher
 from autora.infra.search import SearchError, SearchProvider
 from autora.runtime.actor import Actor
 from autora.runtime.events.outbox import emit
@@ -421,6 +421,11 @@ class SourcePoller:
                 await asyncio.sleep(wait)
             try:
                 page = await self.fetcher.fetch(gdelt_url(source.config))
+            except FetchUnavailable as exc:
+                # from Render GDELT says it with a 429 rather than a sentence (2026-10-03)
+                if str(exc).endswith("answered 429"):
+                    raise GdeltBusy("GDELT answered 429: asked for fewer requests") from None
+                raise
             finally:
                 self._gdelt_last = loop.time()
         entries = parse_gdelt(page.body)

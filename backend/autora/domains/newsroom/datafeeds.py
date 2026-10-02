@@ -12,8 +12,9 @@ official place it was published — that ``fetch_url`` recognises and answers fr
 **GDELT** (``api.gdeltproject.org``): a search over news sites worldwide, free, without a key,
 and at most one request every five seconds; anything faster is answered with a plain-text
 request to slow down — and it says so to an address for minutes on end, even one that waited
-longer (seen 2026-10-03). That answer is ``GdeltBusy``: the poll is recorded as not done, but it
-does not count towards pausing the source, as an outage of the site would.
+longer (seen 2026-10-03), and from Render with a 429 instead. Either answer is ``GdeltBusy``:
+the poll is recorded as not done, but it does not count towards pausing the source, as an
+outage of the site would.
 """
 
 from __future__ import annotations
@@ -30,8 +31,9 @@ from autora.domains.newsroom.feeds import FeedEntry, FeedError
 
 TWSE_URL = "https://openapi.twse.com.tw/v1/opendata/t187ap04_L"
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-GDELT_GAP_SECONDS = 5.5
-"""GDELT asks for one request every five seconds; a little more, to be safe."""
+GDELT_GAP_SECONDS = 10.0
+"""GDELT asks for one request every five seconds; twice that, as from a cloud host's shared
+address the second of two requests 5.5 seconds apart was refused (2026-10-03)."""
 
 _TAIPEI = timezone(timedelta(hours=8))
 _LINE_BREAK = re.compile(r"\s*[\r\n]+\s*")

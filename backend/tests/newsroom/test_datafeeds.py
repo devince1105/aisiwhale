@@ -17,7 +17,7 @@ from autora.domains.newsroom.datafeeds import (
 from autora.domains.newsroom.feeds import FeedError
 from autora.domains.newsroom.models import SourceItem
 from autora.domains.newsroom.sources import SourceConfigError, add_source
-from autora.infra.http import FetchedPage
+from autora.infra.http import FetchedPage, FetchUnavailable
 from tests.conftest import unique_company
 from tests.newsroom.test_sources import FIXTURES, T0, poller
 
@@ -160,3 +160,17 @@ async def test_gdelt_asking_to_slow_down_does_not_pause_the_source(db_session):
         outcome = await busy.poll(db_session, source)
     assert outcome.error.startswith("GdeltBusy") and not outcome.paused
     assert source.consecutive_failures == 0 and source.status == "active"
+
+
+async def test_a_429_from_gdelt_is_busy_too(db_session):
+    company = await unique_company(db_session, "gdelt-429")
+    source = await add_source(
+        db_session, company_id=company.id, name="GDELT", kind="gdelt", config={"query": "q"}
+    )
+
+    class TooMany:
+        async def fetch(self, url):
+            raise FetchUnavailable(f"{url} answered 429")
+
+    outcome = await poller(fetcher=TooMany(), gdelt_gap_seconds=0).poll(db_session, source)
+    assert outcome.error.startswith("GdeltBusy") and source.consecutive_failures == 0
