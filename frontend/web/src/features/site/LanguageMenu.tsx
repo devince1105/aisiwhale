@@ -1,7 +1,8 @@
 "use client";
 
-// The site's language, in the masthead's controls (D-163), as a newspaper puts its editions: a
-// flag and a short name, "[flag] 台 ⌄", open the others (D-164). The flags are drawn, not emoji:
+// The site's language, in the masthead's controls (D-163), as a newspaper puts its editions: its
+// flag alone, "[flag] ⌄", opens the others, each named in full (D-164). The button says which
+// language it is in words too, for a screen reader. The flags are drawn, not emoji:
 // Windows shows a flag emoji as two letters. The other language keeps the reader where they are —
 // the same tab, day, page or stock — except on an article, which may not be published in it:
 // that goes to the other language's front page (the article's own page links its translations).
@@ -10,7 +11,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useId, useRef, useState } from "react";
 
 import { useDismiss } from "./dismiss";
-import { LANG_LABELS, LANG_SHORT, LANGS, words, type Lang } from "./i18n";
+import { LANG_LABELS, LANGS, words, type Lang } from "./i18n";
 
 /** Taiwan's sun: twelve rays round a ring, as a star polygon, about (cx, cy) in a 30×20 flag. */
 function sunRays(cx: number, cy: number, outer: number, inner: number): string {
@@ -72,11 +73,10 @@ export function LanguageMenu({ lang }: { lang: Lang }) {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls={menu}
-        aria-label={w.languageLabel}
+        aria-label={`${w.languageLabel}${lang === "en" ? ": " : "："}${LANG_LABELS[lang]}`}
         className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted hover:bg-canvas hover:text-ink"
       >
         <Flag lang={lang} />
-        <span>{LANG_SHORT[lang]}</span>
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className={open ? "rotate-180" : ""}>
           <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

@@ -366,13 +366,13 @@ describe("外匯: the bank's rates a click away (D-072)", () => {
 });
 
 describe("the language button (D-164)", () => {
-  it("is a flag and a short name, and opens the editions with theirs", async () => {
+  it("is the edition's flag alone, and opens the editions, each with its flag and name", async () => {
     const { LanguageMenu } = await import("./LanguageMenu");
     nav.pathname = "/news/zh-TW/watchlist";
     nav.search = "s=us:MSFT";
     render(<LanguageMenu lang="zh-TW" />);
-    const button = screen.getByRole("button", { name: "語言" });
-    expect(button.textContent).toBe("台");
+    const button = screen.getByRole("button", { name: "語言：繁體中文" });
+    expect(button.textContent).toBe(""); // the flag says it; the label says it for a screen reader
     expect(button.querySelector('[data-flag="tw"]')).not.toBeNull();
     fireEvent.click(button);
     const english = screen.getByRole("link", { name: "English" });
