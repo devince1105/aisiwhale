@@ -3,12 +3,13 @@
 // light or dark are the layout above's (D-047).
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { fetchMarkets } from "@/features/site/api";
 import { MarketStrip } from "@/features/site/MarketStrip";
 import { MemberBadge } from "@/features/site/MemberBadge";
 import { isLang, words } from "@/features/site/i18n";
+import { LanguageMenu } from "@/features/site/LanguageMenu";
 import { operator } from "@/features/site/operator";
 import { SectionNav } from "@/features/site/SectionNav";
 import { SiteName } from "@/features/site/SiteName";
@@ -39,9 +40,13 @@ export default async function SiteLayout({
           </Link>
           <p className="mt-1.5 text-xs whitespace-nowrap text-muted">{w.tagline}</p>
         </div>
-        {/* the reader's controls, top right: light or dark, and who they are; the language is at
-            the sections bar's end (D-087) */}
+        {/* the reader's controls, top right, in one row: the language, light or dark, and who
+            they are (D-163; the language was at the sections bar's end, D-087) */}
         <span className="flex shrink-0 items-center gap-1 text-sm print:hidden">
+          {/* the query string is read in the browser, to keep it when the language changes */}
+          <Suspense fallback={null}>
+            <LanguageMenu lang={lang} />
+          </Suspense>
           <ThemeToggle lang={lang} />
           <MemberBadge lang={lang} />
         </span>

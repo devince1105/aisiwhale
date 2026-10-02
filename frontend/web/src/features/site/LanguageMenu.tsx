@@ -35,7 +35,7 @@ export function LanguageMenu({ lang }: { lang: Lang }) {
         aria-expanded={open}
         aria-controls={menu}
         aria-label={w.languageLabel}
-        className="inline-flex items-center gap-1 px-3 py-2.5 text-sm text-muted hover:text-ink"
+        className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted hover:bg-canvas hover:text-ink"
       >
         {LANG_LABELS[lang]}
         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className={open ? "rotate-180" : ""}>

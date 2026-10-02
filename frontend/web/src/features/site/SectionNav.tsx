@@ -8,7 +8,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { listHref } from "./links";
-import { LanguageMenu } from "./LanguageMenu";
 import { filterName, isFilter, isSection, topicOf, TOPICS, type Lang, type Topic, words } from "./i18n";
 
 type Current = Topic | "all" | "watchlist" | "office" | null;
@@ -70,8 +69,7 @@ export function SectionNav({ lang }: { lang: Lang }) {
       aria-label={w.sectionsLabel}
       className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur-md print:hidden"
     >
-      {/* the tabs scroll sideways on a phone; the language menu beside them does not, so its list
-          is not cut off by the scrolling (D-087) */}
+      {/* the tabs scroll sideways on a phone; the language is in the masthead's controls (D-163) */}
       <div className="mx-auto flex max-w-6xl items-center">
         <div className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
           {/* the query string is read in the browser: until then, the tabs without a current one */}
@@ -79,9 +77,6 @@ export function SectionNav({ lang }: { lang: Lang }) {
             <Current lang={lang} />
           </Suspense>
         </div>
-        <Suspense fallback={null}>
-          <LanguageMenu lang={lang} />
-        </Suspense>
       </div>
     </nav>
   );
