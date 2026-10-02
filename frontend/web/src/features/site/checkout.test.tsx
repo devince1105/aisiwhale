@@ -3,7 +3,7 @@
 //
 // The point of most of these is what the browser does *not* do: it never sees a secret, it never
 // grants anything, and a site with no store yet says so instead of failing silently.
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutError, fetchOffer, formatOffer, goToPaymentPage, startCheckout } from "./checkout";
@@ -146,12 +146,18 @@ describe("the paywall", () => {
     expect(screen.getByTestId("plan-year").textContent).toContain("比月繳省 8%");
   });
 
-  it("leaves out a plan the API does not sell, rather than show a price nobody can pay", async () => {
+  it("keeps a plan the API does not sell yet, faded, with 即將開放 (D-161)", async () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
     openPlans();
-    await waitFor(() => expect(screen.queryByTestId("plan-month")).toBeNull());
-    expect(screen.getByTestId("plan-year")).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId("plan-month").getAttribute("data-reserved")).toBe("true"));
+    const month = screen.getByTestId("plan-month");
+    expect(month.className).toContain("opacity-50");
+    expect((within(month).getByRole("button") as HTMLButtonElement).disabled).toBe(true);
+    expect(month.textContent).toContain("即將開放");
+    const year = screen.getByTestId("plan-year");
+    expect(year.getAttribute("data-reserved")).toBeNull();
+    expect(within(year).getByRole("button", { name: "選擇年繳" })).toBeTruthy();
   });
 
   it("orders the plan that was chosen", async () => {
