@@ -134,7 +134,7 @@
 
 ## 7.3 正式資料庫刪除三家測試公司（2026-10-02）
 
-`echo-demo`、`newsroom-demo`、`smoke-*` 隨資料搬家帶到 Neon，後台在新瀏覽器會開到它們。手機熱點下一筆交易刪除：先檢查剛好 3 家且不含 aisiwhale，交易內暫停 7 個 append-only 觸發器、依外鍵由子表往上逐輪刪除（4 輪）、刪公司、恢復觸發器、提交。刪除前後艾矽鯨的事件 21,580、任務 568、文章 37、成員 8、核准 48 完全相同；全部事件由 22,416 減為 21,580；觸發器 7 個仍啟用。事前在本機副本演練過。**同時發現** Neon 的遷移版本仍是 0058：當天 D-156／D-157／D-159 的後端尚未部署到 Render（待查 Render Events）。
+`echo-demo`、`newsroom-demo`、`smoke-*` 隨資料搬家帶到 Neon，後台在新瀏覽器會開到它們。手機熱點下一筆交易刪除：先檢查剛好 3 家且不含 aisiwhale，交易內暫停 7 個 append-only 觸發器、依外鍵由子表往上逐輪刪除（4 輪）、刪公司、恢復觸發器、提交。刪除前後艾矽鯨的事件 21,580、任務 568、文章 37、成員 8、核准 48 完全相同；全部事件由 22,416 減為 21,580；觸發器 7 個仍啟用。事前在本機副本演練過。**同時發現** Neon 的遷移版本仍是 0058：Render 雖設 `autoDeployTrigger: checksPass`（Auto-Deploy＝After CI Checks Pass），但從未自動部署（Events 全是手動觸發）；`c7c4159` 在 GitHub 上的檢查全數通過仍未部署，表示 Render 沒收到 GitHub 事件，待查 GitHub → Applications → Render 的 Repository access（repo 改名後可能脫落）。當天以 Manual Deploy 部署 API 與 Worker：遷移到 0059、公開 API 出現 `lock` 欄位、持股觀察文章未登入只給前段（`lock=sign_in`、2 段、無來源）；5 篇待審文章期限延到 10/03 15:45（台北），屆時無人決定即交 CEO（D-157）。
 
 ## 8. 待決定
 
