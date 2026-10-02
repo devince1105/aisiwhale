@@ -57,11 +57,13 @@ body {
   @apply bg-canvas text-ink font-sans antialiased;
 }
 
-/* The public site (D-047) chooses light or dark itself: data-theme on its outermost element (the
-   reader's pick, once the page runs), or before that data-site-theme on <html>, set before the
-   first paint from the saved pick; either overrides the system's preference. */
+/* The public site (D-047), and the back office with it (D-160), choose light or dark themselves:
+   data-theme on the outermost element (the pick, once the page runs), or before that
+   data-site-theme on <html>, set before the first paint from the saved pick; either overrides the
+   system's preference. One pick per browser, for both. */
 [data-theme="light"],
-html[data-site-theme="light"] [data-site]:not([data-theme]) {
+html[data-site-theme="light"] [data-site]:not([data-theme]),
+html[data-site-theme="light"] [data-admin]:not([data-theme]) {
   color-scheme: light;
   --color-canvas: #f6f7f9;
   --color-surface: #ffffff;
@@ -81,7 +83,8 @@ html[data-site-theme="light"] [data-site]:not([data-theme]) {
 }
 
 [data-theme="dark"],
-html[data-site-theme="dark"] [data-site]:not([data-theme]) {
+html[data-site-theme="dark"] [data-site]:not([data-theme]),
+html[data-site-theme="dark"] [data-admin]:not([data-theme]) {
   color-scheme: dark;
   --color-canvas: #0f1216;
   --color-surface: #171b21;

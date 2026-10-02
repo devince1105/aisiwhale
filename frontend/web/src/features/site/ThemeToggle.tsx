@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { words, type Lang } from "./i18n";
 import { applyTheme, currentTheme, savedTheme, type Theme } from "./theme";
 
+/** The themed root: the public site's, or the back office's (D-160). */
 function root(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("[data-site]");
+  return document.querySelector<HTMLElement>("[data-site], [data-admin]");
 }
 
 function storage(): Storage | null {
