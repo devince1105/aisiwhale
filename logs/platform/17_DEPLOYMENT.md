@@ -132,6 +132,10 @@
 - **Vercel**：`NEXT_PUBLIC_API_URL` 若建成 Secret 類型，改值會被擋（公開前綴不得為 Secret），要刪掉重建為 Config；改完 Redeploy 且不用建置快取。驗證：瀏覽器端 JS 內嵌 `api.aisiwhale.com`、從 `www` 跨網域帶 cookie 讀 API 200、文章頁首圖從 `img.aisiwhale.com` 載入。
 - 本機 worker 自此停用；本機資料庫不再是正式資料。
 
+## 7.3 正式資料庫刪除三家測試公司（2026-10-02）
+
+`echo-demo`、`newsroom-demo`、`smoke-*` 隨資料搬家帶到 Neon，後台在新瀏覽器會開到它們。手機熱點下一筆交易刪除：先檢查剛好 3 家且不含 aisiwhale，交易內暫停 7 個 append-only 觸發器、依外鍵由子表往上逐輪刪除（4 輪）、刪公司、恢復觸發器、提交。刪除前後艾矽鯨的事件 21,580、任務 568、文章 37、成員 8、核准 48 完全相同；全部事件由 22,416 減為 21,580；觸發器 7 個仍啟用。事前在本機副本演練過。**同時發現** Neon 的遷移版本仍是 0058：當天 D-156／D-157／D-159 的後端尚未部署到 Render（待查 Render Events）。
+
 ## 8. 待決定
 
 - §6 選 A 或 B。
