@@ -2,8 +2,9 @@
 
 // The WebGL part of the office, loaded only on the client (next/dynamic, ssr: false) and only
 // when 3D was chosen: the canvas, camera and context-loss wiring; the scene is OfficeScene.
-import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect } from "react";
+import { useProgress } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useRef } from "react";
 import { NeutralToneMapping } from "three";
 
 import { uiStore } from "@/stores/ui";
@@ -23,6 +24,8 @@ export interface Canvas3DProps {
   theme?: ThemeId;
   onContextLost: () => void;
   onContextRestored: () => void;
+  /** The office is on screen: its models have loaded and a frame has been drawn with them. */
+  onReady?: () => void;
 }
 
 /** Report this canvas losing its context — and stop reporting the moment it is taken down.
@@ -56,7 +59,35 @@ function ContextWatch({ onLost, onRestored }: { onLost: () => void; onRestored: 
 }
 
 
-export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, onContextRestored }: Canvas3DProps) {
+/** Says when the office is really on screen (D-158): nothing is loading any more — the people's
+ * models and the textures, all through three's default loading manager — and frames have been
+ * drawn since. An office with nobody to load is ready after a short while all the same, and any
+ * office after at most 12 seconds of drawing. */
+function ReadyWatch({ onReady }: { onReady?: () => void }) {
+  const active = useProgress((s) => s.active);
+  const total = useProgress((s) => s.total);
+  const frames = useRef(0);
+  const done = useRef(false);
+  const born = useRef<number | null>(null);
+  useFrame(() => {
+    if (done.current || !onReady) return;
+    born.current ??= performance.now();
+    frames.current += 1;
+    const waited = performance.now() - born.current;
+    // a model that never arrives must not keep the office covered for good
+    const settled = (!active && (total > 0 || waited > EMPTY_READY_MS)) || waited > MAX_LOADING_MS;
+    if (settled && frames.current > 2) {
+      done.current = true;
+      onReady();
+    }
+  });
+  return null;
+}
+
+const EMPTY_READY_MS = 1500;
+const MAX_LOADING_MS = 12_000;
+
+export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, onContextRestored, onReady }: Canvas3DProps) {
   return (
     <Canvas
       dpr={CANVAS_DPR}
@@ -74,6 +105,7 @@ export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, 
       }}
     >
       <ContextWatch onLost={onContextLost} onRestored={onContextRestored} />
+      <ReadyWatch onReady={onReady} />
       <OfficeScene insetRight={insetRight} theme={theme} />
     </Canvas>
   );

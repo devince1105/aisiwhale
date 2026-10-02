@@ -158,7 +158,23 @@ describe("OfficeCanvas", () => {
     ) as { snapshot_before: unknown };
     act(() => realtimeStore.getState().hydrate(fixture.snapshot_before));
     rerender(<OfficeCanvas detect={() => DESKTOP} Scene={Scene} />);
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/還沒有代理/)).toBeNull();
+  });
+
+  it("covers the office with a loading screen until it is drawn, and again on a new canvas (D-158)", () => {
+    const { Scene, seen } = sceneStub();
+    const fixture = JSON.parse(
+      readFileSync(join(process.cwd(), "src/realtime/__fixtures__/contract.json"), "utf8"),
+    ) as { snapshot_before: unknown };
+    act(() => realtimeStore.getState().hydrate(fixture.snapshot_before));
+    const { rerender } = render(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} />);
+    expect(screen.getByTestId("office-loading").textContent).toContain("載入 3D 辦公室");
+    act(() => seen.props!.onReady!());
+    expect(screen.queryByTestId("office-loading")).toBeNull();
+    // to 2D and back: a new canvas, which has to load again
+    rerender(<OfficeCanvas view="2d" detect={() => DESKTOP} Scene={Scene} />);
+    rerender(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} />);
+    expect(screen.getByTestId("office-loading")).toBeTruthy();
   });
 
   it("3D draws while visible and stops while the tab is hidden", () => {

@@ -25,7 +25,22 @@ export { DEPARTMENT_LABEL } from "./fallback/board";
 /** The colour a business is marked with on the floor, for pages that list them (T-600). */
 export { businessColors } from "./palette";
 
-const Loading = () => <p className="p-4 text-sm text-muted">載入 3D 辦公室…</p>;
+/** Over the office until it is really drawn (D-158): the code, then the people's models, take a
+ * few seconds, and an empty floor with name tags floating on it is not the office. */
+function Loading3D() {
+  return (
+    <div
+      role="status"
+      data-testid="office-loading"
+      className="absolute inset-0 z-10 grid place-content-center justify-items-center gap-3 bg-canvas/80 backdrop-blur-sm"
+    >
+      <span aria-hidden className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent" />
+      <p className="text-sm text-muted">載入 3D 辦公室…</p>
+    </div>
+  );
+}
+
+const Loading = () => null; // the overlay below stands in for the scene while its code loads
 
 const LazyCanvas3D = dynamic(() => import("./Canvas3D"), { ssr: false, loading: Loading });
 
@@ -103,6 +118,8 @@ export function OfficeCanvas({
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [generation, setGeneration] = useState(0);
   const [lostAt, setLostAt] = useState<number | null>(null);
+  /** Which canvas has drawn the office: a new one (generation) starts out loading again. */
+  const [readyAt, setReadyAt] = useState<number | null>(null);
   /** Which canvas reported the loss: a report from one that is gone is not about this one. */
   const lost = lostAt === generation;
   const [theme, setTheme] = useOfficeTheme();
@@ -176,7 +193,9 @@ export function OfficeCanvas({
         theme={theme}
         onContextLost={() => setLostAt(generation)}
         onContextRestored={() => setLostAt(null)}
+        onReady={() => setReadyAt(generation)}
       />
+      {readyAt !== generation && !lost && !empty ? <Loading3D /> : null}
       <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
       {/* who did what, work and idle moments told apart (D-136) */}
       {empty ? null : <OfficeLog />}
