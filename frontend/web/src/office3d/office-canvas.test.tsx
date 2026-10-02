@@ -169,6 +169,14 @@ describe("OfficeCanvas", () => {
     act(() => realtimeStore.getState().hydrate(fixture.snapshot_before));
     const { rerender } = render(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} />);
     expect(screen.getByTestId("office-loading").textContent).toContain("載入 3D 辦公室");
+    // a bar, 0–100%: the code first, then the models as they load, and never 100 before drawn
+    const bar = () => screen.getByRole("progressbar").getAttribute("aria-valuenow");
+    expect(bar()).toBe("5");
+    act(() => seen.props!.onProgress!(50));
+    expect(bar()).toBe("54");
+    expect(screen.getByTestId("office-loading").textContent).toContain("54%");
+    act(() => seen.props!.onProgress!(100));
+    expect(bar()).toBe("98");
     act(() => seen.props!.onReady!());
     expect(screen.queryByTestId("office-loading")).toBeNull();
     // to 2D and back: a new canvas, which has to load again

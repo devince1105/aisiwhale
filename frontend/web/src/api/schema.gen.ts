@@ -1657,6 +1657,11 @@ export interface components {
         };
         /** ArticleDetail */
         ArticleDetail: {
+            /**
+             * Access
+             * @default free
+             */
+            access: string;
             /** Analytics */
             analytics: components["schemas"]["DailyView"][];
             /** Claims */
@@ -1746,6 +1751,11 @@ export interface components {
         };
         /** ArticleSummary */
         ArticleSummary: {
+            /**
+             * Access
+             * @default free
+             */
+            access: string;
             /**
              * Id
              * Format: uuid
@@ -2977,6 +2987,8 @@ export interface components {
             langs: {
                 [key: string]: string;
             };
+            /** Lock */
+            lock?: ("members" | "sign_in") | null;
             /**
              * Locked
              * @default false

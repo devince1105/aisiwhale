@@ -152,7 +152,7 @@ describe("the front page", () => {
 
   it("marks members-only stories, and knows its sections", () => {
     render(<ArticleList articles={[summary(1, { access: "members", section: null })]} lang="en" />);
-    expect(screen.getByText("Member")).toBeTruthy();
+    expect(screen.getByText("VIP")).toBeTruthy(); // D-159
     expect(listHref("en", null, 3)).toBe("/news/en?page=3");
     expect(isSection("ai") && !isSection("nft") && !isSection(undefined)).toBe(true);
   });

@@ -23,6 +23,19 @@ from autora.runtime.policy import Limit, PolicyEngine, Rule, allow
 AUTO_APPROVE_KEY = "newsroom.auto_approve_if_fact_check_passed"
 CEO_DECIDES_WHEN_UNANSWERED_KEY = "newsroom.ceo_decides_when_unanswered"
 
+VIP_GUIDELINES_KEY = "newsroom.vip_guidelines"
+DEFAULT_VIP_GUIDELINES = (
+    "深度分析、整理多個來源的數據比較、長期追蹤的主題，可以設為 VIP；"
+    "即時新聞、單一事件快訊與一般市場動態維持免費。VIP 約占全部文章的三成以內。"
+)
+"""D-159: which articles the editor-in-chief makes VIP (members-only) when she accepts them. A
+company policy, so the operator can change it without a release."""
+
+
+def vip_guidelines(policies: Mapping[str, Any]) -> str:
+    value = policies.get(VIP_GUIDELINES_KEY)
+    return value.strip() if isinstance(value, str) and value.strip() else DEFAULT_VIP_GUIDELINES
+
 
 def ceo_decides_when_unanswered(policies: Mapping[str, Any]) -> bool:
     """D-157: on unless the company has turned it off."""

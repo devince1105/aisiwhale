@@ -26,6 +26,8 @@ export interface Canvas3DProps {
   onContextRestored: () => void;
   /** The office is on screen: its models have loaded and a frame has been drawn with them. */
   onReady?: () => void;
+  /** How much of the office's models and textures has loaded, 0–100 (D-158). */
+  onProgress?: (percent: number) => void;
 }
 
 /** Report this canvas losing its context — and stop reporting the moment it is taken down.
@@ -63,9 +65,11 @@ function ContextWatch({ onLost, onRestored }: { onLost: () => void; onRestored: 
  * models and the textures, all through three's default loading manager — and frames have been
  * drawn since. An office with nobody to load is ready after a short while all the same, and any
  * office after at most 12 seconds of drawing. */
-function ReadyWatch({ onReady }: { onReady?: () => void }) {
+function ReadyWatch({ onReady, onProgress }: { onReady?: () => void; onProgress?: (percent: number) => void }) {
   const active = useProgress((s) => s.active);
   const total = useProgress((s) => s.total);
+  const progress = useProgress((s) => s.progress);
+  useEffect(() => onProgress?.(progress), [progress, onProgress]);
   const frames = useRef(0);
   const done = useRef(false);
   const born = useRef<number | null>(null);
@@ -87,7 +91,7 @@ function ReadyWatch({ onReady }: { onReady?: () => void }) {
 const EMPTY_READY_MS = 1500;
 const MAX_LOADING_MS = 12_000;
 
-export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, onContextRestored, onReady }: Canvas3DProps) {
+export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, onContextRestored, onReady, onProgress }: Canvas3DProps) {
   return (
     <Canvas
       dpr={CANVAS_DPR}
@@ -105,7 +109,7 @@ export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, 
       }}
     >
       <ContextWatch onLost={onContextLost} onRestored={onContextRestored} />
-      <ReadyWatch onReady={onReady} />
+      <ReadyWatch onReady={onReady} onProgress={onProgress} />
       <OfficeScene insetRight={insetRight} theme={theme} />
     </Canvas>
   );

@@ -265,6 +265,16 @@ export async function reviseArticle(articleId: string, reason: string, api: ApiC
   );
 }
 
+/** Make an article VIP (members read all of it) or free again (D-025, D-159). */
+export async function setArticleAccess(articleId: string, access: "free" | "members", api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.POST("/api/articles/{article_id}/access", {
+      params: { path: { article_id: articleId } },
+      body: { access },
+    }),
+  );
+}
+
 /** Put an article that was taken down back on the site (D-044). */
 export async function republishArticle(articleId: string, api: ApiClient = defaultApi) {
   return unwrap(

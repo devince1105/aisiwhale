@@ -154,9 +154,12 @@ describe("the article page", () => {
     expect(screen.getByText(MEMBERS_ONLY.blocks[0].text)).toBeTruthy();
     expect(screen.queryByText(ARTICLE.blocks[2].text)).toBeNull();
     const notice = screen.getByTestId("members-only");
+    expect(notice.textContent).toContain("VIP 會員專屬報導"); // D-159
+    // one button first, as on a paper's site; the plans are behind it
+    fireEvent.click(within(notice).getByRole("button", { name: "我要成為 VIP 會員看全文" }));
     expect(notice.textContent).toContain("NT$330"); // which dollar, said once and from one place
     expect(notice.textContent).toContain("NT$30");
-    expect(notice.textContent).toContain("已經是會員？");
+    expect(notice.textContent).toContain("已經是 VIP 會員？");
     const link = within(notice).getByRole("link", { name: "登入" });
     expect(link.getAttribute("href")).toBe(`/news/zh-TW/login?next=${encodeURIComponent(ARTICLE.path)}`);
   });
@@ -166,6 +169,7 @@ describe("the article page", () => {
     const notice = screen.getByTestId("members-only");
     expect(within(notice).queryByRole("status")).toBeNull();
 
+    fireEvent.click(within(notice).getByRole("button", { name: "我要成為 VIP 會員看全文" }));
     fireEvent.click(within(notice).getByRole("button", { name: "選擇年繳" }));
 
     const started = await vi.waitFor(() =>

@@ -28,7 +28,14 @@ from autora.db.models import EventRecord, Task
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.advice import NO_ADVICE_BRIEF, no_advice
 from autora.domains.newsroom.agents.researcher import task_story_id
-from autora.domains.newsroom.models import Article, ArticleState, ArticleVersion, Story
+from autora.domains.newsroom.models import (
+    Article,
+    ArticleAccess,
+    ArticleState,
+    ArticleVersion,
+    Story,
+)
+from autora.domains.newsroom.policy import vip_guidelines
 from autora.domains.newsroom.review import MAX_REVISIONS
 from autora.domains.newsroom.tools.review import Issue
 from autora.runtime.behaviors import AgentBehavior, RunContext
@@ -50,8 +57,10 @@ Judge what the editor does not:
    forecast).
 
 Read the draft (read_draft); list_claims and read_evidence if you need to see what it stands on.
-Then decide with final_review(article_id, verdict, issues, reason):
-- accept: it can go to a person for approval;
+Then decide with final_review(article_id, verdict, issues, reason, vip):
+- accept: it can go to a person for approval. Also decide vip: true makes it VIP — members read
+  all of it, everybody else only its opening — following the company's VIP guidelines below;
+  most articles are free;
 - revise: something must change first — each issue says what and why (language and block when it
   is about one). This uses one of the article's revisions; with none left it drops the story;
 - veto: the piece must not run at all — give the reason. Keep this for a piece that cannot be
@@ -64,6 +73,7 @@ When done, reply with only a JSON object (no other text):
  "issues": [{"message": "...", "kind": "fact|unsupported|missing_context|translation|style|other",
              "lang": "zh-TW|en (optional)", "block_ref": "3 (optional)"}],
  "reason": "<for veto: why>",
+ "vip": <for accept: true if you made it VIP>,
  "dropped": <true if final_review said the article was turned down>}
 Write the issues and the reason in Traditional Chinese (zh-TW); never Simplified Chinese.
 """
@@ -74,6 +84,8 @@ class ChiefReview(BaseModel):
     verdict: Literal["accept", "revise", "veto"]
     issues: list[Issue] = Field(default=[], max_length=20)
     reason: str | None = Field(default=None, max_length=1000)
+    vip: bool = False
+    """For accept (D-159): made VIP, for members."""
     dropped: bool = False
     """The piece was turned down (a veto, or a revision with none left): the workflow stops."""
 
@@ -87,8 +99,10 @@ async def final_review_context(session: AsyncSession, ctx: RunContext) -> str | 
     if story is None or story.company_id != ctx.company_id:
         return "No story found for this task: report that, do not guess one."
     lines = [f"Story: {story.title}", f"Story id: {story.id}"]
-    if no_advice(await get_policies(session, ctx.company_id)):
+    policies = await get_policies(session, ctx.company_id)
+    if no_advice(policies):
         lines.append(NO_ADVICE_BRIEF)
+    lines.append(f"The company's VIP guidelines (for accept): {vip_guidelines(policies)}")
     article = await session.scalar(select(Article).where(Article.story_id == story.id))
     if article is None:
         lines.append("This story has no article: report that.")
@@ -152,6 +166,9 @@ async def decided_here(session: AsyncSession, ctx: RunContext, note: BaseModel) 
         return ["a revision lists at least one issue: the ones you sent with final_review"]
     if note.verdict == "veto" and not (note.reason or "").strip():
         return ["a veto says why (reason)"]
+    is_vip = article.access == ArticleAccess.MEMBERS.value
+    if note.verdict == "accept" and note.vip != is_vip:
+        return [f"vip is {str(is_vip).lower()}: report what you set with final_review"]
     turned_down = article.state == ArticleState.REJECTED or (
         article.published_group_id is not None and note.verdict != "accept"
         and article.state != ArticleState.DRAFT

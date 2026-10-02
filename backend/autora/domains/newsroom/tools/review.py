@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from autora.db.models import Agent
 from autora.domains.newsroom import review
+from autora.domains.newsroom.models import Article, ArticleAccess
 from autora.domains.newsroom.review import EventRefs, Review
 from autora.runtime.tools import ToolContext, ToolRegistry, ToolResult
 
@@ -127,6 +128,10 @@ class FinalReviewArgs(BaseModel):
     """For revise: what the writer must change, and why."""
     reason: str | None = Field(default=None, max_length=1000)
     """For veto: why the piece must not run."""
+    vip: bool = Field(
+        default=False,
+        description="For accept: true makes it VIP (members read all of it; others its opening).",
+    )
 
 
 async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
@@ -140,6 +145,13 @@ async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
         actor=ctx.actor,
         refs=_refs(ctx),
     )
+    vip = None
+    if args.verdict == "accept" and not decided.dropped:
+        # D-159: the chief says whether it is VIP; an operator can change it in the back office
+        article = await ctx.session.get(Article, args.article_id)
+        if article is not None and article.company_id == ctx.company_id:
+            article.access = (ArticleAccess.MEMBERS if args.vip else ArticleAccess.FREE).value
+            vip = args.vip
     if decided.dropped:
         next_step = "the article is turned down and its story dropped"
     elif args.verdict == "accept":
@@ -148,8 +160,10 @@ async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
         next_step = f"the writer revises (revision {decided.revision} of {review.MAX_REVISIONS})"
     return ToolResult(
         output=_output(decided)
-        | {"issues": [i.model_dump(exclude_none=True) for i in args.issues], "next": next_step},
-        summary=f"final review of article {args.article_id}: {args.verdict}",
+        | {"issues": [i.model_dump(exclude_none=True) for i in args.issues], "next": next_step}
+        | ({"vip": vip} if vip is not None else {}),
+        summary=f"final review of article {args.article_id}: {args.verdict}"
+        + (" (VIP)" if vip else ""),
     )
 
 
@@ -180,7 +194,8 @@ def register(registry: ToolRegistry) -> None:
         "final_review",
         description=(
             "The editor-in-chief's final review of a draft the editor accepted: accept (on to a "
-            "person's approval), revise (back to the writer with issues; counts against the "
+            "person's approval; vip=true makes it VIP, for members), revise (back to the "
+            "writer with issues; counts against the "
             f"article's {review.MAX_REVISIONS} revisions) or veto (with a reason: the piece is "
             "turned down and its story dropped)."
         ),

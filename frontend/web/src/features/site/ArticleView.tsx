@@ -100,7 +100,9 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
         })}
       </div>
 
-      {article.locked ? <MembersOnly lang={lang} path={article.path} company={article.company_slug} /> : null}
+      {article.locked ? (
+        <MembersOnly lang={lang} path={article.path} company={article.company_slug} lock={article.lock ?? "members"} />
+      ) : null}
 
       {article.sources.length ? (
         <section className="mt-10 border-t border-line pt-6">

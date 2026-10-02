@@ -26,6 +26,9 @@ function respond(body: unknown, status = 200) {
   );
 }
 
+/** The paywall shows its button first; the plans are a click away (D-159). */
+const openPlans = () => fireEvent.click(screen.getByRole("button", { name: "我要成為 VIP 會員看全文" }));
+
 afterEach(() => {
   cleanup();
   document.body.innerHTML = ""; // the forms are appended to the body, not rendered by React
@@ -130,12 +133,14 @@ describe("the paywall", () => {
   it("shows the price the API charges", async () => {
     mockCalls({ ...OFFER, amount: "480.000000" }, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
     await waitFor(() => expect(screen.getByTestId("members-only").textContent).toContain("NT$480"));
   });
 
   it("offers a month and a year side by side, and says what a year saves (D-034)", async () => {
     mockCalls({ ...OFFER, amount: "330.000000" }, () => respond(PAGE, 201), MONTH);
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
     await waitFor(() => expect(screen.getByTestId("plan-month").textContent).toContain("NT$30"));
     expect(screen.getByTestId("plan-year").textContent).toContain("NT$330");
     expect(screen.getByTestId("plan-year").textContent).toContain("比月繳省 8%");
@@ -144,6 +149,7 @@ describe("the paywall", () => {
   it("leaves out a plan the API does not sell, rather than show a price nobody can pay", async () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
     await waitFor(() => expect(screen.queryByTestId("plan-month")).toBeNull());
     expect(screen.getByTestId("plan-year")).toBeTruthy();
   });
@@ -151,6 +157,7 @@ describe("the paywall", () => {
   it("orders the plan that was chosen", async () => {
     const fetchMock = mockCalls(OFFER, () => respond(PAGE, 201), MONTH);
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
     fireEvent.click(await screen.findByRole("button", { name: "選擇月繳" }));
     await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
     const order = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/checkout"));
@@ -160,6 +167,7 @@ describe("the paywall", () => {
   it("says what paying agrees to, with the policies a click away", () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
+    openPlans();
     const notice = screen.getByTestId("members-only");
     expect(notice.textContent).toContain("不會自動扣款");
     expect(screen.getByRole("link", { name: "服務條款" }).getAttribute("href")).toBe("/news/zh-TW/terms");
@@ -169,6 +177,7 @@ describe("the paywall", () => {
   it("takes the reader to PAYUNi", async () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
     fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
     await waitFor(() => expect(document.querySelector("form")?.action).toBe(PAGE.url));
   });
@@ -176,6 +185,7 @@ describe("the paywall", () => {
   it("says so when the site has no store yet, instead of a dead end", async () => {
     mockCalls({ ...OFFER, available: false }, () => respond({}, 503));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
+    openPlans();
     fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
     expect((await screen.findByRole("status")).textContent).toContain("即將開放");
   });
@@ -183,6 +193,7 @@ describe("the paywall", () => {
   it("says try again when the payment page could not be opened", async () => {
     mockCalls(OFFER, () => respond({}, 500));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
+    openPlans();
     fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
     expect((await screen.findByRole("status")).textContent).toContain("請稍後再試");
   });
@@ -192,6 +203,7 @@ describe("the paywall", () => {
     const assign = vi.fn();
     Object.defineProperty(window, "location", { value: { assign }, writable: true });
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
+    openPlans();
     fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith(
@@ -203,9 +215,22 @@ describe("the paywall", () => {
   it("never puts a secret in the page", async () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="en" path="/news/en/articles/x" company="lumen" />);
+    fireEvent.click(screen.getByRole("button", { name: "Become a VIP member to read on" }));
     fireEvent.click(screen.getByRole("button", { name: "Choose yearly" }));
     await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
     const sent = Array.from(document.querySelectorAll("form input")).map((i) => i.getAttribute("name"));
     expect(sent).toEqual(["MerID", "Version", "EncryptInfo", "HashInfo"]);
+  });
+});
+
+describe("持股觀察 (D-159)", () => {
+  it("asks a stranger to sign in, free, and comes back to the story", () => {
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" lock="sign_in" />);
+    const notice = screen.getByTestId("sign-in-to-read");
+    expect(notice.textContent).toContain("登入即可免費閱讀全文");
+    expect(screen.getByRole("link", { name: "登入看全文" }).getAttribute("href")).toBe(
+      `/news/zh-TW/login?next=${encodeURIComponent("/news/zh-TW/articles/x")}`,
+    );
+    expect(screen.queryByTestId("members-only")).toBeNull();
   });
 });

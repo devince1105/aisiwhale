@@ -475,7 +475,11 @@ def _chief_review(request: ModelRequest) -> FakeTurn:
                 "issues": [{"message": "標題請寫出具體日期與公司名稱。", "kind": "style"}],
             }
         else:
-            args = {"article_id": article_id, "verdict": "accept"}
+            args = {
+                "article_id": article_id,
+                "verdict": "accept",
+                "vip": bool(demo.get("chief_vip")),
+            }
         return FakeTurn(text="Deciding.", tool_uses=[FakeToolUse(name="final_review", input=args)])
     args, out = decided[-1]
     return FakeTurn(
@@ -484,6 +488,7 @@ def _chief_review(request: ModelRequest) -> FakeTurn:
             "verdict": args["verdict"],
             "issues": args.get("issues") or [],
             "reason": args.get("reason"),
+            "vip": bool(out.get("vip")),
             "dropped": bool(out.get("dropped")),
         }
     )

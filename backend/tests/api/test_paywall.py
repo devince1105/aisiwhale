@@ -148,3 +148,49 @@ async def test_an_operator_decides_which_articles_are_for_members(api, site, art
 async def test_only_an_operator_may_move_the_paywall(site, article):
     answer = await site.post(f"/api/articles/{article.id}/access", json={"access": "members"})
     assert answer.status_code == 401
+
+
+async def _in_holdings(newsroom_room, article):
+    """Put the article's story in 持股觀察: a source of the holdings section feeds it."""
+    from tests.api.test_public_sections import _from_sources
+
+    async with newsroom_room.committed() as session:
+        await _from_sources(session, article.company_id, article.story_id, ["holdings"])
+        await session.commit()
+
+
+async def test_holdings_are_an_opening_until_signed_in(site, mailbox, article, newsroom_room):
+    # D-159: 持股觀察 is free, but for signed-in readers: a stranger gets the opening
+    whole = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    await _in_holdings(newsroom_room, article)
+
+    body = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    assert body["section"] == "holdings"
+    assert body["access"] == "free" and body["locked"] is True and body["lock"] == "sign_in"
+    assert len(body["blocks"]) < len(whole["blocks"]) and body["sources"] == []
+    rest = whole["blocks"][-1]["text"]
+    assert rest not in (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).text
+
+    await _sign_in(site, mailbox)
+    body = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    assert body["locked"] is False and body["blocks"] == whole["blocks"]
+
+
+async def test_a_vip_holdings_article_still_needs_the_membership(
+    site, mailbox, article, newsroom_room
+):
+    await _in_holdings(newsroom_room, article)
+    await _members_only(newsroom_room, article)
+    await _sign_in(site, mailbox)
+    body = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    assert body["locked"] is True and body["lock"] == "members"
+
+
+def test_what_it_takes_to_read_it():
+    from autora.domains.newsroom.site import lock_for, may_read
+
+    assert lock_for("free", "ai") is None and lock_for("free", None) is None
+    assert lock_for("free", "figures") == "sign_in" and lock_for("members", "ai") == "members"
+    assert may_read(None, "anyone") and may_read("sign_in", "signed_in")
+    assert not may_read("sign_in", "anyone") and not may_read("members", "signed_in")
+    assert may_read("members", "member") and may_read("sign_in", "member")

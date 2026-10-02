@@ -12,6 +12,7 @@ import {
   articleQuery,
   articlesQuery,
   republishArticle,
+  setArticleAccess,
   reviseArticle,
   sourcesQuery,
   startStory,
@@ -158,6 +159,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
   const unpublish = useMutation({ mutationFn: (reason: string) => unpublishArticle(article.id, reason), onSettled });
   const republish = useMutation({ mutationFn: () => republishArticle(article.id), onSettled });
   const revise = useMutation({ mutationFn: (reason: string) => reviseArticle(article.id, reason), onSettled });
+  const access = useMutation({ mutationFn: (to: "free" | "members") => setArticleAccess(article.id, to), onSettled });
   return (
     <ArticleView
       article={article}
@@ -168,8 +170,9 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         unpublish: (reason) => unpublish.mutate(reason),
         republish: () => republish.mutate(),
         revise: (reason) => revise.mutate(reason),
-        busy: unpublish.isPending || republish.isPending || revise.isPending,
-        error: (unpublish.error ?? republish.error ?? revise.error)?.message ?? null,
+        setAccess: (to) => access.mutate(to),
+        busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending,
+        error: (unpublish.error ?? republish.error ?? revise.error ?? access.error)?.message ?? null,
       }}
       cover={<CoverPanel articleId={article.id} cover={article.cover} />}
     />

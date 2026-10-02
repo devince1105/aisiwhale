@@ -231,12 +231,14 @@ async def get_article(
     reader = await reader_for(session, autora_reader)
     if reader is None:
         return article
+    if article.lock == "sign_in":  # 持股觀察: signed in is enough (D-159)
+        return await published_article(session, lang, slug, reader="signed_in") or article
     until = await memberships.access_until(
         session, company_id=article.company_id, customer_ref=customer_ref(reader.id)
     )
     if until is None:
         return article
-    return await published_article(session, lang, slug, unlocked=True) or article
+    return await published_article(session, lang, slug, reader="member") or article
 
 
 @lru_cache

@@ -219,6 +219,22 @@ async def test_with_automatic_approval_nobody_is_asked(committed, e2e_settings):
     assert (await room.article()).state == "PUBLISHED"
 
 
+async def test_the_chief_makes_it_vip_when_she_accepts_it(committed, e2e_settings):
+    # D-159: the chief decides VIP at her final review, by the company's guidelines
+    room = await Newsroom().start(committed, e2e_settings, demo={"chief_vip": True})
+    await room.worker.run_until_idle()
+    chief = (await room.tasks())["chief_review"][0]
+    assert chief.output["verdict"] == "accept" and chief.output["vip"] is True
+    assert (await room.article()).access == "members"
+
+
+async def test_most_are_free(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings)
+    await room.worker.run_until_idle()
+    assert (await room.tasks())["chief_review"][0].output["vip"] is False
+    assert (await room.article()).access == "free"
+
+
 async def _past_its_deadline(room) -> Approval:
     """Nobody answered: move the article's latest approval past its expiry; let expiry run."""
     approve = (await room.tasks())["approve"][0]

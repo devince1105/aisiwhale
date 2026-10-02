@@ -548,6 +548,11 @@
    },
    "ArticleDetail": {
     "properties": {
+     "access": {
+      "default": "free",
+      "title": "Access",
+      "type": "string"
+     },
      "analytics": {
       "items": {
        "$ref": "#/components/schemas/DailyView"
@@ -789,6 +794,11 @@
    },
    "ArticleSummary": {
     "properties": {
+     "access": {
+      "default": "free",
+      "title": "Access",
+      "type": "string"
+     },
      "id": {
       "format": "uuid",
       "title": "Id",
@@ -3890,6 +3900,21 @@
       },
       "title": "Langs",
       "type": "object"
+     },
+     "lock": {
+      "anyOf": [
+       {
+        "enum": [
+         "members",
+         "sign_in"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lock"
      },
      "locked": {
       "default": false,

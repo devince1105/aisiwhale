@@ -5,11 +5,13 @@ The site shows only what was published: the draft group the publisher marked as 
 the sources behind it (the evidence the cited claims quote: title, site and link), never the
 claims' internals, drafts or anything unpublished.
 
-Some articles are for members (D-025). The paywall lives here, in what is returned: a member's
-request gets the whole article, anybody else gets the opening (``PREVIEW_BLOCKS``) and
-``locked``. The site never receives the rest of the text and then hides it — a reader with the
-developer tools open would find it there. Who counts as a member is decided above this module:
-this one is handed a yes or a no.
+Some articles are for members (D-025), shown as VIP (D-159); and the holdings sections are for
+signed-in readers, free (D-159). The paywall lives here, in what is returned: a reader who may
+read it gets the whole article, anybody else gets the opening (``PREVIEW_BLOCKS``), ``locked``
+and which lock (``lock``: ``members`` or ``sign_in``). The site never receives the rest of the
+text and then hides it — a reader with the developer tools open would find it there. Who the
+reader is is decided above this module: this one is handed ``anyone``, ``signed_in`` or
+``member``.
 
 Beacons (``record_beacon``) count readers without knowing who they are: the browser sends a
 random id it makes each day (``session_hash``); no IP address or anything else about the reader is
@@ -29,6 +31,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
+from typing import Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel
@@ -61,7 +64,29 @@ from autora.infra.ids import uuid7
 
 MAX_LIST = 50
 PREVIEW_BLOCKS = 2
-"""At most how many blocks of a members-only article anybody may read."""
+"""At most how many blocks of a locked article anybody may read."""
+
+SIGN_IN_SECTIONS = frozenset({"holdings", "figures"})
+"""持股觀察 (D-159): big investors' filings and public figures' holdings are read in full once
+signed in — free, but an account: the reader's email is what the section is for."""
+
+Reader = Literal["anyone", "signed_in", "member"]
+Lock = Literal["members", "sign_in"]
+
+
+def lock_for(access: str, section: str | None) -> Lock | None:
+    """What it takes to read the whole article: a membership, signing in, or nothing."""
+    if access == ArticleAccess.MEMBERS.value:
+        return "members"
+    if section in SIGN_IN_SECTIONS:
+        return "sign_in"
+    return None
+
+
+def may_read(lock: Lock | None, reader: Reader) -> bool:
+    if lock is None or reader == "member":
+        return True
+    return lock == "sign_in" and reader == "signed_in"
 
 
 def preview(body: list[dict]) -> list[dict]:
@@ -160,7 +185,9 @@ class PublicNeighbour(BaseModel):
 
 class PublicArticle(PublicArticleSummary):
     locked: bool = False
-    """True when ``blocks`` is only the opening, because this one is for members."""
+    """True when ``blocks`` is only the opening, because of ``lock``."""
+    lock: Lock | None = None
+    """What reading all of it takes (D-159): ``members`` (VIP) or ``sign_in``; None when free."""
     blocks: list[PublicBlock]
     sources: list[PublicSource]
     """The evidence the article's claims quote, once per page, in order of first use."""
@@ -272,10 +299,10 @@ def _published(lang: str):
 
 
 async def published_article(
-    session: AsyncSession, lang: str, slug: str, *, unlocked: bool = False
+    session: AsyncSession, lang: str, slug: str, *, reader: Reader = "anyone"
 ) -> PublicArticle | None:
-    """One published article. ``unlocked`` says the reader is a member; without it, a
-    members-only article comes back as its opening and ``locked``."""
+    """One published article, as much of it as ``reader`` may read: a locked one comes back as
+    its opening, ``locked``, with its ``lock``."""
     row = (await session.execute(_published(lang).where(Article.slug == slug))).first()
     if row is None:
         return None
@@ -305,7 +332,8 @@ async def published_article(
             if url not in sources:
                 site = urlsplit(url).hostname or url
                 sources[url] = PublicSource(title=title or site, site=site, url=url)
-    locked = article.access == ArticleAccess.MEMBERS.value and not unlocked
+    lock = lock_for(article.access, section)
+    locked = not may_read(lock, reader)
     body = preview(version.body) if locked else version.body
     newer, older = await _neighbours(session, lang, article)
     return PublicArticle(
@@ -313,6 +341,7 @@ async def published_article(
             article, version, section, await cover_of(session, article.story_id)
         ).model_dump(),
         locked=locked,
+        lock=lock,
         blocks=[PublicBlock(type=b["type"], text=b["text"]) for b in body],
         sources=[] if locked else list(sources.values()),
         langs={lang_: article_path(lang_, article.slug) for lang_ in article.published_langs},

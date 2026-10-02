@@ -26,16 +26,35 @@ export { DEPARTMENT_LABEL } from "./fallback/board";
 export { businessColors } from "./palette";
 
 /** Over the office until it is really drawn (D-158): the code, then the people's models, take a
- * few seconds, and an empty floor with name tags floating on it is not the office. */
-function Loading3D() {
+ * few seconds, and an empty floor with name tags floating on it is not the office. A bar, 0–100%:
+ * the code first (until the scene reports, 5%), then the models and textures (to 98%), and 100%
+ * only once a frame is drawn with them — when the bar goes. */
+export function loadingPercent(models: number | null, ready: boolean): number {
+  if (ready) return 100;
+  if (models === null) return 5;
+  return Math.min(98, Math.round(10 + models * 0.88));
+}
+
+function Loading3D({ percent }: { percent: number }) {
   return (
     <div
       role="status"
       data-testid="office-loading"
       className="absolute inset-0 z-10 grid place-content-center justify-items-center gap-3 bg-canvas/80 backdrop-blur-sm"
     >
-      <span aria-hidden className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent" />
-      <p className="text-sm text-muted">載入 3D 辦公室…</p>
+      <p className="text-sm text-muted">
+        載入 3D 辦公室… <span className="tabular-nums">{percent}%</span>
+      </p>
+      <div
+        role="progressbar"
+        aria-label="載入 3D 辦公室"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-2 w-64 max-w-[70vw] overflow-hidden rounded-full bg-line"
+      >
+        <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${percent}%` }} />
+      </div>
     </div>
   );
 }
@@ -120,6 +139,8 @@ export function OfficeCanvas({
   const [lostAt, setLostAt] = useState<number | null>(null);
   /** Which canvas has drawn the office: a new one (generation) starts out loading again. */
   const [readyAt, setReadyAt] = useState<number | null>(null);
+  /** The models' progress as the current canvas reports it; null until it does. */
+  const [models, setModels] = useState<{ generation: number; percent: number } | null>(null);
   /** Which canvas reported the loss: a report from one that is gone is not about this one. */
   const lost = lostAt === generation;
   const [theme, setTheme] = useOfficeTheme();
@@ -194,8 +215,11 @@ export function OfficeCanvas({
         onContextLost={() => setLostAt(generation)}
         onContextRestored={() => setLostAt(null)}
         onReady={() => setReadyAt(generation)}
+        onProgress={(percent) => setModels({ generation, percent })}
       />
-      {readyAt !== generation && !lost && !empty ? <Loading3D /> : null}
+      {readyAt !== generation && !lost && !empty ? (
+        <Loading3D percent={loadingPercent(models?.generation === generation ? models.percent : null, false)} />
+      ) : null}
       <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
       {/* who did what, work and idle moments told apart (D-136) */}
       {empty ? null : <OfficeLog />}

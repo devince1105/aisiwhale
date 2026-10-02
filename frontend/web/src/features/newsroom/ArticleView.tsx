@@ -16,6 +16,8 @@ export interface OnSite {
   unpublish: (reason: string) => void;
   republish: () => void;
   revise: (reason: string) => void;
+  /** VIP or free (D-159): the editor-in-chief's choice, which a person may change. */
+  setAccess?: (access: "free" | "members") => void;
   busy: boolean;
   error: string | null;
 }
@@ -90,6 +92,36 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
   );
 }
 
+/** Free or VIP (D-159): the editor-in-chief set it at her final review; a person may change it. */
+function AccessControl({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
+  const vip = article.access === "members";
+  return (
+    <section aria-label="閱讀權限" data-testid="access-control" className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
+      <span className="text-muted">閱讀權限：</span>
+      <div role="group" aria-label="閱讀權限" className="flex rounded-lg border border-line p-0.5">
+        {(
+          [
+            ["free", "免費"],
+            ["members", "VIP（會員看全文）"],
+          ] as const
+        ).map(([value, name]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={(value === "members") === vip}
+            disabled={onSite.busy}
+            onClick={() => onSite.setAccess!(value)}
+            className={`rounded-md px-3 py-1 ${(value === "members") === vip ? "bg-accent text-canvas" : "text-muted"} disabled:opacity-50`}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <span className="text-muted">總編在終審時依 VIP 原則決定，可在這裡改。</span>
+    </section>
+  );
+}
+
 export function ArticleView({
   article,
   lang,
@@ -135,6 +167,7 @@ export function ArticleView({
         </p>
       </NewsroomHeader>
 
+      {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
       {cover ? (
         <section aria-label="首圖" className="mb-6 rounded-lg border border-line p-4">

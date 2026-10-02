@@ -127,6 +127,8 @@ class ArticleSummary(BaseModel):
     views: int
     listed: bool = True
     """On the site (D-045): a published version shows unless it was taken down."""
+    access: str = "free"
+    """``free`` or ``members``, VIP (D-025, D-159): the chief decides, an operator may change it."""
     revised_at: datetime | None = None
     """When a changed version of the published article went up (D-045)."""
 
@@ -492,6 +494,7 @@ async def list_articles(
                 revision_count=a.revision_count,
                 published_at=a.published_at,
                 listed=a.listed,
+                access=a.access,
                 revised_at=a.revised_at,
                 updated_at=a.updated_at,
                 views=int(views.get(a.id) or 0),
@@ -570,6 +573,7 @@ async def article_detail(
         published_at=article.published_at,
         updated_at=article.updated_at,
         listed=article.listed,
+        access=article.access,
         revised_at=article.revised_at,
         views=sum(d.views for d in daily),
         story_title=story.title if story else "",

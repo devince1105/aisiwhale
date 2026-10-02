@@ -55,6 +55,7 @@ const ARTICLE_DETAIL: ArticleDetail = {
   revision_count: 1,
   published_at: AT,
   listed: true,
+  access: "free",
   updated_at: AT,
   views: 7,
   story_title: "Lumen City microgrid",
@@ -136,6 +137,17 @@ describe("the model", () => {
 
 describe("taking an article off the site (D-044)", () => {
   const onSite = () => ({ unpublish: vi.fn(), republish: vi.fn(), revise: vi.fn(), busy: false, error: null });
+
+  it("free or VIP: the chief's choice, which a person may change (D-159)", () => {
+    const controls = { ...onSite(), setAccess: vi.fn() };
+    const { rerender } = render(<ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED" }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />);
+    const box = within(screen.getByTestId("access-control"));
+    expect(box.getByRole("button", { name: "免費" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(box.getByRole("button", { name: "VIP（會員看全文）" }));
+    expect(controls.setAccess).toHaveBeenCalledWith("members");
+    rerender(<ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED", access: "members" }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />);
+    expect(within(screen.getByTestId("access-control")).getByRole("button", { name: "VIP（會員看全文）" }).getAttribute("aria-pressed")).toBe("true");
+  });
 
   it("a published article comes down only with a reason", () => {
     const controls = onSite();
