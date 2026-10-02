@@ -2,19 +2,21 @@
 // the operator with the reader's address to reply to; nothing about the operator is on the page.
 // Laid out as a financial data company's contact form is (Bloomberg's): what you need first, then
 // who you are, then what sending agrees to. A field nobody sees catches bots: the API says "sent"
-// to one and sends nothing.
+// to one and sends nothing. And (D-166) how long the form was open goes with it, and — once a
+// site key is configured — a Cloudflare Turnstile token, one per message.
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { API_URL } from "@/config";
+import { API_URL, TURNSTILE_SITE_KEY } from "@/config";
 
 import { words, type Lang } from "./i18n";
+import { Turnstile } from "./Turnstile";
 
 const TOPICS = ["membership", "content", "partnership", "other"] as const;
 type Topic = (typeof TOPICS)[number];
-type State = "idle" | "sending" | "sent" | "failed" | "busy";
+type State = "idle" | "sending" | "sent" | "failed" | "busy" | "check";
 
 export interface ContactBody {
   name: string;
@@ -25,9 +27,14 @@ export interface ContactBody {
   message: string;
   lang: Lang;
   website: string;
+  elapsed_ms: number;
+  turnstile_token: string;
 }
 
-export async function sendContact(body: ContactBody, fetcher: typeof fetch = fetch): Promise<"sent" | "failed" | "busy"> {
+export async function sendContact(
+  body: ContactBody,
+  fetcher: typeof fetch = fetch,
+): Promise<"sent" | "failed" | "busy" | "check"> {
   try {
     const response = await fetcher(`${API_URL}/api/public/contact`, {
       method: "POST",
@@ -35,15 +42,19 @@ export async function sendContact(body: ContactBody, fetcher: typeof fetch = fet
       body: JSON.stringify(body),
     });
     if (response.ok) return "sent";
+    if (response.status === 403) return "check"; // the person check did not hold: do it again
     return response.status === 429 ? "busy" : "failed";
   } catch {
     return "failed";
   }
 }
 
-export function ContactForm({ lang }: { lang: Lang }) {
+export function ContactForm({ lang, siteKey = TURNSTILE_SITE_KEY }: { lang: Lang; siteKey?: string }) {
   const w = words(lang).contactForm;
-  const [body, setBody] = useState<Omit<ContactBody, "lang">>({
+  const opened = useRef(Date.now());
+  const [token, setToken] = useState<string | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+  const [body, setBody] = useState<Omit<ContactBody, "lang" | "elapsed_ms" | "turnstile_token">>({
     name: "",
     email: "",
     phone: "",
@@ -58,8 +69,20 @@ export function ContactForm({ lang }: { lang: Lang }) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (siteKey && !token) {
+      setState("check");
+      return;
+    }
     setState("sending");
-    setState(await sendContact({ ...body, lang }));
+    const outcome = await sendContact({
+      ...body,
+      lang,
+      elapsed_ms: Date.now() - opened.current,
+      turnstile_token: token ?? "",
+    });
+    setState(outcome);
+    // a token is good once: anything but "sent" needs a new one
+    if (outcome !== "sent" && siteKey) setResetKey((n) => n + 1);
   }
 
   if (state === "sent") {
@@ -132,6 +155,7 @@ export function ContactForm({ lang }: { lang: Lang }) {
       </label>
 
       <div className="grid gap-3">
+        {siteKey ? <Turnstile siteKey={siteKey} lang={lang} onToken={setToken} resetKey={resetKey} /> : null}
         <p className="text-xs text-muted">
           {w.consent[0]}
           <Link href={`/news/${lang}/privacy`} className="text-accent underline">
@@ -148,6 +172,7 @@ export function ContactForm({ lang }: { lang: Lang }) {
         </button>
         {state === "failed" ? <p role="alert" className="text-sm text-danger">{w.failed}</p> : null}
         {state === "busy" ? <p role="alert" className="text-sm text-danger">{w.busy}</p> : null}
+        {state === "check" ? <p role="alert" className="text-sm text-danger">{w.check}</p> : null}
       </div>
     </form>
   );

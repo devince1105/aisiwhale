@@ -191,6 +191,11 @@ class Settings(BaseSettings):
     email_from: str = "AiSiWhale <onboarding@resend.dev>"
     contact_inbox: str = "service@aisiwhale.com"
     """Where the site's 聯絡我們 form sends readers' messages (D-165)."""
+    contact_daily_cap: int = Field(default=30, ge=0)
+    """At most this many 聯絡我們 messages a day (D-166): they share the Resend quota with the
+    sign-in links, which a flood must not use up."""
+    turnstile_secret_key: SecretStr | None = None
+    """Cloudflare Turnstile's secret (D-166). Unset: the form is not checked by Turnstile."""
 
     # --- Payments: PAYUNi (D-024) ---
     payuni_env: Literal["sandbox", "production"] = "sandbox"

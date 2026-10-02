@@ -3,7 +3,7 @@
 //
 // The point of most of these is what the browser does *not* do: it never sees a secret, it never
 // grants anything, and a site with no store yet says so instead of failing silently.
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CheckoutError, fetchOffer, formatOffer, goToPaymentPage, startCheckout } from "./checkout";
@@ -273,13 +273,36 @@ describe("聯絡我們 (D-165)", () => {
     expect(await screen.findByTestId("contact-sent")).toBeTruthy();
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/api\/public\/contact$/);
-    expect(JSON.parse(String(init!.body))).toMatchObject({ name: "王小明", topic: "partnership", website: "", lang: "zh-TW" });
+    const sent = JSON.parse(String(init!.body));
+    expect(sent).toMatchObject({ name: "王小明", topic: "partnership", website: "", lang: "zh-TW", turnstile_token: "" });
+    expect(typeof sent.elapsed_ms).toBe("number"); // how long it was open, for the API to judge (D-166)
+  });
+
+  it("with a Turnstile site key, asks for the check before sending, and sends its token (D-166)", async () => {
+    const { ContactForm } = await import("./ContactForm");
+    const fetchMock = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(async () => new Response(null, { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    let rendered: Record<string, unknown> = {};
+    vi.stubGlobal("turnstile", { render: (_el: HTMLElement, options: Record<string, unknown>) => ((rendered = options), "w1"), reset: vi.fn(), remove: vi.fn() });
+    render(<ContactForm lang="zh-TW" siteKey="site-key" />);
+    fireEvent.change(screen.getByLabelText("請說明你的問題或需求"), { target: { value: "想請問月繳可以開發票嗎？" } });
+    fireEvent.change(screen.getByLabelText("姓名"), { target: { value: "王小明" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "reader@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "送出" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("真人驗證");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(rendered.sitekey).toBe("site-key"));
+    act(() => (rendered.callback as (t: string) => void)("token-1"));
+    fireEvent.click(screen.getByRole("button", { name: "送出" }));
+    expect(await screen.findByTestId("contact-sent")).toBeTruthy();
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]!.body)).turnstile_token).toBe("token-1");
+    vi.unstubAllGlobals();
   });
 
   it("says try later when too many were sent", async () => {
     const { sendContact } = await import("./ContactForm");
     const busy = vi.fn(async () => new Response(null, { status: 429 })) as unknown as typeof fetch;
-    const body = { name: "a", email: "a@b.c", phone: "", company: "", topic: "other" as const, message: "0123456789", lang: "zh-TW" as const, website: "" };
+    const body = { name: "a", email: "a@b.c", phone: "", company: "", topic: "other" as const, message: "0123456789", lang: "zh-TW" as const, website: "", elapsed_ms: 5000, turnstile_token: "" };
     expect(await sendContact(body, busy)).toBe("busy");
     const down = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
     expect(await sendContact(body, down)).toBe("failed");

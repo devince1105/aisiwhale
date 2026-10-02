@@ -2129,6 +2129,11 @@ export interface components {
              * @default
              */
             company: string;
+            /**
+             * Elapsed Ms
+             * @default 0
+             */
+            elapsed_ms: number;
             /** Email */
             email: string;
             /**
@@ -2152,6 +2157,11 @@ export interface components {
              * @enum {string}
              */
             topic: "membership" | "content" | "partnership" | "other";
+            /**
+             * Turnstile Token
+             * @default
+             */
+            turnstile_token: string;
             /**
              * Website
              * @default

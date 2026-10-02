@@ -1685,6 +1685,12 @@
       "title": "Company",
       "type": "string"
      },
+     "elapsed_ms": {
+      "default": 0,
+      "minimum": 0.0,
+      "title": "Elapsed Ms",
+      "type": "integer"
+     },
      "email": {
       "maxLength": 200,
       "minLength": 3,
@@ -1727,6 +1733,12 @@
        "other"
       ],
       "title": "Topic",
+      "type": "string"
+     },
+     "turnstile_token": {
+      "default": "",
+      "maxLength": 4096,
+      "title": "Turnstile Token",
       "type": "string"
      },
      "website": {

@@ -99,6 +99,8 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: TURNSTILE_SECRET_KEY # Cloudflare Turnstile for 聯絡我們 (D-166); empty: no check
+        sync: false
       - key: PAYUNI_ENV
         sync: false
       - key: PAYUNI_MER_ID
