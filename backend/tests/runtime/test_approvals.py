@@ -381,3 +381,59 @@ async def test_expired_approval_keeps_task_waiting(db_session, world):
     assert (await _reload(db_session, Task, task.id)).state != "WAITING_APPROVAL"
     # and it is not asked a third time while the second one is open
     assert await world["approvals"].renew_waiting(db_session) == []
+
+
+async def _waiting_task(world, session, action):
+    task = await _task(world, session, name="approve", role="human")
+    return task, await world["approvals"].request_for_task(
+        session, task, kind=DOMAIN_KIND, summary="Publish?", action=action
+    )
+
+
+async def test_unanswered_is_approved_only_where_a_domain_says_so(db_session, world):
+    # D-156: silence is consent for the actions a domain names, and only those
+    approvals = world["approvals"]
+
+    async def yes(session, approval):
+        return True
+
+    approvals.approve_when_unanswered("consented", yes)
+    task, consented = await _waiting_task(world, db_session, "consented")
+    other_task, other = await _waiting_task(world, db_session, "other")
+
+    world["clock"].now += timedelta(hours=25)
+    assert await approvals.expire_due(db_session) == [consented.id, other.id]
+
+    consented = await _reload(db_session, Approval, consented.id)
+    assert consented.state == "APPROVED"
+    assert consented.decided_by == {"kind": "system", "id": "approvals"}
+    assert (await _reload(db_session, Task, task.id)).state == "SUCCEEDED"
+    assert (await _reload(db_session, Approval, other.id)).state == "EXPIRED"
+    assert (await _reload(db_session, Task, other_task.id)).state == "WAITING_APPROVAL"
+    # and a person still may not be impersonated: decide() remains a human's
+    with pytest.raises(ApprovalError, match="only a human"):
+        await approvals.decide(db_session, other.id, outcome="approve", actor=Actor.system("x"))
+
+
+async def test_unanswered_but_refused_by_the_domain_expires_and_is_asked_again(db_session, world):
+    approvals = world["approvals"]
+
+    async def yes(session, approval):
+        return True
+
+    async def refuse(session, approval, outcome, actor, reason):
+        raise RuntimeError("the article changed while it waited")
+
+    approvals.approve_when_unanswered("refused", yes)
+    approvals.on_decided("refused", refuse)
+    task, approval = await _waiting_task(world, db_session, "refused")
+
+    world["clock"].now += timedelta(hours=25)
+    await approvals.expire_due(db_session)
+
+    assert (await _reload(db_session, Approval, approval.id)).state == "EXPIRED"
+    assert (await _reload(db_session, Task, task.id)).state == "WAITING_APPROVAL"
+    again = await db_session.scalar(
+        select(Approval).where(Approval.task_id == task.id, Approval.state == "PENDING")
+    )
+    assert again is not None and again.id != approval.id

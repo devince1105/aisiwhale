@@ -38,8 +38,10 @@ from autora.company.agents import hire_agent
 from autora.company.organization import role_by_key
 from autora.company.workflows import StartWorkflowError, start_workflow
 from autora.db.models import Agent, AgentStatus, Approval, WorkflowRun
+from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom import organization, personas
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
+from autora.domains.newsroom.policy import approves_when_unanswered
 from autora.domains.newsroom.publisher import (
     NotAllowed,
     PublishError,
@@ -437,7 +439,7 @@ async def publish_step(ctx: ServiceContext) -> None:
 
 def on_article_decided(policy: PolicyEngine):
     """A person's decision on an ``approve_article`` approval approves, sends back (D-044) or
-    rejects the article."""
+    rejects the article. The system's is only ever "approve", when nobody answered (D-156)."""
 
     async def hook(
         session: AsyncSession, approval: Approval, outcome: str, actor: Actor, reason: str | None
@@ -451,6 +453,7 @@ def on_article_decided(policy: PolicyEngine):
                 article_id=article_id,
                 actor=actor,
                 reason=reason,
+                unanswered=actor.kind == "system",
             )
         elif outcome == "revise":
             await return_article(
@@ -470,3 +473,8 @@ def on_article_decided(policy: PolicyEngine):
             )
 
     return hook
+
+
+async def approve_article_when_unanswered(session: AsyncSession, approval: Approval) -> bool:
+    """D-156: an article's approval nobody answered is approved, unless the company said not to."""
+    return approves_when_unanswered(await get_policies(session, approval.company_id))

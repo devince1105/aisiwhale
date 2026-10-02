@@ -75,7 +75,9 @@ function Card({
         <p className="text-xs text-muted tabular-nums">
           {pending ? `已等待 ${card.waiting}` : null}
           {pending && card.expires?.in ? (
-            <span className={card.expires.soon ? "text-warn" : undefined}>・{card.expires.in}後過期</span>
+            <span className={card.expires.soon ? "text-warn" : undefined}>
+              ・{card.expires.in}後{card.expires.then === "approve" ? "自動核准" : "過期"}
+            </span>
           ) : null}
         </p>
       </div>

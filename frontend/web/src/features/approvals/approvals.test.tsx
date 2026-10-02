@@ -38,8 +38,10 @@ describe("model", () => {
       runId: pending.run_id,
       decision: null,
     });
-    expect(card.expires).toMatchObject({ at: pending.expires_at, soon: false });
+    expect(card.expires).toMatchObject({ at: pending.expires_at, soon: false, then: "expire" });
     expect(card.expires!.in).toMatch(/小時/);
+    // an article nobody objects to is approved at the deadline (D-156); other requests expire
+    expect(approvalCard({ ...pending, action: "approve_article" }, agents, NOW).expires!.then).toBe("approve");
     // unknown agent: still says who, by id
     expect(approvalCard(pending, {}, NOW).requester).toBe(`代理 ${writerId.slice(0, 8)}`);
   });

@@ -2,6 +2,7 @@
 model, offline tools), with a person's approval, automatic approval, revisions and rejection."""
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import delete, select
@@ -25,7 +26,7 @@ from autora.domains.newsroom.models import (
     Story,
     StoryCover,
 )
-from autora.domains.newsroom.policy import AUTO_APPROVE_KEY
+from autora.domains.newsroom.policy import APPROVE_WHEN_UNANSWERED_KEY, AUTO_APPROVE_KEY
 from autora.domains.newsroom.workflow import TEMPLATE_NAME, start_story
 from autora.runtime.actor import Actor
 from tests.conftest import unique_company
@@ -216,6 +217,60 @@ async def test_with_automatic_approval_nobody_is_asked(committed, e2e_settings):
     [approved] = await room.events("ARTICLE_APPROVED")
     assert approved.payload["by"] == "system"
     assert (await room.article()).state == "PUBLISHED"
+
+
+async def _past_its_deadline(room) -> Approval:
+    """Nobody answered: move the article's approval past its expiry, then let expiry run."""
+    approval = await room.approval()
+    async with room.committed() as session:
+        row = await session.get(Approval, approval.id)
+        row.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+        await room.runtime.approvals.expire_due(session)
+        await session.commit()
+    return approval
+
+
+async def test_an_article_nobody_answered_for_a_day_is_published(committed, e2e_settings):
+    # D-156: full automation — the operator had a day to object, and did not
+    room = await Newsroom().start(committed, e2e_settings)
+    await room.worker.run_until_idle()
+    approval = await _past_its_deadline(room)
+
+    decided = await room.get(Approval, approval.id)
+    assert decided.state == "APPROVED"
+    assert decided.decided_by == {"kind": "system", "id": "approvals"}  # never a person's name
+    assert decided.reason == "nobody objected before the deadline"
+    await room.worker.run_until_idle()
+    tasks = await room.tasks()
+    assert all(t.state == "SUCCEEDED" for ts in tasks.values() for t in ts)
+    [approved] = await room.events("ARTICLE_APPROVED")
+    assert approved.payload["by"] == "system"
+    assert (await room.article()).state == "PUBLISHED"
+
+
+async def test_with_silence_not_consent_it_is_asked_again(committed, e2e_settings):
+    # the company can turn D-156 off: then D-001 and D-131 as before — expire, ask again, wait
+    room = await Newsroom().start(committed, e2e_settings)
+    async with committed() as session:
+        await upsert_policy(
+            session,
+            room.company.id,
+            APPROVE_WHEN_UNANSWERED_KEY,
+            False,
+            updated_by=OPERATOR.as_json(),
+        )
+        await session.commit()
+    await room.worker.run_until_idle()
+    approval = await _past_its_deadline(room)
+
+    assert (await room.get(Approval, approval.id)).state == "EXPIRED"
+    approve = (await room.tasks())["approve"][0]
+    assert approve.state == "WAITING_APPROVAL"
+    again = await room.get_where(
+        Approval, Approval.task_id == approve.id, Approval.state == "PENDING"
+    )
+    assert again is not None and again.id != approval.id
+    assert (await room.article()).state == "IN_REVIEW"
 
 
 def _break_each_draft(room, times):

@@ -46,7 +46,9 @@ export interface ApprovalCard {
   /** What will run once approved: the tool's arguments, else the whole payload. */
   details: unknown;
   waiting: string;
-  expires: { at: string; in: string | null; soon: boolean } | null;
+  /** When the deadline is, and what happens then: an article nobody objected to is approved
+   * (D-156); anything else expires and is asked again (D-131). */
+  expires: { at: string; in: string | null; soon: boolean; then: "approve" | "expire" } | null;
   taskId: string | null;
   runId: string | null;
   /** A decision task (an article to approve) can be sent back; a paused agent run cannot. */
@@ -111,6 +113,7 @@ export function approvalCard(approval: Approval, agents: Record<string, AgentSta
           at: approval.expires_at,
           in: expiresMs !== null && expiresMs > 0 ? formatDuration(expiresMs) : null,
           soon: expiresMs !== null && expiresMs < 60 * 60 * 1000,
+          then: approval.action === "approve_article" ? "approve" : "expire",
         }
       : null,
     taskId: approval.task_id,

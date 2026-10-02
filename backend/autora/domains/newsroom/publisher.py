@@ -187,7 +187,9 @@ async def approve_article(
     article_id: uuid.UUID,
     actor: Actor,
     reason: str | None = None,
+    unanswered: bool = False,
 ) -> Article:
+    """``unanswered``: the system approving because nobody answered in time (D-156)."""
     article = await _article(session, company_id, article_id)
     if article.state in (ArticleState.APPROVED, ArticleState.PUBLISHED):
         return article  # already decided
@@ -196,9 +198,8 @@ async def approve_article(
     passed = await _fact_check_passed(session, article)
     if not passed:
         raise PublishError("the current draft has no passed fact-check")
-    await _allowed(
-        session, policy, actor, "approve_article", article, {"fact_check_passed": passed}
-    )
+    facts = {"fact_check_passed": passed, "unanswered": unanswered}
+    await _allowed(session, policy, actor, "approve_article", article, facts)
     await ARTICLE_FSM.transition(
         session, article, ArticleState.APPROVED, actor=actor, reason=reason
     )

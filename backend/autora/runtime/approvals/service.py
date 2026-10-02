@@ -22,7 +22,14 @@ cannot be decided, so without one the task — and the article behind it — wai
 nobody could make, its workflow RUNNING for days and the operator's count of pending approvals
 at zero. The renewal is the reminder: it is asked again, and heard again in the team group.
 
-Only humans decide. Automatic approval (policy flag) is a PolicyEngine decision, not an approval.
+**Unless silence is consent** (D-156): a domain may say, per action, that an approval nobody has
+answered by its expiry is approved instead (``approve_when_unanswered(action, rule)``; the rule
+decides per approval, e.g. from a company policy). The decision is then the system's, recorded as
+``system:approvals`` with the reason, so it never reads as a person's. If the domain's hook refuses
+it (the article is no longer fit to approve), the approval expires and is asked again as before.
+
+Only humans decide — or, past the deadline and only where a domain allows it, nobody objecting.
+Automatic approval (policy flag) is a PolicyEngine decision, not an approval.
 
 A domain can act on a decision in the same transaction (T-514): ``on_decided(action, hook)``
 registers a hook for approvals of that ``action`` (e.g. ``approve_article`` approves or rejects
@@ -31,6 +38,7 @@ the article). It runs before the task moves on; if it raises, the decision is no
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -48,12 +56,19 @@ from autora.runtime.events.schema import EventPayload, new_event
 from autora.runtime.lifecycles import APPROVAL_FSM
 from autora.runtime.task_manager import Claim, TaskManager
 
+log = logging.getLogger(__name__)
+
 DEFAULT_EXPIRY = timedelta(hours=24)  # D-001
 
 DecisionOutcome = Literal["approve", "reject", "revise"]
 DecisionHook = Callable[
     [AsyncSession, Approval, DecisionOutcome, Actor, str | None], Awaitable[None]
 ]
+UnansweredRule = Callable[[AsyncSession, Approval], Awaitable[bool]]
+"""Whether an approval of this action that nobody answered in time is approved (D-156)."""
+
+UNANSWERED = Actor.system("approvals")
+UNANSWERED_REASON = "nobody objected before the deadline"
 
 
 class ApprovalError(Exception):
@@ -66,11 +81,19 @@ class ApprovalService:
     default_expiry: timedelta = DEFAULT_EXPIRY
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
     hooks: dict[str, DecisionHook] = field(default_factory=dict)
+    unanswered: dict[str, UnansweredRule] = field(default_factory=dict)
 
     def on_decided(self, action: str, hook: DecisionHook) -> None:
         if action in self.hooks:
             raise ApprovalError(f"a decision hook for {action!r} is already registered")
         self.hooks[action] = hook
+
+    def approve_when_unanswered(self, action: str, rule: UnansweredRule) -> None:
+        """Approvals of ``action`` still pending at their expiry are approved, where ``rule``
+        says so (D-156); the rest expire and are asked again."""
+        if action in self.unanswered:
+            raise ApprovalError(f"an unanswered rule for {action!r} is already registered")
+        self.unanswered[action] = rule
 
     # --- requesting ------------------------------------------------------------------------
 
@@ -175,6 +198,17 @@ class ApprovalService:
     ) -> Approval:
         if actor.kind != "human":
             raise ApprovalError("only a human can decide an approval")
+        return await self._decide(session, approval_id, outcome=outcome, actor=actor, reason=reason)
+
+    async def _decide(
+        self,
+        session: AsyncSession,
+        approval_id: uuid.UUID,
+        *,
+        outcome: DecisionOutcome,
+        actor: Actor,
+        reason: str | None,
+    ) -> Approval:
         approval = await session.get(Approval, approval_id, with_for_update=True)
         if approval is None:
             raise ApprovalError(f"approval {approval_id} not found")
@@ -260,6 +294,8 @@ class ApprovalService:
             )
         ).all()
         for approval in due:
+            if await self._approve_unanswered(session, approval):
+                continue
             await APPROVAL_FSM.transition(
                 session, approval, ApprovalState.EXPIRED, actor=Actor.system("approvals")
             )
@@ -273,6 +309,30 @@ class ApprovalService:
             )
         await self.renew_waiting(session)
         return [a.id for a in due]
+
+    async def _approve_unanswered(self, session: AsyncSession, approval: Approval) -> bool:
+        """Approve an approval nobody answered, where its action's rule allows it (D-156). In a
+        savepoint: a hook that refuses (the article changed meanwhile) leaves it to expire."""
+        rule = self.unanswered.get(approval.action or "")
+        if rule is None or not await rule(session, approval):
+            return False
+        approval_id = approval.id  # the rollback below expires the row's attributes
+        try:
+            async with session.begin_nested():
+                await self._decide(
+                    session,
+                    approval_id,
+                    outcome="approve",
+                    actor=UNANSWERED,
+                    reason=UNANSWERED_REASON,
+                )
+        except Exception:  # noqa: BLE001 - any refusal means: ask a person again instead
+            log.warning(
+                "approval %s: not approved unanswered, so it expires", approval_id, exc_info=True
+            )
+            await session.refresh(approval)
+            return False
+        return True
 
     async def renew_waiting(self, session: AsyncSession) -> list[uuid.UUID]:
         """Ask again for every task still waiting on an approval nobody can decide any more (its

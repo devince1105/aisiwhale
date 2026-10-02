@@ -162,7 +162,11 @@ export function chatItem(
     case "APPROVAL_REQUESTED":
       return say(`${clip(s(p.summary) ?? "有一件事", 160)}，請您核准。`, "warn", { approvalRef: s(p.ref_id) ?? undefined });
     case "APPROVAL_APPROVED":
-      return notice(event.actor.kind === "human" ? "你核准了" : "已自動核准", "ok");
+      // nobody objected in time (D-156): the system's, and it says why
+      return notice(
+        event.actor.kind === "human" ? "你核准了" : event.actor.id === "approvals" ? "期限內沒有人反對，已自動核准" : "已自動核准",
+        "ok",
+      );
     case "APPROVAL_REJECTED":
       return notice(`${event.actor.kind === "human" ? "你退回了" : "已退回"}${s(p.reason) ? `：${clip(s(p.reason)!, 60)}` : ""}`, "danger");
     case "APPROVAL_RETURNED":
