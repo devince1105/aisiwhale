@@ -42,8 +42,9 @@ export function DemoOffice({ lang }: { lang: string }) {
 
   const names = SCRIPT.department_names[lang] ?? SCRIPT.department_names["zh-TW"];
   return (
+    // D-174: no colour of its own in 3D — the office's transparent backdrop shows the page
     <div
-      className="relative h-[70dvh] min-h-[480px] overflow-hidden rounded-xl border border-line bg-canvas"
+      className={`relative h-[70dvh] min-h-[480px] overflow-hidden rounded-xl border border-line ${mode === "2d" ? "bg-canvas" : ""}`}
       data-terminal={mode === "2d"}
       style={mode === "2d" ? terminalVars() : undefined}
       data-testid="demo-office"
