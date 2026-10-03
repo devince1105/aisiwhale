@@ -9,11 +9,12 @@ import { realtimeStore } from "@/stores/realtime";
 
 import type { Canvas3DProps } from "./Canvas3D";
 import { chooseMode, detectCapabilities, parseView, type Capabilities } from "./capabilities";
-import { BACKDROP_SHARE, backdropStyle, OfficeCanvas, STALLED_MS } from "./OfficeCanvas";
+import { BACKDROP_SHARE, backdropStyle, OfficeCanvas, officeVisit, QUIET_COVER_DELAY_MS, STALLED_MS } from "./OfficeCanvas";
 import { THEMES } from "./palette";
 import { readTheme, THEME_STORAGE_KEY } from "./theme";
 
 afterEach(() => {
+  officeVisit.drawn = false;
   cleanup();
   window.localStorage.clear();
   realtimeStore.getState().reset();
@@ -183,10 +184,16 @@ describe("OfficeCanvas", () => {
     expect(seen.props!.onProgress).toBe(before);
     act(() => seen.props!.onReady!());
     expect(screen.queryByTestId("office-loading")).toBeNull();
-    // to 2D and back: a new canvas, which has to load again
+    // to 2D and back: a new canvas, which has to be drawn again — from what is already here
+    // (D-175): a plain cover, no bar, seen only if drawing takes more than a moment
     rerender(<OfficeCanvas view="2d" detect={() => DESKTOP} Scene={Scene} />);
     rerender(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} />);
-    expect(screen.getByTestId("office-loading")).toBeTruthy();
+    const cover = screen.getByTestId("office-loading");
+    expect(cover.dataset.quiet).toBe("true");
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(cover.style.animation).toContain(`${QUIET_COVER_DELAY_MS}ms`);
+    act(() => seen.props!.onReady!());
+    expect(screen.queryByTestId("office-loading")).toBeNull();
   });
 
   it("a scene whose code never starts: after a while, a reload or the 2D board (D-171)", () => {

@@ -48,6 +48,27 @@ export function backdropStyle([, bottom]: readonly [string, string]): string {
   return `linear-gradient(180deg, transparent 0%, color-mix(in srgb, ${bottom} ${BACKDROP_SHARE}%, transparent) 100%)`;
 }
 
+/** Whether the office has been drawn once in this visit to the site (D-175). Coming back to it,
+ * nothing is downloaded again — only the GPU is handed the same models — so instead of the bar
+ * a plain cover, faded in only if that takes longer than a moment. Exported for tests. */
+export const officeVisit = { drawn: false };
+
+/** How long a return to the office may take before its cover is seen at all. */
+export const QUIET_COVER_DELAY_MS = 300;
+
+function QuietCover() {
+  return (
+    <div
+      role="status"
+      aria-label="載入 3D 辦公室"
+      data-testid="office-loading"
+      data-quiet="true"
+      className="absolute inset-0 z-10 bg-canvas/80 backdrop-blur-sm"
+      style={{ animation: `office-cover-in 200ms ease-out ${QUIET_COVER_DELAY_MS}ms both` }}
+    />
+  );
+}
+
 function Loading3D({ percent, onTwoD }: { percent: number; onTwoD?: () => void }) {
   const [stalled, setStalled] = useState(false);
   const starting = percent <= 5;
@@ -248,16 +269,23 @@ export function OfficeCanvas({
         theme={theme}
         onContextLost={() => setLostAt(generation)}
         onContextRestored={() => setLostAt(null)}
-        onReady={() => setReadyAt(generation)}
+        onReady={() => {
+          officeVisit.drawn = true;
+          setReadyAt(generation);
+        }}
         onProgress={(percent) =>
           setModels((was) => (was?.generation === generation && was.percent === percent ? was : { generation, percent }))
         }
       />
       {readyAt !== generation && !lost && !empty ? (
-        <Loading3D
-          percent={loadingPercent(models?.generation === generation ? models.percent : null, false)}
-          onTwoD={onViewChange ? () => onViewChange("2d") : undefined}
-        />
+        officeVisit.drawn ? (
+          <QuietCover />
+        ) : (
+          <Loading3D
+            percent={loadingPercent(models?.generation === generation ? models.percent : null, false)}
+            onTwoD={onViewChange ? () => onViewChange("2d") : undefined}
+          />
+        )
       ) : null}
       <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
       {/* who did what, work and idle moments told apart (D-136) */}

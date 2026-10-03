@@ -142,3 +142,13 @@ html[data-site-theme="dark"] [data-admin]:not([data-theme]) {
     background: var(--color-muted);
   }
 }
+
+/* D-175: a return to the 3D office is covered only if drawing it takes more than a moment */
+@keyframes office-cover-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
