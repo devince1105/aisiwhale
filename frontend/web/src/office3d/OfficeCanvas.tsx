@@ -19,7 +19,7 @@ import { useOfficeTheme } from "./theme";
 import { usePageVisible } from "./usePageVisible";
 
 export type { OfficeView } from "./capabilities";
-export { parseView } from "./capabilities";
+export { NARROW_QUERY, parseView } from "./capabilities";
 /** The names the office puts on its rooms, for pages that offer a way into them (T-600). */
 export { DEPARTMENT_LABEL } from "./fallback/board";
 /** The colour a business is marked with on the floor, for pages that list them (T-600). */
@@ -173,6 +173,8 @@ export interface OfficeCanvasProps {
   selectionInsetRight?: number;
   /** key -> name for the company's departments, from the org chart (T-600 batch 3). */
   departmentNames?: Readonly<Record<string, string>>;
+  /** Kept while its page is not shown (D-176): draw nothing, keep everything. */
+  paused?: boolean;
   /** Test seams: capability probe, the WebGL scene, and fetching the 2D board ahead of need. */
   detect?: () => Capabilities;
   Scene?: ComponentType<Canvas3DProps>;
@@ -184,6 +186,7 @@ export function OfficeCanvas({
   onViewChange,
   onMode,
   departmentNames,
+  paused = false,
   selectionInsetRight = 0,
   detect = detectCapabilities,
   Scene = LazyCanvas3D,
@@ -264,7 +267,7 @@ export function OfficeCanvas({
     >
       <Scene
         key={generation}
-        frameloop={visible && !lost ? "always" : "never"}
+        frameloop={visible && !lost && !paused ? "always" : "never"}
         insetRight={selectionInsetRight}
         theme={theme}
         onContextLost={() => setLostAt(generation)}

@@ -79,8 +79,13 @@ describe("the screen invents nothing (AC-S6)", () => {
   });
 
   it("the demo office is the public site's alone: nothing outside it plays its script", () => {
+    // the public site's layout holds the office kept between pages (D-176): still the public
+    // site, and it plays only once the AI 編輯部 page has asked for it
     const users = hits(/demo-office/).filter(
-      (hit) => !hit.startsWith("features/demo-office/") && !hit.startsWith("app/(site)/news/[lang]/office/"),
+      (hit) =>
+        !hit.startsWith("features/demo-office/") &&
+        !hit.startsWith("app/(site)/news/[lang]/office/") &&
+        !hit.startsWith("app/(site)/news/[lang]/layout.tsx"),
     );
     // comments that name the decision are fine; an import is not
     expect(users.filter((hit) => /\bfrom\s+["']/.test(hit))).toEqual([]);

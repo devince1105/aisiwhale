@@ -2,7 +2,7 @@
 // playing a script, labelled as a demo; the real office stays in the back office.
 import { notFound } from "next/navigation";
 
-import { DemoOffice } from "@/features/demo-office/DemoOffice";
+import { OfficeSlot } from "@/features/demo-office/KeptOffice";
 import { isLang, words } from "@/features/site/i18n";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
@@ -24,7 +24,8 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
       </div>
       <p className="mt-3 max-w-3xl leading-relaxed text-muted">{w.intro}</p>
       <div className="mt-6">
-        <DemoOffice lang={lang} />
+        {/* on a capable computer, the office kept between pages moves in here (D-176) */}
+        <OfficeSlot lang={lang} />
       </div>
     </section>
   );

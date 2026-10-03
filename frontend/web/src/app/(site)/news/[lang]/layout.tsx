@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
+import { KeptOffice } from "@/features/demo-office/KeptOffice";
 import { fetchMarkets } from "@/features/site/api";
 import { MarketStrip } from "@/features/site/MarketStrip";
 import { MemberBadge } from "@/features/site/MemberBadge";
@@ -53,6 +54,8 @@ export default async function SiteLayout({
       <SectionNav lang={lang} />
       <main className="flex-1">{children}</main>
       <SiteFooter lang={lang} marketSources={[...new Set(quotes.map((q) => q.source))]} />
+      {/* the AI 編輯部, kept between pages where the computer can afford it (D-176) */}
+      <KeptOffice lang={lang} />
     </div>
   );
 }
