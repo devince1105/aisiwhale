@@ -213,14 +213,12 @@ describe("OfficeCanvas", () => {
     }
   });
 
-  it("the office's backdrop is a faint tint of the page's own colour, light or dark (D-171)", () => {
-    const style = backdropStyle(["#f3f1ec", "#d4cdc2"]);
-    expect(style).toBe(
-      `linear-gradient(180deg, color-mix(in srgb, #f3f1ec ${BACKDROP_SHARE}%, var(--color-canvas)) 0%, ` +
+  it("the office's backdrop fades from the page's colour to a faint tint of the theme (D-172)", () => {
+    expect(backdropStyle(["#f3f1ec", "#d4cdc2"])).toBe(
+      "linear-gradient(180deg, var(--color-canvas) 0%, " +
         `color-mix(in srgb, #d4cdc2 ${BACKDROP_SHARE}%, var(--color-canvas)) 100%)`,
     );
-    expect(BACKDROP_SHARE).toBeGreaterThanOrEqual(10);
-    expect(BACKDROP_SHARE).toBeLessThanOrEqual(20);
+    expect(BACKDROP_SHARE).toBe(15);
   });
 
   it("3D draws while visible and stops while the tab is hidden", () => {

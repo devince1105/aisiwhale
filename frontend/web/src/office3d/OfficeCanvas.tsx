@@ -39,13 +39,12 @@ export function loadingPercent(models: number | null, ready: boolean): number {
  * download of it that stalls never ends, and only a reload fetches it again. */
 export const STALLED_MS = 15_000;
 
-/** The office's own backdrop, at this share over the page's colour (D-171): the light themes'
- * cream on a dark page was a bright box round the office; faint, it is the page's colour, tinted. */
-export const BACKDROP_SHARE = 18;
+/** The office's backdrop (D-171, D-172): from the page's own colour at the top to the theme's
+ * floor colour at this share at the bottom — a keynote's fade, which in dark mode stays dark. */
+export const BACKDROP_SHARE = 15;
 
-export function backdropStyle([top, bottom]: readonly [string, string]): string {
-  const tint = (colour: string) => `color-mix(in srgb, ${colour} ${BACKDROP_SHARE}%, var(--color-canvas))`;
-  return `linear-gradient(180deg, ${tint(top)} 0%, ${tint(bottom)} 100%)`;
+export function backdropStyle([, bottom]: readonly [string, string]): string {
+  return `linear-gradient(180deg, var(--color-canvas) 0%, color-mix(in srgb, ${bottom} ${BACKDROP_SHARE}%, var(--color-canvas)) 100%)`;
 }
 
 function Loading3D({ percent, onTwoD }: { percent: number; onTwoD?: () => void }) {
