@@ -92,6 +92,40 @@ function ReadyWatch({ onReady, onProgress }: { onReady?: () => void; onProgress?
   return null;
 }
 
+/** When the canvas measures itself again on its own, in ms after it starts watching its box. */
+export const MEASURE_AGAIN_MS = [0, 250, 1000] as const;
+
+/**
+ * The canvas draws nothing until it knows its size, and it learns its size from a
+ * ResizeObserver's first report (D-173). That report comes with the browser's next rendering
+ * step — and opening the AI 編輯部 after the watchlist, it did not come: the canvas stayed at the
+ * browser's default 300×150, the scene never mounted, and the loading bar stayed at 5% until a
+ * reload. This observer asks to be measured again a few times on timers too; a measurement
+ * that finds the same box changes nothing.
+ */
+export function measuringObserver(Base: typeof ResizeObserver | undefined = globalThis.ResizeObserver) {
+  if (!Base) return undefined;
+  return class MeasuringObserver extends Base {
+    private readonly report: ResizeObserverCallback;
+    private timers: ReturnType<typeof setTimeout>[] = [];
+    constructor(report: ResizeObserverCallback) {
+      super(report);
+      this.report = report;
+    }
+    override observe(target: Element, options?: ResizeObserverOptions) {
+      super.observe(target, options);
+      this.timers.push(...MEASURE_AGAIN_MS.map((ms) => setTimeout(() => this.report([], this), ms)));
+    }
+    override disconnect() {
+      this.timers.forEach(clearTimeout);
+      this.timers = [];
+      super.disconnect();
+    }
+  };
+}
+
+const MeasuringObserver = measuringObserver();
+
 const EMPTY_READY_MS = 1500;
 const MAX_LOADING_MS = 12_000;
 
@@ -99,6 +133,7 @@ export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, 
   return (
     <Canvas
       dpr={CANVAS_DPR}
+      resize={MeasuringObserver ? { polyfill: MeasuringObserver } : undefined}
       orthographic
       // PCF (three removed the soft variant and warned on every shader compile)
       shadows="percentage"
