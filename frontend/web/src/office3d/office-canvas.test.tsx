@@ -213,10 +213,10 @@ describe("OfficeCanvas", () => {
     }
   });
 
-  it("the office's backdrop fades from the page's colour to a faint tint of the theme (D-172)", () => {
+  it("the office's backdrop fades from transparent to a faint tint of the theme (D-172)", () => {
     expect(backdropStyle(["#f3f1ec", "#d4cdc2"])).toBe(
-      "linear-gradient(180deg, var(--color-canvas) 0%, " +
-        `color-mix(in srgb, #d4cdc2 ${BACKDROP_SHARE}%, var(--color-canvas)) 100%)`,
+      "linear-gradient(180deg, transparent 0%, " +
+        `color-mix(in srgb, #d4cdc2 ${BACKDROP_SHARE}%, transparent) 100%)`,
     );
     expect(BACKDROP_SHARE).toBe(15);
   });
