@@ -35,7 +35,27 @@ export function loadingPercent(models: number | null, ready: boolean): number {
   return Math.min(98, Math.round(10 + models * 0.88));
 }
 
-function Loading3D({ percent }: { percent: number }) {
+/** How long the scene's code may take to start before the overlay offers a way out (D-171): a
+ * download of it that stalls never ends, and only a reload fetches it again. */
+export const STALLED_MS = 15_000;
+
+/** The office's own backdrop, at this share over the page's colour (D-171): the light themes'
+ * cream on a dark page was a bright box round the office; faint, it is the page's colour, tinted. */
+export const BACKDROP_SHARE = 18;
+
+export function backdropStyle([top, bottom]: readonly [string, string]): string {
+  const tint = (colour: string) => `color-mix(in srgb, ${colour} ${BACKDROP_SHARE}%, var(--color-canvas))`;
+  return `linear-gradient(180deg, ${tint(top)} 0%, ${tint(bottom)} 100%)`;
+}
+
+function Loading3D({ percent, onTwoD }: { percent: number; onTwoD?: () => void }) {
+  const [stalled, setStalled] = useState(false);
+  const starting = percent <= 5;
+  useEffect(() => {
+    if (!starting) return;
+    const timer = setTimeout(() => setStalled(true), STALLED_MS);
+    return () => clearTimeout(timer);
+  }, [starting]);
   return (
     <div
       role="status"
@@ -55,6 +75,21 @@ function Loading3D({ percent }: { percent: number }) {
       >
         <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${percent}%` }} />
       </div>
+      {stalled && starting ? (
+        <div className="grid justify-items-center gap-2 text-sm" data-testid="office-stalled">
+          <p className="text-muted">載入比平常久，可能是網路中斷了。</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => window.location.reload()} className="rounded-md bg-accent px-3 py-1 text-accent-ink">
+              重新載入
+            </button>
+            {onTwoD ? (
+              <button type="button" onClick={onTwoD} className="rounded-md border border-line px-3 py-1">
+                改看 2D
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -198,14 +233,13 @@ export function OfficeCanvas({
     );
   }
 
-  const [top, bottom] = THEMES[theme].palette.backdrop;
   return (
     <div
       data-office-mode="3d"
       data-context-lost={lost}
       data-office-theme={theme}
       className="relative h-full"
-      style={{ background: `linear-gradient(180deg, ${top} 0%, ${bottom} 100%)` }}
+      style={{ background: backdropStyle(THEMES[theme].palette.backdrop) }}
     >
       <Scene
         key={generation}
@@ -220,7 +254,10 @@ export function OfficeCanvas({
         }
       />
       {readyAt !== generation && !lost && !empty ? (
-        <Loading3D percent={loadingPercent(models?.generation === generation ? models.percent : null, false)} />
+        <Loading3D
+          percent={loadingPercent(models?.generation === generation ? models.percent : null, false)}
+          onTwoD={onViewChange ? () => onViewChange("2d") : undefined}
+        />
       ) : null}
       <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
       {/* who did what, work and idle moments told apart (D-136) */}

@@ -9,7 +9,7 @@ import { realtimeStore } from "@/stores/realtime";
 
 import type { Canvas3DProps } from "./Canvas3D";
 import { chooseMode, detectCapabilities, parseView, type Capabilities } from "./capabilities";
-import { OfficeCanvas } from "./OfficeCanvas";
+import { BACKDROP_SHARE, backdropStyle, OfficeCanvas, STALLED_MS } from "./OfficeCanvas";
 import { THEMES } from "./palette";
 import { readTheme, THEME_STORAGE_KEY } from "./theme";
 
@@ -187,6 +187,40 @@ describe("OfficeCanvas", () => {
     rerender(<OfficeCanvas view="2d" detect={() => DESKTOP} Scene={Scene} />);
     rerender(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} />);
     expect(screen.getByTestId("office-loading")).toBeTruthy();
+  });
+
+  it("a scene whose code never starts: after a while, a reload or the 2D board (D-171)", () => {
+    vi.useFakeTimers();
+    try {
+      const { Scene, seen } = sceneStub();
+      const fixture = JSON.parse(
+        readFileSync(join(process.cwd(), "src/realtime/__fixtures__/contract.json"), "utf8"),
+      ) as { snapshot_before: unknown };
+      act(() => realtimeStore.getState().hydrate(fixture.snapshot_before));
+      const onViewChange = vi.fn();
+      render(<OfficeCanvas view="3d" detect={() => DESKTOP} Scene={Scene} onViewChange={onViewChange} />);
+      act(() => void vi.advanceTimersByTime(STALLED_MS - 1));
+      expect(screen.queryByTestId("office-stalled")).toBeNull(); // a slow start is still a start
+      act(() => void vi.advanceTimersByTime(1));
+      expect(screen.getByTestId("office-stalled").textContent).toContain("重新載入");
+      fireEvent.click(screen.getByRole("button", { name: "改看 2D" }));
+      expect(onViewChange).toHaveBeenCalledWith("2d");
+      // once the models come, the way out goes: it is loading after all
+      act(() => seen.props!.onProgress!(20));
+      expect(screen.queryByTestId("office-stalled")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the office's backdrop is a faint tint of the page's own colour, light or dark (D-171)", () => {
+    const style = backdropStyle(["#f3f1ec", "#d4cdc2"]);
+    expect(style).toBe(
+      `linear-gradient(180deg, color-mix(in srgb, #f3f1ec ${BACKDROP_SHARE}%, var(--color-canvas)) 0%, ` +
+        `color-mix(in srgb, #d4cdc2 ${BACKDROP_SHARE}%, var(--color-canvas)) 100%)`,
+    );
+    expect(BACKDROP_SHARE).toBeGreaterThanOrEqual(10);
+    expect(BACKDROP_SHARE).toBeLessThanOrEqual(20);
   });
 
   it("3D draws while visible and stops while the tab is hidden", () => {
