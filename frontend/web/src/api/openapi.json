@@ -3555,6 +3555,51 @@
     "title": "OfferView",
     "type": "object"
    },
+   "OfficeHours": {
+    "description": "When the AI staff work (D-193). ``shifts`` empty: always at work.",
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "string"
+     },
+     "next_start": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Start"
+     },
+     "on_duty": {
+      "title": "On Duty",
+      "type": "boolean"
+     },
+     "shifts": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Shifts",
+      "type": "array"
+     },
+     "timezone": {
+      "title": "Timezone",
+      "type": "string"
+     }
+    },
+    "required": [
+     "shifts",
+     "days",
+     "timezone",
+     "on_duty",
+     "next_start"
+    ],
+    "title": "OfficeHours",
+    "type": "object"
+   },
    "OfficeThemeBody": {
     "properties": {
      "theme": {
@@ -11146,6 +11191,61 @@
     "summary": "Watch",
     "tags": [
      "watchlist"
+    ]
+   }
+  },
+  "/api/office-hours": {
+   "get": {
+    "description": "The worker's shifts, read from the settings the worker shares: no database query.",
+    "operationId": "office_hours_api_office_hours_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OfficeHours"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Office Hours",
+    "tags": [
+     "meta"
     ]
    }
   },

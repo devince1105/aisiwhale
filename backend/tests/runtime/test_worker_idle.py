@@ -28,6 +28,7 @@ async def test_an_idle_loop_asks_less_often(monkeypatch):
         idle_poll_interval = 0.08
         worker_id = "idle"
         concurrency = 1
+        shifts = None
         _running: dict = {}
 
         async def tick(self):

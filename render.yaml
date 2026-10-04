@@ -26,6 +26,14 @@ services:
         value: prod
       - key: TOOLS_PROFILE
         value: live
+      # office hours (D-193): two weekday shifts, Taipei time; outside them the worker leaves the
+      # database alone so Neon can suspend and stop billing compute
+      - key: WORKER_SHIFTS
+        value: "07:00-11:00,19:00-23:00"
+      - key: WORKER_DAYS
+        value: mon-fri
+      - key: WORKER_TIMEZONE
+        value: Asia/Taipei
       - key: SITE_BASE_URL
         value: https://aisiwhale.com
       - key: COOKIE_DOMAIN

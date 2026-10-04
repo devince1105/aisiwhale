@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { approvalsQuery, kpisQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
+import { approvalsQuery, kpisQuery, officeHoursQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
 import { AgentPanel } from "@/features/agent-panel/AgentPanel";
 import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
@@ -142,6 +142,7 @@ function CompanyOffice({ company }: { company: Company }) {
   // AI 編輯部 shows the site's company in it
   const queries = useQueryClient();
   const officeTheme = useQuery(officeThemeQuery(company.id));
+  const hours = useQuery(officeHoursQuery());
   const chooseTheme = useMutation({
     mutationFn: (theme: ThemeId) => setOfficeTheme(company.id, theme),
     onMutate: (theme) => queries.setQueryData(queryKeys.officeTheme(company.id), theme),
@@ -163,7 +164,10 @@ function CompanyOffice({ company }: { company: Company }) {
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
         <div>
           <p className="text-xs tracking-widest text-muted uppercase">Office</p>
-          <h1 className="text-lg font-semibold">{company.name} 的辦公室</h1>
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            {company.name} 的辦公室
+            <OffDuty hours={hours.data} />
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <div role="group" aria-label="顯示方式" className="flex rounded-lg border border-line p-0.5">
@@ -224,5 +228,20 @@ function CompanyOffice({ company }: { company: Company }) {
       </div>
       <AgentPanel />
     </main>
+  );
+}
+
+/** Out of hours (D-193): a quiet office is closed, not broken — and when it opens again. */
+export function OffDuty({ hours }: { hours: { on_duty: boolean; next_start?: string | null; timezone: string } | undefined }) {
+  if (!hours || hours.on_duty) return null;
+  const opens = hours.next_start
+    ? new Intl.DateTimeFormat("zh-TW", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: hours.timezone }).format(
+        new Date(hours.next_start),
+      )
+    : null;
+  return (
+    <span data-testid="off-duty" className="rounded-full border border-line px-2 py-0.5 text-xs font-normal text-muted">
+      下班中{opens ? `・${opens} 上班` : ""}
+    </span>
   );
 }

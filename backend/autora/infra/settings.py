@@ -242,6 +242,13 @@ class Settings(BaseSettings):
     worker_concurrency: int = Field(default=4, ge=1)
     """Agent runs executed at the same time by one worker process."""
     worker_poll_seconds: float = Field(default=1.0, gt=0)
+    worker_shifts: str = ""
+    """Office hours (D-193): ``HH:MM-HH:MM`` windows, comma-separated, such as
+    ``07:00-11:00,19:00-23:00``. Outside them the worker leaves the database alone so it can
+    sleep. Empty: always at work."""
+    worker_days: str = "mon-sun"
+    """The days the shifts are worked: ``mon-fri``, or a list such as ``mon,wed,fri``."""
+    worker_timezone: str = "Asia/Taipei"
     worker_idle_poll_seconds: float = Field(default=8.0, gt=0)
     """The slowest the worker polls when it has nothing to do (D-192); it is back to
     ``worker_poll_seconds`` as soon as there is work. The browser tests set it to their own fast

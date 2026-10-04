@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from autora.runtime.services import ServiceRegistry
     from autora.runtime.task_manager import TaskManager
     from autora.runtime.tools import ToolRegistry
-    from autora.runtime.worker import Worker
+from autora.runtime.worker import Worker
 
 
 def load_event_catalogs() -> None:
@@ -553,6 +553,7 @@ def build_worker(
     from autora.runtime.models.factory import gateway_from_settings
     from autora.runtime.progress import ProgressPublisher
     from autora.runtime.services import ServiceDispatcher
+    from autora.runtime.shifts import Shifts
     from autora.runtime.worker import Worker
 
     runtime = runtime or build_runtime(settings)
@@ -610,6 +611,7 @@ def build_worker(
         concurrency=settings.worker_concurrency,
         poll_interval=settings.worker_poll_seconds,
         idle_poll_interval=max(settings.worker_idle_poll_seconds, settings.worker_poll_seconds),
+        shifts=Shifts.parse(settings.worker_shifts, settings.worker_days, settings.worker_timezone),
         maintenance_interval=settings.worker_maintenance_seconds,
         company_ids=companies,
         maintenance_jobs=[

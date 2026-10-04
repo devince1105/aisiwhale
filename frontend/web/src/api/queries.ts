@@ -25,6 +25,7 @@ export const queryKeys = {
   /** The company's days (T-608). */
   org: (companyId: string) => ["org", companyId] as const,
   officeTheme: (companyId: string) => ["officeTheme", companyId] as const,
+  officeHours: () => ["officeHours"] as const,
   failedWorkflows: (companyId: string) => ["workflows", "failed", companyId] as const,
   cycles: (companyId: string) => ["cycles", companyId] as const,
   cycle: (cycleId: string) => ["cycle", cycleId] as const,
@@ -483,6 +484,16 @@ export function projectsQuery(companyId: string, api: ApiClient = defaultApi) {
 }
 
 /** Pause or resume a project, as the PauseProject / ResumeProject command (D-056). */
+/** When the AI staff work (D-193): read from the settings, asked again every few minutes. */
+export function officeHoursQuery(api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.officeHours(),
+    queryFn: async () => unwrap(await api.GET("/api/office-hours")),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
 /** The office's style (D-178): the company's, the same in every browser and on the site. */
 export function officeThemeQuery(companyId: string, api: ApiClient = defaultApi) {
   return queryOptions({

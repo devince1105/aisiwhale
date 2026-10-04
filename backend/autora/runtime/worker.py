@@ -40,6 +40,7 @@ from autora.runtime.agent_runner import AgentRunner, RunOutcome
 from autora.runtime.approvals import ApprovalService
 from autora.runtime.scheduler import Scheduler
 from autora.runtime.services import ServiceDispatcher
+from autora.runtime.shifts import Shifts
 from autora.runtime.task_manager import AgentBusy, Claim, TaskManager
 
 log = logging.getLogger("autora.worker")
@@ -65,6 +66,9 @@ class Worker:
     services: ServiceDispatcher | None = None
     concurrency: int = 4
     poll_interval: float = 1.0
+    shifts: Shifts | None = None
+    """Office hours (D-193): outside them, no new work and — once what runs has finished — no
+    query at all until the next shift. None: always at work."""
     idle_poll_interval: float = 8.0
     """Idle, the loop slows down (D-192): a pass that finds nothing to do and nothing running waits
     twice as long as the last one, up to this; any work brings it back to ``poll_interval``. Every
@@ -89,6 +93,10 @@ class Worker:
         log.info("worker %s started (concurrency=%d)", self.worker_id, self.concurrency)
         wait = self.poll_interval
         while not stop.is_set():
+            if self.shifts is not None and not self.shifts.on_duty(self.clock()):
+                await self._off_duty(stop)
+                wait = self.poll_interval
+                continue
             handled = 0
             try:
                 handled = await self.tick()
@@ -103,6 +111,22 @@ class Worker:
             except TimeoutError:
                 pass
         await self.shutdown()
+
+    async def _off_duty(self, stop: asyncio.Event) -> None:
+        """Clocked out (D-193): let what runs finish, then wait for the next shift untouched."""
+        if self._running:
+            await asyncio.wait(list(self._running.values()), timeout=self.poll_interval)
+            return
+        assert self.shifts is not None
+        now = self.clock()
+        start = self.shifts.next_start(now)
+        log.info("worker %s off duty until %s", self.worker_id, start.isoformat())
+        # woken at most hourly, so a clock that jumped (a sleeping laptop) is not trusted for days
+        seconds = min(3600.0, max(1.0, (start - now).total_seconds()))
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=seconds)
+        except TimeoutError:
+            pass
 
     async def tick(self) -> int:
         """One pass: maintenance if due, service steps, then claim and start runs. Returns the

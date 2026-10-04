@@ -980,6 +980,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/office-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office Hours
+         * @description The worker's shifts, read from the settings the worker shares: no database query.
+         */
+        get: operations["office_hours_api_office_hours_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/payments/payuni/notify": {
         parameters: {
             query?: never;
@@ -2916,6 +2936,22 @@ export interface components {
             currency: string;
             /** Interval */
             interval: string;
+        };
+        /**
+         * OfficeHours
+         * @description When the AI staff work (D-193). ``shifts`` empty: always at work.
+         */
+        OfficeHours: {
+            /** Days */
+            days: string;
+            /** Next Start */
+            next_start: string | null;
+            /** On Duty */
+            on_duty: boolean;
+            /** Shifts */
+            shifts: string[];
+            /** Timezone */
+            timezone: string;
         };
         /** OfficeThemeBody */
         OfficeThemeBody: {
@@ -6278,6 +6314,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    office_hours_api_office_hours_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficeHours"];
+                };
             };
             /** @description Validation Error */
             422: {
