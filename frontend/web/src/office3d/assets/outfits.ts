@@ -94,9 +94,10 @@ export const OUTFITS: Record<string, Outfit> = {
       { cells: ["3:1"], parts: ["body"], color: "#f0f0f4" },
     ],
   },
-  // Mari: reddish-brown twin tails, a red plugsuit
+  // Mari: reddish-brown twin tails, a red plugsuit — no backpack (D-185)
   mari: {
     model: "character-female-f",
+    hide: [NO_BACKPACK], // D-185
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#8a3d22" },
       { cells: ["3:3", "3:1"], parts: ["body"], color: "#b3182c" },
