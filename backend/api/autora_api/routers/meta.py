@@ -51,7 +51,7 @@ async def office_hours(_: Operator, settings: SettingsDep) -> OfficeHours:
     now = datetime.now(UTC)
     on_duty = shifts is None or shifts.on_duty(now)
     return OfficeHours(
-        shifts=[s.strip() for s in settings.worker_shifts.split(",") if s.strip()],
+        shifts=[g.strip() for g in settings.worker_shifts.split(";") if g.strip()],
         days=settings.worker_days,
         timezone=settings.worker_timezone,
         on_duty=on_duty,

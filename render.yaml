@@ -26,12 +26,10 @@ services:
         value: prod
       - key: TOOLS_PROFILE
         value: live
-      # office hours (D-193): two weekday shifts, Taipei time; outside them the worker leaves the
-      # database alone so Neon can suspend and stop billing compute
+      # office hours (D-193, D-194), Taipei time: weekdays US stocks 07-09 and Taiwan stocks 14-16,
+      # weekends one hour; outside them the worker leaves the database alone so Neon can suspend
       - key: WORKER_SHIFTS
-        value: "07:00-11:00,19:00-23:00"
-      - key: WORKER_DAYS
-        value: mon-fri
+        value: "mon-fri 07:00-09:00,14:00-16:00; sat-sun 09:00-10:00"
       - key: WORKER_TIMEZONE
         value: Asia/Taipei
       - key: SITE_BASE_URL
