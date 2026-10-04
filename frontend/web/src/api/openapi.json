@@ -3555,6 +3555,26 @@
     "title": "OfferView",
     "type": "object"
    },
+   "OfficeThemeBody": {
+    "properties": {
+     "theme": {
+      "enum": [
+       "muji",
+       "wabisabi",
+       "industrial",
+       "google",
+       "cyber"
+      ],
+      "title": "Theme",
+      "type": "string"
+     }
+    },
+    "required": [
+     "theme"
+    ],
+    "title": "OfficeThemeBody",
+    "type": "object"
+   },
    "OpportunityLine": {
     "description": "One thing the company might do, and how far it has got (T-611).\n\nKept short on purpose: the thesis and the evidence are a query away, and a CEO comparing\nfive opportunities needs the shape of each, not the case for it.",
     "properties": {
@@ -4800,6 +4820,26 @@
      "path"
     ],
     "title": "PublicNeighbour",
+    "type": "object"
+   },
+   "PublicOfficeTheme": {
+    "properties": {
+     "theme": {
+      "enum": [
+       "muji",
+       "wabisabi",
+       "industrial",
+       "google",
+       "cyber"
+      ],
+      "title": "Theme",
+      "type": "string"
+     }
+    },
+    "required": [
+     "theme"
+    ],
+    "title": "PublicOfficeTheme",
     "type": "object"
    },
    "PublicQuote": {
@@ -9446,6 +9486,144 @@
     ]
    }
   },
+  "/api/companies/{company_id}/office-theme": {
+   "get": {
+    "description": "The office's style (D-178): one per company, the same in every browser.",
+    "operationId": "get_office_theme_api_companies__company_id__office_theme_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "company_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Company Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OfficeThemeBody"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Office Theme",
+    "tags": [
+     "companies"
+    ]
+   },
+   "put": {
+    "description": "Choose the office's style — the back office's and, for the site's company, the public\nAI 編輯部's (D-178).",
+    "operationId": "put_office_theme_api_companies__company_id__office_theme_put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "company_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Company Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OfficeThemeBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OfficeThemeBody"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Office Theme",
+    "tags": [
+     "companies"
+    ]
+   }
+  },
   "/api/companies/{company_id}/org": {
    "get": {
     "description": "The whole org chart in one call — what the office needs to draw its rooms.",
@@ -11611,6 +11789,57 @@
      }
     },
     "summary": "Markets",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/office-theme": {
+   "get": {
+    "description": "The style the site's AI 編輯部 is shown in: its company's, chosen in the back office\n(D-178). An unknown company, or none named, has the default.",
+    "operationId": "public_office_theme_api_public_office_theme_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicOfficeTheme"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Public Office Theme",
     "tags": [
      "public"
     ]

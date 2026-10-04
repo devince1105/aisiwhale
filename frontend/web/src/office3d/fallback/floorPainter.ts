@@ -163,8 +163,9 @@ export function paintFloor(ctx: CanvasRenderingContext2D, scene: Scene, pictures
   const moving = new Set(walking.map((walker) => walker.agentId));
 
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = CONSOLE.bg;
-  ctx.fillRect(0, 0, scene.width, scene.height);
+  // cleared, not painted: the element's own background shows — the console's green in the back
+  // office, the page's colour on the public site (D-177)
+  ctx.clearRect(0, 0, scene.width, scene.height);
 
   const backdrop = pictures.art(BACKDROP_KEY);
   if (backdrop) ctx.drawImage(backdrop, scene.backdrop.x, scene.backdrop.y);

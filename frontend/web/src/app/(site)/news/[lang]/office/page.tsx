@@ -3,6 +3,7 @@
 import { notFound } from "next/navigation";
 
 import { OfficeSlot } from "@/features/demo-office/KeptOffice";
+import { fetchOfficeTheme } from "@/features/site/api";
 import { isLang, words } from "@/features/site/i18n";
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
@@ -14,6 +15,8 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
   const { lang } = await params;
   if (!isLang(lang)) notFound();
   const w = words(lang).office;
+  // the style is the company's, chosen in the back office; a reader has no setting (D-178)
+  const theme = await fetchOfficeTheme(process.env.SITE_COMPANY || undefined);
   return (
     <section className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-center gap-3">
@@ -25,7 +28,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
       <p className="mt-3 max-w-3xl leading-relaxed text-muted">{w.intro}</p>
       <div className="mt-6">
         {/* on a capable computer, the office kept between pages moves in here (D-176) */}
-        <OfficeSlot lang={lang} />
+        <OfficeSlot lang={lang} theme={theme} />
       </div>
     </section>
   );

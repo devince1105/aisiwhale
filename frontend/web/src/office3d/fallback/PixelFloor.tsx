@@ -19,7 +19,6 @@ import { useRoster } from "../agents/roster";
 import { DEFAULT_THEME, type ThemeId } from "../palette";
 import { CueDirector, routeFor } from "../visual/CueRunner";
 import type { BoardCard, FloorPlan } from "./board";
-import { CONSOLE } from "./console";
 import { paintFloor, Pictures } from "./floorPainter";
 import { buildScene, hitTest, type Scene } from "./tiles";
 import { walkersNow, type Walker } from "./walkers";
@@ -114,7 +113,7 @@ export function PixelFloor({
       width={scene.current.width}
       height={scene.current.height}
       className="h-full w-full border-2 border-[color:var(--console-edge-dim)] object-contain"
-      style={{ imageRendering: "pixelated", background: CONSOLE.bg }}
+      style={{ imageRendering: "pixelated", background: "var(--console-bg)" }}
       onClick={(event) => {
         const current = scene.current;
         const element = canvas.current;

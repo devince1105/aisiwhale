@@ -11,14 +11,15 @@ import type { Canvas3DProps } from "./Canvas3D";
 import { chooseMode, detectCapabilities, type Capabilities, type ModeReason, type OfficeView } from "./capabilities";
 import { useRoster } from "./agents/roster";
 import { onOfficeKey } from "./interaction/picking";
-import { THEMES } from "./palette";
+import { DEFAULT_THEME, THEMES, type ThemeId } from "./palette";
 import { OfficeLog } from "./OfficeLog";
 import { OfficeSettings } from "./OfficeSettings";
-import { terminalVars } from "./fallback/console";
+import { terminalVars, type BoardLook } from "./fallback/console";
 import { useOfficeTheme } from "./theme";
 import { usePageVisible } from "./usePageVisible";
 
 export type { OfficeView } from "./capabilities";
+export type { ThemeId } from "./palette";
 export { NARROW_QUERY, parseView } from "./capabilities";
 /** The names the office puts on its rooms, for pages that offer a way into them (T-600). */
 export { DEPARTMENT_LABEL } from "./fallback/board";
@@ -175,6 +176,15 @@ export interface OfficeCanvasProps {
   departmentNames?: Readonly<Record<string, string>>;
   /** Kept while its page is not shown (D-176): draw nothing, keep everything. */
   paused?: boolean;
+  /** The 2D board's colours: the back office's console, or the public site's (D-177). */
+  boardLook?: BoardLook;
+  /** The public site's demo (D-178): no settings to change its style, and no line saying why a
+   * phone gets the 2D board. */
+  demo?: boolean;
+  /** The company's style, chosen in the back office (D-178); without it, the browser's own. */
+  theme?: ThemeId;
+  /** Choosing a style in the settings: saved for the company when given. */
+  onTheme?: (theme: ThemeId) => void;
   /** Test seams: capability probe, the WebGL scene, and fetching the 2D board ahead of need. */
   detect?: () => Capabilities;
   Scene?: ComponentType<Canvas3DProps>;
@@ -187,6 +197,10 @@ export function OfficeCanvas({
   onMode,
   departmentNames,
   paused = false,
+  boardLook = "console",
+  demo = false,
+  theme: companyTheme,
+  onTheme,
   selectionInsetRight = 0,
   detect = detectCapabilities,
   Scene = LazyCanvas3D,
@@ -202,7 +216,9 @@ export function OfficeCanvas({
   const [models, setModels] = useState<{ generation: number; percent: number } | null>(null);
   /** Which canvas reported the loss: a report from one that is gone is not about this one. */
   const lost = lostAt === generation;
-  const [theme, setTheme] = useOfficeTheme();
+  const [browserTheme, setBrowserTheme] = useOfficeTheme();
+  const theme = companyTheme ?? (demo ? DEFAULT_THEME : browserTheme);
+  const setTheme = onTheme ?? setBrowserTheme;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const visible = usePageVisible();
 
@@ -250,9 +266,9 @@ export function OfficeCanvas({
     // setting belongs here too: it is the same office, seen without WebGL
     return (
       <div data-office-mode="2d" data-office-theme={theme} className="relative h-full overflow-y-auto">
-        {REASON[reason] ? <p className="px-4 pt-4 text-sm text-muted">{REASON[reason]}</p> : null}
-        <LazyBoard2D departmentNames={departmentNames} theme={theme} />
-        <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
+        {REASON[reason] && !demo ? <p className="px-4 pt-4 text-sm text-muted">{REASON[reason]}</p> : null}
+        <LazyBoard2D departmentNames={departmentNames} theme={theme} look={boardLook} />
+        {demo ? null : <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />}
       </div>
     );
   }
@@ -290,7 +306,7 @@ export function OfficeCanvas({
           />
         )
       ) : null}
-      <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />
+      {demo ? null : <OfficeSettings theme={theme} onTheme={setTheme} open={settingsOpen} onOpen={setSettingsOpen} />}
       {/* who did what, work and idle moments told apart (D-136) */}
       {empty ? null : <OfficeLog />}
       {empty ? (

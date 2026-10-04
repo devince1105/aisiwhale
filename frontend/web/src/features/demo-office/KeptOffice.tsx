@@ -14,12 +14,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { create } from "zustand";
 
-import { NARROW_QUERY } from "@/office3d/OfficeCanvas";
+import { NARROW_QUERY, type ThemeId } from "@/office3d/OfficeCanvas";
 
 import { DemoOffice } from "./DemoOffice";
 
 /** The page's place for the kept office, while the AI 編輯部 page is shown. */
-export const keptOffice = create<{ wanted: boolean; slot: HTMLElement | null }>(() => ({
+export const keptOffice = create<{ wanted: boolean; slot: HTMLElement | null; theme?: ThemeId }>(() => ({
   wanted: false,
   slot: null,
 }));
@@ -41,16 +41,25 @@ export function keepsOfficeAlive(win: Window = window): boolean {
 const FRAME = "h-[70dvh] min-h-[480px]";
 
 /** On the AI 編輯部 page: the office itself, or — where it is kept — the place it moves into. */
-export function OfficeSlot({ lang, keep = keepsOfficeAlive }: { lang: string; keep?: () => boolean }) {
+export function OfficeSlot({
+  lang,
+  theme,
+  keep = keepsOfficeAlive,
+}: {
+  lang: string;
+  /** The company's style, from the back office (D-178). */
+  theme?: ThemeId;
+  keep?: () => boolean;
+}) {
   const [kept, setKept] = useState<boolean | null>(null);
   const place = useRef<HTMLDivElement>(null);
   useEffect(() => setKept(keep()), [keep]);
   useLayoutEffect(() => {
     if (!kept || !place.current) return;
-    keptOffice.setState({ wanted: true, slot: place.current });
+    keptOffice.setState({ wanted: true, slot: place.current, theme });
     return () => keptOffice.setState({ slot: null });
-  }, [kept]);
-  if (kept === false) return <DemoOffice lang={lang} />;
+  }, [kept, theme]);
+  if (kept === false) return <DemoOffice lang={lang} theme={theme} />;
   return <div ref={place} className={FRAME} data-testid="office-slot" />;
 }
 
@@ -58,6 +67,7 @@ export function OfficeSlot({ lang, keep = keepsOfficeAlive }: { lang: string; ke
 export function KeptOffice({ lang }: { lang: string }) {
   const wanted = keptOffice((s) => s.wanted);
   const slot = keptOffice((s) => s.slot);
+  const theme = keptOffice((s) => s.theme);
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const park = useRef<HTMLDivElement>(null);
 
@@ -86,7 +96,7 @@ export function KeptOffice({ lang }: { lang: string }) {
   return (
     <>
       <div ref={park} aria-hidden className="pointer-events-none invisible fixed top-0 -left-[10000px] h-[70dvh] w-[1100px]" />
-      {host ? createPortal(<DemoOffice lang={lang} active={slot !== null} />, host) : null}
+      {host ? createPortal(<DemoOffice lang={lang} active={slot !== null} theme={theme} />, host) : null}
     </>
   );
 }

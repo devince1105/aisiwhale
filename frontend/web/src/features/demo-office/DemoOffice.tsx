@@ -5,7 +5,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { OfficeCanvas, terminalVars, type OfficeView } from "@/office3d/OfficeCanvas";
+import { OfficeCanvas, type OfficeView, type ThemeId } from "@/office3d/OfficeCanvas";
 import { realtimeStore } from "@/stores/realtime";
 import { uiStore } from "@/stores/ui";
 
@@ -18,7 +18,7 @@ const SCRIPT = scriptJson as Script;
  * ``active``: whether its page is on screen. A kept office (D-176) lives on while the reader is
  * elsewhere on the site: then the script waits and nothing is drawn.
  */
-export function DemoOffice({ lang, active = true }: { lang: string; active?: boolean }) {
+export function DemoOffice({ lang, active = true, theme }: { lang: string; active?: boolean; theme?: ThemeId }) {
   const [ready, setReady] = useState(false);
   const player = useRef<ReturnType<typeof createDemoPlayer> | null>(null);
   const shown = useRef(active);
@@ -62,10 +62,9 @@ export function DemoOffice({ lang, active = true }: { lang: string; active?: boo
     <div
       className={`relative h-[70dvh] min-h-[480px] overflow-hidden rounded-xl border border-line ${mode === "2d" ? "bg-canvas" : ""}`}
       data-terminal={mode === "2d"}
-      style={mode === "2d" ? terminalVars() : undefined}
       data-testid="demo-office"
     >
-      {ready ? <OfficeCanvas view={view} onViewChange={setView} onMode={setMode} departmentNames={names} paused={!active} /> : null}
+      {ready ? <OfficeCanvas view={view} onViewChange={setView} onMode={setMode} departmentNames={names} paused={!active} boardLook="site" demo theme={theme} /> : null}
     </div>
   );
 }

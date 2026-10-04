@@ -21,7 +21,7 @@ import { uiStore, useUi } from "@/stores/ui";
 import { assignSeats } from "../scene/layout";
 import { arcBetween, boardModel, floorPlan, handoffsAfter, type BoardCard, type Box } from "./board";
 import { LogColumn, RosterColumn } from "./BoardSideColumns";
-import { BADGE_INK, CONSOLE, consoleVars } from "./console";
+import { BADGE_INK, CONSOLE, consoleVars, type BoardLook } from "./console";
 import type { ThemeId } from "../palette";
 import { PixelFloor } from "./PixelFloor";
 import { Ticker } from "./Ticker";
@@ -119,7 +119,10 @@ function Card({ card, selected, cardRef }: { card: BoardCard; selected: boolean;
 export function OfficeBoard2D({
   departmentNames = {},
   theme,
+  look = "console",
 }: {
+  /** The back office's console, or the public site's colours (D-177). */
+  look?: BoardLook;
   /** key -> name, from the org chart; without it a room shows the key it is known by. */
   departmentNames?: Readonly<Record<string, string>>;
   /** The office's style (D-011): the 2D floor is painted in the same one as the 3D view. */
@@ -169,7 +172,7 @@ export function OfficeBoard2D({
 
   if (!rows.length) {
     return (
-      <p style={consoleVars()} className="h-full bg-[color:var(--console-bg)] p-4 text-sm text-[color:var(--console-text-dim)]">
+      <p style={consoleVars(look)} className="h-full bg-[color:var(--console-bg)] p-4 text-sm text-[color:var(--console-text-dim)]">
         這間公司還沒有代理。
       </p>
     );
@@ -178,7 +181,7 @@ export function OfficeBoard2D({
     <div
       aria-label="辦公室（2D）"
       data-testid="office-console"
-      style={consoleVars()}
+      style={consoleVars(look)}
       className="grid h-full min-h-0 bg-[color:var(--console-bg)] text-[color:var(--console-text)] [font-variant-numeric:tabular-nums] lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,18rem)]"
     >
       <RosterColumn cards={rows.flatMap((row) => row.cards)} selected={selected} />
@@ -211,8 +214,9 @@ export function OfficeBoard2D({
           ))}
         </div>
 
-        <div ref={container} className="relative grid min-h-0 grid-rows-[minmax(0,3fr)_auto] gap-4 overflow-y-auto p-3">
-          {/* the floor takes the room it needs: it is the thing this view is for */}
+        <div ref={container} className="relative grid min-h-0 grid-rows-[minmax(26rem,3fr)_auto] gap-4 overflow-y-auto p-3">
+          {/* the floor takes the room it needs: it is the thing this view is for — and its row
+              never less than that, or on a short screen the cards below are drawn over it */}
           <div className="min-h-[26rem]">
             <PixelFloor plan={plan} cards={everyone} selected={selected} focused={shown === ALL_ROOMS ? null : shown} theme={theme} />
           </div>

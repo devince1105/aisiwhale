@@ -1,18 +1,18 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { approvalsQuery, kpisQuery, orgQuery } from "@/api/queries";
+import { approvalsQuery, kpisQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
 import { AgentPanel } from "@/features/agent-panel/AgentPanel";
 import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 import { ConnectionBadge } from "@/features/dashboard/DashboardView";
 import { connectionModel, dashboardModel } from "@/features/dashboard/model";
 import { useNow } from "@/hooks/useNow";
-import { OfficeCanvas, terminalVars, parseView, type OfficeView } from "@/office3d/OfficeCanvas";
+import { OfficeCanvas, terminalVars, parseView, type OfficeView, type ThemeId } from "@/office3d/OfficeCanvas";
 import { useRealtime, type RealtimeState } from "@/stores/realtime";
 import { useUi } from "@/stores/ui";
 
@@ -138,6 +138,15 @@ function CompanyOffice({ company }: { company: Company }) {
   const org = useQuery(orgQuery(company.id));
   const departmentNames = useMemo(() => departmentNames_(org.data), [org.data]);
   const pending = useQuery(approvalsQuery(company.id));
+  // the office's style is the company's (D-178): the same in every browser, and the site's
+  // AI 編輯部 shows the site's company in it
+  const queries = useQueryClient();
+  const officeTheme = useQuery(officeThemeQuery(company.id));
+  const chooseTheme = useMutation({
+    mutationFn: (theme: ThemeId) => setOfficeTheme(company.id, theme),
+    onMutate: (theme) => queries.setQueryData(queryKeys.officeTheme(company.id), theme),
+    onSettled: () => queries.invalidateQueries({ queryKey: queryKeys.officeTheme(company.id) }),
+  });
   const model = dashboardModel(realtime, kpis.data, connection, now);
   // what the office settled on (``auto`` is decided in the canvas, by asking the browser)
   const [mode, setMode] = useState<"2d" | "3d">("3d");
@@ -202,6 +211,8 @@ function CompanyOffice({ company }: { company: Company }) {
             onMode={setMode}
             selectionInsetRight={448}
             departmentNames={departmentNames}
+            theme={officeTheme.data}
+            onTheme={(theme) => chooseTheme.mutate(theme)}
           />
         </div>
         {/* the team group beside the office (D-109); on a narrow screen, over it */}

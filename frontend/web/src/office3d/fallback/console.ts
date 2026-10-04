@@ -65,11 +65,28 @@ export const TONE_INK: Record<string, string> = {
 /** A box in the console's style: hard edges, two-tone border, no rounding. */
 export const BOX = "border-2 border-[color:var(--console-edge-dim)] bg-[color:var(--console-panel)]";
 
+/** The console's own dark green (the back office), or the public site's colours (D-177). */
+export type BoardLook = "console" | "site";
+
 /**
  * The CSS variables the 2D office paints itself with, set on its root element so nothing
- * outside it is touched — the admin pages around it keep the app's own theme.
+ * outside it is touched — the admin pages around it keep the app's own theme. On the public
+ * site (D-177) they are the site's own tokens, light or dark with the page: the back office's
+ * terminal green there was another site's look.
  */
-export function consoleVars(): Record<string, string> {
+export function consoleVars(look: BoardLook = "console"): Record<string, string> {
+  if (look === "site") {
+    return {
+      "--console-bg": "var(--color-canvas)",
+      "--console-panel": "var(--color-surface)",
+      "--console-panel-dim": "var(--color-canvas)",
+      "--console-edge": "var(--color-neutral)",
+      "--console-edge-dim": "var(--color-line)",
+      "--console-text": "var(--color-ink)",
+      "--console-text-dim": "var(--color-muted)",
+      "--console-accent": "var(--color-accent)",
+    };
+  }
   return {
     "--console-bg": CONSOLE.bg,
     "--console-panel": CONSOLE.panel,

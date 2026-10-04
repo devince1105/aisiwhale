@@ -24,6 +24,7 @@ export const queryKeys = {
   roles: () => ["roles"] as const,
   /** The company's days (T-608). */
   org: (companyId: string) => ["org", companyId] as const,
+  officeTheme: (companyId: string) => ["officeTheme", companyId] as const,
   failedWorkflows: (companyId: string) => ["workflows", "failed", companyId] as const,
   cycles: (companyId: string) => ["cycles", companyId] as const,
   cycle: (cycleId: string) => ["cycle", cycleId] as const,
@@ -482,6 +483,29 @@ export function projectsQuery(companyId: string, api: ApiClient = defaultApi) {
 }
 
 /** Pause or resume a project, as the PauseProject / ResumeProject command (D-056). */
+/** The office's style (D-178): the company's, the same in every browser and on the site. */
+export function officeThemeQuery(companyId: string, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.officeTheme(companyId),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/companies/{company_id}/office-theme", {
+          params: { path: { company_id: companyId } },
+        }),
+      ).theme,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export async function setOfficeTheme(companyId: string, theme: Schemas["OfficeThemeBody"]["theme"], api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.PUT("/api/companies/{company_id}/office-theme", {
+      params: { path: { company_id: companyId } },
+      body: { theme },
+    }),
+  ).theme;
+}
+
 export async function decideProject(
   companyId: string,
   projectId: string,

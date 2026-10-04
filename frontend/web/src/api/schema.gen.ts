@@ -625,6 +625,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/office-theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Office Theme
+         * @description The office's style (D-178): one per company, the same in every browser.
+         */
+        get: operations["get_office_theme_api_companies__company_id__office_theme_get"];
+        /**
+         * Put Office Theme
+         * @description Choose the office's style — the back office's and, for the site's company, the public
+         *     AI 編輯部's (D-178).
+         */
+        put: operations["put_office_theme_api_companies__company_id__office_theme_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/org": {
         parameters: {
             query?: never;
@@ -1153,6 +1178,27 @@ export interface paths {
          *     left out rather than shown as zero.
          */
         get: operations["markets_api_public_markets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/office-theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Office Theme
+         * @description The style the site's AI 編輯部 is shown in: its company's, chosen in the back office
+         *     (D-178). An unknown company, or none named, has the default.
+         */
+        get: operations["public_office_theme_api_public_office_theme_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2870,6 +2916,14 @@ export interface components {
             /** Interval */
             interval: string;
         };
+        /** OfficeThemeBody */
+        OfficeThemeBody: {
+            /**
+             * Theme
+             * @enum {string}
+             */
+            theme: "muji" | "wabisabi" | "industrial" | "google" | "cyber";
+        };
         /**
          * OpportunityLine
          * @description One thing the company might do, and how far it has got (T-611).
@@ -3359,6 +3413,14 @@ export interface components {
             path: string;
             /** Title */
             title: string;
+        };
+        /** PublicOfficeTheme */
+        PublicOfficeTheme: {
+            /**
+             * Theme
+             * @enum {string}
+             */
+            theme: "muji" | "wabisabi" | "industrial" | "google" | "cyber";
         };
         /** PublicQuote */
         PublicQuote: {
@@ -5458,6 +5520,76 @@ export interface operations {
             };
         };
     };
+    get_office_theme_api_companies__company_id__office_theme_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficeThemeBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_office_theme_api_companies__company_id__office_theme_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfficeThemeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficeThemeBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_org_api_companies__company_id__org_get: {
         parameters: {
             query?: never;
@@ -6459,6 +6591,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicQuote"][];
+                };
+            };
+        };
+    };
+    public_office_theme_api_public_office_theme_get: {
+        parameters: {
+            query?: {
+                company?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicOfficeTheme"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

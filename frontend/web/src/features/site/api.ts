@@ -4,7 +4,7 @@
 import createClient from "openapi-fetch";
 
 import { ApiError, type Schemas } from "@/api/client";
-import type { paths } from "@/api/schema.gen";
+import type { components, paths } from "@/api/schema.gen";
 import { SERVER_API_URL } from "@/config";
 
 import type { Section } from "./i18n";
@@ -182,6 +182,19 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
     return [];
   }
 }
+
+/** The style the site's AI 編輯部 is shown in: its company's, chosen in the back office (D-178).
+ * Never throws: when the API cannot be reached, the office's default. */
+export async function fetchOfficeTheme(company: string | undefined, options: SiteClientOptions = {}): Promise<OfficeThemeId> {
+  try {
+    const { data } = await client(options).GET("/api/public/office-theme", { params: { query: { company } } });
+    return data?.theme ?? "muji";
+  } catch {
+    return "muji";
+  }
+}
+
+export type OfficeThemeId = components["schemas"]["PublicOfficeTheme"]["theme"];
 
 /** A watchlist figure's chart (D-072): a currency in NT$, the Nasdaq, the yield, oil. Never
  * throws: null is "no chart". */

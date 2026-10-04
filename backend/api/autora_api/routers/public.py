@@ -29,6 +29,7 @@ from sqlalchemy import select
 
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
+from autora.company.office_theme import DEFAULT_OFFICE_THEME, OfficeTheme, office_theme
 from autora.db.models import Company
 from autora.db.session import get_sessionmaker
 from autora.domains.newsroom import forex as currencies
@@ -313,6 +314,24 @@ async def figure_chart(
     each day for about five years. None for a figure without one (or offline)."""
     response.headers["Cache-Control"] = "public, max-age=600"
     return await figures.figure(key, session)
+
+
+class PublicOfficeTheme(BaseModel):
+    theme: OfficeTheme
+
+
+@router.get("/api/public/office-theme")
+async def public_office_theme(
+    session: Session, company: Annotated[str | None, Query(max_length=100)] = None
+) -> PublicOfficeTheme:
+    """The style the site's AI 編輯部 is shown in: its company's, chosen in the back office
+    (D-178). An unknown company, or none named, has the default."""
+    found = (
+        await session.scalar(select(Company).where(Company.slug == company)) if company else None
+    )
+    if found is None:
+        return PublicOfficeTheme(theme=DEFAULT_OFFICE_THEME)
+    return PublicOfficeTheme(theme=await office_theme(session, found.id))
 
 
 @router.get("/api/public/markets")

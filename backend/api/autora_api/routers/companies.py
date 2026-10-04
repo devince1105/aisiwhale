@@ -14,6 +14,7 @@ from autora.company.agents import pause_agent as agent_pause
 from autora.company.agents import resume_agent as agent_resume
 from autora.company.agents import retire_agent as agent_retire
 from autora.company.companies import CompanyAlreadyExists, create_company
+from autora.company.office_theme import OfficeTheme, office_theme, set_office_theme
 from autora.company.organization import org_chart, role_by_key
 from autora.db.models import Agent, Company, Department
 from autora.db.repositories import agents as agent_repo
@@ -106,6 +107,29 @@ async def post_company(body: CompanyCreate, session: Session, operator: Operator
 @router.get("/{company_id}")
 async def get_company(company_id: uuid.UUID, session: Session, _: Operator) -> CompanyOut:
     return CompanyOut.of(await _company_or_404(session, company_id))
+
+
+class OfficeThemeBody(BaseModel):
+    theme: OfficeTheme
+
+
+@router.get("/{company_id}/office-theme")
+async def get_office_theme(company_id: uuid.UUID, session: Session, _: Operator) -> OfficeThemeBody:
+    """The office's style (D-178): one per company, the same in every browser."""
+    await _company_or_404(session, company_id)
+    return OfficeThemeBody(theme=await office_theme(session, company_id))
+
+
+@router.put("/{company_id}/office-theme")
+async def put_office_theme(
+    company_id: uuid.UUID, body: OfficeThemeBody, session: Session, operator: Operator
+) -> OfficeThemeBody:
+    """Choose the office's style — the back office's and, for the site's company, the public
+    AI 編輯部's (D-178)."""
+    await _company_or_404(session, company_id)
+    await set_office_theme(session, company_id, body.theme, actor=operator)
+    await session.commit()
+    return body
 
 
 async def _agent_out(session: Session, agent: Agent) -> AgentOut:

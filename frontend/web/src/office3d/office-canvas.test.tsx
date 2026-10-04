@@ -139,6 +139,31 @@ describe("OfficeCanvas", () => {
     expect(screen.queryByTestId("scene")).toBeNull();
   });
 
+  it("on the public site: the company's style, no settings to change it, no line about narrow screens (D-178)", () => {
+    const { Scene, seen } = sceneStub();
+    window.localStorage.setItem(THEME_STORAGE_KEY, "industrial"); // a browser's own choice does not count
+    render(<OfficeCanvas demo theme="cyber" detect={() => DESKTOP} Scene={Scene} />);
+    expect(seen.props!.theme).toBe("cyber");
+    expect(screen.queryByRole("button", { name: "辦公室設定" })).toBeNull();
+    cleanup();
+    const phone = render(<OfficeCanvas demo theme="cyber" detect={() => ({ webgl2: true, narrow: true })} Scene={Scene} />);
+    expect(mode(phone.container)).toBe("2d");
+    expect(phone.container.textContent).not.toContain("較窄");
+    expect(screen.queryByRole("button", { name: "辦公室設定" })).toBeNull();
+    window.localStorage.removeItem(THEME_STORAGE_KEY);
+  });
+
+  it("in the back office: the company's style, and a choice is the company's (D-178)", () => {
+    const { Scene, seen } = sceneStub();
+    const onTheme = vi.fn();
+    render(<OfficeCanvas theme="wabisabi" onTheme={onTheme} detect={() => DESKTOP} Scene={Scene} />);
+    expect(seen.props!.theme).toBe("wabisabi");
+    fireEvent.click(screen.getByRole("button", { name: "辦公室設定" }));
+    fireEvent.click(screen.getByRole("button", { name: THEMES.google.label }));
+    expect(onTheme).toHaveBeenCalledWith("google");
+    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBeNull(); // not this browser's alone
+  });
+
   it("a narrow screen gets the board unless 3D is chosen", () => {
     const { Scene } = sceneStub();
     const narrow = () => ({ webgl2: true, narrow: true });
