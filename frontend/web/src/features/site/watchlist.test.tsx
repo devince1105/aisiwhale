@@ -268,7 +268,7 @@ describe("the watchlist page to watch (D-064)", () => {
     render(<WatchlistPage lang="zh-TW" />);
     const drawers = within(await screen.findByTestId("watchlist"));
     expect(drawers.getByRole("button", { name: "美股1" }).getAttribute("aria-expanded")).toBe("true");
-    expect(drawers.getByRole("button", { name: "指數・利率1" })).toBeTruthy();
+    expect(drawers.getByRole("button", { name: "台股1" })).toBeTruthy(); // the TAIEX, with the stocks (D-191)
     const remove = drawers.getByRole("button", { name: "移除「輝達」" });
     expect(remove.querySelector("svg")).toBeTruthy();
     fireEvent.click(remove);

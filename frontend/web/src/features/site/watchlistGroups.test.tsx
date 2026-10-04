@@ -19,7 +19,7 @@ const ITEMS = [
   item("usdtwd", "美金"),
   item("us:CORN", "Teucrium Corn"),
   item("xau", "黃金"),
-  item("taiex", "加權指數"),
+  item("nasdaq", "那斯達克"),
   item("btc", "比特幣"),
   item("us:AAPL", "蘋果"),
 ];
@@ -30,6 +30,8 @@ describe("觀察清單分類 (D-094)", () => {
     expect(groupOf("us10y")).toBe("index");
     expect(groupOf("us:USO")).toBe("commodity");
     expect(groupOf("txf1")).toBe("tw"); // 台指期, with the Taiwan stocks (D-190)
+    expect(groupOf("taiex")).toBe("tw"); // and the index itself (D-191)
+    expect(groupOf("nasdaq")).toBe("index");
   });
 
   it("drawers in a fixed order, the reader's order inside, not counted; one folds and stays folded", () => {

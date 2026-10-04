@@ -89,10 +89,11 @@ const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat"]);
 /** Which drawer of the watchlist an item sits in (D-094). */
 export function groupOf(key: string): Group {
   if (COMMODITY_FUNDS.has(key) || COMMODITIES.has(key)) return "commodity";
-  // 台指期 (D-179) with the Taiwan stocks, where a reader of the Taiwan market looks (D-190)
-  if (key.startsWith("tw:") || key === "txf1") return "tw";
+  // the TAIEX and 台指期 (D-179) with the Taiwan stocks, where a reader of the Taiwan market
+  // looks (D-190, D-191)
+  if (key.startsWith("tw:") || key === "taiex" || key === "txf1") return "tw";
   if (key.startsWith("us:")) return "us";
   if (isCurrency(key)) return "fx";
   if (key === "btc" || key === "eth") return "crypto";
-  return "index"; // TAIEX, the Nasdaq, the 10-year yield
+  return "index"; // the Nasdaq, the 10-year yield
 }
