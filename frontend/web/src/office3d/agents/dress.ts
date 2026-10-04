@@ -4,7 +4,7 @@
 // clone gets its own geometry and material, so every other figure stays as it was.
 import { BufferAttribute, CanvasTexture, type Material, type Mesh, type MeshStandardMaterial, type Object3D, type SkinnedMesh } from "three";
 
-import type { Outfit, Paint } from "../assets/outfits";
+import type { Hide, Outfit, Paint } from "../assets/outfits";
 
 const COLS = 16;
 const ROWS = 4;
@@ -53,6 +53,11 @@ export function ruleFor(
       (!p.bones || (bone !== null && p.bones.includes(bone))) &&
       !(p.notFace && part === "head" && Math.abs(position[2] - FACE_Z) < 0.006 && position[1] < FACE_TOP),
   );
+}
+
+/** Whether a body vertex is part of what the outfit leaves off (D-183). */
+export function hiddenBy(hide: readonly Hide[], cell: string, bone: string | null, z: number): boolean {
+  return hide.some((h) => z < h.behind && h.cells.includes(cell) && bone !== null && h.bones.includes(bone));
 }
 
 function hexRgb(hex: string): [number, number, number] {
@@ -138,6 +143,19 @@ export function dress(body: Object3D, outfit: Outfit): { dispose: () => void } {
       next[i * 2 + 1] = (sr + ((v * ROWS) % 1)) / ROWS;
     }
     geometry.setAttribute("uv", new BufferAttribute(next, 2));
+    if (part === "body" && outfit.hide?.length && geometry.index) {
+      // read the original cells (``uv``), not the repainted ones
+      const hidden = (i: number) =>
+        hiddenBy(outfit.hide!, cellOf(uv.getX(i), uv.getY(i)), boneOf(mesh, i), position.getZ(i));
+      const index = geometry.index.array;
+      const kept: number[] = [];
+      for (let t = 0; t < index.length; t += 3) {
+        if (!(hidden(index[t]) && hidden(index[t + 1]) && hidden(index[t + 2]))) {
+          kept.push(index[t], index[t + 1], index[t + 2]);
+        }
+      }
+      geometry.setIndex(kept);
+    }
     mesh.geometry = geometry;
     owned.push(geometry);
   });

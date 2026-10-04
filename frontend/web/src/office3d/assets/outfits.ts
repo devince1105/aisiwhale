@@ -23,10 +23,23 @@ export interface Paint {
   notFace?: boolean;
 }
 
+/** Part of a figure left off (D-183): every triangle of the body whose corners are all on these
+ * bones, behind ``behind`` (the figure faces +z) and on these palette cells. */
+export interface Hide {
+  cells: string[];
+  bones: string[];
+  behind: number;
+}
+
 export interface Outfit {
   model: Character;
   paints: Paint[];
+  hide?: Hide[];
 }
+
+/** female-f's backpack: the bag's cells behind her back (her back is at z −0.13, the bag's
+ * faces at −0.153 to −0.233). The straps in front stay, as a jacket's trim. */
+const NO_BACKPACK: Hide = { cells: ["2:5", "3:7"], bones: ["torso"], behind: -0.145 };
 
 const SKIN = "#f2c9a8";
 const BLACK = "#1b1b20";
@@ -118,9 +131,10 @@ export const OUTFITS: Record<string, Outfit> = {
 
   // The public site's demo office (D-155): made-up people, each on the cell layout of a figure
   // above, in colours of her own.
-  // Rinka: silver hair, a charcoal suit, gold
+  // Riyuki (月城凜雪): silver hair, a charcoal suit, gold — no backpack (D-183)
   demo_rinka: {
     model: "character-female-f",
+    hide: [NO_BACKPACK],
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#c9ccd6" },
       { cells: ["2:5"], color: "#b8913a" },
@@ -189,9 +203,10 @@ export const OUTFITS: Record<string, Outfit> = {
       { cells: ["3:1"], parts: ["body"], color: "#5a5d66" },
     ],
   },
-  // Ririka: coral hair, an orange top, denim
+  // Rika (工藤莉花): coral hair, an orange top, denim — no backpack (D-183)
   demo_ririka: {
     model: "character-female-f",
+    hide: [NO_BACKPACK],
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#f08a7a" },
       { cells: ["2:5"], color: "#3a5a8c" },

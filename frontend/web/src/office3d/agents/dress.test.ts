@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { CHARACTERS, characterFor } from "../assets/characters";
 import { OUTFITS, type Paint } from "../assets/outfits";
-import { cellOf, ruleFor, SPARE_CELLS } from "./dress";
+import { cellOf, hiddenBy, ruleFor, SPARE_CELLS } from "./dress";
 
 describe("an outfit", () => {
   it("each is made on a real figure, with room in the palette for all its colours", () => {
@@ -48,5 +48,25 @@ describe("which rule repaints a vertex", () => {
     expect(cellOf(0.07, 0.8)).toBe("3:1");
     expect(cellOf(0.99, 0.99)).toBe("3:15");
     expect(cellOf(1, 1)).toBe("3:15");
+  });
+});
+
+describe("what an outfit leaves off (D-183)", () => {
+  it("the backpack of the demo's two figures on female-f: the bag behind the back, not the back", () => {
+    for (const key of ["demo_rinka", "demo_ririka"]) {
+      const { model, hide = [] } = OUTFITS[key];
+      expect(model).toBe("character-female-f");
+      expect(hiddenBy(hide, "2:5", "torso", -0.233)).toBe(true); // the bag's back
+      expect(hiddenBy(hide, "3:7", "torso", -0.213)).toBe(true); // its flap
+      expect(hiddenBy(hide, "2:5", "torso", -0.153)).toBe(true); // its face against her back
+      expect(hiddenBy(hide, "3:3", "torso", -0.153)).toBe(false); // her clothes there
+      expect(hiddenBy(hide, "2:5", "torso", 0.096)).toBe(false); // the straps in front
+      expect(hiddenBy(hide, "2:5", "arm-left", -0.2)).toBe(false); // nothing but the torso
+    }
+  });
+
+  it("everybody else wears what the figure has", () => {
+    const others = Object.entries(OUTFITS).filter(([key]) => key !== "demo_rinka" && key !== "demo_ririka");
+    expect(others.filter(([, outfit]) => outfit.hide?.length)).toEqual([]);
   });
 });

@@ -47,7 +47,7 @@ MAX_DISPLAY_MS = 6_000
 
 # (role, name, avatar_key, department_key, office_zone_key, business_unit_key)
 CAST = [
-    ("ceo", "Rinka Tsukishiro｜月城凜花", "demo_rinka", "executive", "ceo", None),
+    ("ceo", "Riyuki Tsukishiro｜月城凜雪", "demo_rinka", "executive", "ceo", None),
     (
         "editor_in_chief",
         "Kaede Shirasagi｜白鷺楓",
@@ -91,7 +91,7 @@ CAST = [
     ("editor", "Mio Akemura｜朱村澪", "demo_mio", "newsroom_editing", "editorial", "ai_media"),
     (
         "marketing",
-        "Ririka Tomoshibi｜燈火莉莉花",
+        "Rika Kudo｜工藤莉花",
         "demo_ririka",
         "newsroom_audience",
         "growth",
