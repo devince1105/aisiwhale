@@ -328,7 +328,7 @@ const WORDS = {
       title: "AI 編輯部",
       badge: "示範畫面",
       intro:
-        "艾矽鯨的報導由一組 AI 代理分工完成：找題材、研究、分析、撰稿、審稿、總編終審，最後核准才發佈。這裡是一段示範：人物與報導都是虛構的，節奏取自一次真實的工作週期。",
+        "艾矽鯨的報導由 AI 代理分工完成，從找題材到總編終審，核准後才發佈。以下為示範，人物與報導皆為虛構。",
     },
     watch: {
       title: "我的觀察清單",
@@ -678,7 +678,7 @@ const WORDS = {
       title: "The AI newsroom",
       badge: "Demo",
       intro:
-        "AiSiWhale's stories are made by a team of AI agents: finding stories, research, analysis, writing, editing and a final read by the editor-in-chief, then approval before anything is published. This is a demo: the people and the stories are made up; the rhythm is taken from one real working cycle.",
+        "AiSiWhale's stories are made by a team of AI agents, from finding a story to the editor-in-chief's final read, and published only once approved. A demo: the people and stories are made up.",
     },
     watch: {
       title: "My watchlist",

@@ -50,7 +50,11 @@ export function PixelFloor({
   selected,
   focused,
   theme = DEFAULT_THEME,
+  fit = "box",
 }: {
+  /** ``box``: fill the box it is given, letterboxed; ``width``: as wide as the box and only as tall
+   * as the floor is (D-181) — no empty bands above and below it on a phone. */
+  fit?: "box" | "width";
   plan: FloorPlan;
   /** The people on the floor, by id. */
   cards: Map<string, BoardCard>;
@@ -112,7 +116,7 @@ export function PixelFloor({
       aria-label={room ? `樓層（俯視，${room}）` : "樓層（俯視）"}
       width={scene.current.width}
       height={scene.current.height}
-      className="h-full w-full border-2 border-[color:var(--console-edge-dim)] object-contain"
+      className={`w-full border-2 border-[color:var(--console-edge-dim)] ${fit === "width" ? "h-auto" : "h-full object-contain"}`}
       style={{ imageRendering: "pixelated", background: "var(--console-bg)" }}
       onClick={(event) => {
         const current = scene.current;

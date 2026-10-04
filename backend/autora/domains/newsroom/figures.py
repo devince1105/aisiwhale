@@ -10,6 +10,8 @@ five years, for the watchlist page to show when the figure is picked.
 
 - The Taiwan index (``taiex``, D-073): its days as TWSE's index history gives them, stored with the
   Taiwan stocks' (``price_history.INDEX``) — five years is sixty requests, too many to ask again.
+- 台指期 (``txf1``, D-180): the TAIEX futures' near month, stored as the index is
+  (``futures.TXF1``) from the futures exchange's daily download.
 - Bitcoin and Ether (``btc``, ``eth``, D-073): Tiingo's crypto prices, through the same cache.
 
 FRED's figures and a currency cross are each day's close and nothing more (``close_only``): the
@@ -29,6 +31,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.domains.newsroom.forex import CHARTED, SOURCE, TiingoFx
+from autora.domains.newsroom.futures import SOURCE as TAIFEX
+from autora.domains.newsroom.futures import TXF1
 from autora.domains.newsroom.price_history import INDEX, PublicBar, history
 
 log = logging.getLogger(__name__)
@@ -167,6 +171,10 @@ class Figures:
         elif key == "taiex" and session is not None:
             stored = await history(session, "tw", INDEX)
             bars, close_only, source = stored.bars, False, "TWSE"
+        elif key == "txf1" and session is not None:
+            # 台指期's near month, stored beside the index (D-180)
+            stored = await history(session, "tw", TXF1)
+            bars, close_only, source = stored.bars, False, TAIFEX
         else:
             return None
         if not bars:

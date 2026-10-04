@@ -57,7 +57,7 @@ import { ARROW, direction, formatChange, formatValue, GROUPS, groupOf, isCurrenc
 function isFigure(key: string): boolean {
   return (
     isCurrency(key) ||
-    ["taiex", "nasdaq", "us10y", "wti", "xau", "btc", "eth", "maize", "soybeans", "wheat"].includes(key)
+    ["taiex", "txf1", "nasdaq", "us10y", "wti", "xau", "btc", "eth", "maize", "soybeans", "wheat"].includes(key)
   );
 }
 import { reorderWatchlist, setWatched, useWatchlist, type WatchedStock } from "./watchlistStore";

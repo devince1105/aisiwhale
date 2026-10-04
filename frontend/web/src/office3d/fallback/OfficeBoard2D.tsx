@@ -116,6 +116,12 @@ function Card({ card, selected, cardRef }: { card: BoardCard; selected: boolean;
   );
 }
 
+/** A room's name for a tab on the public site (D-181): 研究組 is 研究, so all seven fit one line on
+ * a phone; a name of two characters, or one in Latin letters, is left as it is. */
+export function shortRoom(label: string): string {
+  return /^[\u4e00-\u9fff]{2,}[層組部室處]$/.test(label) ? label.slice(0, -1) : label;
+}
+
 export function OfficeBoard2D({
   departmentNames = {},
   theme,
@@ -128,6 +134,11 @@ export function OfficeBoard2D({
   /** The office's style (D-011): the 2D floor is painted in the same one as the 3D view. */
   theme?: ThemeId;
 }) {
+  const onSite = look === "site";
+  /** A room's dot: its business's colour; on the site, the accent for a room of no business (決策層)
+   * — every room has one there, so none looks left out (D-181). 全部 is not a room. */
+  const dotFor = (id: string, colour: string | null | undefined): string | null =>
+    colour ?? (onSite && id !== ALL_ROOMS ? "var(--color-accent)" : null);
   const company = useRealtime((s) => s.company);
   const selected = useUi((s) => s.selectedAgentId);
   const now = useNow();
@@ -190,7 +201,9 @@ export function OfficeBoard2D({
         <div
           role="tablist"
           aria-label="房間"
-          className="flex flex-wrap gap-1 border-b-2 border-[color:var(--console-edge-dim)] bg-[color:var(--console-panel-dim)] px-3 py-2 text-[11px] uppercase tracking-[0.15em]"
+          className={`flex border-b-2 border-[color:var(--console-edge-dim)] bg-[color:var(--console-panel-dim)] text-[11px] uppercase ${
+            onSite ? "flex-nowrap gap-0.5 overflow-x-auto px-2 py-1.5 tracking-normal" : "flex-wrap gap-1 px-3 py-2 tracking-[0.15em]"
+          }`}
         >
           {[{ id: ALL_ROOMS, label: "全部", businessColor: null }, ...rows].map((tab) => (
             <button
@@ -200,38 +213,49 @@ export function OfficeBoard2D({
               aria-selected={shown === tab.id}
               data-testid={`room-tab-${tab.id}`}
               onClick={() => setRoom(tab.id)}
-              className={`flex items-center gap-1.5 border-2 px-2 py-1 ${
+              className={`flex shrink-0 items-center border-2 py-1 ${onSite ? "gap-1 px-1" : "gap-1.5 px-2"} ${
                 shown === tab.id
                   ? "border-[color:var(--console-accent)] bg-[color:var(--console-accent)] text-[color:var(--console-bg)]"
                   : "border-transparent text-[color:var(--console-text-dim)] hover:border-[color:var(--console-edge-dim)] hover:text-[color:var(--console-text)]"
               }`}
             >
-              {tab.businessColor ? (
-                <span aria-hidden className="size-1.5" style={{ backgroundColor: tab.businessColor }} />
+              {dotFor(tab.id, tab.businessColor) ? (
+                <span aria-hidden className="size-1.5" style={{ backgroundColor: dotFor(tab.id, tab.businessColor)! }} />
               ) : null}
-              {tab.label}
+              {onSite ? shortRoom(tab.label) : tab.label}
             </button>
           ))}
         </div>
 
-        <div ref={container} className="relative grid min-h-0 grid-rows-[minmax(26rem,3fr)_auto] gap-4 overflow-y-auto p-3">
+        <div
+          ref={container}
+          className={`relative grid min-h-0 gap-4 overflow-y-auto p-3 ${onSite ? "grid-rows-[auto_auto] content-start" : "grid-rows-[minmax(26rem,3fr)_auto]"}`}
+        >
           {/* the floor takes the room it needs: it is the thing this view is for — and its row
               never less than that, or on a short screen the cards below are drawn over it */}
-          <div className="min-h-[26rem]">
-            <PixelFloor plan={plan} cards={everyone} selected={selected} focused={shown === ALL_ROOMS ? null : shown} theme={theme} />
+          <div className={onSite ? undefined : "min-h-[26rem]"}>
+            <PixelFloor
+              plan={plan}
+              cards={everyone}
+              selected={selected}
+              focused={shown === ALL_ROOMS ? null : shown}
+              theme={theme}
+              fit={onSite ? "width" : "box"}
+            />
           </div>
           <div className="grid gap-4">
           {visible.map((row) => (
             <section key={row.id} aria-label={row.label}>
               <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--console-text-dim)]">
-                {/* the same colour the 3D floor marks this room with; none for a shared function */}
-                {row.businessColor ? (
+                {/* the same colour the 3D floor marks this room with; none for a shared function —
+                    except on the site, where every room has its dot (D-181) */}
+                {dotFor(row.id, row.businessColor) ? (
                   <span
                     aria-hidden
                     data-testid={`row-business-${row.id}`}
                     title={row.business ?? undefined}
                     className="size-2"
-                    style={{ backgroundColor: row.businessColor }}
+                    style={{ backgroundColor: dotFor(row.id, row.businessColor)! }}
                   />
                 ) : null}
                 {row.label}

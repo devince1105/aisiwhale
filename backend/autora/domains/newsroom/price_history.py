@@ -384,6 +384,7 @@ class PricesKeeper:
         get: GetJson,
         us: GetRows | None = None,
         *,
+        futures: Callable[[date, date], Awaitable[str]] | None = None,
         pause: float = PAUSE_SECONDS,
         us_pause: float = TIINGO_PAUSE_SECONDS,
     ) -> None:
@@ -393,6 +394,8 @@ class PricesKeeper:
         self.us = us
         """Tiingo's reader; None without its key, and the US pages have no chart."""
         self.us_pause = us_pause
+        self.futures = futures
+        """The futures exchange's download, for 台指期's chart (D-180); None offline."""
 
     async def _tw(self, session: AsyncSession) -> tuple[tuple[str, ...], dict[str, str]]:
         # the index first (D-073): the watchlist's chart of it, then the stocks
@@ -413,6 +416,10 @@ class PricesKeeper:
                 session, self.get, today=today, symbols=symbols, exchanges=exchanges,
                 pause=self.pause,
             )  # fmt: skip
+            if self.futures is not None:
+                from autora.domains.newsroom.futures import refresh_txf1  # it builds on this module
+
+                await refresh_txf1(session, self.futures, today=today, pause=self.pause)
             if self.us is not None:
                 us = tuple(dict.fromkeys((*US_STOCKS, *await securities.tracked(session, "us"))))
                 await refresh_us(session, self.us, today=today, symbols=us, pause=self.us_pause)

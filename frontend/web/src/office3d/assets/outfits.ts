@@ -159,15 +159,15 @@ export const OUTFITS: Record<string, Outfit> = {
       { cells: ["3:15"], parts: ["body"], color: "#6b4a33" },
     ],
   },
-  // Yuzuha: mint hair, grey and charcoal
+  // Yuzuha: mint hair, a grey jacket, charcoal trousers — on Kaede's figure (D-182): Shinobu's
+  // (female-a) has wide sleeves that, coloured, read as blades in her hands, and an analyst
+  // carries nothing of the kind into the office
   demo_yuzuha: {
-    model: "character-female-a",
+    model: "character-female-d",
     paints: [
-      { cells: ["3:13"], color: SKIN },
-      { cells: ["2:15"], parts: ["body"], color: "#2a2d33" },
-      { cells: ["3:11"], parts: ["body"], color: "#4a4f58" },
-      { cells: ["2:11"], parts: ["body"], bones: ["arm-left", "arm-right"], color: "#9fd8c4" },
-      { cells: ["2:11"], parts: ["body"], color: "#4a4f58" },
+      { cells: ["3:11"], parts: ["head"], color: "#9fd8c4" },
+      { cells: ["3:3"], parts: ["body"], color: "#4a4f58" },
+      { cells: ["3:1"], parts: ["body"], color: "#2a2d33" },
     ],
   },
   // Kotone: plum hair, a lilac top, dark trousers

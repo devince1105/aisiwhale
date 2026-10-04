@@ -253,6 +253,7 @@ def build_scheduler(
     T-516, the 13F positions for the stock pages D-049)."""
     from autora.company.cycle import CYCLE_START_SCHEDULE
     from autora.domains.newsroom.analytics import ANALYTICS_SCHEDULE, AnalyticsCollector
+    from autora.domains.newsroom.futures import taifex_csv
     from autora.domains.newsroom.holdings import HOLDINGS_SCHEDULE, HoldingsKeeper
     from autora.domains.newsroom.official_trades import (
         OFFICIAL_SCHEDULE,
@@ -298,6 +299,7 @@ def build_scheduler(
     prices = PricesKeeper(
         http_json() if live else no_prices,
         tiingo_rows(tiingo.get_secret_value()) if tiingo else None,
+        futures=taifex_csv() if live else None,
         pause=PAUSE_SECONDS if live else 0,  # waiting for an exchange nobody asks is only slow
     )
     scheduler.register(PRICES_SCHEDULE, prices.schedule_handler())
