@@ -26,10 +26,11 @@ services:
         value: prod
       - key: TOOLS_PROFILE
         value: live
-      # office hours (D-193, D-194), Taipei time: weekdays US stocks 07-09 and Taiwan stocks 14-16,
-      # weekends one hour; outside them the worker leaves the database alone so Neon can suspend
+      # office hours (D-193 - D-195): an hour before each market opens and an hour after it closes —
+      # Taiwan's in Taipei time, New York's in New York time (daylight saving follows by itself) —
+      # and an hour at weekends; outside them the worker leaves the database alone so Neon can sleep
       - key: WORKER_SHIFTS
-        value: "mon-fri 07:00-09:00,14:00-16:00; sat-sun 09:00-10:00"
+        value: "mon-fri 08:00-09:00,13:30-14:30; mon-fri 08:30-09:30,16:00-17:00 America/New_York; sat-sun 09:00-10:00"
       - key: WORKER_TIMEZONE
         value: Asia/Taipei
       - key: SITE_BASE_URL

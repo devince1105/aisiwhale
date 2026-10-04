@@ -35,6 +35,33 @@ def test_the_next_clock_in():
     assert s.next_start(taipei(10, 12)) == taipei(12, 7)  # Saturday
 
 
+MARKETS = (
+    "mon-fri 08:00-09:00,13:30-14:30; "  # Taiwan: an hour before the open, after the close
+    "mon-fri 08:30-09:30,16:00-17:00 America/New_York; "  # New York's, the same, in its own time
+    "sat-sun 09:00-10:00"
+)
+
+
+def test_an_hour_before_each_market_opens_and_an_hour_after_it_closes():
+    """D-195: Taiwan's in Taipei time, New York's in New York time, weekends an hour."""
+    s = Shifts.parse(MARKETS, timezone="Asia/Taipei")
+    assert s is not None
+    assert s.on_duty(taipei(5, 8, 30)) and s.on_duty(taipei(5, 14)) and not s.on_duty(taipei(5, 12))
+    # New York in daylight saving (until 2026-11-01): 08:30 there is 20:30 in Taipei, 16:00 is 04:00
+    assert s.on_duty(taipei(5, 20, 45)) and s.on_duty(taipei(6, 4, 30))
+    assert not s.on_duty(taipei(5, 22)) and not s.on_duty(taipei(6, 5, 30))
+    # and in winter time an hour later in Taipei, with no change to the setting
+    november = datetime(2026, 11, 2, 21, 45, tzinfo=ZoneInfo("Asia/Taipei"))  # a Monday
+    assert s.on_duty(november) and not s.on_duty(november.replace(hour=20))
+    # Monday morning Taipei is still Sunday in New York: no US shift then
+    assert not s.on_duty(taipei(5, 4, 30))
+    assert s.on_duty(taipei(10, 9, 30)) and not s.on_duty(taipei(10, 8))  # Saturday
+    assert s.next_start(taipei(5, 9, 10)) == taipei(5, 13, 30)
+    assert s.next_start(taipei(5, 14, 40)) == taipei(5, 20, 30)
+    assert s.next_start(taipei(5, 21, 40)) == taipei(6, 4)
+    assert s.hours_a_week() == 5 * 4 + 2 * 1
+
+
 def test_no_shifts_is_always_at_work_and_nonsense_is_refused():
     assert Shifts.parse("") is None
     for spec, days in (("7-11", "mon-fri"), ("11:00-07:00", "mon-fri"), ("07:00-11:00", "funday")):

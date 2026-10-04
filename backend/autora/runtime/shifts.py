@@ -66,10 +66,31 @@ def _windows(spec: str) -> list[tuple[time, time]]:
 
 
 @dataclass(frozen=True)
-class Shifts:
-    by_day: dict[int, tuple[tuple[time, time], ...]]
-    """Weekday (0 is Monday) -> its shifts, earliest first; a day not here is a day off."""
+class Roster:
+    """Shifts kept in one time zone: weekday (0 is Monday) -> its windows, earliest first."""
+
     zone: ZoneInfo
+    by_day: dict[int, tuple[tuple[time, time], ...]]
+
+    def on_duty(self, now: datetime) -> bool:
+        local = now.astimezone(self.zone)
+        windows = self.by_day.get(local.weekday(), ())
+        return any(begins <= local.time() < ends for begins, ends in windows)
+
+    def next_start(self, now: datetime) -> datetime | None:
+        local = now.astimezone(self.zone)
+        for ahead in range(8):
+            day = (local + timedelta(days=ahead)).date()
+            for begins, _ in self.by_day.get(day.weekday(), ()):
+                start = datetime.combine(day, begins, tzinfo=self.zone)
+                if start > local:
+                    return start
+        return None
+
+
+@dataclass(frozen=True)
+class Shifts:
+    rosters: tuple[Roster, ...]
 
     @classmethod
     def parse(
@@ -77,45 +98,49 @@ class Shifts:
     ) -> Shifts | None:
         """None for an empty ``spec``: no shifts, always at work.
 
-        ``spec`` is shifts for ``days`` (``07:00-11:00,19:00-23:00``), or groups of days with
-        their own shifts, separated by ``;`` (D-194): ``mon-fri 07:00-09:00,14:00-16:00;
-        sat-sun 09:00-10:00``."""
+        ``spec`` is shifts for ``days`` (``07:00-11:00,19:00-23:00``), or groups separated by
+        ``;``, each ``[days] shifts [time zone]`` (D-194, D-195): ``mon-fri 08:00-09:00,
+        13:30-14:30; mon-fri 08:30-09:30,16:00-17:00 America/New_York; sat-sun 09:00-10:00``.
+        A group without a zone is in ``timezone``: the New York market's hours stay its hours
+        through daylight saving."""
         if not spec.strip():
             return None
-        by_day: dict[int, list[tuple[time, time]]] = {}
+        by_zone: dict[str, dict[int, list[tuple[time, time]]]] = {}
         for group in (g.strip() for g in spec.split(";") if g.strip()):
-            head, _, rest = group.partition(" ")
-            if head[:1].isalpha():
-                group_days, windows = _days(head), _windows(rest)
-            else:
-                group_days, windows = _days(days), _windows(group)
+            words = group.split()
+            zone = words.pop() if words and "/" in words[-1] else timezone
+            group_days = _days(words.pop(0)) if words and words[0][:1].isalpha() else _days(days)
+            windows = _windows(" ".join(words).replace(" ", ""))
             if not windows:
-                raise ShiftsError(f"no shifts for {head!r}")
+                raise ShiftsError(f"no shifts in {group!r}")
+            try:
+                ZoneInfo(zone)
+            except Exception as exc:  # noqa: BLE001 - an unknown zone, however it is reported
+                raise ShiftsError(f"not a time zone: {zone!r}") from exc
             for day in group_days:
-                by_day.setdefault(day, []).extend(windows)
-        return cls({d: tuple(sorted(w)) for d, w in by_day.items()}, ZoneInfo(timezone))
+                by_zone.setdefault(zone, {}).setdefault(day, []).extend(windows)
+        return cls(
+            tuple(
+                Roster(ZoneInfo(zone), {d: tuple(sorted(w)) for d, w in days_.items()})
+                for zone, days_ in by_zone.items()
+            )
+        )
 
     def on_duty(self, now: datetime) -> bool:
-        local = now.astimezone(self.zone)
-        return any(
-            begins <= local.time() < ends for begins, ends in self.by_day.get(local.weekday(), ())
-        )
+        return any(roster.on_duty(now) for roster in self.rosters)
 
     def next_start(self, now: datetime) -> datetime:
         """The next clock-in after ``now`` (in ``now``'s zone)."""
-        local = now.astimezone(self.zone)
-        for ahead in range(8):
-            day = (local + timedelta(days=ahead)).date()
-            for begins, _ in self.by_day.get(day.weekday(), ()):
-                start = datetime.combine(day, begins, tzinfo=self.zone)
-                if start > local:
-                    return start.astimezone(now.tzinfo)
-        raise ShiftsError("no shift in the coming week")
+        starts = [s for s in (r.next_start(now) for r in self.rosters) if s is not None]
+        if not starts:
+            raise ShiftsError("no shift in the coming week")
+        return min(starts).astimezone(now.tzinfo)
 
     def hours_a_week(self) -> float:
         """How long the office is open in a week."""
         return sum(
             (datetime.combine(datetime.min, e) - datetime.combine(datetime.min, b)).seconds / 3600
-            for windows in self.by_day.values()
+            for roster in self.rosters
+            for windows in roster.by_day.values()
             for b, e in windows
         )
