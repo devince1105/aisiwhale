@@ -119,6 +119,7 @@ const WORDS = {
     markets: "主要市場指標",
     quoteNames: {
       taiex: "加權指數",
+      txf1: "台指期",
       "tw:2330": "台積電",
       "tw:2317": "鴻海",
       "tw:2454": "聯發科",
@@ -490,6 +491,7 @@ const WORDS = {
     markets: "Markets",
     quoteNames: {
       taiex: "TAIEX",
+      txf1: "TAIEX futures",
       "tw:2330": "TSMC",
       "tw:2317": "Hon Hai",
       "tw:2454": "MediaTek",

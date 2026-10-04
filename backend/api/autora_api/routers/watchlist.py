@@ -33,6 +33,7 @@ router = APIRouter(prefix="/api/me/watchlist", tags=["watchlist"])
 
 FIGURES = {
     "TAIEX": ("加權指數", "TAIEX"),
+    "TXF1": ("台指期", "TAIEX futures"),
     "NASDAQ": ("那斯達克", "Nasdaq"),
     "US10Y": ("美國10年期公債", "US 10Y"),
     "WTI": ("西德州原油", "WTI crude"),

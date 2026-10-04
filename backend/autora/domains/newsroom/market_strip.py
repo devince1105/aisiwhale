@@ -56,6 +56,7 @@ Nasdaq Composite itself comes after them, from FRED."""
 
 ORDER = (
     "taiex",
+    "txf1",
     *(f"tw:{code}" for code in TW_STOCKS),
     *(f"us:{symbol}" for symbol in US_STOCKS),
     "nasdaq",
@@ -69,13 +70,17 @@ ORDER = (
     "eth",
 )
 """What the strip shows, in this order. ``xau`` is spot gold (D-071): not ``gold``, which is
-Barrick Gold's ticker on a reader's watchlist."""
+Barrick Gold's ticker on a reader's watchlist. ``txf1`` is 台指期, the TAIEX futures' near month
+(D-179), right after the index it follows."""
 
 TWSE_INDEX = "https://openapi.twse.com.tw/v1/exchangeReport/MI_INDEX"
 TWSE_STOCKS = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
 TWSE_COMPANIES = "https://openapi.twse.com.tw/v1/opendata/t187ap03_L"
 """Listed companies' particulars: the shares issued, for a market value (not ETFs)."""
 FINNHUB_PROFILE = "https://finnhub.io/api/v1/stock/profile2"
+TAIFEX_FUTURES = "https://openapi.taifex.com.tw/v1/DailyMarketReportFut"
+"""The futures exchange's daily report: every contract month of every future, the day session
+(一般) and the night one (盤後) apiece."""
 DAY = 24 * 3600
 FRED = "https://api.stlouisfed.org/fred/series/observations"
 COINGECKO = "https://api.coingecko.com/api/v3/simple/price"
@@ -214,6 +219,41 @@ async def _twse(client: httpx.AsyncClient, shares: dict[str, float]) -> list[Pub
                 )
             )
     return out
+
+
+async def taifex(client: httpx.AsyncClient) -> list[PublicQuote]:
+    """台指期 (``txf1``, D-179): the TAIEX futures' near month — the earliest monthly contract,
+    not a weekly one — at the day session's last trade, as TXF1 is quoted elsewhere."""
+    rows = (await client.get(TAIFEX_FUTURES)).raise_for_status().json()
+    months = [
+        row
+        for row in rows
+        if row.get("Contract") == "TX"
+        and row.get("TradingSession") == "一般"
+        and str(row.get("ContractMonth(Week)", "")).strip().isdigit()
+        and _price(row.get("Last")) is not None
+    ]
+    if not months:
+        return []
+    near = min(months, key=lambda row: row["ContractMonth(Week)"].strip())
+    value, change = _num(near["Last"]), _price(near.get("Change"))
+    day = near["Date"].strip()
+    return [
+        PublicQuote(
+            key="txf1",
+            value=value,
+            change=change,
+            change_pct=_pct(change, value) if change is not None else None,
+            as_of=date(int(day[:4]), int(day[4:6]), int(day[6:8])),
+            basis="close",
+            source="TAIFEX",
+            open=_price(near.get("Open")),
+            high=_price(near.get("High")),
+            low=_price(near.get("Low")),
+            previous_close=round(value - change, 4) if change is not None else None,
+            currency="TWD",
+        )
+    ]
 
 
 def fred(api_key: str) -> Callable[[httpx.AsyncClient], Awaitable[list[PublicQuote]]]:
@@ -475,6 +515,7 @@ def build_board(
     feeds = [
         Feed("twse", twse(), every_seconds=30 * 60),
         Feed("coingecko", coingecko, every_seconds=5 * 60),
+        Feed("taifex", taifex, every_seconds=30 * 60),
     ]
     if fred_api_key:
         feeds.append(Feed("fred", fred(fred_api_key), every_seconds=6 * 3600))

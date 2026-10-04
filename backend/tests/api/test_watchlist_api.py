@@ -37,7 +37,10 @@ async def test_a_new_list_starts_with_the_strip_s_stocks_once(site, mailbox):
     assert [s["key"] for s in first] == list(ORDER)  # the strip's own order, all of it
     assert first[0] == {"symbol": "TAIEX", "market": "market", "key": "taiex",
                         "name": "加權指數", "exchange": None}  # fmt: skip
-    assert first[1]["name"] == "台積電" and first[-1]["name"] == "以太幣"
+    # D-179: 台指期, after the index it follows, then the stocks
+    assert first[1] == {"symbol": "TXF1", "market": "market", "key": "txf1",
+                        "name": "台指期", "exchange": None}  # fmt: skip
+    assert first[2]["name"] == "台積電" and first[-1]["name"] == "以太幣"
     for stock in first:
         assert (await site.delete(f"{URL}/{stock['symbol']}")).status_code == 204
     assert (await site.get(URL)).json() == []  # not filled again

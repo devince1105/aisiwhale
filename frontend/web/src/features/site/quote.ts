@@ -3,7 +3,7 @@
 import type { PublicQuote } from "./api";
 import type { Lang } from "./i18n";
 
-const DECIMALS: Record<string, number> = { btc: 0 };
+const DECIMALS: Record<string, number> = { btc: 0, txf1: 0 }; // 台指期 trades in whole points
 
 /** A stock's code as readers look it up: ``tw:2330`` is ``2330.TW``, ``us:NVDA`` is ``NVDA``. */
 export function stockCode(key: string, exchange?: string | null): string | null {
@@ -84,7 +84,8 @@ export type Group = (typeof GROUPS)[number];
 
 /** Funds that follow a commodity: with the futures, not the stocks (D-080, D-081). */
 const COMMODITY_FUNDS = new Set(["us:USO", "us:CORN", "us:SOYB", "us:WEAT"]);
-const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat"]);
+/** ``txf1``: 台指期, the TAIEX futures' near month (D-179) — a future, so with the futures. */
+const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat", "txf1"]);
 
 /** Which drawer of the watchlist an item sits in (D-094). */
 export function groupOf(key: string): Group {

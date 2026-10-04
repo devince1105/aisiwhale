@@ -172,9 +172,9 @@ async def test_a_failing_service_keeps_its_last_figures_and_is_not_hammered():
 
 
 async def test_without_a_fred_key_the_us_figures_are_left_out_not_faked():
-    assert [f.name for f in build_board(fred_api_key=None).feeds] == ["twse", "coingecko"]
+    assert [f.name for f in build_board(fred_api_key=None).feeds] == ["twse", "coingecko", "taifex"]
     names = [f.name for f in build_board(fred_api_key=None, finnhub_api_key="fk").feeds]
-    assert names == ["twse", "coingecko", "finnhub"]
+    assert names == ["twse", "coingecko", "taifex", "finnhub"]
     never = QuoteBoard(
         [Feed("down", quotes.coingecko, every_seconds=60)],
         client=lambda: httpx.AsyncClient(transport=_transport([], broken={"api.coingecko.com"})),
@@ -217,9 +217,44 @@ async def test_gold_and_three_currencies_from_the_shared_cache():
     assert [f.name for f in build_board(fred_api_key=None, forex=forex).feeds] == [
         "twse",
         "coingecko",
+        "taifex",
         "tiingo",
     ]
     assert [f.name for f in build_board(fred_api_key=None, forex=TiingoFx(None)).feeds] == [
         "twse",
         "coingecko",
+        "taifex",
     ]
+
+
+async def test_taifex_gives_the_near_month_at_the_day_session_s_close():
+    """D-179: 台指期 (TXF1) is the TAIEX futures' earliest monthly contract — not a weekly one,
+    not the night session — as the futures exchange's daily report gives it."""
+    from autora.domains.newsroom.market_strip import TAIFEX_FUTURES, taifex
+
+    def row(month, session, last, change, contract="TX"):
+        return {"Date": "20261002", "Contract": contract, "ContractMonth(Week)": month,
+                "TradingSession": session, "Last": last, "Change": change,
+                "Open": "48552", "High": "48802", "Low": "48472"}  # fmt: skip
+
+    rows = [
+        row("202611", "一般", "48841", "-17"),
+        row("202610", "盤後", "48475", "-223"),
+        row("202610W1", "一般", "48600", "-5"),
+        row("202610", "一般", "48671", "-27"),
+        row("202610", "一般", "1", "0", contract="MTX"),  # 小台, not this one
+    ]
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == TAIFEX_FUTURES
+        return httpx.Response(200, json=rows)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(answer)) as client:
+        [quote] = await taifex(client)
+    assert (quote.key, quote.value, quote.change, quote.change_pct) == ("txf1", 48671, -27, -0.06)
+    assert quote.as_of.isoformat() == "2026-10-02" and quote.source == "TAIFEX"
+    assert (quote.open, quote.high, quote.low, quote.previous_close) == (48552, 48802, 48472, 48698)
+
+    empty = httpx.MockTransport(lambda request: httpx.Response(200, json=[]))
+    async with httpx.AsyncClient(transport=empty) as client:
+        assert await taifex(client) == []  # a holiday's empty report: no figure, not a zero
