@@ -84,13 +84,13 @@ export type Group = (typeof GROUPS)[number];
 
 /** Funds that follow a commodity: with the futures, not the stocks (D-080, D-081). */
 const COMMODITY_FUNDS = new Set(["us:USO", "us:CORN", "us:SOYB", "us:WEAT"]);
-/** ``txf1``: 台指期, the TAIEX futures' near month (D-179) — a future, so with the futures. */
-const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat", "txf1"]);
+const COMMODITIES = new Set(["wti", "xau", "maize", "soybeans", "wheat"]);
 
 /** Which drawer of the watchlist an item sits in (D-094). */
 export function groupOf(key: string): Group {
   if (COMMODITY_FUNDS.has(key) || COMMODITIES.has(key)) return "commodity";
-  if (key.startsWith("tw:")) return "tw";
+  // 台指期 (D-179) with the Taiwan stocks, where a reader of the Taiwan market looks (D-190)
+  if (key.startsWith("tw:") || key === "txf1") return "tw";
   if (key.startsWith("us:")) return "us";
   if (isCurrency(key)) return "fx";
   if (key === "btc" || key === "eth") return "crypto";

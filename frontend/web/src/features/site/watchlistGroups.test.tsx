@@ -29,6 +29,7 @@ describe("觀察清單分類 (D-094)", () => {
     expect(ITEMS.map((i) => groupOf(i.key))).toEqual(["us", "tw", "fx", "commodity", "commodity", "index", "crypto", "us"]);
     expect(groupOf("us10y")).toBe("index");
     expect(groupOf("us:USO")).toBe("commodity");
+    expect(groupOf("txf1")).toBe("tw"); // 台指期, with the Taiwan stocks (D-190)
   });
 
   it("drawers in a fixed order, the reader's order inside, not counted; one folds and stays folded", () => {
