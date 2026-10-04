@@ -11897,7 +11897,7 @@
   },
   "/api/public/securities": {
    "get": {
-    "description": "Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the\nNew Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``.",
+    "description": "Any listed Taiwan or US stock (D-061), by code, ticker or name; a currency against the\nNew Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``;\nand the strip's own figures (D-189): the index, 台指期, rates, oil, gold, coins.",
     "operationId": "search_securities_api_public_securities_get",
     "parameters": [
      {

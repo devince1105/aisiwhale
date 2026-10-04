@@ -524,6 +524,31 @@ class PublicSecurity(BaseModel):
     kind: str
 
 
+STRIP_FIGURES: tuple[tuple[str, str, str, str, str, tuple[str, ...]], ...] = (
+    ("TAIEX", "加權指數", "TAIEX", "TWSE", "index", ("台股", "大盤", "加權")),
+    ("TXF1", "台指期", "TAIEX futures", "TAIFEX", "future", ("台指", "期貨", "TX", "TXF")),
+    ("NASDAQ", "那斯達克", "Nasdaq", "FRED", "index", ("那指",)),
+    ("US10Y", "美國10年期公債", "US 10Y", "FRED", "rate", ("公債", "殖利率", "treasury")),
+    ("WTI", "西德州原油", "WTI crude", "FRED", "spot", ("原油", "油價", "oil")),
+    ("XAU", "黃金", "Gold", "Tiingo", "spot", ("金價",)),
+    ("BTC", "比特幣", "Bitcoin", "CoinGecko", "crypto", ()),
+    ("ETH", "以太幣", "Ether", "CoinGecko", "crypto", ("以太坊", "ethereum")),
+)
+"""The strip's figures a reader may keep (D-062), found by search too (D-189): by symbol, by name
+or by what people call it — 台指 or TX for 台指期. (symbol, zh, en, source, kind, also called)"""
+
+
+def _figures(query: str) -> list[PublicSecurity]:
+    q = query.strip().lower()
+    return [
+        PublicSecurity(
+            symbol=symbol, market="market", name=zh, name_en=en, exchange=source, kind=kind
+        )
+        for symbol, zh, en, source, kind, also in STRIP_FIGURES
+        if q in symbol.lower() or q in zh or q in en.lower() or any(q in a.lower() for a in also)
+    ]
+
+
 def _currencies(query: str) -> list[PublicSecurity]:
     """Currencies with a chart against the New Taiwan dollar whose code or name has ``query``
     in it (D-072): 歐元, EUR or euro find ``EURTWD``."""
@@ -558,20 +583,25 @@ async def search_securities(
     q: Annotated[str, Query(min_length=1, max_length=40)],
     limit: Annotated[int, Query(ge=1, le=20)] = 12,
 ) -> list[PublicSecurity]:
-    """Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the
-    New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``."""
+    """Any listed Taiwan or US stock (D-061), by code, ticker or name; a currency against the
+    New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``;
+    and the strip's own figures (D-189): the index, 台指期, rates, oil, gold, coins."""
     response.headers["Cache-Control"] = "public, max-age=3600"
-    return _currencies(q) + [
-        PublicSecurity(
-            symbol=row.symbol,
-            market=row.market,
-            name=row.name,
-            name_en=row.name_en,
-            exchange=row.exchange,
-            kind=row.kind,
-        )  # fmt: skip
-        for row in await securities.search(session, q, limit=limit)
-    ]
+    return (
+        _figures(q)
+        + _currencies(q)
+        + [
+            PublicSecurity(
+                symbol=row.symbol,
+                market=row.market,
+                name=row.name,
+                name_en=row.name_en,
+                exchange=row.exchange,
+                kind=row.kind,
+            )  # fmt: skip
+            for row in await securities.search(session, q, limit=limit)
+        ]
+    )
 
 
 @router.get("/api/public/quotes")

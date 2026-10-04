@@ -404,9 +404,9 @@ function Search({ lang, watched }: { lang: Lang; watched: Set<string> | null }) 
         found.length ? (
           <ul className="mt-2 divide-y divide-line rounded-lg border border-line" data-testid="search-results">
             {found.map((security) => {
-              // a currency (D-072) or a grain's world price (D-080) is a figure: keyed as the strip
-              // keys one, with no page of its own
-              const currency = security.kind === "fx" || security.kind === "commodity";
+              // a currency (D-072), a grain's world price (D-080) or one of the strip's figures
+              // (D-189) is a figure: keyed as the strip keys one, with no page of its own
+              const currency = security.market === "market";
               const key = currency ? security.symbol.toLowerCase() : `${security.market}:${security.symbol}`;
               return (
                 <li key={key} className="flex items-center gap-3 px-3 py-2 text-sm">

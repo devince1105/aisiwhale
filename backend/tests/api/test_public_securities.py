@@ -78,3 +78,16 @@ async def test_once_it_has_days_its_quote_is_the_last_close(public, db_session):
     assert [q["key"] for q in listed] == ["tw:6488"]  # PLTR has no days yet: left out
     history = (await public.get("/api/public/stocks/6488/history")).json()
     assert len(history["bars"]) == 2 and history["preparing"] is False
+
+
+async def test_the_strip_s_figures_are_found_too(public):
+    """D-189: 台指期 and the strip's other figures by symbol, name or what people call them."""
+    for q in ("TXF1", "txf", "台指期", "台指", "期貨"):
+        found = (await public.get("/api/public/securities", params={"q": q})).json()
+        assert {"symbol": "TXF1", "market": "market", "name": "台指期", "name_en": "TAIEX futures",
+                "exchange": "TAIFEX", "kind": "future"} in found, q  # fmt: skip
+    assert (await public.get("/api/public/securities", params={"q": "大盤"})).json()[0][
+        "symbol"
+    ] == ("TAIEX")
+    coins = (await public.get("/api/public/securities", params={"q": "比特幣"})).json()
+    assert coins[0]["symbol"] == "BTC" and coins[0]["kind"] == "crypto"

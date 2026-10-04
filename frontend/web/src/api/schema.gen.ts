@@ -1237,8 +1237,9 @@ export interface paths {
         };
         /**
          * Search Securities
-         * @description Any listed Taiwan or US stock (D-061), by code, ticker or name; and a currency against the
-         *     New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``.
+         * @description Any listed Taiwan or US stock (D-061), by code, ticker or name; a currency against the
+         *     New Taiwan dollar (D-072), by its name or code — ``EURTWD``, market ``market``, kind ``fx``;
+         *     and the strip's own figures (D-189): the index, 台指期, rates, oil, gold, coins.
          */
         get: operations["search_securities_api_public_securities_get"];
         put?: never;
