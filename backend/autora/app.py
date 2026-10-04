@@ -609,6 +609,7 @@ def build_worker(
         ),
         concurrency=settings.worker_concurrency,
         poll_interval=settings.worker_poll_seconds,
+        idle_poll_interval=max(settings.worker_idle_poll_seconds, settings.worker_poll_seconds),
         maintenance_interval=settings.worker_maintenance_seconds,
         company_ids=companies,
         maintenance_jobs=[

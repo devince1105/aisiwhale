@@ -93,6 +93,7 @@ export class Stack {
       WORKER_ID: "e2e-worker",
       WORKER_COMPANY_IDS: JSON.stringify([seeded.company_id, seeded.newsroom_company_id]),
       WORKER_POLL_SECONDS: "0.2",
+      WORKER_IDLE_POLL_SECONDS: "0.2", // the tests wait on no idle worker (D-192)
       PYTHONUNBUFFERED: "1",
     };
     this.api = new Proc("api", ["-m", "uvicorn", "--app-dir", "backend/api", "main:app", "--port", String(API_PORT)], env);

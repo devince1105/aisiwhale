@@ -242,6 +242,10 @@ class Settings(BaseSettings):
     worker_concurrency: int = Field(default=4, ge=1)
     """Agent runs executed at the same time by one worker process."""
     worker_poll_seconds: float = Field(default=1.0, gt=0)
+    worker_idle_poll_seconds: float = Field(default=8.0, gt=0)
+    """The slowest the worker polls when it has nothing to do (D-192); it is back to
+    ``worker_poll_seconds`` as soon as there is work. The browser tests set it to their own fast
+    pace, so nothing there waits on an idle worker."""
     worker_maintenance_seconds: float = Field(default=15.0, gt=0)
     """How often the worker reaps expired leases, expires approvals and fires schedules."""
     worker_company_ids: list[uuid.UUID] = []

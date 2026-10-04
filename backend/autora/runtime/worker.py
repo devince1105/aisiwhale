@@ -48,6 +48,12 @@ MaintenanceJob = Callable[[AsyncSession], Awaitable[None]]
 """A periodic job the worker runs in its own transaction and commits (see ``maintenance_jobs``)."""
 
 
+def idle_wait(previous: float, *, busy: bool, base: float, ceiling: float) -> float:
+    """How long the worker waits before its next pass (D-192): ``base`` while there is work,
+    doubling from the last wait while there is none, never above ``ceiling``."""
+    return base if busy else min(ceiling, max(base, previous * 2))
+
+
 @dataclass
 class Worker:
     worker_id: str
@@ -59,6 +65,11 @@ class Worker:
     services: ServiceDispatcher | None = None
     concurrency: int = 4
     poll_interval: float = 1.0
+    idle_poll_interval: float = 8.0
+    """Idle, the loop slows down (D-192): a pass that finds nothing to do and nothing running waits
+    twice as long as the last one, up to this; any work brings it back to ``poll_interval``. Every
+    pass reads every free agent and their claimable tasks from the database, and the database's
+    network transfer is metered: a second-by-second loop over an idle office was most of it."""
     maintenance_interval: float = 15.0
     grace: float = 30.0
     company_ids: frozenset[uuid.UUID] | None = None
@@ -76,13 +87,19 @@ class Worker:
 
     async def run_forever(self, stop: asyncio.Event) -> None:
         log.info("worker %s started (concurrency=%d)", self.worker_id, self.concurrency)
+        wait = self.poll_interval
         while not stop.is_set():
+            handled = 0
             try:
-                await self.tick()
+                handled = await self.tick()
             except Exception:  # noqa: BLE001 - a transient DB error must not end the process
                 log.exception("worker tick failed")
+            wait = idle_wait(
+                wait, busy=handled > 0 or bool(self._running),
+                base=self.poll_interval, ceiling=self.idle_poll_interval,
+            )  # fmt: skip
             try:
-                await asyncio.wait_for(stop.wait(), timeout=self.poll_interval)
+                await asyncio.wait_for(stop.wait(), timeout=wait)
             except TimeoutError:
                 pass
         await self.shutdown()
