@@ -19,6 +19,7 @@ import { useRoster } from "../agents/roster";
 import { DEFAULT_THEME, type ThemeId } from "../palette";
 import { CueDirector, routeFor } from "../visual/CueRunner";
 import type { BoardCard, FloorPlan } from "./board";
+import { BACKDROP_KEY, piece, type BakedPiece } from "./art/pieces";
 import { paintFloor, Pictures } from "./floorPainter";
 import { buildScene, hitTest, type Scene } from "./tiles";
 import { walkersNow, type Walker } from "./walkers";
@@ -42,6 +43,46 @@ function probe(walking: Walker[], theme: ThemeId): void {
   const started = key === lastWalking ? 0 : ids.filter((id) => !lastWalking.includes(id)).length;
   window.__autoraOfficeFloor = { walking: ids, walks: (previous?.walks ?? 0) + started, theme };
   lastWalking = key;
+}
+
+/** The floor's picture as a rectangle it fills on every row, in canvas pixels (D-187): walls and
+ * windows included, without the empty columns its bake and the canvas's whole tiles leave on the
+ * right — nor the corners where its outline is not square (the top rows end 12 px short on the
+ * right), so no background shows anywhere along the frame. */
+export function floorBox(
+  back: Pick<BakedPiece, "rows"> | null,
+  scene: Pick<Scene, "backdrop" | "width" | "height">,
+): { x: number; y: number; width: number; height: number } | null {
+  if (!back) return null;
+  let x0 = 0, x1 = Infinity, y0 = -1, y1 = -1; // prettier-ignore
+  back.rows.forEach((row, y) => {
+    let first = -1;
+    let last = -1;
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === "." || row[x] === " ") continue;
+      if (first < 0) first = x;
+      last = x;
+    }
+    if (last < 0) return; // an empty row: above or below the floor
+    if (y0 < 0) y0 = y;
+    y1 = y;
+    x0 = Math.max(x0, first);
+    x1 = Math.min(x1, last);
+  });
+  if (y0 < 0 || x1 < x0) return null;
+  const x = Math.max(0, scene.backdrop.x + x0);
+  const y = Math.max(0, scene.backdrop.y + y0);
+  return { x, y, width: Math.min(scene.width, scene.backdrop.x + x1 + 1) - x, height: Math.min(scene.height, scene.backdrop.y + y1 + 1) - y };
+}
+
+/** The whole canvas, scaled so that ``box`` fills its frame. */
+function cropStyle(box: { x: number; y: number; width: number; height: number }, scene: Pick<Scene, "width" | "height">) {
+  return {
+    width: `${(scene.width / box.width) * 100}%`,
+    height: `${(scene.height / box.height) * 100}%`,
+    left: `${(-box.x / box.width) * 100}%`,
+    top: `${(-box.y / box.height) * 100}%`,
+  };
 }
 
 export function PixelFloor({
@@ -69,6 +110,7 @@ export function PixelFloor({
   const roster = useRoster();
   const characters = useMemo(() => new Map(roster.members.map((m) => [m.id, m.character as string])), [roster.members]);
   scene.current = buildScene(plan, cards, characters);
+  const crop = useMemo(() => (fit === "width" ? floorBox(piece(BACKDROP_KEY), scene.current!) : null), [fit]); // the picture is fixed
   const pictures = useMemo(() => new Pictures(theme), [theme]);
   const latest = useRef({ roster, selected, focused, characters, pictures });
   latest.current = { roster, selected, focused, characters, pictures };
@@ -107,7 +149,7 @@ export function PixelFloor({
   }, [director]);
 
   const room = focused ? (plan.rooms.find((r) => r.id === focused)?.label ?? focused) : null;
-  return (
+  const drawn = (
     <canvas
       ref={canvas}
       data-testid="room-plan"
@@ -116,8 +158,12 @@ export function PixelFloor({
       aria-label={room ? `樓層（俯視，${room}）` : "樓層（俯視）"}
       width={scene.current.width}
       height={scene.current.height}
-      className={`w-full border-2 border-[color:var(--console-edge-dim)] ${fit === "width" ? "h-auto" : "h-full object-contain"}`}
-      style={{ imageRendering: "pixelated", background: "var(--console-bg)" }}
+      className={
+        fit === "width"
+          ? "absolute"
+          : "h-full w-full border-2 border-[color:var(--console-edge-dim)] object-contain"
+      }
+      style={{ imageRendering: "pixelated", background: "var(--console-bg)", ...(crop ? cropStyle(crop, scene.current) : null) }}
       onClick={(event) => {
         const current = scene.current;
         const element = canvas.current;
@@ -131,5 +177,15 @@ export function PixelFloor({
         if (hit) uiStore.getState().selectAgent(hit);
       }}
     />
+  );
+  if (!crop) return drawn;
+  // the floor's own outline, edge to edge: the picture's margins (D-187) are cut off by the frame
+  return (
+    <div
+      className="relative w-full overflow-hidden border-2 border-[color:var(--console-edge-dim)]"
+      style={{ aspectRatio: `${crop.width} / ${crop.height}` }}
+    >
+      {drawn}
+    </div>
   );
 }

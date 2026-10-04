@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 
 import { CHARACTERS, characterFor } from "../assets/characters";
-import { OUTFITS, type Paint } from "../assets/outfits";
-import { cellOf, hiddenBy, ruleFor, SPARE_CELLS } from "./dress";
+import { LEFT_OFF, OUTFITS, type Paint } from "../assets/outfits";
+import { cellOf, hiddenBy, ruleFor, SPARE_CELLS, type Corner } from "./dress";
 
 describe("an outfit", () => {
   it("each is made on a real figure, with room in the palette for all its colours", () => {
@@ -51,24 +51,33 @@ describe("which rule repaints a vertex", () => {
   });
 });
 
-describe("what an outfit leaves off (D-183)", () => {
-  it("no figure on female-f carries its backpack: the bag behind the back, not the back", () => {
+describe("what a figure leaves off (D-183 – D-186)", () => {
+  it("female-f's backpack, whoever wears it: the bag sticking out of her back, not her back", () => {
+    const hide = LEFT_OFF["character-female-f"]!;
+    const at = (z: number, cell = "2:5", bone: string | null = "torso"): Corner => ({ cell, bone, z });
+    expect(hiddenBy(hide, [at(-0.213), at(-0.213), at(-0.213)])).toBe(true); // the bag's back
+    expect(hiddenBy(hide, [at(-0.213), at(-0.133), at(-0.133)])).toBe(true); // its sides, to her back
+    expect(hiddenBy(hide, [at(-0.233, "3:7"), at(-0.233, "3:7"), at(-0.213, "3:7")])).toBe(true); // its buckle
+    expect(hiddenBy(hide, [at(-0.133), at(-0.133), at(-0.133)])).toBe(false); // her back itself
+    expect(hiddenBy(hide, [at(-0.133), at(0.096), at(0.096)])).toBe(false); // her top, round to the front
+    expect(hiddenBy(hide, [at(-0.153, "3:3"), at(-0.213), at(-0.213)])).toBe(false); // her belt
+    expect(hiddenBy(hide, [at(-0.213, "2:5", "arm-left"), at(-0.213), at(-0.213)])).toBe(false); // the torso only
+    // everybody on it: Tifa, Mari, and the demo's 月城凜雪 and 工藤莉花
     const onF = Object.entries(OUTFITS).filter(([, outfit]) => outfit.model === "character-female-f");
     expect(onF.map(([key]) => key).sort()).toEqual(["demo_rinka", "demo_ririka", "mari", "tifa"]);
-    for (const [key] of onF) {
-      const { model, hide = [] } = OUTFITS[key];
-      expect(model).toBe("character-female-f");
-      expect(hiddenBy(hide, "2:5", "torso", -0.233)).toBe(true); // the bag's back
-      expect(hiddenBy(hide, "3:7", "torso", -0.213)).toBe(true); // its flap
-      expect(hiddenBy(hide, "2:5", "torso", -0.153)).toBe(true); // its face against her back
-      expect(hiddenBy(hide, "3:3", "torso", -0.153)).toBe(false); // her clothes there
-      expect(hiddenBy(hide, "2:5", "torso", 0.096)).toBe(false); // the straps in front
-      expect(hiddenBy(hide, "2:5", "arm-left", -0.2)).toBe(false); // nothing but the torso
-    }
   });
 
-  it("everybody else wears what the figure has", () => {
-    const others = Object.entries(OUTFITS).filter(([, outfit]) => outfit.model !== "character-female-f");
-    expect(others.filter(([, outfit]) => outfit.hide?.length)).toEqual([]);
+  it("female-a's swords, whoever wears it: blade and hilt on the arms, not the arms", () => {
+    const hide = LEFT_OFF["character-female-a"]!;
+    const at = (cell: string, bone: string | null = "arm-left"): Corner => ({ cell, bone, z: 0 });
+    expect(hiddenBy(hide, [at("2:11"), at("2:11"), at("3:7")])).toBe(true); // blade to hilt
+    expect(hiddenBy(hide, [at("2:11", "arm-right"), at("2:11", "arm-right"), at("2:11", "arm-right")])).toBe(true);
+    expect(hiddenBy(hide, [at("2:11"), at("3:13"), at("3:13")])).toBe(false); // where it meets her hand
+    expect(hiddenBy(hide, [at("2:15"), at("2:15"), at("2:15")])).toBe(false); // her sleeve
+    expect(hiddenBy(hide, [at("2:11", "leg-left"), at("2:11", "leg-left"), at("2:11", "leg-left")])).toBe(false); // her legs' blue
+  });
+
+  it("no other figure leaves anything off", () => {
+    expect(Object.keys(LEFT_OFF).sort()).toEqual(["character-female-a", "character-female-f"]);
   });
 });

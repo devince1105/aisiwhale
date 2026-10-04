@@ -50,6 +50,7 @@ function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
       seat={seat}
       model={model}
       outfit={outfitFor(member.avatar)}
+      character={member.character}
       figure={picturesOf(member.avatar)}
     />
   );

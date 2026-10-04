@@ -23,23 +23,41 @@ export interface Paint {
   notFace?: boolean;
 }
 
-/** Part of a figure left off (D-183): every triangle of the body whose corners are all on these
- * bones, behind ``behind`` (the figure faces +z) and on these palette cells. */
+/** Part of a figure left off (D-183, D-186): every triangle of the body whose three corners are
+ * on these bones and palette cells — and, where given, no further forward than ``surface`` (the
+ * figure faces +z) with at least one of them sticking out behind ``behind``, so that the surface
+ * itself (her back) stays. */
 export interface Hide {
   cells: string[];
   bones: string[];
-  behind: number;
+  surface?: number;
+  behind?: number;
 }
 
 export interface Outfit {
   model: Character;
   paints: Paint[];
-  hide?: Hide[];
 }
 
-/** female-f's backpack: the bag's cells behind her back (her back is at z −0.13, the bag's
- * faces at −0.153 to −0.233). The straps in front stay, as a jacket's trim. */
-const NO_BACKPACK: Hide = { cells: ["2:5", "3:7"], bones: ["torso"], behind: -0.145 };
+/** female-f's backpack: the bag is her top's colour (cell 2:5) with a buckle (3:7), from her back
+ * at z −0.133 out to −0.233 (D-186, measured from the model). Her back, and the top in front,
+ * stay. */
+/** female-a's swords, one in each hand: blade (cell 2:11) and hilt (3:7), on the arms, out to
+ * |x| 0.55 where every other figure's hands end at 0.38 (D-187, measured from the model). Nobody
+ * brings a weapon into the office. */
+const NO_SWORDS: Hide = { cells: ["2:11", "3:7"], bones: ["arm-left", "arm-right"] };
+
+const NO_BACKPACK: Hide = { cells: ["2:5", "3:7"], bones: ["torso"], surface: -0.13, behind: -0.15 };
+
+/**
+ * What a figure leaves off, whoever wears it (D-186): the model's, not an outfit's, so the 3D
+ * office and the 2D board's baked sprite (one per model) agree, dressed or not. Nobody in the
+ * office carries a backpack (D-183 – D-185).
+ */
+export const LEFT_OFF: Partial<Record<Character, readonly Hide[]>> = {
+  "character-female-a": [NO_SWORDS],
+  "character-female-f": [NO_BACKPACK],
+};
 
 const SKIN = "#f2c9a8";
 const BLACK = "#1b1b20";
@@ -49,7 +67,6 @@ export const OUTFITS: Record<string, Outfit> = {
   // Tifa: long dark hair, black top, brown suspenders, black skirt — no backpack (D-184)
   tifa: {
     model: "character-female-f",
-    hide: [NO_BACKPACK], // D-184
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: BLACK },
       { cells: ["2:5"], color: "#6a4527" },
@@ -97,7 +114,6 @@ export const OUTFITS: Record<string, Outfit> = {
   // Mari: reddish-brown twin tails, a red plugsuit — no backpack (D-185)
   mari: {
     model: "character-female-f",
-    hide: [NO_BACKPACK], // D-185
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#8a3d22" },
       { cells: ["3:3", "3:1"], parts: ["body"], color: "#b3182c" },
@@ -136,7 +152,6 @@ export const OUTFITS: Record<string, Outfit> = {
   // Riyuki (月城凜雪): silver hair, a charcoal suit, gold — no backpack (D-183)
   demo_rinka: {
     model: "character-female-f",
-    hide: [NO_BACKPACK],
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#c9ccd6" },
       { cells: ["2:5"], color: "#b8913a" },
@@ -208,7 +223,6 @@ export const OUTFITS: Record<string, Outfit> = {
   // Rika (工藤莉花): coral hair, an orange top, denim — no backpack (D-183)
   demo_ririka: {
     model: "character-female-f",
-    hide: [NO_BACKPACK],
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: "#f08a7a" },
       { cells: ["2:5"], color: "#3a5a8c" },

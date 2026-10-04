@@ -32,7 +32,9 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 
 import { HEAD_SCALE } from "@/office3d/agents/AvatarController";
 import { AVATAR_SCALE, SEAT_LIFT } from "@/office3d/agents/body";
+import { leaveOff } from "@/office3d/agents/dress";
 import { CHARACTERS, characterUrl, type Character } from "@/office3d/assets/characters";
+import { LEFT_OFF } from "@/office3d/assets/outfits";
 
 import { assemble, camera, ELEVATION, lights, PIXELS_PER_METRE, read, renderer, type BakedSprite } from "./render";
 
@@ -76,6 +78,7 @@ export const personKey = (character: string, pose: string, dir: string, frame: n
  * flicker from one walk frame to the next.
  */
 export const COLOURS_PER_CHARACTER = 10;
+
 
 type Rgb = [number, number, number];
 
@@ -234,6 +237,11 @@ function shadowOval(width: number, height: number, centre: { x: number; y: numbe
 
 async function bakeCharacter(character: Character, ppm: number): Promise<BakedSprite[]> {
   const model = await new GLTFLoader().loadAsync(characterUrl(character));
+  // what the 3D office leaves off this figure, the sprite leaves off too (D-186): female-f's bag
+  const hide = LEFT_OFF[character];
+  if (hide?.length) {
+    for (const mesh of meshes(model.scene)) if (mesh.name.startsWith("body")) leaveOff(mesh, mesh.geometry, hide);
+  }
   const texture = meshes(model.scene).map((m) => (m.material as MeshBasicMaterial).map).find(Boolean) ?? null;
   if (!texture) throw new Error(`${character} has no texture`);
   // the texture's own palette, read at full size: mipmaps would average neighbouring swatches

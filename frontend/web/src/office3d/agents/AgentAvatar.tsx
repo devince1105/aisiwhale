@@ -16,7 +16,8 @@ import { visualForAgent, type Pose } from "../visual/mapping";
 import { avatarHandlers } from "../interaction/picking";
 import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
-import { dress } from "./dress";
+import type { Character } from "../assets/characters";
+import { dress, strip } from "./dress";
 import { Standee, standeeLift, type Pictures, type Waiting } from "./Standee";
 import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
 
@@ -46,7 +47,10 @@ export function AgentAvatar({
   model,
   outfit = null,
   figure = null,
+  character,
 }: {
+  /** Her figure: what it leaves off applies dressed or not (D-186). */
+  character?: Character;
   agentId: string;
   seat: Seat;
   model: AvatarModel;
@@ -61,8 +65,8 @@ export function AgentAvatar({
     copy.traverse((o) => {
       if ((o as Mesh).isMesh) o.castShadow = true;
     });
-    return { body: copy, dressed: outfit ? dress(copy, outfit) : null };
-  }, [model.scene, outfit]);
+    return { body: copy, dressed: outfit ? dress(copy, outfit) : character ? strip(copy, character) : null };
+  }, [model.scene, outfit, character]);
   useEffect(() => () => dressed?.dispose(), [dressed]);
   const controller = useMemo(() => new AvatarController(body, model.animations), [body, model.animations]);
   const group = useRef<Group>(null);

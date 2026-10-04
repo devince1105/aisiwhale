@@ -4,7 +4,8 @@
 // clone gets its own geometry and material, so every other figure stays as it was.
 import { BufferAttribute, CanvasTexture, type Material, type Mesh, type MeshStandardMaterial, type Object3D, type SkinnedMesh } from "three";
 
-import type { Hide, Outfit, Paint } from "../assets/outfits";
+import { LEFT_OFF, type Hide, type Outfit, type Paint } from "../assets/outfits";
+import type { Character } from "../assets/characters";
 
 const COLS = 16;
 const ROWS = 4;
@@ -55,9 +56,43 @@ export function ruleFor(
   );
 }
 
-/** Whether a body vertex is part of what the outfit leaves off (D-183). */
-export function hiddenBy(hide: readonly Hide[], cell: string, bone: string | null, z: number): boolean {
-  return hide.some((h) => z < h.behind && h.cells.includes(cell) && bone !== null && h.bones.includes(bone));
+export interface Corner {
+  cell: string;
+  bone: string | null;
+  z: number;
+}
+
+/** Whether a triangle is part of what the figure leaves off (D-183, D-186). */
+export function hiddenBy(hide: readonly Hide[], corners: readonly Corner[]): boolean {
+  return hide.some(
+    (h) =>
+      corners.every(
+        (c) => (h.surface === undefined || c.z < h.surface) && h.cells.includes(c.cell) && c.bone !== null && h.bones.includes(c.bone),
+      ) &&
+      (h.behind === undefined || corners.some((c) => c.z < h.behind!)),
+  );
+}
+
+/**
+ * Drop from ``geometry`` (``mesh``'s own copy) every triangle whose three corners are all hidden
+ * by ``hide`` (D-183). Shared with the 2D bake, which leaves the same part off a figure (D-186).
+ */
+export function leaveOff(
+  mesh: Mesh,
+  geometry: Mesh["geometry"],
+  hide: readonly Hide[],
+  uv: BufferAttribute = geometry.getAttribute("uv") as BufferAttribute,
+): void {
+  if (!geometry.index) return;
+  const position = geometry.getAttribute("position");
+  const corner = (i: number): Corner => ({ cell: cellOf(uv.getX(i), uv.getY(i)), bone: boneOf(mesh, i), z: position.getZ(i) });
+  const index = geometry.index.array;
+  const kept: number[] = [];
+  for (let t = 0; t < index.length; t += 3) {
+    const triangle = [index[t], index[t + 1], index[t + 2]];
+    if (!hiddenBy(hide, triangle.map(corner))) kept.push(...triangle);
+  }
+  geometry.setIndex(kept);
 }
 
 function hexRgb(hex: string): [number, number, number] {
@@ -92,6 +127,23 @@ function paintPalette(image: CanvasImageSource & { width: number; height: number
     ctx.putImageData(source, sc * cw, sr * ch);
   });
   return canvas;
+}
+
+/** A figure with no outfit still leaves off what its model does (D-186): its body meshes get
+ * their own geometry, without those triangles. Returns what to dispose, or null. */
+export function strip(body: Object3D, character: Character): { dispose: () => void } | null {
+  const hide = LEFT_OFF[character];
+  if (!hide?.length) return null;
+  const owned: { dispose: () => void }[] = [];
+  body.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh || partOf(mesh) !== "body") return;
+    const geometry = mesh.geometry.clone();
+    leaveOff(mesh, geometry, hide);
+    mesh.geometry = geometry;
+    owned.push(geometry);
+  });
+  return { dispose: () => owned.forEach((o) => o.dispose()) };
 }
 
 /** Dress ``body`` (a clone of a figure) in ``outfit``. Returns what to dispose with it. */
@@ -143,19 +195,9 @@ export function dress(body: Object3D, outfit: Outfit): { dispose: () => void } {
       next[i * 2 + 1] = (sr + ((v * ROWS) % 1)) / ROWS;
     }
     geometry.setAttribute("uv", new BufferAttribute(next, 2));
-    if (part === "body" && outfit.hide?.length && geometry.index) {
-      // read the original cells (``uv``), not the repainted ones
-      const hidden = (i: number) =>
-        hiddenBy(outfit.hide!, cellOf(uv.getX(i), uv.getY(i)), boneOf(mesh, i), position.getZ(i));
-      const index = geometry.index.array;
-      const kept: number[] = [];
-      for (let t = 0; t < index.length; t += 3) {
-        if (!(hidden(index[t]) && hidden(index[t + 1]) && hidden(index[t + 2]))) {
-          kept.push(index[t], index[t + 1], index[t + 2]);
-        }
-      }
-      geometry.setIndex(kept);
-    }
+    // read the original cells (``uv``), not the repainted ones
+    const hide = LEFT_OFF[outfit.model];
+    if (part === "body" && hide?.length) leaveOff(mesh, geometry, hide, uv);
     mesh.geometry = geometry;
     owned.push(geometry);
   });
