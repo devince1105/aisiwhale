@@ -1,11 +1,16 @@
 """D-188: a figure that joined the strip later reaches the watchlists made before it."""
 
+import importlib
 import uuid
 
 from sqlalchemy import select, text
 
 from autora.accounts.models import Reader, WatchlistItem
-from autora.accounts.watchlist import INSERT_AFTER_SQL, insert_after_params
+
+# the migration's own SQL, as Alembic runs it
+_MIGRATION = importlib.import_module("autora.db.migrations.versions.0061_watchlists_get_txf1")
+INSERT_AFTER_SQL = _MIGRATION.INSERT_AFTER_SQL
+insert_after_params = _MIGRATION.insert_after_params
 
 
 async def _reader(session, keys: list[tuple[str, str]]) -> uuid.UUID:
