@@ -52,8 +52,8 @@ describe("which rule repaints a vertex", () => {
 });
 
 describe("what an outfit leaves off (D-183)", () => {
-  it("the backpack of the demo's two figures on female-f: the bag behind the back, not the back", () => {
-    for (const key of ["demo_rinka", "demo_ririka"]) {
+  it("the backpack of Tifa and the demo's two on female-f: the bag behind the back, not the back", () => {
+    for (const key of ["demo_rinka", "demo_ririka", "tifa"]) {
       const { model, hide = [] } = OUTFITS[key];
       expect(model).toBe("character-female-f");
       expect(hiddenBy(hide, "2:5", "torso", -0.233)).toBe(true); // the bag's back
@@ -66,7 +66,7 @@ describe("what an outfit leaves off (D-183)", () => {
   });
 
   it("everybody else wears what the figure has", () => {
-    const others = Object.entries(OUTFITS).filter(([key]) => key !== "demo_rinka" && key !== "demo_ririka");
+    const others = Object.entries(OUTFITS).filter(([key]) => !["demo_rinka", "demo_ririka", "tifa"].includes(key));
     expect(others.filter(([, outfit]) => outfit.hide?.length)).toEqual([]);
   });
 });

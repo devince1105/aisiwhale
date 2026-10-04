@@ -46,9 +46,10 @@ const BLACK = "#1b1b20";
 
 /** By avatar_key (the same key as the head photo, ``people.avatarPhoto``). */
 export const OUTFITS: Record<string, Outfit> = {
-  // Tifa: long dark hair, black top, brown suspenders, black skirt
+  // Tifa: long dark hair, black top, brown suspenders, black skirt — no backpack (D-184)
   tifa: {
     model: "character-female-f",
+    hide: [NO_BACKPACK], // D-184
     paints: [
       { cells: ["3:13", "3:11"], parts: ["head"], color: BLACK },
       { cells: ["2:5"], color: "#6a4527" },
