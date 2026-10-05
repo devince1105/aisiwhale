@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { CHARACTER_DIR, CHARACTERS, characterFor, POSE_CLIP, REQUIRED_CLIPS } from "./characters";
+import { CHARACTER_DIR, CHARACTERS, characterFor, OWN_FIGURES, ownFigure, POSE_CLIP, REQUIRED_CLIPS } from "./characters";
 
 interface Gltf {
   animations?: { name: string }[];
@@ -28,6 +28,23 @@ describe("character assets (Kenney Mini Characters, CC0)", () => {
         expect(() => readFileSync(join(process.cwd(), "public", CHARACTER_DIR, decodeURIComponent(image.uri!)))).not.toThrow();
       }
     }
+  });
+
+  it("every own figure (D-196) is a skinned GLB on the pack's bones, with every clip", () => {
+    for (const figure of OWN_FIGURES) {
+      const json = gltf(figure) as Gltf & { nodes: { name?: string }[] };
+      expect(json.skins?.length, figure).toBe(1);
+      const nodes = new Set(json.nodes.map((n) => n.name));
+      for (const bone of ["root", "torso", "head", "arm-left", "arm-right", "leg-left", "leg-right"]) {
+        expect(nodes.has(bone), `${figure} has ${bone}`).toBe(true);
+      }
+      const clips = new Set(json.animations?.map((a) => a.name));
+      for (const clip of REQUIRED_CLIPS) expect(clips.has(clip), `${figure} has ${clip}`).toBe(true);
+      expect(json.images ?? [], figure).toEqual([]); // flat colours, no texture to fetch
+    }
+    expect(ownFigure("tifa")).toBe("tifa");
+    expect(ownFigure("ada")).toBeNull();
+    expect(ownFigure(null)).toBeNull();
   });
 
   it("every pose has a clip; the clips are the pack's", () => {

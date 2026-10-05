@@ -28,6 +28,20 @@ export type Character = (typeof CHARACTERS)[number];
 export const characterUrl = (character: Character) => `${CHARACTER_DIR}/${character}.glb`;
 
 /**
+ * Members with a figure of their own (D-196), by avatar_key: made in Blender on the pack's
+ * skeleton, with the pack's clips (``figures-source/blender``). She is drawn as it — not as a
+ * standee, and not as a dressed pack figure.
+ */
+export const OWN_FIGURES = ["tifa"] as const;
+export type OwnFigure = (typeof OWN_FIGURES)[number];
+
+export function ownFigure(avatarKey: string | null | undefined): OwnFigure | null {
+  return avatarKey && (OWN_FIGURES as readonly string[]).includes(avatarKey) ? (avatarKey as OwnFigure) : null;
+}
+
+export const ownFigureUrl = (figure: OwnFigure) => `${CHARACTER_DIR}/${figure}.glb`;
+
+/**
  * Clips per pose (02 §7 poses). The pack has one sitting clip; thinking, typing and reading are
  * the same seat with a different upper-body accent that T-405 layers on. `once` plays one time
  * and settles back into `base`.

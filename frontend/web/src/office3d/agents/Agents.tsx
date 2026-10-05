@@ -14,7 +14,7 @@ import { Suspense, useMemo } from "react";
 import { figureBackPhoto, figurePhoto, figureSitBackPhoto, figureSidePhotos, figureSitPhoto, figureThinkPhotos, figureWaitPhotos, figureWalkPhotos } from "@/people";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
-import { characterUrl } from "../assets/characters";
+import { characterUrl, ownFigure, ownFigureUrl } from "../assets/characters";
 import { outfitFor } from "../assets/outfits";
 import type { Seat } from "../scene/layout";
 import { AgentAvatar } from "./AgentAvatar";
@@ -42,16 +42,18 @@ function picturesOf(avatar: string | null | undefined): Pictures | null {
 }
 
 function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
-  const gltf = useGLTF(characterUrl(member.character), false);
+  // her own figure (D-196) is already dressed and leaves nothing off
+  const own = ownFigure(member.avatar);
+  const gltf = useGLTF(own ? ownFigureUrl(own) : characterUrl(member.character), false);
   const model = useMemo(() => ({ scene: gltf.scene, animations: gltf.animations }), [gltf]);
   return (
     <AgentAvatar
       agentId={member.id}
       seat={seat}
       model={model}
-      outfit={outfitFor(member.avatar)}
-      character={member.character}
-      figure={picturesOf(member.avatar)}
+      outfit={own ? null : outfitFor(member.avatar)}
+      character={own ? undefined : member.character}
+      figure={own ? null : picturesOf(member.avatar)}
     />
   );
 }
