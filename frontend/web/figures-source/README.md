@@ -37,7 +37,7 @@ D-198 改成直接做乾淨的低模，所有細節用畫的：
 ## 預算
 
 - 每個人物最多 10,000 個三角形（`check-assets`，D-198 起；原為 3,000）。
-- Tifa 和 Ada 都是 9999 版：Tifa 9,974 個（D-203），Ada 9,900 個（D-200），GLB 各約 800 KB。
+- Tifa、Ada、Rei 都是 9999 版：Tifa 9,974 個（D-203），Ada 9,900 個（D-200），Rei 9,792 個（D-204），GLB 各約 800 KB。
 - 每個人物的貼圖在顯示卡裡約佔 21 MB（2048 圖集），這比三角形更吃資源。人數變多時，先考慮把圖集降到 1024 或改用壓縮貼圖。
 
 ## 檔案
@@ -46,7 +46,7 @@ D-198 改成直接做乾淨的低模，所有細節用畫的：
 |---|---|
 | `blender/lib.py` | 載入 Kenney 骨架（`reset`、`rig`）與一些舊版基本形體 |
 | `blender/figure.py` | 共用：網格（`ring`、`surface`、`ellipsoid`、`sweep`、`mirror`、`rim`、`planar_front`）、畫布（`Canvas`）、動森的頭與臉（`ac_head`、`ac_face`、`ac_ears`、`ac_nose`）、頭髮（`Hair`：髮蓋、髮片、垂下的長髮）、組裝與烘焙（`part`、`assemble`） |
-| `blender/tifa.py`、`ada.py` | 每個人自己的配色、服裝、髮型和畫上去的細節 |
+| `blender/tifa.py`、`ada.py`、`rei.py` | 每個人自己的配色、服裝、髮型和畫上去的細節 |
 | `blender/export.py` | 匯出 GLB（需先設定 `OUT`、`BUDGET`） |
 | `blender/build.sh` | 背景執行整條流程：`./build.sh tifa` 寫出 `public/models/characters/tifa.glb` 和 `tifa.blend`（約 45 秒），並複製一份到使用者本機的存檔區 `data/blender/tifa-<三角形數>.blend`：做滿 1 萬上限（9,500 以上）的叫 `-9999`，其他直接寫實際面數（例如 `ada-4964`）；`data/` 不進 git |
 | `blender/<avatar_key>.blend` | 成品，可以直接打開看 |
@@ -67,7 +67,7 @@ Ada 的 9999 版是把 1 萬三角形的上限用滿（9,500～9,999）。第一
 
 **比例一律照 Tifa**（使用者的決定，D-199）：頭（`ac_head`）、身體、手臂的數字都沿用，頭到腳總高一樣。參考圖的比例不一定一致（例如 Ada 的參考圖腿太長），只取髮型、臉、服裝。
 
-1. 複製最接近的一位（長髮看 `tifa.py`，短髮看 `ada.py`）成 `<avatar_key>.py`，改配色、服裝、髮型和畫布上的內容。共用的東西留在 `figure.py`。開頭要有 `fit_arms()`；手臂上的配件要跟 `forearm-*`，不是 `arm-*`。
+1. 複製最接近的一位（長髮看 `tifa.py`，短髮看 `ada.py`）成 `<avatar_key>.py`，改配色、服裝、髮型和畫布上的內容。共用的東西留在 `figure.py`。開頭要有 `fit_arms()`；手臂上的配件要跟 `forearm-*`，不是 `arm-*`。頭髮頂端（縮放前）要在 0.600，整個人才會是 0.618 高：辦公室用同一個倍數把自有人物放大到平面人偶的高度，`assets.test.ts` 會檢查（D-203）。
 2. 在參考圖上量比例。可以用 Blender 的 numpy 在圖上打格線、取樣顏色。
 3. 開著 Blender 邊改邊看：`python3 bl.py run lib.py figure.py <avatar_key>.py`。
 4. 完成後執行 `./build.sh <avatar_key>`，再跑 `pnpm -F web check-assets` 和 `pnpm -F web exec vitest run src/office3d`。

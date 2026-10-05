@@ -35,9 +35,10 @@
 
 ## 自製內容（非第三方）
 
-- **成員自己的人物模型（D-196～D-198）**：在 Blender 裡用腳本建的動森風 Q 版人物，原始檔與腳本在 `frontend/web/figures-source/blender/`（`figure.py`、`tifa.py`、`ada.py` 與各自的 `.blend`）。骨架與 32 段動畫沿用上面的 Kenney `character-female-f.glb`（CC0，未改動），網格、材質和貼圖（腳本畫的）是自製的。造型照使用者提供的角色圖（`avatars-source/q`、`back`、`stand-side`）做；**角色本身（Tifa，Square Enix《Final Fantasy VII》；Ada Wong，Capcom《Resident Evil》）不是我們的**，屬同人造型、沒有官方授權。
+- **成員自己的人物模型（D-196～D-198）**：在 Blender 裡用腳本建的動森風 Q 版人物，原始檔與腳本在 `frontend/web/figures-source/blender/`（`figure.py`、`tifa.py`、`ada.py`、`rei.py` 與各自的 `.blend`）。骨架與 32 段動畫沿用上面的 Kenney `character-female-f.glb`（CC0，未改動），網格、材質和貼圖（腳本畫的）是自製的。造型照使用者提供的角色圖（`avatars-source/q`、`back`、`stand-side`）做；**角色本身（Tifa，Square Enix《Final Fantasy VII》；Ada Wong，Capcom《Resident Evil》；綾波零，khara《新世紀福音戰士》）不是我們的**，屬同人造型、沒有官方授權。
   - `models/characters/tifa.glb`
   - `models/characters/ada.glb`
+  - `models/characters/rei.glb`
 
 - 房間、家具、植物、地板材質：全部由程式產生（`src/office3d/scene/`），沒有使用任何下載的模型或圖片。
 - 風格參考（D-008、D-010）：《動物森友會》、《Good Job!》、使用者提供的等角辦公室渲染圖——**只參考風格，沒有使用或仿製其中任何素材**。
