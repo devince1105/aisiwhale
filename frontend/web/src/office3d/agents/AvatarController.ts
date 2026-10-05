@@ -87,11 +87,13 @@ const SEATED_ARMS: Record<"sit_type" | "sit_idle" | "sit_read" | "slump" | "thin
 /** How far a seated own figure turns her head toward the camera (radians), and how quickly (per second). */
 export const GAZE_LIMIT = Math.PI / 4;
 const GAZE_RATE = 4;
-/** How far she lifts her head toward a camera above her (radians, D-215): about 20 degrees, well inside
- * what a neck does, so a bird's-eye view gets a look up and not a head thrown back. */
-export const GAZE_UP_LIMIT = 0.35;
-/** The share of the camera's height above her (as an angle) she lifts her head by: the eyes do the rest. */
-export const GAZE_UP_SHARE = 0.5;
+/** How far she lifts her head toward a camera above her (radians, D-215, D-216): 30 degrees, half of what
+ * a neck does, so a bird's-eye view gets a clear look up and not a head thrown back. */
+export const GAZE_UP_LIMIT = Math.PI / 6;
+/** The share of the camera's height above her (as an angle) she lifts her head by - from the office's
+ * usual 39 degrees, about 29 - always below the camera, so she looks at it and not over it; the eyes do
+ * the rest. */
+export const GAZE_UP_SHARE = 0.75;
 
 /** Where an own figure's head goes for a camera at ``at`` in her own frame (+z ahead, +x her left, +y up),
  * if she is looking at all: [turn, lift] - the turn toward it, not round to look behind her, and the lift
