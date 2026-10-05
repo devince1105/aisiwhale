@@ -2962,6 +2962,29 @@ export interface components {
             theme: "muji" | "wabisabi" | "industrial" | "google" | "cyber";
         };
         /**
+         * OperatorDecision
+         * @description What a person decided about a project (D-202): they resumed it, or said no to the CEO's
+         *     pause or kill — with what they said.
+         *
+         *     The CEO asked and a person answered. Without this line the answer was lost: the snapshot
+         *     showed only the project's state, so a pause the operator rejected on 9/30 with a reason was
+         *     asked for again on 10/01 and twice on 10/02, on the same numbers.
+         */
+        OperatorDecision: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "resumed" | "rejected_pause" | "rejected_kill";
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
          * OpportunityLine
          * @description One thing the company might do, and how far it has got (T-611).
          *
@@ -4342,6 +4365,11 @@ export interface components {
              * @default 0
              */
             open_tasks: number;
+            /**
+             * Operator Decisions
+             * @default []
+             */
+            operator_decisions: components["schemas"]["OperatorDecision"][];
             /** State */
             state: string;
         };

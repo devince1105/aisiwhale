@@ -3620,6 +3620,42 @@
     "title": "OfficeThemeBody",
     "type": "object"
    },
+   "OperatorDecision": {
+    "description": "What a person decided about a project (D-202): they resumed it, or said no to the CEO's\npause or kill — with what they said.\n\nThe CEO asked and a person answered. Without this line the answer was lost: the snapshot\nshowed only the project's state, so a pause the operator rejected on 9/30 with a reason was\nasked for again on 10/01 and twice on 10/02, on the same numbers.",
+    "properties": {
+     "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+     },
+     "decision": {
+      "enum": [
+       "resumed",
+       "rejected_pause",
+       "rejected_kill"
+      ],
+      "title": "Decision",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "required": [
+     "at",
+     "decision"
+    ],
+    "title": "OperatorDecision",
+    "type": "object"
+   },
    "OpportunityLine": {
     "description": "One thing the company might do, and how far it has got (T-611).\n\nKept short on purpose: the thesis and the evidence are a query away, and a CEO comparing\nfive opportunities needs the shape of each, not the case for it.",
     "properties": {
@@ -7158,6 +7194,14 @@
       "default": 0,
       "title": "Open Tasks",
       "type": "integer"
+     },
+     "operator_decisions": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/OperatorDecision"
+      },
+      "title": "Operator Decisions",
+      "type": "array"
      },
      "state": {
       "title": "State",
