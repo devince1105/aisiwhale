@@ -62,6 +62,28 @@ async def test_a_brief_is_a_story_taken_straight_into_production(api, newsroom_r
     )
 
 
+async def test_a_brief_may_say_its_section(api, newsroom_room, db_session):
+    """D-208: a story started from a sentence has no sources to say where it belongs."""
+    room = newsroom_room
+    db_session.add(
+        Project(company_id=room.company.id, name="newsroom", state="ACTIVE", kill_criteria={})
+    )
+    await db_session.flush()
+    posted = await api.post(
+        f"/api/companies/{room.company.id}/team/messages",
+        json={"text": "10/5 台股收盤", "kind": "brief", "section": "tw"},
+    )
+    assert posted.status_code == 201, posted.text
+    story = await db_session.get(Story, posted.json()["story_id"])
+    await db_session.refresh(story)
+    assert story.seed == {"query": "10/5 台股收盤", "section": "tw"}
+    bad = await api.post(
+        f"/api/companies/{room.company.id}/team/messages",
+        json={"text": "x", "kind": "brief", "section": "nft"},
+    )
+    assert bad.status_code == 422
+
+
 async def test_a_message_needs_words_and_the_operator(api, newsroom_room):
     company = newsroom_room.company.id
     blank = await api.post(f"/api/companies/{company}/team/messages", json={"text": "   "})

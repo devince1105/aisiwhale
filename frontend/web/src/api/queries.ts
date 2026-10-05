@@ -6,6 +6,9 @@ import { QueryClient, queryOptions } from "@tanstack/react-query";
 
 import { api as defaultApi, unwrap, type ApiClient, type Schemas } from "./client";
 
+/** One of the site's sections (D-047), as the API spells them. */
+export type Section = NonNullable<Schemas["ArticleSectionBody"]["section"]>;
+
 export const queryKeys = {
   companies: () => ["companies"] as const,
   agents: (companyId: string) => ["agents", companyId] as const,
@@ -277,6 +280,16 @@ export async function setArticleAccess(articleId: string, access: "free" | "memb
   );
 }
 
+/** Put an article in a section of the site, or back to what its sources say (null) (D-208). */
+export async function setArticleSection(articleId: string, section: Section | null, api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.POST("/api/articles/{article_id}/section", {
+      params: { path: { article_id: articleId } },
+      body: { section },
+    }),
+  );
+}
+
 /** Put an article that was taken down back on the site (D-044). */
 export async function republishArticle(articleId: string, api: ApiClient = defaultApi) {
   return unwrap(
@@ -394,12 +407,14 @@ export async function postTeamMessage(
   companyId: string,
   text: string,
   kind: "note" | "brief" = "note",
+  section: Section | null = null,
   api: ApiClient = defaultApi,
 ) {
   return unwrap(
     await api.POST("/api/companies/{company_id}/team/messages", {
       params: { path: { company_id: companyId } },
-      body: { text, kind },
+      // a brief's section on the site (D-208): a story from a sentence has no sources to say it
+      body: { text, kind, ...(kind === "brief" && section ? { section } : {}) },
     }),
   );
 }

@@ -13,6 +13,7 @@ import {
   articlesQuery,
   republishArticle,
   setArticleAccess,
+  setArticleSection,
   reviseArticle,
   sourcesQuery,
   startStory,
@@ -20,6 +21,7 @@ import {
   storyQuery,
   unpublishArticle,
   workflowEventsQuery,
+  type Section,
   type StoryState,
 } from "@/api/queries";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
@@ -160,6 +162,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
   const republish = useMutation({ mutationFn: () => republishArticle(article.id), onSettled });
   const revise = useMutation({ mutationFn: (reason: string) => reviseArticle(article.id, reason), onSettled });
   const access = useMutation({ mutationFn: (to: "free" | "members") => setArticleAccess(article.id, to), onSettled });
+  const section = useMutation({ mutationFn: (to: Section | null) => setArticleSection(article.id, to), onSettled });
   return (
     <ArticleView
       article={article}
@@ -171,8 +174,9 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         republish: () => republish.mutate(),
         revise: (reason) => revise.mutate(reason),
         setAccess: (to) => access.mutate(to),
-        busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending,
-        error: (unpublish.error ?? republish.error ?? revise.error ?? access.error)?.message ?? null,
+        setSection: (to) => section.mutate(to),
+        busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending || section.isPending,
+        error: (unpublish.error ?? republish.error ?? revise.error ?? access.error ?? section.error)?.message ?? null,
       }}
       cover={<CoverPanel articleId={article.id} cover={article.cover} />}
     />

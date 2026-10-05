@@ -113,6 +113,37 @@ async def test_an_article_is_in_the_section_most_of_its_sources_name(public, new
     assert bad.status_code == 422
 
 
+async def test_a_section_a_person_gives_wins_and_can_be_taken_back(api, public, newsroom_room):
+    """D-208: 10/05's brief about the TAIEX had no sources, so it was on the front page only."""
+    room = newsroom_room
+    article_id = await room.publish()
+    list_ = {"lang": "zh-TW", "company": room.company.slug}
+
+    given = await api.post(f"/api/articles/{article_id}/section", json={"section": "tw"})
+    assert given.status_code == 200, given.text
+    assert given.json()["section"] == "tw"
+    tw = (await public.get("/api/public/articles", params=list_ | {"section": "tw"})).json()
+    assert [a["section"] for a in tw] == ["tw"]
+    detail = (await api.get(f"/api/articles/{article_id}")).json()
+    assert (detail["section"], detail["section_given"]) == ("tw", True)
+
+    async with room.committed() as session:
+        await _from_sources(session, room.company.id, room.story.id, ["ai", "ai"])
+        await session.commit()
+    one = await public.get(f"/api/public/articles/zh-TW/{tw[0]['slug']}")
+    assert one.json()["section"] == "tw"  # the person's choice, over what the sources say
+
+    back = await api.post(f"/api/articles/{article_id}/section", json={"section": None})
+    assert back.json()["section"] == "ai"  # automatic again: the sources decide
+    detail = (await api.get(f"/api/articles/{article_id}")).json()
+    assert (detail["section"], detail["section_given"]) == ("ai", False)
+
+    bad = await api.post(f"/api/articles/{article_id}/section", json={"section": "nft"})
+    assert bad.status_code == 422
+    missing = await api.post(f"/api/articles/{uuid.uuid4()}/section", json={"section": "tw"})
+    assert missing.status_code == 404
+
+
 async def test_pages_and_the_next_article_along(public, newsroom_room):
     room = newsroom_room
     first_id = uuid.UUID(await room.publish())

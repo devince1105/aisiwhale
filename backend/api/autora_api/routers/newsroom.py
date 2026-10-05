@@ -45,7 +45,8 @@ from autora.domains.newsroom.publisher import (
     republish_article,
     unpublish_article,
 )
-from autora.domains.newsroom.sources import SourceConfigError, add_source
+from autora.domains.newsroom.site import section_of
+from autora.domains.newsroom.sources import SECTION, SourceConfigError, add_source
 from autora.domains.newsroom.stories import StoryDesk, StoryError
 from autora.domains.newsroom.tools import covers as covers_tool
 from autora.domains.newsroom.workflow import start_article_revision, start_story
@@ -53,6 +54,7 @@ from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
 from autora.runtime.fsm import IllegalTransition
 from autora_api.deps import Operator, RuntimeDep, Session
+from autora_api.routers.public import Section
 
 router = APIRouter(tags=["newsroom"])
 
@@ -236,6 +238,29 @@ async def set_article_access(
     article.access = body.access.value
     await session.commit()
     return {"article_id": str(article.id), "access": article.access}
+
+
+class ArticleSectionBody(BaseModel):
+    section: Section | None
+    """Where it goes on the site; null: back to what its story's sources say (D-208)."""
+
+
+@router.post("/api/articles/{article_id}/section")
+async def set_article_section(
+    article_id: uuid.UUID, body: ArticleSectionBody, session: Session, _: Operator
+) -> dict[str, str | None]:
+    """Put an article in a section of the site (D-208). Kept on its story, beside what started it:
+    a story a person started has no sources to say where it belongs."""
+    article = await session.get(Article, article_id)
+    if article is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"article {article_id} not found")
+    story = await session.get(Story, article.story_id)
+    if story is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"article {article_id} has no story")
+    seed = {k: v for k, v in (story.seed or {}).items() if k != SECTION}
+    story.seed = seed | ({SECTION: body.section} if body.section else {})
+    await session.commit()
+    return {"article_id": str(article.id), "section": await section_of(session, article.id)}
 
 
 class UnpublishBody(BaseModel):

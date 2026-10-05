@@ -666,6 +666,22 @@
       "title": "Revision Count",
       "type": "integer"
      },
+     "section": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Section"
+     },
+     "section_given": {
+      "default": false,
+      "title": "Section Given",
+      "type": "boolean"
+     },
      "shown": {
       "anyOf": [
        {
@@ -790,6 +806,38 @@
      "title"
     ],
     "title": "ArticleRef",
+    "type": "object"
+   },
+   "ArticleSectionBody": {
+    "properties": {
+     "section": {
+      "anyOf": [
+       {
+        "enum": [
+         "holdings",
+         "figures",
+         "ai",
+         "tw",
+         "us",
+         "crypto",
+         "institutions",
+         "gold",
+         "commodities",
+         "fx"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Section"
+     }
+    },
+    "required": [
+     "section"
+    ],
+    "title": "ArticleSectionBody",
     "type": "object"
    },
    "ArticleSummary": {
@@ -6694,6 +6742,29 @@
       "title": "Kind",
       "type": "string"
      },
+     "section": {
+      "anyOf": [
+       {
+        "enum": [
+         "holdings",
+         "figures",
+         "ai",
+         "tw",
+         "us",
+         "crypto",
+         "institutions",
+         "gold",
+         "commodities",
+         "fx"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Section"
+     },
      "text": {
       "maxLength": 1000,
       "minLength": 1,
@@ -8130,6 +8201,92 @@
      }
     ],
     "summary": "Post Revise",
+    "tags": [
+     "newsroom"
+    ]
+   }
+  },
+  "/api/articles/{article_id}/section": {
+   "post": {
+    "description": "Put an article in a section of the site (D-208). Kept on its story, beside what started it:\na story a person started has no sources to say where it belongs.",
+    "operationId": "set_article_section_api_articles__article_id__section_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ArticleSectionBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "title": "Response Set Article Section Api Articles  Article Id  Section Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Article Section",
     "tags": [
      "newsroom"
     ]

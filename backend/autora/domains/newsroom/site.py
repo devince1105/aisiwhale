@@ -54,6 +54,7 @@ from autora.domains.newsroom.models import (
     Evidence,
     Source,
     SourceItem,
+    Story,
     StoryCover,
     StoryItem,
     SupportType,
@@ -264,10 +265,15 @@ def _named(version: ArticleVersion, section: str | None) -> list[PublicNamedStoc
 
 
 def _section():
-    """The section most of the article's story's sources name; ties go to the first in
-    alphabetical order, so an article does not change section from one read to the next."""
+    """The section a person gave the article's story (D-208), else the one most of its sources
+    name; ties go to the first in alphabetical order, so an article does not change section from
+    one read to the next.
+
+    A story a person started — a brief from the team chat — has no sources at all, so without a
+    section given it is on the front page only: 10/05's close of the TAIEX at a record was not
+    under 台股."""
     named = Source.config[SECTION].astext
-    return (
+    by_sources = (
         select(named)
         .select_from(StoryItem)
         .join(SourceItem, SourceItem.id == StoryItem.source_item_id)
@@ -278,6 +284,21 @@ def _section():
         .limit(1)
         .correlate(Article)
         .scalar_subquery()
+    )
+    given = Story.seed[SECTION].astext
+    by_person = (
+        select(given)
+        .where(Story.id == Article.story_id, given.in_(SECTIONS))
+        .correlate(Article)
+        .scalar_subquery()
+    )
+    return func.coalesce(by_person, by_sources)
+
+
+async def section_of(session: AsyncSession, article_id: uuid.UUID) -> str | None:
+    """The section an article is in on the site (D-047, D-208)."""
+    return await session.scalar(
+        select(_section()).select_from(Article).where(Article.id == article_id)
     )
 
 

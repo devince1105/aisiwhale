@@ -37,7 +37,8 @@ from autora.domains.newsroom.models import (
     StoryItem,
 )
 from autora.domains.newsroom.publisher import article_path
-from autora.domains.newsroom.site import LIBRARY_NAME
+from autora.domains.newsroom.site import LIBRARY_NAME, section_of
+from autora.domains.newsroom.sources import SECTION
 
 CONTEXT = 80
 """Characters of evidence text shown before and after a quote."""
@@ -218,6 +219,10 @@ class ArticleDetail(ArticleSummary):
     analytics: list[DailyView]
     workflow_run_ids: list[uuid.UUID]
     cover: CoverView | None = None
+    section: str | None = None
+    """Where it is on the site (D-047): one of the sections, or None for the front page only."""
+    section_given: bool = False
+    """A person chose it (D-208), rather than the story's sources deciding it."""
 
 
 def cover_view(row: StoryCover | None) -> CoverView | None:
@@ -562,6 +567,8 @@ async def article_detail(
     current = groups.get(article.current_draft_group_id) if article.current_draft_group_id else None
     return ArticleDetail(
         cover=cover_view(await cover_of(session, article.story_id)),
+        section=await section_of(session, article.id),
+        section_given=bool(story and (story.seed or {}).get(SECTION)),
         id=article.id,
         story_id=article.story_id,
         title=article.title,

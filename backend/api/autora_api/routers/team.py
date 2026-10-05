@@ -11,9 +11,11 @@ from pydantic import BaseModel, Field
 from autora.app import build_embedder
 from autora.company.team_chat import FEED_LIMIT, post_message, team_feed
 from autora.db.models import Company
+from autora.domains.newsroom.sources import SECTION
 from autora.domains.newsroom.stories import StoryDesk
 from autora_api.deps import Operator, RuntimeDep, Session
 from autora_api.routers.newsroom import start_now
+from autora_api.routers.public import Section
 
 router = APIRouter(prefix="/api/companies/{company_id}/team", tags=["team"])
 
@@ -29,6 +31,9 @@ class TeamMessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
     kind: Literal["note", "brief"] = "note"
     """``brief``: a story for the newsroom to write — taken up at once, as 開始製作 would."""
+    section: Section | None = None
+    """A brief's section on the site (D-208): a story started from a sentence has no sources to
+    say where it belongs. Ignored for a note."""
 
 
 class TeamMessageOut(BaseModel):
@@ -78,8 +83,9 @@ async def post_team_message(
     ref_type = None
     if body.kind == "brief":
         desk = StoryDesk(build_embedder(None))
+        seed = {"query": text} | ({SECTION: body.section} if body.section else {})
         story = await desk.create(
-            session, company_id=company_id, title=text, seed={"query": text}, actor=operator
+            session, company_id=company_id, title=text, seed=seed, actor=operator
         )
         run = await start_now(session, story, None, operator, runtime)
         story_id, run_id, ref_type = story.id, run.id, "story"

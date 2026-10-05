@@ -257,6 +257,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/articles/{article_id}/section": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Article Section
+         * @description Put an article in a section of the site (D-208). Kept on its story, beside what started it:
+         *     a story a person started has no sources to say where it belongs.
+         */
+        post: operations["set_article_section_api_articles__article_id__section_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/articles/{article_id}/unpublish": {
         parameters: {
             query?: never;
@@ -1790,6 +1811,13 @@ export interface components {
             revised_at?: string | null;
             /** Revision Count */
             revision_count: number;
+            /** Section */
+            section?: string | null;
+            /**
+             * Section Given
+             * @default false
+             */
+            section_given: boolean;
             /** Shown */
             shown: number | null;
             /** Slug */
@@ -1832,6 +1860,11 @@ export interface components {
             state: string;
             /** Title */
             title: string;
+        };
+        /** ArticleSectionBody */
+        ArticleSectionBody: {
+            /** Section */
+            section: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx") | null;
         };
         /** ArticleSummary */
         ArticleSummary: {
@@ -4137,6 +4170,8 @@ export interface components {
              * @enum {string}
              */
             kind: "note" | "brief";
+            /** Section */
+            section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx") | null;
             /** Text */
             text: string;
         };
@@ -4842,6 +4877,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionStarted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_article_section_api_articles__article_id__section_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArticleSectionBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string | null;
+                    };
                 };
             };
             /** @description Validation Error */

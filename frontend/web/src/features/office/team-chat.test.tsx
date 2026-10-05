@@ -247,4 +247,19 @@ describe("the group beside the office (D-109)", () => {
       expect(calls.find((c) => c.url.includes("/team/messages"))?.body).toEqual({ text: "輝達財報重點", kind: "brief" }),
     );
   });
+
+  it("a brief may say its section on the site (D-208)", async () => {
+    const calls = serve();
+    open();
+    await screen.findByText("早安");
+    expect(screen.queryByRole("combobox", { name: "題材的分類" })).toBeNull(); // a note has none
+    fireEvent.click(screen.getByRole("button", { name: "交辦題材" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "題材的分類" }), { target: { value: "tw" } });
+    const box = screen.getByRole("textbox", { name: "交辦的題材" });
+    fireEvent.change(box, { target: { value: "台股收盤" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() =>
+      expect(calls.find((c) => c.url.includes("/team/messages"))?.body).toEqual({ text: "台股收盤", kind: "brief", section: "tw" }),
+    );
+  });
 });

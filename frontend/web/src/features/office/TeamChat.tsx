@@ -12,6 +12,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "
 import { approvalsQuery, articlesQuery, decideApproval, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
 import { Face } from "@/features/agent-panel/Face";
 import { commandChoice, type Approval } from "@/features/approvals/model";
+import { isSection, SECTIONS, words as siteWords, type Section } from "@/features/site/i18n";
 import { withCompany } from "@/features/company/CompanyScope";
 import { useNow } from "@/hooks/useNow";
 import { useRealtime } from "@/stores/realtime";
@@ -306,10 +307,13 @@ function ApprovalActions({ approval, companyId }: { approval?: Pick<Approval, "i
 
 /** A note, or 交辦題材: a story for the newsroom to write, started at once. Enter sends (not
  * while an input method is still composing); Shift+Enter is a new line. */
+const SECTION_NAMES = siteWords("zh-TW").sections;
+
 function Composer({ companyId, onSent }: { companyId: string; onSent: () => void }) {
   const client = useQueryClient();
   const [text, setText] = useState("");
   const [brief, setBrief] = useState(false);
+  const [section, setSection] = useState<Section | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const send = async () => {
@@ -318,9 +322,10 @@ function Composer({ companyId, onSent }: { companyId: string; onSent: () => void
     setBusy(true);
     setError(null);
     try {
-      await postTeamMessage(companyId, words, brief ? "brief" : "note");
+      await postTeamMessage(companyId, words, brief ? "brief" : "note", section);
       setText("");
       setBrief(false);
+      setSection(null);
       onSent();
       await client.invalidateQueries({ queryKey: queryKeys.team(companyId) });
     } catch (e) {
@@ -347,6 +352,22 @@ function Composer({ companyId, onSent }: { companyId: string; onSent: () => void
           交辦題材
         </button>
         <span className="text-[11px] text-muted">{brief ? "送出後新聞室會立刻開始製作這個題材" : "一般留言"}</span>
+        {brief ? (
+          // D-208: a story from a sentence has no sources to say where on the site it belongs
+          <select
+            aria-label="題材的分類"
+            value={section ?? ""}
+            onChange={(e) => setSection(isSection(e.target.value) ? e.target.value : null)}
+            className="ml-auto rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[11px]"
+          >
+            <option value="">分類：只在首頁</option>
+            {SECTIONS.map((s) => (
+              <option key={s} value={s}>
+                {SECTION_NAMES[s]}
+              </option>
+            ))}
+          </select>
+        ) : null}
       </div>
       <div className="flex items-end gap-2">
         <textarea

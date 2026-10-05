@@ -6,6 +6,8 @@ import type { EventEnvelope } from "@autora/event-schema";
 import Link from "next/link";
 import { Fragment, useState, type ReactNode } from "react";
 
+import { isSection, SECTIONS, words, type Section as SiteSection } from "@/features/site/i18n";
+
 import { ARTICLE_STATE, claimNumbers, formatTime, label, orderedClaims, problems, type ArticleDetail } from "./model";
 import { Badge, ClaimList, Empty, EventList, NewsroomHeader, Section } from "./parts";
 
@@ -18,6 +20,8 @@ export interface OnSite {
   revise: (reason: string) => void;
   /** VIP or free (D-159): the editor-in-chief's choice, which a person may change. */
   setAccess?: (access: "free" | "members") => void;
+  /** Where it goes on the site (D-208); null: what its story's sources say. */
+  setSection?: (section: SiteSection | null) => void;
   busy: boolean;
   error: string | null;
 }
@@ -122,6 +126,42 @@ function AccessControl({ article, onSite }: { article: ArticleDetail; onSite: On
   );
 }
 
+const SECTION_NAMES = words("zh-TW").sections;
+
+/** Where it is on the site (D-047, D-208): what its story's sources say, unless a person chose. A
+ * brief from the team chat has no sources, so on its own it is on the front page only. */
+function SectionControl({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
+  const now = article.section && isSection(article.section) ? SECTION_NAMES[article.section] : null;
+  return (
+    <section aria-label="分類" data-testid="section-control" className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
+      <label className="flex items-center gap-2">
+        <span className="text-muted">分類：</span>
+        <select
+          aria-label="分類"
+          value={article.section_given && article.section ? article.section : ""}
+          disabled={onSite.busy}
+          onChange={(e) => onSite.setSection!(isSection(e.target.value) ? e.target.value : null)}
+          className="rounded-lg border border-line bg-canvas px-2 py-1"
+        >
+          <option value="">{`自動（${!article.section_given && now ? now : "依新聞來源"}）`}</option>
+          {SECTIONS.map((section) => (
+            <option key={section} value={section}>
+              {SECTION_NAMES[section]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="text-muted">
+        {article.section_given
+          ? "你指定的分類。"
+          : now
+            ? "依新聞來源自動分類，可在這裡改。"
+            : "沒有新聞來源可判斷（例如交辦的題材），只出現在首頁「全部」；請選一個分類。"}
+      </span>
+    </section>
+  );
+}
+
 export function ArticleView({
   article,
   lang,
@@ -168,6 +208,7 @@ export function ArticleView({
       </NewsroomHeader>
 
       {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
+      {onSite?.setSection ? <SectionControl article={article} onSite={onSite} /> : null}
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
       {cover ? (
         <section aria-label="首圖" className="mb-6 rounded-lg border border-line p-4">

@@ -105,6 +105,8 @@ const ARTICLE_DETAIL: ArticleDetail = {
   ],
   analytics: [{ day: "2026-09-21", lang: "en", views: 5, uniques: 5, read_complete: 2 }],
   workflow_run_ids: ["run1"],
+  section: null,
+  section_given: false,
 };
 
 const event = (event_type: string, payload: object): EventEnvelope =>
@@ -147,6 +149,26 @@ describe("taking an article off the site (D-044)", () => {
     expect(controls.setAccess).toHaveBeenCalledWith("members");
     rerender(<ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED", access: "members" }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />);
     expect(within(screen.getByTestId("access-control")).getByRole("button", { name: "VIP（會員看全文）" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("a section a person chooses; a brief with no sources is on the front page only (D-208)", () => {
+    const controls = { ...onSite(), setSection: vi.fn() };
+    const view = (patch: Partial<ArticleDetail>) => (
+      <ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED", ...patch }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />
+    );
+    const { rerender } = render(view({ section: null, section_given: false }));
+    const box = () => within(screen.getByTestId("section-control"));
+    expect(box().getByText(/只出現在首頁「全部」/)).toBeTruthy();
+    fireEvent.change(box().getByRole("combobox", { name: "分類" }), { target: { value: "tw" } });
+    expect(controls.setSection).toHaveBeenCalledWith("tw");
+
+    rerender(view({ section: "tw", section_given: true }));
+    expect((box().getByRole("combobox", { name: "分類" }) as HTMLSelectElement).value).toBe("tw");
+    fireEvent.change(box().getByRole("combobox", { name: "分類" }), { target: { value: "" } });
+    expect(controls.setSection).toHaveBeenLastCalledWith(null); // back to what the sources say
+
+    rerender(view({ section: "ai", section_given: false }));
+    expect(box().getByRole("option", { name: "自動（AI 科技）" })).toBeTruthy();
   });
 
   it("a published article comes down only with a reason", () => {
