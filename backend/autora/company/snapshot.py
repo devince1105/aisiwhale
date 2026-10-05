@@ -27,7 +27,7 @@ import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -42,6 +42,7 @@ from autora.db.models import (
     BusinessUnit,
     CompanyGoal,
     Cycle,
+    EventRecord,
     GoalStatus,
     KpiScope,
     OpportunitySignal,
@@ -97,6 +98,25 @@ class GoalLine(BaseModel):
     which is itself worth seeing: a goal nobody measures cannot be managed."""
 
 
+OPERATOR_MEMORY = timedelta(days=14)
+"""How long what a person decided about a project stays in front of the CEO (D-202)."""
+OPERATOR_DECISIONS_SHOWN = 3
+OPERATOR_REASON_CHARS = 600
+
+
+class OperatorDecision(BaseModel):
+    """What a person decided about a project (D-202): they resumed it, or said no to the CEO's
+    pause or kill — with what they said.
+
+    The CEO asked and a person answered. Without this line the answer was lost: the snapshot
+    showed only the project's state, so a pause the operator rejected on 9/30 with a reason was
+    asked for again on 10/01 and twice on 10/02, on the same numbers."""
+
+    at: datetime
+    decision: Literal["resumed", "rejected_pause", "rejected_kill"]
+    reason: str | None = None
+
+
 class ProjectLine(BaseModel):
     id: uuid.UUID
     name: str
@@ -111,6 +131,8 @@ class ProjectLine(BaseModel):
     awaiting_approval: int = 0
     """Finished work waiting for a person's decision (D-162): output the project has made, held
     until someone approves it — not output it failed to make."""
+    operator_decisions: list[OperatorDecision] = []
+    """What a person decided about it in the last two weeks, newest first (D-202)."""
 
 
 class ProductLine(BaseModel):
@@ -452,9 +474,65 @@ class SnapshotBuilder:
                     open_tasks=counts[0],
                     failed_tasks=counts[1],
                     awaiting_approval=counts[2],
+                    operator_decisions=await self._operator_decisions(
+                        session, company_id, project.id, now
+                    ),
                 )
             )
         return lines
+
+    async def _operator_decisions(
+        self, session: AsyncSession, company_id: uuid.UUID, project_id: uuid.UUID, now: datetime
+    ) -> list[OperatorDecision]:
+        """A person's resumes, and the CEO's pauses and kills a person said no to (D-202).
+
+        Only a person's: the CEO's own decisions on articles nobody answered (D-157) are not an
+        operator speaking. A pause a person approved is not here either — the project's state
+        already says it."""
+        since = now - OPERATOR_MEMORY
+        human = "human"
+        decisions = [
+            OperatorDecision(
+                at=event.occurred_at,
+                decision="resumed",
+                reason=_reason((event.payload or {}).get("reason")),
+            )
+            for event in await session.scalars(
+                select(EventRecord).where(
+                    EventRecord.company_id == company_id,
+                    EventRecord.aggregate_id == project_id,
+                    EventRecord.event_type == "PROJECT_RESUMED",
+                    EventRecord.actor["kind"].astext == human,
+                    EventRecord.occurred_at >= since,
+                    EventRecord.occurred_at <= now,
+                )
+            )
+        ]
+        refused = await session.scalars(
+            select(Approval).where(
+                Approval.company_id == company_id,
+                Approval.state == ApprovalState.REJECTED.value,
+                Approval.payload["command"].astext.in_(("PauseProject", "KillProject")),
+                Approval.payload["args"]["project_id"].astext == str(project_id),
+                Approval.decided_by["kind"].astext == human,
+                Approval.decided_at >= since,
+                Approval.decided_at <= now,
+            )
+        )
+        for approval in refused:
+            if approval.decided_at is None:
+                continue
+            decisions.append(
+                OperatorDecision(
+                    at=approval.decided_at,
+                    decision="rejected_pause"
+                    if approval.payload.get("command") == "PauseProject"
+                    else "rejected_kill",
+                    reason=_reason(approval.reason),
+                )
+            )
+        decisions.sort(key=lambda d: d.at, reverse=True)
+        return decisions[:OPERATOR_DECISIONS_SHOWN]
 
     async def _task_counts(
         self, session: AsyncSession, project_id: uuid.UUID
@@ -652,6 +730,11 @@ def _number(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _reason(value: Any) -> str | None:
+    text = value.strip() if isinstance(value, str) else None
+    return text[:OPERATOR_REASON_CHARS] if text else None
 
 
 def _text(value: Any) -> str | None:

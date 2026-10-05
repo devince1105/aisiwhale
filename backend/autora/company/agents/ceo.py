@@ -122,6 +122,11 @@ BEFORE_PAUSING = """Before pausing (D-162), read a project's numbers for what th
   between it and its results, say approvals are the bottleneck instead.
 - `failed_tasks` counts the last day only. Old failures are not a reason.
 - A cycle that cost a small fraction of the project's budget is not "inefficient" on cost alone.
+- `operator_decisions` is what a person decided about the project in the last two weeks (D-202):
+  they resumed it, or said no to a pause or kill, usually saying why. That question is answered.
+  Do not ask it again on the same grounds — not on the same numbers, and not about anything
+  their reason already explains. Ask again only for a new problem in the current numbers that
+  their reason does not cover, and say in your reason what is new since they decided.
 Pause only for a problem you can name in its current numbers, and name them in the reason."""
 
 SYSTEM_PROMPT = """You are the chief executive of an autonomous company.

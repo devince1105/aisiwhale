@@ -6,6 +6,7 @@ waits rather than half-running.
 """
 
 import uuid
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -591,6 +592,60 @@ async def test_the_strategy_a_person_approves_is_what_the_next_snapshot_reads(db
 
     snapshot = await SnapshotBuilder(Reporting()).build(db_session, company.id)
     assert snapshot.strategy_summary == "Own bilingual local news."
+
+
+async def test_what_a_person_decided_about_a_project_is_what_the_next_snapshot_reads(
+    db_session, bus
+):
+    """D-202: a pause a person said no to, and a project a person resumed, are in front of the
+    CEO with what they said. The 9/30 rejections never were, and it asked again three times."""
+    from autora.company.reporting import Reporting
+    from autora.company.snapshot import SnapshotBuilder
+
+    company, _, project = await _world(db_session, with_unit=True)
+
+    async def ask():
+        return await bus.submit(
+            db_session, "PauseProject", {"project_id": str(project.id), "reason": "0 published"},
+            company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
+        )  # fmt: skip
+
+    first = await ask()
+    await bus.approvals.decide(
+        db_session, first.approval.id, outcome="reject", actor=HUMAN,
+        reason="文章在等人核准，不是沒有產出",
+    )  # fmt: skip
+    second = await ask()
+    # 10/02: approved with a note that meant no — a pause a person approved is the state's to say
+    await bus.approvals.decide(
+        db_session, second.approval.id, outcome="approve", actor=HUMAN, reason="請繼續運作"
+    )
+    resume = {"project_id": str(project.id), "reason": "  誤按核准，請持續運作 "}
+    await bus.submit(
+        db_session, "ResumeProject", resume,
+        company_id=company.id, actor=HUMAN, idempotency_key=_key(),
+    )  # fmt: skip
+
+    builder = SnapshotBuilder(Reporting())
+    (line,) = (await builder.build(db_session, company.id)).portfolio[0].projects
+    assert line.state == ProjectState.ACTIVE.value
+    assert [(d.decision, d.reason) for d in line.operator_decisions] == [
+        ("resumed", "誤按核准，請持續運作"),
+        ("rejected_pause", "文章在等人核准，不是沒有產出"),
+    ]
+
+    # two weeks on, the question may be asked again
+    later = datetime.now(UTC) + timedelta(days=15)
+    (line,) = (await builder.build(db_session, company.id, now=later)).portfolio[0].projects
+    assert line.operator_decisions == []
+
+
+async def test_the_ceo_is_told_a_person_s_answer_closes_the_question():
+    """D-202: the rule that goes with the line, in both prompts that may pause."""
+    from autora.company.agents.ceo import BEFORE_PAUSING
+
+    assert "`operator_decisions`" in BEFORE_PAUSING
+    assert "Do not ask it again on the same grounds" in BEFORE_PAUSING
 
 
 async def test_every_attempt_is_in_the_log_whatever_happened(db_session, bus):
