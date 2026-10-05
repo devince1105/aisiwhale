@@ -55,11 +55,7 @@ ac_ears(SKIN, radii=(0.034, 0.024, 0.031), seg=10, rings=7, soft_fold=True)
 ac_nose()
 
 # ---- the glasses: two rounded frames standing off the face, a bridge, arms back to the ears ---------------
-def face_y(x, z):
-    """The front of the head at (x, z): HEAD_PROFILE's superellipse."""
-    zs = [p[0] for p in HEAD_PROFILE]
-    rx, ry, pw = (float(np.interp(z, zs, [p[k] for p in HEAD_PROFILE])) for k in (1, 2, 3))
-    return HEAD_Y - ry * max(0.0, 1 - abs(x / rx) ** pw) ** (1 / pw)
+face_y = face_front
 
 
 def rounded_rect(cx, cz, a, b, rc, n):

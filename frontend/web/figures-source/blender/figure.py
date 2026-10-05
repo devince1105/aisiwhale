@@ -387,6 +387,14 @@ def ac_head(skin, ppm=3400, seg=24, rings=None):
     return head, Canvas("face", w, h, ppm, skin)
 
 
+def face_front(x, z):
+    """The front of the head at (x, z), before the head is scaled: HEAD_PROFILE's superellipse - for
+    glasses or a tiara standing just off the face."""
+    zs = [p[0] for p in HEAD_PROFILE]
+    rx, ry, pw = (float(np.interp(z, zs, [p[k] for p in HEAD_PROFILE])) for k in (1, 2, 3))
+    return HEAD_Y - ry * max(0.0, 1 - abs(x / rx) ** pw) ** (1 / pw)
+
+
 def ac_face(face, eye_x=0.055, eye_z=0.437, gaze=0.0070, brows=(True, True), colors=None):
     """Paint an Animal Crossing face: per eye a round white ringed in dark brown - heavy over the
     top, fine underneath - with a tall iris pushed toward her left by ``gaze`` (so a crescent of white

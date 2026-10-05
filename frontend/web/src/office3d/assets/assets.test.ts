@@ -57,7 +57,8 @@ describe("character assets (Kenney Mini Characters, CC0)", () => {
     expect(ownFigure("sayla")).toBe("sayla");
     expect(ownFigure("mari")).toBe("mari");
     expect(ownFigure("shinobu")).toBe("shinobu");
-    expect(ownFigure("ami")).toBeNull();
+    expect(ownFigure("ami")).toBe("ami");
+    expect(ownFigure("chunli")).toBeNull();
     expect(ownFigure(null)).toBeNull();
   });
 
