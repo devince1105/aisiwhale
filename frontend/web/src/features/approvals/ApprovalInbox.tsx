@@ -81,7 +81,13 @@ function Card({
           ) : null}
         </p>
       </div>
-      <h3 className="mt-1 font-medium break-words">{card.summary}</h3>
+      <h3 className="mt-1 font-medium break-words">{card.command?.title ?? card.summary}</h3>
+      {card.command ? (
+        <div className="mt-1 grid gap-1 text-sm" data-testid="command-choice">
+          {card.command.body ? <Folded text={card.command.body} className="text-ink" /> : null}
+          {card.command.effect ? <p className="text-warn">{card.command.effect}</p> : null}
+        </div>
+      ) : null}
       {card.withCeo ? (
         // D-157: nobody decided in a day, so the CEO is reading it; the operator still may
         <p className="mt-1 text-xs text-warn" data-testid="with-ceo">
@@ -147,7 +153,7 @@ function Card({
                 onClick={() => onDecide("approve", reason.trim() || null)}
                 className="rounded-lg bg-ok px-4 py-1.5 text-sm font-medium text-canvas disabled:opacity-50"
               >
-                核准
+                {card.command?.approve ?? "核准"}
               </button>
               {card.canSendBack ? (
                 <button
@@ -166,7 +172,7 @@ function Card({
                 onClick={() => onDecide("reject", reason.trim() || null)}
                 className="rounded-lg border border-danger-line px-4 py-1.5 text-sm text-danger disabled:opacity-50"
               >
-                {card.canSendBack ? "駁回（放棄這則）" : "駁回"}
+                {card.command?.reject ?? (card.canSendBack ? "駁回（放棄這則）" : "駁回")}
               </button>
             </div>
           </div>

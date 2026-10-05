@@ -2,12 +2,13 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   approvalsQuery,
   decideApproval,
   failedWorkflowsQuery,
+  projectsQuery,
   queryKeys,
   restartWorkflow,
 } from "@/api/queries";
@@ -36,6 +37,12 @@ function CompanyApprovals({ company }: { company: Company }) {
   const [state, setState] = useState<ApprovalState>("PENDING");
   const approvals = useQuery(approvalsQuery(company.id, state));
   const failed = useQuery(failedWorkflowsQuery(company.id));
+  // a command names its project by id; the card says which one it is (D-201)
+  const projects = useQuery(projectsQuery(company.id));
+  const projectNames = useMemo(
+    () => Object.fromEntries((projects.data ?? []).map((p) => [p.id, p.name])),
+    [projects.data],
+  );
   const queryClient = useQueryClient();
   const current = useRealtime((s) => (s.company?.companyId === company.id ? s.company : null));
   const connection = useRealtime((s) => s.connection);
@@ -59,7 +66,7 @@ function CompanyApprovals({ company }: { company: Company }) {
       <ApprovalInbox
         state={state}
         onState={setState}
-        cards={approvals.data?.map((a) => approvalCard(a, agents, now))}
+        cards={approvals.data?.map((a) => approvalCard(a, agents, now, projectNames))}
         loadError={approvals.error?.message ?? null}
         decide={(id, decision, reason) => decideApproval(id, decision, reason)}
         live={connection.status === "live"}

@@ -11,6 +11,7 @@ import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "
 
 import { approvalsQuery, articlesQuery, decideApproval, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
 import { Face } from "@/features/agent-panel/Face";
+import { commandChoice, type Approval } from "@/features/approvals/model";
 import { withCompany } from "@/features/company/CompanyScope";
 import { useNow } from "@/hooks/useNow";
 import { useRealtime } from "@/stores/realtime";
@@ -189,7 +190,7 @@ function Bubble({
   item: Extract<ChatItem, { type: "message" }>;
   companyId: string;
   compact: boolean;
-  approval?: { id: string; state?: string };
+  approval?: Pick<Approval, "id" | "payload">;
 }) {
   const mine = item.speaker.kind === "me";
   const time = <span className="shrink-0 self-end text-[10px] text-muted">{timeLabel(item.at)}</span>;
@@ -236,14 +237,16 @@ function Bubble({
   );
 }
 
-/** 核准 / 退回修改 / 駁回, as in the inbox; once decided, what became of it. */
-function ApprovalActions({ approval, companyId }: { approval?: { id: string }; companyId: string }) {
+/** 核准 / 退回修改 / 駁回, as in the inbox; once decided, what became of it. An executive's command
+ * cannot be sent back, and its buttons say what they do (D-201). */
+function ApprovalActions({ approval, companyId }: { approval?: Pick<Approval, "id" | "payload">; companyId: string }) {
   const client = useQueryClient();
   const [asking, setAsking] = useState<"revise" | "reject" | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!approval) return <span className="mt-1.5 block text-[11px] text-muted">已處理</span>;
+  const choice = commandChoice(approval.payload ?? {});
   const decide = async (decision: "approve" | "revise" | "reject") => {
     setBusy(true);
     setError(null);
@@ -265,7 +268,7 @@ function ApprovalActions({ approval, companyId }: { approval?: { id: string }; c
           <input
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder={asking === "revise" ? "要改哪裡？" : "為什麼不發？"}
+            placeholder={asking === "revise" ? "要改哪裡？" : choice ? "為什麼不同意？" : "為什麼不發？"}
             aria-label={asking === "revise" ? "退回修改的理由" : "駁回的理由"}
             className="rounded-md border border-line bg-canvas px-2 py-1 text-xs"
           />
@@ -281,13 +284,15 @@ function ApprovalActions({ approval, companyId }: { approval?: { id: string }; c
       ) : (
         <div className="flex flex-wrap gap-1.5">
           <button type="button" disabled={busy} onClick={() => void decide("approve")} className={`${button} border-ok bg-ok text-white`}>
-            核准
+            {choice?.approve ?? "核准"}
           </button>
-          <button type="button" disabled={busy} onClick={() => setAsking("revise")} className={`${button} border-line text-ink`}>
-            退回修改
-          </button>
+          {choice ? null : (
+            <button type="button" disabled={busy} onClick={() => setAsking("revise")} className={`${button} border-line text-ink`}>
+              退回修改
+            </button>
+          )}
           <button type="button" disabled={busy} onClick={() => setAsking("reject")} className={`${button} border-line text-danger`}>
-            駁回
+            {choice?.reject ?? "駁回"}
           </button>
           <Link href={withCompany("/admin/approvals", companyId)} className="self-center text-[11px] text-muted underline">
             看全文

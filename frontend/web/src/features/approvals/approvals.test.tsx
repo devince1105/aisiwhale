@@ -9,7 +9,7 @@ import { eventToQueryKeys } from "@/api/invalidation";
 import type { AgentState } from "@/realtime/reducer";
 
 import { ApprovalInbox, type ApprovalInboxProps } from "./ApprovalInbox";
-import { approvalCard, type Approval } from "./model";
+import { approvalCard, commandChoice, type Approval } from "./model";
 
 // A real pending approval: the echo writer's echo_note, with the company policy override
 // echo_note/writer = needs_approval (seed_echo.py --approval on), from GET /api/approvals.
@@ -65,6 +65,45 @@ describe("model", () => {
       at: "2026-09-18T11:00:00Z",
       reason: "wrong topic",
     });
+  });
+
+  it("a CEO command says what it is and what each button does (D-201)", () => {
+    // the CEO's request of 10/02, approved with the note 「請繼續運作、不要暫停」
+    const pause = {
+      ...pending,
+      kind: "command",
+      action: "command",
+      task_id: null,
+      run_id: null,
+      summary: "Pause project 01a0d2c7-c9dd-750a-9a16-dc8cbd8b3f91: Last cycle spent NT$3.563520, produced 0 published articles",
+      payload: {
+        command: "PauseProject",
+        role: "ceo",
+        args: { project_id: "01a0d2c7-c9dd-750a-9a16-dc8cbd8b3f91", reason: "Last cycle spent NT$3.563520, produced 0 published articles" },
+      },
+    } as Approval;
+    const card = approvalCard(pause, agents, NOW, { "01a0d2c7-c9dd-750a-9a16-dc8cbd8b3f91": "持股動態與科技產業" });
+    expect(card.command).toMatchObject({
+      title: "暫停專案「持股動態與科技產業」",
+      body: "Last cycle spent NT$3.563520, produced 0 published articles",
+      approve: "核准：暫停專案",
+      reject: "駁回：繼續運作",
+    });
+    expect(card.command!.effect).toContain("不會有新文章");
+    expect(card.canSendBack).toBe(false);
+    // a project this page cannot name is shown by the start of its id
+    expect(approvalCard(pause, agents, NOW).command!.title).toBe("暫停專案（01a0d2c7）");
+
+    expect(commandChoice({ command: "UpdateStrategy", args: { summary: "雙語、有來源" } })).toMatchObject({
+      title: "更新公司策略",
+      body: "雙語、有來源",
+      approve: "核准：採用新策略",
+      reject: "駁回：維持原策略",
+    });
+    expect(commandChoice({ command: "KillProject", args: { project_id: "p1", reason: "r" } })!.effect).toContain("不能再恢復");
+    // not a command, or one this page has no words for: the plain 核准 / 駁回
+    expect(approvalCard(pending, agents, NOW).command).toBeNull();
+    expect(commandChoice({ command: "SomethingNew", args: {} })).toBeNull();
   });
 
   it("an APPROVAL_* event makes every approvals list of the company stale", () => {
@@ -163,6 +202,26 @@ describe("inbox", () => {
     fireEvent.click(within(card()).getByRole("button", { name: "駁回" }));
     await waitFor(() => expect(within(card()).getByRole("alert").textContent).toBe("送出失敗：network down"));
     expect(props.refresh).not.toHaveBeenCalled();
+  });
+
+  it("a command's buttons name the outcome; it cannot be sent back (D-201)", async () => {
+    const pause = {
+      ...pending,
+      kind: "command",
+      action: "command",
+      task_id: null,
+      run_id: null,
+      payload: { command: "PauseProject", args: { project_id: "p1", reason: null } },
+    } as Approval;
+    const { props, card } = setup({ cards: [approvalCard(pause, agents, NOW, { p1: "持股動態與科技產業" })] });
+    expect(within(card()).getByRole("heading").textContent).toBe("暫停專案「持股動態與科技產業」");
+    expect(within(card()).getByTestId("command-choice").textContent).toContain("直到有人在儀表板按「恢復專案」");
+    expect(within(card()).queryByRole("button", { name: "核准" })).toBeNull();
+    expect(within(card()).queryByRole("button", { name: "退回修改" })).toBeNull();
+    fireEvent.change(within(card()).getByRole("textbox"), { target: { value: "請繼續運作、不要暫停" } });
+    fireEvent.click(within(card()).getByRole("button", { name: "駁回：繼續運作" }));
+    await waitFor(() => expect(props.decide).toHaveBeenCalledWith(pending.id, "reject", "請繼續運作、不要暫停"));
+    expect(within(card()).queryByRole("button", { name: "核准：暫停專案" })).toBeNull(); // sent
   });
 
   it("state tabs; decided lists have no buttons", () => {

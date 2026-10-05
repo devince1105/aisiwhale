@@ -59,7 +59,103 @@ export interface ApprovalCard {
   article: { id: string; draftGroupId: string | null } | null;
   /** A transcribed official's transaction report to check against its scan (D-051). */
   officialReport: OfficialReportCheck | null;
+  /** An executive's command (pause a project, a new strategy…): what it is and what each button
+   * does, in words (D-201). Null for anything else, which keeps 核准 / 駁回. */
+  command: CommandChoice | null;
   decision: { by: string; at: string; reason: string | null } | null;
+}
+
+/**
+ * What approving a command does, and what saying no keeps (D-201). A bare 核准 read as agreeing
+ * with one's own note: on 10/02 two of the CEO's requests to pause the newsroom were approved
+ * with the note 「請繼續運作、不要暫停」, and it wrote nothing for three days. So the buttons name
+ * the outcome, and the card names the project instead of its id.
+ */
+export interface CommandChoice {
+  title: string;
+  /** The executive's reason, or the strategy itself. */
+  body: string | null;
+  /** What happens once approved. */
+  effect: string | null;
+  approve: string;
+  reject: string;
+}
+
+function named(names: Record<string, string>, id: unknown): string {
+  const key = String(id ?? "");
+  return names[key] ? `「${names[key]}」` : `（${key.slice(0, 8)}）`;
+}
+
+export function commandChoice(
+  payload: Record<string, unknown>,
+  projects: Record<string, string> = {},
+  agents: Record<string, AgentState> = {},
+): CommandChoice | null {
+  if (typeof payload.command !== "string") return null;
+  const args = (payload.args ?? {}) as Record<string, unknown>;
+  const reason = typeof args.reason === "string" && args.reason.trim() ? args.reason.trim() : null;
+  switch (payload.command) {
+    case "PauseProject":
+      return {
+        title: `暫停專案${named(projects, args.project_id)}`,
+        body: reason,
+        effect: "核准後這個專案停工：不再開始新的工作（新聞室不排稿，不會有新文章），直到有人在儀表板按「恢復專案」。",
+        approve: "核准：暫停專案",
+        reject: "駁回：繼續運作",
+      };
+    case "ResumeProject":
+      return {
+        title: `恢復專案${named(projects, args.project_id)}`,
+        body: reason,
+        effect: "核准後專案恢復運作，下一個週期起照常開始工作。",
+        approve: "核准：恢復專案",
+        reject: "駁回：維持暫停",
+      };
+    case "KillProject":
+      return {
+        title: `終止專案${named(projects, args.project_id)}`,
+        body: reason,
+        effect: "核准後這個專案永久結束，不能再恢復。",
+        approve: "核准：終止專案",
+        reject: "駁回：繼續運作",
+      };
+    case "UpdateStrategy":
+      return {
+        title: "更新公司策略",
+        body: typeof args.summary === "string" ? args.summary : null,
+        effect: "核准後執行長往後每個週期都照這份策略規劃。",
+        approve: "核准：採用新策略",
+        reject: "駁回：維持原策略",
+      };
+    case "CreateProject":
+      return {
+        title: `新專案「${String(args.name ?? "")}」`,
+        body: typeof args.description === "string" ? args.description : null,
+        effect: "核准後建立這個專案，開始花預算做事。",
+        approve: "核准：建立專案",
+        reject: "駁回：不建立",
+      };
+    case "AllocateBudget":
+      return {
+        title: `撥預算 NT$${String(args.amount ?? "")}`,
+        body: reason,
+        effect: null,
+        approve: "核准：撥這筆預算",
+        reject: "駁回：不撥",
+      };
+    case "PauseAgent": {
+      const id = String(args.agent_id ?? "");
+      return {
+        title: `暫停員工「${personName(agents[id]?.display_name) || id.slice(0, 8)}」`,
+        body: reason,
+        effect: "核准後這位員工不再接任務，直到有人恢復。",
+        approve: "核准：暫停這位員工",
+        reject: "駁回：繼續工作",
+      };
+    }
+    default:
+      return null;
+  }
 }
 
 export interface OfficialReportCheck {
@@ -98,7 +194,12 @@ function actorName(actor: Record<string, unknown> | null, agents: Record<string,
 
 /** The article requests were once titled 「核准發布：…」, which read as if it had been; they are
  * requests (D-141), and the older rows are shown with the new word. */
-export function approvalCard(approval: Approval, agents: Record<string, AgentState>, now: Date): ApprovalCard {
+export function approvalCard(
+  approval: Approval,
+  agents: Record<string, AgentState>,
+  now: Date,
+  projects: Record<string, string> = {},
+): ApprovalCard {
   const payload = approval.payload as Record<string, unknown>;
   const expiresMs = approval.expires_at ? Date.parse(approval.expires_at) - now.getTime() : null;
   return {
@@ -130,6 +231,7 @@ export function approvalCard(approval: Approval, agents: Record<string, AgentSta
           }
         : null,
     officialReport: officialReport(approval.kind, payload),
+    command: commandChoice(payload, projects, agents),
     decision: approval.decided_at
       ? { by: actorName(approval.decided_by, agents), at: approval.decided_at, reason: approval.reason }
       : null,

@@ -156,7 +156,7 @@ describe("the group beside the office (D-109)", () => {
     envelope(1, "APPROVAL_REQUESTED", { kind: "article", ref_type: "task", ref_id: TASK, summary: "核准發布：黃金需求" }, { kind: "system", id: "service:newsroom.approve" }),
     envelope(2, "TEAM_MESSAGE_POSTED", { text: "早安", kind: "note" }, { kind: "human", id: "operator" }),
   ];
-  const serve = () => {
+  const serve = (items: unknown[] = feed, approvals: unknown[] = [{ id: "ap1", ref_id: TASK, state: "PENDING" }]) => {
     const calls: { url: string; method: string; body: unknown }[] = [];
     vi.stubGlobal(
       "fetch",
@@ -165,11 +165,11 @@ describe("the group beside the office (D-109)", () => {
         const url = request.url;
         const body = request.method === "GET" ? null : await request.clone().json().catch(() => null);
         calls.push({ url, method: request.method, body });
-        if (url.includes("/team/feed")) return Response.json({ items: feed, has_more: false });
+        if (url.includes("/team/feed")) return Response.json({ items, has_more: false });
         if (url.includes("/team/messages")) return Response.json({ seq: 99, story_id: null, workflow_run_id: null }, { status: 201 });
         if (url.includes("/decide")) return Response.json({ id: "ap1" });
         if (url.includes("/articles")) return Response.json([]);
-        if (url.includes("/api/approvals")) return Response.json([{ id: "ap1", ref_id: TASK, state: "PENDING" }]);
+        if (url.includes("/api/approvals")) return Response.json(approvals);
         return Response.json({});
       }),
     );
@@ -214,6 +214,23 @@ describe("the group beside the office (D-109)", () => {
     fireEvent.change(within(asked).getByRole("textbox", { name: "退回修改的理由" }), { target: { value: "標題太長" } });
     fireEvent.click(send);
     await waitFor(() => expect(calls.find((c) => c.url.includes("/decide"))?.body).toEqual({ decision: "revise", reason: "標題太長" }));
+  });
+
+  it("the CEO's command: the buttons say what they do, and it cannot be sent back (D-201)", async () => {
+    const CMD = "0192f000-0000-7000-8000-0000000000e1";
+    const calls = serve(
+      [envelope(1, "APPROVAL_REQUESTED", { kind: "command", ref_type: "command", ref_id: CMD, summary: "Pause project p1: no reason given" }, { kind: "agent", id: "ceo" })],
+      [{ id: "ap2", ref_id: CMD, state: "PENDING", payload: { command: "PauseProject", args: { project_id: "p1", reason: null } } }],
+    );
+    open();
+    const asked = await screen.findByTestId("chat-approval");
+    expect(within(asked).queryByRole("button", { name: "核准" })).toBeNull();
+    expect(within(asked).queryByRole("button", { name: "退回修改" })).toBeNull();
+    expect(within(asked).getByRole("button", { name: "核准：暫停專案" })).toBeTruthy();
+    fireEvent.click(within(asked).getByRole("button", { name: "駁回：繼續運作" }));
+    fireEvent.change(within(asked).getByRole("textbox", { name: "駁回的理由" }), { target: { value: "請繼續運作" } });
+    fireEvent.click(within(asked).getByRole("button", { name: "送出" }));
+    await waitFor(() => expect(calls.find((c) => c.url.includes("/api/approvals/ap2/decide"))?.body).toEqual({ decision: "reject", reason: "請繼續運作" }));
   });
 
   it("a brief goes to the newsroom; Enter sends, but not while an input method is composing", async () => {
