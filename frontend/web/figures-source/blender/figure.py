@@ -714,18 +714,60 @@ def part(o, canvas, weights):
     return o
 
 
-def _pack(canvases, size, pad):
-    """Shelves, tallest first. Returns {canvas name: (x, y)} of each canvas' lower-left pixel."""
-    rects, x, y, shelf = {}, pad, pad, 0
-    for c in sorted(canvases, key=lambda c: -c.h):
-        if x + c.w + pad > size:
-            x, y, shelf = pad, y + shelf + 2 * pad, 0
-        if y + c.h + pad > size or c.w + 2 * pad > size:
+HAIR_GUTTER = 32      # pixels of a hair canvas' own paint round it (see _pack)
+CROWN_BLEED = 64      # and more past the cap's seam
+
+
+def _gutter(c, pad, hair):
+    """(around, right): the pixels of its own paint a canvas keeps round it, and past its right edge."""
+    if c.name.split("-")[0] not in hair:
+        return pad, pad
+    return HAIR_GUTTER, HAIR_GUTTER + (CROWN_BLEED if c.name == "cap" else 0)
+
+
+def _pack(canvases, size, pad, hair=()):
+    """A skyline, tallest first: each canvas, with its gutter round it, goes where its top ends lowest,
+    then leftmost. Returns {canvas name: (x, y)} of each canvas' lower-left pixel.
+
+    Seen from afar, the hair samples coarse mipmap levels, each texel the average of 16 to 256 pixels,
+    and where its canvas ends those blocks take in the next canvas: the face or the skin, light in dark
+    hair (D-214). Hair gathers to points: all the cap's columns meet at the crown, a lock is a tube
+    whose seam runs down its side and whose root and tip close to a point, and a point samples coarser
+    still. So the hair's canvases (named in ``hair``) keep ``HAIR_GUTTER`` pixels of their own paint
+    round them, and the cap goes first, into the atlas' corner, its crown along the atlas' edge: sampled
+    clamped, the blocks there hold only the hair. Its seam's side keeps ``CROWN_BLEED`` more."""
+    sky = [(0, size, 0)]                # the skyline: (x, width, height) left to right
+    rects = {}
+    for c in sorted(canvases, key=lambda c: (c.name != "cap", -c.h, -c.w)):
+        g, gr = _gutter(c, pad, hair)
+        w, h = c.w + g + gr, c.h + 2 * g
+        best = None
+        for i, (x, _, _) in enumerate(sky):
+            if x + w > size:
+                break
+            y, j = 0, i
+            while j < len(sky) and sky[j][0] < x + w:
+                y = max(y, sky[j][2])
+                j += 1
+            if y + h <= size and (best is None or (y + h, x) < (best[0] + h, best[1])):
+                best = (y, x)
+        if best is None:
             raise RuntimeError(f"the atlas is full at {c.name}: lower some canvases' resolution")
-        rects[c.name] = (x, y)
-        x += c.w + 2 * pad
-        shelf = max(shelf, c.h)
-    print("atlas rows used", y + shelf + pad, "of", size)
+        y, x = best
+        rects[c.name] = (x + g, y + g)
+        cut = []
+        for sx, sw, sh in sky:
+            if sx < x:
+                cut.append((sx, min(sw, x - sx), sh))
+            if sx + sw > x + w:
+                cut.append((max(sx, x + w), sx + sw - max(sx, x + w), sh))
+        sky = []
+        for s in sorted(cut + [(x, w, y + h)]):
+            if sky and sky[-1][2] == s[2]:
+                sky[-1] = (sky[-1][0], sky[-1][1] + s[1], s[2])
+            else:
+                sky.append(s)
+    print("atlas rows used", max(s[2] for s in sky), "of", size)
     return rects
 
 
@@ -798,11 +840,11 @@ def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, sample
     for _, c, _ in PARTS:
         if c not in canvases:
             canvases.append(c)
-    rects = _pack(canvases, size, pad)
+    rects = _pack(canvases, size, pad, matte)
     atlas = np.full((size, size, 3), 0.5, dtype=np.float32)
     for c in canvases:
         x, y = rects[c.name]
-        atlas[y - pad:y + c.h + pad, x - pad:x + c.w + pad] = np.pad(c.rgb, ((pad, pad), (pad, pad), (0, 0)), mode="edge")
+        atlas[y:y + c.h, x:x + c.w] = c.rgb
     for o, c, weights in PARTS:
         x, y = rects[c.name]
         bm = bmesh.new()
@@ -848,6 +890,13 @@ def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, sample
             x, y = rects[face.name]
             dark[y:y + face.h, x:x + face.w, 0] *= keep.astype(np.float32)
         atlas = atlas * (1 - dark * np.array([0.7, 1.0, 1.1], dtype=np.float32))      # warm shadows, as on skin
+    for c in canvases:
+        # each canvas' paint, shadows and all, carried on into its gutter (see _pack): out from its
+        # edges, and for the hair, which closes round, across its seam from the other side
+        x, y = rects[c.name]
+        g, gr = _gutter(c, pad, matte)
+        wide = np.pad(atlas[y:y + c.h, x:x + c.w], ((0, 0), (g, gr), (0, 0)), mode="wrap" if c.name.split("-")[0] in matte else "edge")
+        atlas[y - g:y + c.h + g, x - g:x + c.w + gr] = np.pad(wide, ((g, g), (0, 0), (0, 0)), mode="edge")
     img = bpy.data.images.new(name, size, size, alpha=False)
     img.pixels[:] = np.concatenate([np.clip(atlas, 0, 1), np.ones((size, size, 1), dtype=np.float32)], axis=2).ravel()
     img.file_format = "PNG"
@@ -856,6 +905,7 @@ def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, sample
         nt = m.node_tree
         tex = nt.nodes.new("ShaderNodeTexImage")
         tex.image = img
+        tex.extension = "EXTEND"        # glTF CLAMP_TO_EDGE: nothing past the atlas' edge is sampled
         nt.links.new(tex.outputs["Color"], next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"])
     mesh.parent = arm
     mesh.modifiers.new("Armature", "ARMATURE").object = arm
