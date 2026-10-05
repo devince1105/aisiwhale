@@ -7,7 +7,7 @@ import { CHARACTER_DIR, CHARACTERS, characterFor, OWN_FIGURES, ownFigure, POSE_C
 interface Gltf {
   animations?: { name: string }[];
   skins?: unknown[];
-  images?: { uri?: string }[];
+  images?: { uri?: string; bufferView?: number }[];
 }
 
 function gltf(character: string): Gltf {
@@ -40,7 +40,11 @@ describe("character assets (Kenney Mini Characters, CC0)", () => {
       }
       const clips = new Set(json.animations?.map((a) => a.name));
       for (const clip of REQUIRED_CLIPS) expect(clips.has(clip), `${figure} has ${clip}`).toBe(true);
-      expect(json.images ?? [], figure).toEqual([]); // flat colours, no texture to fetch
+      // the baked atlas (D-197) travels inside the GLB: nothing beside it to fetch
+      for (const image of json.images ?? []) {
+        expect(image.uri, figure).toBeUndefined();
+        expect(image.bufferView, figure).toBeTypeOf("number");
+      }
     }
     expect(ownFigure("tifa")).toBe("tifa");
     expect(ownFigure("ada")).toBeNull();

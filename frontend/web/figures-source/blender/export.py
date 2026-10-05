@@ -1,5 +1,5 @@
 # Join the parts into one skinned mesh (on copies; the parts stay editable), fit the triangle
-# budget, and write OUT (a GLB with every clip). Expects OUT and BUDGET.
+# budget, and write OUT (a GLB with every clip; baked textures as JPEG). Expects OUT and BUDGET.
 import bmesh
 arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
 if arm.animation_data:
@@ -38,6 +38,8 @@ arm.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.export_scene.gltf(filepath=OUT, export_format="GLB", use_selection=True, export_animations=True,
                           export_animation_mode="ACTIONS", export_skins=True, export_apply=False,
-                          export_yup=True, export_texcoords=False, export_normals=True)
+                          export_yup=True, export_texcoords=True, export_normals=True,
+                          export_tangents=True, export_image_format="JPEG", export_image_quality=88,
+                          export_jpeg_quality=88)
 bpy.data.objects.remove(body, do_unlink=True)
 print("triangles", tris, "->", after)

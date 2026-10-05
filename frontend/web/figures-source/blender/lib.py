@@ -114,13 +114,45 @@ def tube(name, a, b, r1, r2=None, bone=None, material=None, seg=10, caps=True, p
     return bind(_new(name, bm), bone, material)
 
 
-def box(name, center, size, bone, material, bevel=0.3, rot=(0, 0, 0)):
+def lathe(name, a, b, radii, bone, material, seg=10, squash=1.0, caps=True):
+    """A body of revolution from a to b whose radius passes through ``radii`` (evenly spaced along
+    the axis; a 0 at either end closes it to a point). ``squash`` flattens it across (y over x)."""
+    a, b = Vector(a), Vector(b)
+    n = len(radii)
+    bm = bmesh.new()
+    rings = []
+    for i, r in enumerate(radii):
+        z = i / (n - 1) - 0.5
+        if r <= 0:
+            rings.append([bm.verts.new((0, 0, z))])
+        else:
+            rings.append([bm.verts.new((r * math.cos(2 * math.pi * k / seg), r * squash * math.sin(2 * math.pi * k / seg), z))
+                          for k in range(seg)])
+    for lo, hi in zip(rings, rings[1:]):
+        for k in range(seg):
+            if len(lo) == 1:
+                bm.faces.new((lo[0], hi[k], hi[(k + 1) % seg]))
+            elif len(hi) == 1:
+                bm.faces.new((lo[k], lo[(k + 1) % seg], hi[0]))
+            else:
+                bm.faces.new((lo[k], lo[(k + 1) % seg], hi[(k + 1) % seg], hi[k]))
+    for ring in (rings[0], rings[-1]):
+        if caps and len(ring) > 1:
+            bm.faces.new(ring)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    d = b - a
+    rot = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    bm.transform(Matrix.Translation((a + b) / 2) @ rot @ Matrix.Diagonal((1, 1, d.length, 1)))
+    return bind(_new(name, bm), bone, material)
+
+
+def box(name, center, size, bone, material, bevel=0.3, rot=(0, 0, 0), segs=2):
     """A rounded box: ``bevel`` is the fraction of the smallest side rounded off."""
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bm.transform(Matrix.Diagonal((*size, 1)))
     if bevel:
-        bmesh.ops.bevel(bm, geom=bm.verts[:] + bm.edges[:], offset=min(size) * bevel / 2, segments=2,
+        bmesh.ops.bevel(bm, geom=bm.verts[:] + bm.edges[:], offset=min(size) * bevel / 2, segments=segs,
                         affect="EDGES", profile=0.5)
     bm.transform(Matrix.Translation(center) @ Euler(rot).to_matrix().to_4x4())
     return bind(_new(name, bm), bone, material)
