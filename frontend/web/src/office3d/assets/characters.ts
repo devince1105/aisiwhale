@@ -32,7 +32,7 @@ export const characterUrl = (character: Character) => `${CHARACTER_DIR}/${charac
  * skeleton, with the pack's clips (``figures-source/blender``). She is drawn as it — not as a
  * standee, and not as a dressed pack figure.
  */
-export const OWN_FIGURES = ["tifa", "ada", "rei", "sayla"] as const;
+export const OWN_FIGURES = ["tifa", "ada", "rei", "sayla", "mari"] as const;
 export type OwnFigure = (typeof OWN_FIGURES)[number];
 
 export function ownFigure(avatarKey: string | null | undefined): OwnFigure | null {
