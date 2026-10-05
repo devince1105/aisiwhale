@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import select
 
 from autora.db.repositories.companies import get_policies
-from autora.domains.newsroom import markets
+from autora.domains.newsroom import holdings, markets
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source
 from autora.domains.newsroom.sources import SECTIONS, SourceConfigError, add_source
@@ -41,7 +41,8 @@ async def test_every_filing_source_says_whose_it_is_and_stands_alone(db_session)
             )
         )
     ).all()
-    assert len(filings) == 6  # Buffett, Ackman, Burry, Druckenmiller, Duan, Cathie Wood
+    # Buffett, Ackman, Burry, Druckenmiller, Duan, Cathie Wood; NVIDIA, Temasek, Soros (HD-01)
+    assert len(filings) == 9
     # and a public figure's own filings as an owner (D-050)
     filings += (
         await db_session.scalars(
@@ -50,7 +51,7 @@ async def test_every_filing_source_says_whose_it_is_and_stands_alone(db_session)
             )
         )
     ).all()
-    assert len(filings) == 7 and filings[-1].config["section"] == "figures"
+    assert len(filings) == 10 and filings[-1].config["section"] == "figures"
     for source in filings:
         assert source.config["own_story"] is True and source.config["max_age_days"] == 120
         assert source.config["title_prefix"] and source.trust_level >= 0.9
@@ -85,6 +86,28 @@ async def test_a_filer_that_moved_is_the_same_source_with_a_new_address(db_sessi
 
     again = await markets.seed_markets(db_session, actor=ACTOR, slug=slug)
     assert again.added == [] and "CIK=0002026053" in ackman.url
+
+
+async def test_the_holdings_dashboard_follows_nine_13f_filers(db_session):
+    """HD-01: NVIDIA (the company's own investments), Temasek and Soros join the six investors;
+    the holdings refresh finds each by the CIK in its feed, as it does the others."""
+    slug = f"markets-{uuid.uuid4().hex[:8]}"
+    newsroom = await markets.seed_markets(db_session, actor=ACTOR, slug=slug)
+    found = holdings.thirteenf_sources(newsroom.sources)
+    filers = {holdings.investor_name(source): cik for source, cik in found}
+    assert filers == {
+        "巴菲特": "1067983",
+        "比爾・艾克曼": "2026053",
+        "麥可・貝瑞": "1649339",
+        "杜肯米勒": "1536411",
+        "段永平": "1759760",
+        "木頭姐": "1697748",
+        "輝達": "1045810",
+        "淡馬錫": "1021944",
+        "索羅斯": "1029160",
+    }
+    nvidia = next(s for s in newsroom.sources if s.name == "SEC 13F：輝達")
+    assert nvidia.config["title_prefix"] == "輝達（NVIDIA）" and nvidia.config["own_story"] is True
 
 
 def test_searches_stay_inside_the_free_plan():

@@ -266,6 +266,11 @@ SOURCES: tuple[MarketSource, ...] = (
     _investor("杜肯米勒", "Duquesne Family Office", "0001536411"),
     _investor("段永平", "H&H International Investment", "0001759760"),
     _investor("木頭姐", "ARK Investment Management", "0001697748"),
+    # the holdings dashboard's (HD-01): NVIDIA's own investments — the company's, not its CEO's —
+    # Singapore's state investor, and Soros's family office
+    _investor("輝達", "NVIDIA", "0001045810"),
+    _investor("淡馬錫", "Temasek", "0001021944"),
+    _investor("索羅斯", "Soros Fund Management", "0001029160"),
     # public figures (D-050): the President's SEC filings as an owner (Trump Media, DJT), and —
     # as neither the President's OGE transaction reports nor Congress's STOCK Act reports have a
     # feed — searches for news of new ones, which the newsroom follows to the filing itself
