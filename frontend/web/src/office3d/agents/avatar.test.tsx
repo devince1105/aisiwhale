@@ -12,7 +12,7 @@ import { REQUIRED_CLIPS } from "../assets/characters";
 import { assignSeats, seatsForRole } from "../scene/layout";
 import { visualForAgent } from "../visual/mapping";
 import { AgentAvatar, placeFor, type AvatarModel } from "./AgentAvatar";
-import { AvatarController, GAZE_LIMIT, HEAD_SCALE, upperBody } from "./AvatarController";
+import { AvatarController, GAZE_LIMIT, GAZE_UP_LIMIT, GAZE_UP_SHARE, gazeToward, HEAD_SCALE, upperBody } from "./AvatarController";
 
 // A stand-in for a Kenney character: the same bone names, a 1 s clip per name the office plays.
 function fakeModel(bendy = false): AvatarModel {
@@ -269,6 +269,30 @@ describe("AvatarController", () => {
     controller.gaze = 0;
     for (let i = 0; i < 40; i++) controller.update(0.05);
     expect(Math.abs(Math.atan2(new Vector3(0, 0, 1).applyQuaternion(head.quaternion).x, 1))).toBeLessThan(0.05);
+  });
+
+  it("idle, she lifts her head toward a camera above her, a little, as well as turning (D-215)", () => {
+    const model = fakeModel(true);
+    const controller = new AvatarController(model.scene, model.animations, 1);
+    const head = model.scene.getObjectByName("head")!;
+    controller.setPose("sit_idle");
+    const ahead = () => new Vector3(0, 0, 1).applyQuaternion(head.quaternion);
+    // a camera high above, a little to her left: she turns toward it and looks up, by no more than the limit
+    [controller.gaze, controller.gazeUp] = gazeToward({ x: 2, y: 10, z: 6 }, true);
+    for (let i = 0; i < 60; i++) controller.update(0.05);
+    expect(Math.asin(ahead().y)).toBeCloseTo(GAZE_UP_LIMIT, 1);
+    expect(Math.atan2(ahead().x, ahead().z)).toBeCloseTo(Math.atan2(2, 6), 1);
+    // a camera only a little above: half of its height, not all of it
+    [controller.gaze, controller.gazeUp] = gazeToward({ x: 0, y: 1, z: 6 }, true);
+    for (let i = 0; i < 60; i++) controller.update(0.05);
+    expect(Math.asin(ahead().y)).toBeCloseTo(Math.atan2(1, 6) * GAZE_UP_SHARE, 2);
+    // below her, or behind her, or busy: she does not look
+    expect(gazeToward({ x: 0, y: -3, z: 6 }, true)[1]).toBe(0);
+    expect(gazeToward({ x: 0, y: 10, z: -6 }, true)).toEqual([0, 0]);
+    expect(gazeToward({ x: 2, y: 10, z: 6 }, false)).toEqual([0, 0]);
+    [controller.gaze, controller.gazeUp] = [0, 0];
+    for (let i = 0; i < 60; i++) controller.update(0.05);
+    expect(ahead().y).toBeCloseTo(0, 2);
   });
 
   it("an own figure keeps the head she was modelled with (D-198)", () => {

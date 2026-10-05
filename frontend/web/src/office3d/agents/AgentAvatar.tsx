@@ -8,14 +8,14 @@ import { useEffect, useMemo, useRef } from "react";
 import { Vector3, type AnimationClip, type Group, type Mesh, type Object3D } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 
-import { realtimeStore, serverNow } from "@/stores/realtime";
+import { effectiveState, realtimeStore, serverNow } from "@/stores/realtime";
 
 import type { Seat } from "../scene/layout";
 import { routeFor, useCues, type Route } from "../visual/CueRunner";
 import { visualForAgent, type Pose } from "../visual/mapping";
 import { avatarHandlers } from "../interaction/picking";
 import type { Outfit } from "../assets/outfits";
-import { AvatarController } from "./AvatarController";
+import { AvatarController, gazeToward } from "./AvatarController";
 import type { Character } from "../assets/characters";
 import { dress, strip } from "./dress";
 import { isSeated, Standee, standeeLift, type Pictures, type Waiting } from "./Standee";
@@ -84,6 +84,8 @@ export function AgentAvatar({
   const paper = useRef<Mesh>(null);
   const dirty = useRef(true);
   const nextCheck = useRef(0);
+  /** Whether she is idle (閒置) - with nothing to do, not waiting on anything - read with her pose. */
+  const idle = useRef(true);
   const cues = useCues();
   const roster = useRoster();
   const latestRoster = useRef(roster);
@@ -100,12 +102,12 @@ export function AgentAvatar({
   useFrame(({ camera }, dt) => {
     const now = performance.now();
     const g = group.current;
-    // seated, an own figure turns her head toward the camera (D-203): up to GAZE_LIMIT either way, and
-    // not round to look behind her
+    // idle in her seat, an own figure looks at the camera (D-203, D-215): her head turns toward it, up to
+    // GAZE_LIMIT either way and not round to look behind her, and lifts toward it as it looks down on her
+    // (a share of its height above her, up to GAZE_UP_LIMIT). Busy or waiting, she minds her desk.
     if (hand && g) {
-      const at = g.worldToLocal(eye.copy(camera.position));
-      const turn = Math.atan2(at.x, at.z);
-      controller.gaze = isSeated(controller.pose) && Math.abs(turn) < Math.PI * 0.6 ? turn : 0;
+      const looking = idle.current && !walk.current && isSeated(controller.pose);
+      [controller.gaze, controller.gazeUp] = gazeToward(g.worldToLocal(eye.copy(camera.position)), looking);
     }
 
     // a walk cue in progress: the courier
@@ -143,7 +145,9 @@ export function AgentAvatar({
       nextCheck.current = now + RECHECK_MS;
       const state = realtimeStore.getState();
       const agent = state.company?.agents[agentId];
-      const pose = (agent && visualForAgent(agent, serverNow(state))?.pose) || "sit_idle";
+      const at = serverNow(state);
+      const pose = (agent && visualForAgent(agent, at)?.pose) || "sit_idle";
+      idle.current = !agent?.activity || effectiveState(agent.activity, at) === "IDLE";
       waiting.current =
         agent?.activity?.stored_state === "WAITING" ? (agent.activity.detail.reason === "approval" ? "approval" : "other") : null;
       if (pose !== controller.pose) {

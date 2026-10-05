@@ -87,6 +87,20 @@ const SEATED_ARMS: Record<"sit_type" | "sit_idle" | "sit_read" | "slump" | "thin
 /** How far a seated own figure turns her head toward the camera (radians), and how quickly (per second). */
 export const GAZE_LIMIT = Math.PI / 4;
 const GAZE_RATE = 4;
+/** How far she lifts her head toward a camera above her (radians, D-215): about 20 degrees, well inside
+ * what a neck does, so a bird's-eye view gets a look up and not a head thrown back. */
+export const GAZE_UP_LIMIT = 0.35;
+/** The share of the camera's height above her (as an angle) she lifts her head by: the eyes do the rest. */
+export const GAZE_UP_SHARE = 0.5;
+
+/** Where an own figure's head goes for a camera at ``at`` in her own frame (+z ahead, +x her left, +y up),
+ * if she is looking at all: [turn, lift] - the turn toward it, not round to look behind her, and the lift
+ * toward it when it is above her. The controller limits and eases both. */
+export function gazeToward(at: { x: number; y: number; z: number }, looking: boolean): [number, number] {
+  const turn = Math.atan2(at.x, at.z);
+  if (!looking || Math.abs(turn) >= Math.PI * 0.6) return [0, 0];
+  return [turn, Math.max(0, Math.atan2(at.y, Math.hypot(at.x, at.z))) * GAZE_UP_SHARE];
+}
 /** Standing and walking: how far below level the arms hang (radians), and the forearms' bend forward. */
 const HANG = 1.15;
 const ELBOW_BEND = 0.26;
@@ -124,7 +138,10 @@ export class AvatarController {
   /** Where the head should turn, about its own vertical (radians, + toward her left); the head eases
    * there. Set each frame by whoever knows where the camera is (D-203). */
   gaze = 0;
+  /** How far up the head should lift (radians, + up), eased the same way (D-215). */
+  gazeUp = 0;
   private headTurn = 0;
+  private headLift = 0;
 
   constructor(
     private readonly root: Object3D,
@@ -189,10 +206,13 @@ export class AvatarController {
       if (!entry || (this.bendy && name.startsWith("arm-"))) continue;
       entry.bone.quaternion.multiply(this.offset.setFromEuler(this.euler.set(x, y, z)));
     }
-    const target = Math.max(-GAZE_LIMIT, Math.min(GAZE_LIMIT, this.gaze));
-    this.headTurn += (target - this.headTurn) * Math.min(1, dt * GAZE_RATE);
-    if (Math.abs(this.headTurn) > 1e-4) {
-      this.bones.get("head")?.bone.quaternion.multiply(this.offset.setFromEuler(this.euler.set(0, this.headTurn, 0)));
+    const ease = Math.min(1, dt * GAZE_RATE);
+    this.headTurn += (Math.max(-GAZE_LIMIT, Math.min(GAZE_LIMIT, this.gaze)) - this.headTurn) * ease;
+    this.headLift += (Math.max(0, Math.min(GAZE_UP_LIMIT, this.gazeUp)) - this.headLift) * ease;
+    if (Math.abs(this.headTurn) > 1e-4 || this.headLift > 1e-4) {
+      // turned first, then lifted in the turned frame (x forward is a nod down, so up is negative)
+      this.bones.get("head")?.bone.quaternion.multiply(this.offset.setFromEuler(this.euler.set(-this.headLift, this.headTurn, 0, "YXZ")));
+      this.euler.order = "XYZ";
     }
   }
 
