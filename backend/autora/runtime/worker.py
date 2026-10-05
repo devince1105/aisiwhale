@@ -38,12 +38,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from autora.db.models import ActivityState, Agent, AgentActivity, AgentStatus
 from autora.runtime.agent_runner import AgentRunner, RunOutcome
 from autora.runtime.approvals import ApprovalService
+from autora.runtime.oncall import AskForCall, Call, Overtime
 from autora.runtime.scheduler import Scheduler
 from autora.runtime.services import ServiceDispatcher
 from autora.runtime.shifts import Shifts
 from autora.runtime.task_manager import AgentBusy, Claim, TaskManager
 
 log = logging.getLogger("autora.worker")
+
+CLOCK_SKEW = timedelta(seconds=5)
+"""How far the worker's clock and the API's may disagree (D-205)."""
 
 MaintenanceJob = Callable[[AsyncSession], Awaitable[None]]
 """A periodic job the worker runs in its own transaction and commits (see ``maintenance_jobs``)."""
@@ -69,6 +73,18 @@ class Worker:
     shifts: Shifts | None = None
     """Office hours (D-193): outside them, no new work and — once what runs has finished — no
     query at all until the next shift. None: always at work."""
+    on_call: AskForCall | None = None
+    """Off duty, asked every ``call_poll_interval`` whether a person has just acted in the back
+    office (D-205). If so the worker comes in, works until nothing is left, and goes home again.
+    The question goes to the API, never the database. None: the shifts only."""
+    overtime: Overtime | None = None
+    """What a call may use and what it used (勞基法: a day's and a month's limit). None: no
+    limit but ``call_limit`` per call."""
+    call_poll_interval: float = 60.0
+    call_idle: float = 180.0
+    """On call, seconds with nothing to do before the worker goes home."""
+    call_limit: float = 3600.0
+    """The longest one call lasts, in seconds."""
     idle_poll_interval: float = 8.0
     """Idle, the loop slows down (D-192): a pass that finds nothing to do and nothing running waits
     twice as long as the last one, up to this; any work brings it back to ``poll_interval``. Every
@@ -86,6 +102,12 @@ class Worker:
     on_outcome: Callable[[RunOutcome], Awaitable[None]] | None = None
     _running: dict[uuid.UUID, asyncio.Task[RunOutcome | None]] = field(default_factory=dict)
     _last_maintenance: datetime | None = None
+    _call: Call | None = None
+    _answered: datetime | None = None
+    """The latest call taken (D-205): one call is answered once."""
+    _covered_until: datetime | None = None
+    """Up to when the worker has been at work: what a person did before that, it has seen."""
+    _clocked_out: bool = False
 
     # --- loop ------------------------------------------------------------------------------
 
@@ -93,40 +115,110 @@ class Worker:
         log.info("worker %s started (concurrency=%d)", self.worker_id, self.concurrency)
         wait = self.poll_interval
         while not stop.is_set():
-            if self.shifts is not None and not self.shifts.on_duty(self.clock()):
+            if self.shifts is not None and not await self._at_work():
                 await self._off_duty(stop)
                 wait = self.poll_interval
                 continue
+            self._clocked_out = False
+            # a little before the pass begins: the two machines' clocks need not agree exactly
+            self._covered_until = self.clock() - CLOCK_SKEW
             handled = 0
             try:
                 handled = await self.tick()
             except Exception:  # noqa: BLE001 - a transient DB error must not end the process
                 log.exception("worker tick failed")
+            busy = handled > 0 or bool(self._running)
+            if self._call is not None:
+                self._call.idle_since = None if busy else (self._call.idle_since or self.clock())
             wait = idle_wait(
-                wait, busy=handled > 0 or bool(self._running),
-                base=self.poll_interval, ceiling=self.idle_poll_interval,
-            )  # fmt: skip
+                wait, busy=busy, base=self.poll_interval, ceiling=self.idle_poll_interval
+            )
             try:
                 await asyncio.wait_for(stop.wait(), timeout=wait)
             except TimeoutError:
                 pass
         await self.shutdown()
 
+    async def _at_work(self) -> bool:
+        """On a shift, or on a call that is not over (D-205). A call ends when it is done, at its
+        limit, or when a shift begins; its time is written down as overtime then."""
+        assert self.shifts is not None
+        now = self.clock()
+        on_shift = self.shifts.on_duty(now)
+        if self._call is not None and (
+            on_shift or self._call.over(now, timedelta(seconds=self.call_idle))
+        ):
+            await self._end_call(now)
+        return on_shift or self._call is not None
+
     async def _off_duty(self, stop: asyncio.Event) -> None:
-        """Clocked out (D-193): let what runs finish, then wait for the next shift untouched."""
+        """Clocked out (D-193): let what runs finish, then wait for the next shift without a
+        query — or, on call (D-205), until a person does something in the back office."""
         if self._running:
             await asyncio.wait(list(self._running.values()), timeout=self.poll_interval)
             return
         assert self.shifts is not None
         now = self.clock()
         start = self.shifts.next_start(now)
-        log.info("worker %s off duty until %s", self.worker_id, start.isoformat())
+        if not self._clocked_out:
+            on_call = " (on call)" if self.on_call is not None else ""
+            log.info("worker %s off duty until %s%s", self.worker_id, start.isoformat(), on_call)
+            self._clocked_out = True
         # woken at most hourly, so a clock that jumped (a sleeping laptop) is not trusted for days
-        seconds = min(3600.0, max(1.0, (start - now).total_seconds()))
+        ceiling = self.call_poll_interval if self.on_call is not None else 3600.0
+        seconds = min(ceiling, max(1.0, (start - now).total_seconds()))
         try:
             await asyncio.wait_for(stop.wait(), timeout=seconds)
         except TimeoutError:
             pass
+        if self.on_call is not None and not stop.is_set():
+            await self._answer()
+
+    async def _answer(self) -> None:
+        """Has a person acted since the worker last worked? Then it comes in — if the day's and
+        the month's overtime allow (D-205)."""
+        assert self.on_call is not None and self.shifts is not None
+        called = await self.on_call()
+        now = self.clock()
+        if called is None or self.shifts.on_duty(now):
+            return
+        limit = timedelta(seconds=self.call_limit)
+        # a worker just started has seen nothing: it answers a call of the last hour, not older
+        seen = max(
+            (t for t in (self._answered, self._covered_until) if t is not None),
+            default=now - limit,
+        )
+        if called <= seen:
+            return
+        self._answered = called
+        left = limit
+        if self.overtime is not None:
+            try:
+                left = min(limit, await self.overtime.left(now))
+            except Exception:  # noqa: BLE001 - no record of the hours, no overtime
+                log.exception("cannot read the overtime used; not coming in")
+                return
+        if left <= timedelta(0):
+            log.info(
+                "worker %s: a person acted at %s, but the overtime allowed is used up",
+                self.worker_id, called.isoformat(),
+            )  # fmt: skip
+            return
+        self._call = Call(started=now, until=now + left)
+        log.info(
+            "worker %s on call: a person acted at %s (at most %s of overtime)",
+            self.worker_id, called.isoformat(), left,
+        )  # fmt: skip
+
+    async def _end_call(self, now: datetime) -> None:
+        call, self._call = self._call, None
+        assert call is not None
+        log.info("worker %s: call over after %s", self.worker_id, now - call.started)
+        if self.overtime is not None:
+            try:
+                await self.overtime.record(call.started, now)
+            except Exception:  # noqa: BLE001 - the work is done; only the record is lost
+                log.exception("cannot write down the overtime of a call")
 
     async def tick(self) -> int:
         """One pass: maintenance if due, service steps, then claim and start runs. Returns the

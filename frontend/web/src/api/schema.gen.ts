@@ -2942,6 +2942,8 @@ export interface components {
          * @description When the AI staff work (D-193). ``shifts`` empty: always at work.
          */
         OfficeHours: {
+            /** Called At */
+            called_at?: string | null;
             /** Days */
             days: string;
             /** Next Start */

@@ -7,7 +7,7 @@ Work execution tables (tasks, agent_runs, ...) live in ``tasks.py``.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -113,6 +113,23 @@ class Schedule(IdMixin, TimestampMixin, Base):
     consecutive_failures: Mapped[int] = mapped_column(server_default="0")
     lease_owner: Mapped[str | None]
     lease_until: Mapped[datetime | None]
+
+
+class WorkerOvertime(Base):
+    """The office's overtime, one row a day (D-205): how long the worker came in outside its
+    shifts because a person did something in the back office.
+
+    Kept in the database, not in the worker's memory, so a deploy does not reset what the month
+    has used. Read when a call comes and written when it ends — both times the database is awake
+    anyway, because a person just woke it."""
+
+    __tablename__ = "worker_overtime"
+    __table_args__ = (CheckConstraint("seconds >= 0", name="seconds_non_negative"),)
+
+    day: Mapped[date] = mapped_column(primary_key=True)
+    """In the shifts' time zone (WORKER_TIMEZONE)."""
+    seconds: Mapped[int] = mapped_column(server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
 class PolicyDecision(IdMixin, Base):

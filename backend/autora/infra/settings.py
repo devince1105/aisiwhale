@@ -249,6 +249,22 @@ class Settings(BaseSettings):
     worker_days: str = "mon-sun"
     """The days the shifts are worked: ``mon-fri``, or a list such as ``mon,wed,fri``."""
     worker_timezone: str = "Asia/Taipei"
+    worker_call_url: str = ""
+    """On call (D-205): off its shifts, where the worker asks once a minute whether a person has
+    just done something in the back office — the API's ``/api/office-hours/call``, answered from
+    the API's memory, so the database sleeps through it. Empty: no on-call, the shifts only."""
+    worker_call_token: SecretStr = SecretStr("")
+    """Shared by the API and the worker (one Render env group): the API answers the worker's
+    question only to this token. Empty: the API does not answer it at all."""
+    worker_call_poll_seconds: float = Field(default=60.0, gt=0)
+    worker_call_idle_seconds: float = Field(default=180.0, gt=0)
+    """On call, how long with nothing to do before the worker goes home again."""
+    worker_call_max_minutes: float = Field(default=60.0, gt=0)
+    """The longest one call keeps the worker in."""
+    worker_overtime_day_hours: float = Field(default=4.0, ge=0)
+    """Overtime one day may hold: as 勞基法 has it, with 8 regular hours no more than 12 in all."""
+    worker_overtime_month_hours: float = Field(default=46.0, ge=0)
+    """Overtime one month may hold (勞基法 §32: 46 hours)."""
     worker_idle_poll_seconds: float = Field(default=8.0, gt=0)
     """The slowest the worker polls when it has nothing to do (D-192); it is back to
     ``worker_poll_seconds`` as soon as there is work. The browser tests set it to their own fast

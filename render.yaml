@@ -6,6 +6,14 @@
 previews:
   generation: off
 
+# one value both services read (D-205): the API answers the worker's "has anyone called?" only to
+# this token; generated once for the group, so the two services hold the same one
+envVarGroups:
+  - name: aisiwhale-on-call
+    envVars:
+      - key: WORKER_CALL_TOKEN
+        generateValue: true
+
 services:
   - type: web
     name: aisiwhale-api
@@ -26,13 +34,18 @@ services:
         value: prod
       - key: TOOLS_PROFILE
         value: live
-      # office hours (D-193 - D-195): an hour before each market opens and an hour after it closes —
-      # Taiwan's in Taipei time, New York's in New York time (daylight saving follows by itself) —
-      # and an hour at weekends; outside them the worker leaves the database alone so Neon can sleep
+      # office hours (D-193 - D-195, D-205): six hours on weekdays, three at weekends, in one
+      # stretch each; outside them the worker leaves the database alone so Neon can sleep
       - key: WORKER_SHIFTS
-        value: "mon-fri 08:00-09:00,13:30-14:30; mon-fri 08:30-09:30,16:00-17:00 America/New_York; sat-sun 09:00-10:00"
+        value: "mon-fri 15:00-21:00; sat-sun 18:00-21:00"
       - key: WORKER_TIMEZONE
         value: Asia/Taipei
+      # on call (D-205): off its shifts, the worker asks the API once a minute whether a person
+      # has just changed something in the back office, and comes in until it is done — overtime,
+      # four hours a day and 46 a month at most (勞基法). The token is the env group's, below.
+      - key: WORKER_CALL_URL
+        value: https://api.aisiwhale.com/api/office-hours/call
+      - fromGroup: aisiwhale-on-call
       - key: SITE_BASE_URL
         value: https://aisiwhale.com
       - key: COOKIE_DOMAIN

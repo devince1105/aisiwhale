@@ -1,6 +1,7 @@
 """D-192: an idle worker polls the database less and less often, and is quick again with work."""
 
 import asyncio
+from datetime import UTC, datetime
 
 from autora.runtime.worker import idle_wait
 
@@ -30,6 +31,10 @@ async def test_an_idle_loop_asks_less_often(monkeypatch):
         concurrency = 1
         shifts = None
         _running: dict = {}
+        _call = None
+
+        def clock(self):
+            return datetime.now(UTC)
 
         async def tick(self):
             ticks.append(asyncio.get_running_loop().time())

@@ -80,6 +80,9 @@ async def test_off_duty_the_worker_does_nothing_until_its_shift():
         concurrency = 1
         shifts = off
         _running: dict = {}
+        _call = None
+        on_call = None  # shifts only: no asking anyone (D-205)
+        _clocked_out = False
 
         def clock(self):
             return datetime(2026, 10, 5, 12, 0, tzinfo=UTC)  # long after the shift
@@ -92,6 +95,7 @@ async def test_off_duty_the_worker_does_nothing_until_its_shift():
             pass
 
         _off_duty = Worker._off_duty
+        _at_work = Worker._at_work
 
     stop = asyncio.Event()
     asyncio.get_running_loop().call_later(0.3, stop.set)

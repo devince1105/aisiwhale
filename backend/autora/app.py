@@ -545,18 +545,22 @@ def build_worker(
     ``runtime`` lets a caller share one it already built — a soak test drives the same cycle
     runner the worker advances, so both read the same (accelerated) clock (T-610).
     """
+    from zoneinfo import ZoneInfo
+
     from autora.company.cycle import maintenance_job as cycle_maintenance_job
     from autora.db.session import get_sessionmaker
     from autora.infra.blobstore import build_blob_store
     from autora.runtime.agent_runner import AgentRunner
     from autora.runtime.cost.guard import DbCostGuard
     from autora.runtime.models.factory import gateway_from_settings
+    from autora.runtime.oncall import Overtime, api_caller
     from autora.runtime.progress import ProgressPublisher
     from autora.runtime.services import ServiceDispatcher
     from autora.runtime.shifts import Shifts
     from autora.runtime.worker import Worker
 
     runtime = runtime or build_runtime(settings)
+    call_token = settings.worker_call_token.get_secret_value()
     session_factory = session_factory or get_sessionmaker()
     companies = (
         company_ids if company_ids is not None else (frozenset(settings.worker_company_ids) or None)
@@ -612,6 +616,19 @@ def build_worker(
         poll_interval=settings.worker_poll_seconds,
         idle_poll_interval=max(settings.worker_idle_poll_seconds, settings.worker_poll_seconds),
         shifts=Shifts.parse(settings.worker_shifts, settings.worker_days, settings.worker_timezone),
+        # on call (D-205): off its shifts, the worker comes in when a person has just acted
+        on_call=api_caller(settings.worker_call_url, call_token)
+        if settings.worker_call_url and call_token
+        else None,
+        overtime=Overtime(
+            session_factory,
+            day_limit=timedelta(hours=settings.worker_overtime_day_hours),
+            month_limit=timedelta(hours=settings.worker_overtime_month_hours),
+            zone=ZoneInfo(settings.worker_timezone),
+        ),
+        call_poll_interval=settings.worker_call_poll_seconds,
+        call_idle=settings.worker_call_idle_seconds,
+        call_limit=settings.worker_call_max_minutes * 60,
         maintenance_interval=settings.worker_maintenance_seconds,
         company_ids=companies,
         maintenance_jobs=[

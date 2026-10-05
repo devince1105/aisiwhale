@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import AsyncIterator
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,20 +62,47 @@ def admin_actor(reader: Reader) -> Actor:
     return Actor.human(f"admin:{reader.id}")
 
 
+class OfficeCall:
+    """When a person last changed something in the back office (D-205).
+
+    Off its shifts the worker asks for this once a minute and comes in when it is new. It lives
+    in this process's memory, not the database: answering must not wake the database the shifts
+    let sleep. A restart forgets it, and the next shift does the work instead."""
+
+    at: datetime | None = None
+
+    def mark(self) -> None:
+        self.at = datetime.now(UTC)
+
+
+OFFICE_CALL = OfficeCall()
+READ_ONLY = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
 async def require_operator(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Annotated[Settings, Depends(settings_dep)],
     session: Annotated[AsyncSession, Depends(get_session)],
     autora_admin: Annotated[str | None, Cookie()] = None,
 ) -> Actor:
     """The back office's caller: the API_BEARER_TOKEN (scripts, CI, the way in when email
-    fails), or an admin signed in with an emailed link (D-055)."""
+    fails), or an admin signed in with an emailed link (D-055).
+
+    One who changes something calls the worker in, if it is off its shifts (D-205): an approval,
+    a draft sent back, a brief, a project resumed. Reading calls nobody."""
     expected = settings.api_bearer_token.get_secret_value()
+    actor: Actor | None = None
     if credentials is not None and secrets.compare_digest(credentials.credentials, expected):
-        return Actor.human("operator")
-    reader = await admin_for(session, autora_admin, settings)
-    if reader is not None:
-        return admin_actor(reader)
+        actor = Actor.human("operator")
+    else:
+        reader = await admin_for(session, autora_admin, settings)
+        if reader is not None:
+            actor = admin_actor(reader)
+    if actor is not None:
+        if request.method not in READ_ONLY:
+            OFFICE_CALL.mark()
+        return actor
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="sign in to the back office, or send the operator token",

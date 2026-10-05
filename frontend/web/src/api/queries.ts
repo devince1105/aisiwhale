@@ -484,13 +484,14 @@ export function projectsQuery(companyId: string, api: ApiClient = defaultApi) {
 }
 
 /** Pause or resume a project, as the PauseProject / ResumeProject command (D-056). */
-/** When the AI staff work (D-193): read from the settings, asked again every few minutes. */
+/** When the AI staff work (D-193), and whether a person just called them in (D-205): read from
+ * the settings and the API's memory — no database — so asked every minute. */
 export function officeHoursQuery(api: ApiClient = defaultApi) {
   return queryOptions({
     queryKey: queryKeys.officeHours(),
     queryFn: async () => unwrap(await api.GET("/api/office-hours")),
-    staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 

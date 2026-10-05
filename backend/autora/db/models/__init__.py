@@ -67,6 +67,7 @@ from autora.db.models.runtime import (
     PolicyDecision,
     Schedule,
     StateTransition,
+    WorkerOvertime,
 )
 from autora.db.models.tasks import (
     AGENT_RUN_TERMINAL,
@@ -147,5 +148,6 @@ __all__ = [
     "TransactionKind",
     "TransactionSource",
     "WorkflowRun",
+    "WorkerOvertime",
     "WorkflowRunState",
 ]

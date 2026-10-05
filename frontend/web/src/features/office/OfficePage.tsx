@@ -232,16 +232,32 @@ function CompanyOffice({ company }: { company: Company }) {
 }
 
 /** Out of hours (D-193): a quiet office is closed, not broken — and when it opens again. */
-export function OffDuty({ hours }: { hours: { on_duty: boolean; next_start?: string | null; timezone: string } | undefined }) {
+/** How long after a person acts the office says the worker was called in (D-205): one call's length. */
+const CALLED_FOR_MS = 60 * 60 * 1000;
+
+export function OffDuty({
+  hours,
+  now = new Date(),
+}: {
+  hours: { on_duty: boolean; next_start?: string | null; timezone: string; called_at?: string | null } | undefined;
+  now?: Date;
+}) {
   if (!hours || hours.on_duty) return null;
   const opens = hours.next_start
     ? new Intl.DateTimeFormat("zh-TW", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: hours.timezone }).format(
         new Date(hours.next_start),
       )
     : null;
+  // D-205: what you just did in the back office called the worker in, off its shifts
+  const called = hours.called_at ? now.getTime() - Date.parse(hours.called_at) < CALLED_FOR_MS : false;
   return (
-    <span data-testid="off-duty" className="rounded-full border border-line px-2 py-0.5 text-xs font-normal text-muted">
-      下班中{opens ? `・${opens} 上班` : ""}
+    <span
+      data-testid="off-duty"
+      title={called ? "你剛才在後台的操作已通知員工，約 1 分鐘內臨時上班處理（加班：每天最多 4 小時、每月 46 小時）" : undefined}
+      className="rounded-full border border-line px-2 py-0.5 text-xs font-normal text-muted"
+    >
+      下班中{called ? "・已通知加班" : ""}
+      {opens ? `・${opens} 上班` : ""}
     </span>
   );
 }
