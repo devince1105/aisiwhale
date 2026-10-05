@@ -325,6 +325,37 @@ def planar_front(o, x0, z0, width, height, wrap, limit=-0.2):
     return o
 
 
+# ---- painting in the figure's own coordinates (D-204) -----------------------------------------------
+def polyline(PX, PZ, pts, r, samples=24):
+    """Distance (minus r) from every (PX, PZ) to a smooth line through ``pts`` - for painting in the
+    figure's own coordinates on a part whose canvas is wrapped round it: work out where each pixel is
+    (seen from the front, say), and a stripe crossing two parts' canvases meets itself."""
+    P = [np.array(p, dtype=np.float64) for p in pts]
+    curve = []
+    for i in range(len(P) - 1):
+        p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
+        for k in range(samples):
+            t = k / samples
+            curve.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    curve.append(P[-1])
+    d = np.full(PX.shape, 1e3)
+    for a, b in zip(curve, curve[1:]):
+        ab = b - a
+        t = np.clip(((PX - a[0]) * ab[0] + (PZ - a[1]) * ab[1]) / max(ab @ ab, 1e-12), 0, 1)
+        d = np.minimum(d, np.hypot(PX - (a[0] + ab[0] * t), PZ - (a[1] + ab[1] * t)))
+    return d - r
+
+
+def project_front(o, x0, z0, width, height, axes=(0, 2)):
+    """UVs straight from the front (x, z) - or, with ``axes`` (0, 1), from above: a small part whose
+    face is painted as it is seen, before it is turned into place."""
+    i, j = axes
+    for l in o.data.loops:
+        co = o.data.vertices[l.vertex_index].co
+        o.data.uv_layers[0].data[l.index].uv = ((co[i] - x0) / width, (co[j] - z0) / height)
+    return o
+
+
 # ---- an Animal Crossing head ------------------------------------------------------------------------
 HEAD_Y = 0.02           # the head's centre line, a little behind the neck bone
 HEAD_PIVOT = (0, HEAD_Y, 0.345)

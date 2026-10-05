@@ -21,33 +21,6 @@ GREEN, GREEN_LIGHT, GREEN_DARK = "#4E9446", "#86C46E", "#2F6A30"
 GREY, GREY_DARK = "#8A8590", "#45414B"
 
 
-def polyline(PX, PZ, pts, r, samples=24):
-    """Distance (minus r) from every (PX, PZ) to a smooth line through ``pts`` - for painting in the
-    figure's own coordinates on a part whose canvas is wrapped round it."""
-    P = [np.array(p, dtype=np.float64) for p in pts]
-    curve = []
-    for i in range(len(P) - 1):
-        p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
-        for k in range(samples):
-            t = k / samples
-            curve.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
-    curve.append(P[-1])
-    d = np.full(PX.shape, 1e3)
-    for a, b in zip(curve, curve[1:]):
-        ab = b - a
-        t = np.clip(((PX - a[0]) * ab[0] + (PZ - a[1]) * ab[1]) / max(ab @ ab, 1e-12), 0, 1)
-        d = np.minimum(d, np.hypot(PX - (a[0] + ab[0] * t), PZ - (a[1] + ab[1] * t)))
-    return d - r
-
-
-def project_front(o, x0, z0, width, height):
-    """UVs straight from the front: a small part whose face is painted as it is seen."""
-    for l in o.data.loops:
-        co = o.data.vertices[l.vertex_index].co
-        o.data.uv_layers[0].data[l.index].uv = ((co.x - x0) / width, (co.z - z0) / height)
-    return o
-
-
 # hip stripes, front and back (her left side; the right is the mirror): in the figure's x and z,
 # drawn on the hips and the thighs alike
 STRIPES_FRONT = [[(0.0590, 0.210), (0.0525, 0.192), (0.0365, 0.175)], [(0.0610, 0.187), (0.0550, 0.168), (0.0390, 0.151)]]
