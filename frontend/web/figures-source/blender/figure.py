@@ -186,12 +186,14 @@ def surface(name, rows, closed=True, start=None, end=None, inside=None):
     return o
 
 
-def ellipsoid(name, center, radii, seg=8, rings=5):
+def ellipsoid(name, center, radii, seg=8, rings=5, power=2.0):
+    """An ellipsoid; a ``power`` above 2 squares it off toward a rounded box (pouches, holsters)."""
     cx, cy, cz = center
     rows = []
     for j in range(1, rings):
         a = math.pi * j / rings
-        rows.append(ring((cx, cy, cz - radii[2] * math.cos(a)), radii[0] * math.sin(a), radii[1] * math.sin(a), seg))
+        c, s = _se(math.cos(a), power), _se(math.sin(a), power)
+        rows.append(ring((cx, cy, cz - radii[2] * c), radii[0] * s, radii[1] * s, seg, power=power))
     return surface(name, rows, start=(cx, cy, cz - radii[2]), end=(cx, cy, cz + radii[2]))
 
 
@@ -300,6 +302,173 @@ def planar_front(o, x0, z0, width, height, wrap, limit=-0.2):
     bm.to_mesh(o.data)
     bm.free()
     return o
+
+
+# ---- an Animal Crossing head ------------------------------------------------------------------------
+HEAD_Y = 0.02           # the head's centre line, a little behind the neck bone
+HEAD_PIVOT = (0, HEAD_Y, 0.345)
+FACE_BOX = (-0.115, 0.335, 0.23, 0.29)          # the face canvas on the front of the head: x0, z0, width, height
+FACE_COLORS = {"line": "#46302A", "iris": "#5E4336", "white": "#FAF4EF", "lid": "#F2AD9C", "brow": "#5A3E32",
+               "blush": "#F4A090", "hatch": "#EE8F84", "mouth": "#6E3A28"}
+
+
+def ac_head(skin, ppm=3400):
+    """The head: rounder than a ball, with a wide jaw and a flat soft chin, from the chin at 0.345 to
+    the crown at 0.58. Returns the object and its face canvas, whose coordinates are the head's
+    (x across, z up) less FACE_BOX's corner: paint at (x - x0, z - z0). The back of the head is
+    unrolled into the canvas' top strip, so it shades with the rest."""
+    head = surface("head", [ring((0, HEAD_Y, z), rx, ry, 24, power=p) for z, rx, ry, p in [
+        (0.350, .066, .070, 2.6), (0.360, .087, .091, 2.6), (0.378, .098, .101, 2.5), (0.400, .1015, .104, 2.4),
+        (0.425, .102, .105, 2.35), (0.455, .100, .104, 2.35), (0.490, .095, .100, 2.35), (0.520, .088, .093, 2.35),
+        (0.548, .074, .079, 2.35), (0.568, .050, .054, 2.35)]],
+        start=(0, HEAD_Y, 0.345), end=(0, HEAD_Y, 0.580))
+    x0, z0, w, h = FACE_BOX
+    planar_front(head, x0, z0, w, h, wrap=(0.83, 0.99))
+    return head, Canvas("face", w, h, ppm, skin)
+
+
+def ac_face(face, eye_x=0.055, eye_z=0.437, gaze=0.0070, brows=(True, True), colors=None):
+    """Paint an Animal Crossing face: per eye a round white ringed in dark brown - heavy over the
+    top, fine underneath - with a tall iris pushed toward her left by ``gaze`` (so a crescent of white
+    shows on her right of it), two thick lashes at the outer corner and a blush of pink over the lid;
+    thin arched brows (``brows``: her right, her left), hatched blush on the cheeks, a smile."""
+    c = dict(FACE_COLORS, **(colors or {}))
+    x0, z0, _, _ = FACE_BOX
+    fx, fz = (lambda x: x - x0), (lambda z: z - z0)
+    a, b = 0.0235, 0.0232
+    for s, brow in ((1, brows[1]), (-1, brows[0])):
+        cx, cz = s * eye_x, eye_z
+        X, Y = face.X - fx(cx), face.Y - fz(cz)
+        e = face.ellipse(fx(cx), fz(cz), a, b)
+        ang = np.degrees(np.arctan2(Y / b, X / a)) % 360       # 0 = toward her left, 90 = up
+        face.put(c["lid"], 0.55 * np.clip(np.sin(np.radians(ang)), 0, 1) ** 0.8 * np.clip(1 - e / 0.0065, 0, 1) * (e > 0))
+        face.fill(c["white"], e)
+        iris = np.maximum(face.ellipse(fx(cx + gaze), fz(cz - 0.0005), 0.0152, 0.0222), e)
+        face.fill(c["iris"], iris)
+        face.put(c["line"], 0.35 * face.cover(iris) * np.clip(Y / b, 0, 1))          # the lid's shadow on the iris
+        t = np.interp(ang, [0, 45, 90, 135, 180, 215, 250, 270, 315, 360],
+                      [0.0011, 0.0022, 0.0027, 0.0027, 0.0024, 0.0016, 0.0008, 0.0005, 0.0006, 0.0011])
+        face.fill(c["line"], np.abs(e) - t)
+        for at, tilt, length in ((36, 26, 0.0115), (9, -8, 0.0075)):
+            th = math.radians(at if s > 0 else 180 - at)
+            d = math.radians(tilt if s > 0 else 180 - tilt)
+            bx, bz = fx(cx) + a * math.cos(th), fz(cz) + b * math.sin(th)
+            face.fill(c["line"], face.stroke([(bx - math.cos(d) * 0.003, bz - math.sin(d) * 0.003),
+                                              (bx + math.cos(d) * length, bz + math.sin(d) * length)], 0.0023, 0.0009))
+        if brow:
+            face.fill(c["brow"], face.stroke([(fx(cx - 0.0165), fz(cz + 0.0375)), (fx(cx), fz(cz + 0.0425)),
+                                              (fx(cx + 0.0165), fz(cz + 0.039))], 0.0014, 0.0015, 0.0027))
+        bx, bz = fx(s * (eye_x + 0.019)), fz(eye_z - 0.045)
+        face.put(c["blush"], 0.5 * np.clip(1 - np.hypot((face.X - bx) / 0.021, (face.Y - bz) / 0.012), 0, 1) ** 1.3)
+        for k in (-1, 0, 1):
+            hx = bx + k * 0.0068
+            face.fill(c["hatch"], face.stroke([(hx - 0.0026, bz - 0.0052), (hx + 0.0026, bz + 0.0052)], 0.0008), alpha=0.7)
+    mz = eye_z - 0.0345
+    face.fill(c["mouth"], face.stroke([(fx(-0.0245), fz(mz)), (fx(-0.014), fz(mz - 0.009)), (fx(0), fz(mz - 0.0125)),
+                                       (fx(0.014), fz(mz - 0.009)), (fx(0.0245), fz(mz))], 0.0019))
+
+
+def ac_ears(skin, center=(0.110, 0.040, 0.414), radii=(0.034, 0.019, 0.034), weights="head"):
+    """Round ears standing off the sides of the head, with a fold painted inside."""
+    lobe = Canvas("ear", 0.06, 0.06, 2000, skin)
+    lobe.fill("#E6A27C", np.abs(lobe.ellipse(0.75 * lobe.width, 0.5 * lobe.height, 0.0050, 0.0150)) - 0.0012, soft=0.001)
+    ear = ellipsoid("ear-l", center, radii, 8, 6)
+    part(ear, lobe, weights)
+    part(mirror(ear, "ear-r"), lobe, weights)
+
+
+def ac_nose(z=0.417, color="#F6894B"):
+    """A small orange bean of a nose, lighter on top."""
+    c = Canvas("nose", 0.03, 0.02, 2000, color)
+    c.shade(0.93 + 0.16 * c.Y / c.height)
+    part(ellipsoid("nose", (0, HEAD_Y - 0.1055, z), (0.0125, 0.0085, 0.0068), 8, 5), c, "head")
+
+
+def scale_parts(prefixes, pivot, k):
+    """Scale every part whose name starts with one of ``prefixes`` about ``pivot`` - to size the head
+    and hair as a whole to the reference."""
+    for o, _, _ in PARTS:
+        if o.name.split("-")[0] in prefixes:
+            scale_about(o, pivot, k)
+
+
+HEAD_PARTS = ("head", "ear", "earring", "nose", "cap", "fringe", "lock", "mass", "tie", "tail", "bob")
+
+
+# ---- hair -----------------------------------------------------------------------------------------------
+class Hair:
+    """One head of hair round a centre: a cap from the crown, locks lying on it, masses hanging from
+    under it. Every piece carries strands painted along its length.
+    ``flare``: how far the hair stands further out below its middle (over ``flare_depth`` metres);
+    ``tuck``: how far it comes back in toward its ends (between ``tuck_from`` and ``tuck_to`` metres
+    below the middle) - a bob's ends turn under."""
+
+    def __init__(self, center, radii, color, flare=0.13, flare_depth=0.07, tuck=0.0, tuck_from=0.09, tuck_to=0.14):
+        self.c, self.r, self.color = Vector(center), Vector(radii), color
+        self.flare, self.flare_depth = flare, flare_depth
+        self.tuck, self.tuck_from, self.tuck_to = tuck, tuck_from, tuck_to
+        self.axis = lambda co: Vector((self.c.x, self.c.y, co.z))
+
+    def scale(self, z):
+        """The horizontal scale at a height: an ellipsoid above the middle; below, the flare."""
+        k = z - self.c.z
+        if k >= 0:
+            return math.sqrt(max(1e-4, 1 - (k / self.r.z) ** 2))
+        return 1 + self.flare * smooth(0, self.flare_depth, -k) - self.tuck * smooth(self.tuck_from, self.tuck_to, -k)
+
+    def on(self, x, z, lift=0.0):
+        """The point on the front of the hair's surface at (x, z), ``lift`` off it."""
+        rx, ry = self.r.x * self.scale(z) + lift, self.r.y * self.scale(z) + lift
+        x = max(-0.995 * rx, min(0.995 * rx, x))
+        return Vector((x, self.c.y - ry * math.sqrt(1 - (x / rx) ** 2), z))
+
+    def strands(self, name, o, count, weights, ppm=1100, length=0.2, girth=0.14, seed=0):
+        cv = Canvas(name, girth, length, ppm, self.color)
+        cv.streaks(count, groove=0.3, drift=0.14, seed=seed)
+        cv.shade(1.06 - 0.16 * (cv.Y / cv.height))                         # a little darker toward the ends
+        return part(o, cv, weights)
+
+    def cap(self, hem, cols=32, rows=9, rim_depth=0.026, parting=22, ppm=940, seed=3):
+        """The cap: columns from the crown, each ending at ``hem(azimuth)`` - azimuth in degrees, 0 the
+        front, + toward her left - with an edge ``rim_depth`` thick, and a parting at ``parting``."""
+        c, r = self.c, self.r
+        polar = lambda z: math.acos(min(1, (z - c.z) / r.z)) if z >= c.z else math.pi / 2 + (c.z - z) / r.z
+        height = lambda ph: c.z + r.z * math.cos(ph) if ph <= math.pi / 2 else c.z - (ph - math.pi / 2) * r.z
+        grid = []
+        for j in range(1, rows + 1):
+            row = []
+            for i in range(cols):
+                az = -180 + 360 * i / cols
+                z = height(polar(hem(az)) * j / rows)
+                a = math.radians(az)
+                row.append(Vector((c.x + r.x * self.scale(z) * math.sin(a), c.y - r.y * self.scale(z) * math.cos(a), z)))
+            grid.append(row)
+        cap = surface("cap", grid, start=(c.x, c.y, c.z + r.z), inside=c)
+        rim(cap, rim_depth, self.axis)
+        crown = Canvas("cap", 2 * math.pi * r.x, 0.30, ppm, self.color)
+        crown.streaks(72, groove=0.3, drift=0.14, seed=seed)
+        crown.shade(1.0 + 0.16 * np.exp(-((crown.Y / crown.height - 0.32) / 0.14) ** 2))      # a soft sheen round the crown
+        if parting is not None:
+            px = (0.5 + parting / 360) * crown.width
+            crown.fill("#231B1E", np.maximum(crown.column(px - 0.0012, px + 0.0012), 0.03 - crown.Y), alpha=0.85)
+        return part(cap, crown, "head")
+
+    def blade(self, name, pts, widths, thicks, seed, weights="head", seg=6):
+        """A lock lying on the hair: ``pts`` are (x, z) on the front of the head, or full positions."""
+        path = [Vector(p) if len(p) == 3 else self.on(p[0], p[1], thicks[min(i, len(thicks) - 1)] / 2 - 0.006)
+                for i, p in enumerate(pts)]
+        o = sweep(name, path, widths, thicks, self.c, seg=seg)
+        return self.strands(name, o, max(4, int(max(widths) / 0.007)), weights, length=0.16, girth=2.2 * max(widths), seed=seed)
+
+    def mass(self, name, path, widths, thicks, count, weights, length, girth, seed, tip=True):
+        """A heavy lock hanging from under the cap."""
+        return self.strands(name, sweep(name, path, widths, thicks, self.axis, seg=10, tip=tip), count, weights,
+                            length=length, girth=girth, seed=seed)
+
+
+def hang(z0, z1):
+    """Weights for hair that hangs past the neck: the head's above z1, the torso's below z0."""
+    return lambda co: {"head": smooth(z0, z1, co.z), "torso": 1 - smooth(z0, z1, co.z)}
 
 
 # ---- the figure -----------------------------------------------------------------------------------------

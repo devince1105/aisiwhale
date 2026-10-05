@@ -1,4 +1,4 @@
-# 成員自己的 3D 人物（D-196、D-197、D-198）
+# 成員自己的 3D 人物（D-196～D-199）
 
 不對外提供的原始檔。網站載入的是匯出後的 `public/models/characters/<avatar_key>.glb`。
 
@@ -29,7 +29,7 @@ D-198 改成直接做乾淨的低模，所有細節用畫的：
 ## 預算
 
 - 每個人物最多 10,000 個三角形（`check-assets`，D-198 起；原為 3,000）。
-- Tifa 用了 5,616 個，GLB 645 KB。
+- Tifa 用了 5,616 個，GLB 645 KB；Ada 4,964 個，564 KB。
 - 每個人物的貼圖在顯示卡裡約佔 21 MB（2048 圖集），這比三角形更吃資源。人數變多時，先考慮把圖集降到 1024 或改用壓縮貼圖。
 
 ## 檔案
@@ -37,17 +37,19 @@ D-198 改成直接做乾淨的低模，所有細節用畫的：
 | 檔案 | 用途 |
 |---|---|
 | `blender/lib.py` | 載入 Kenney 骨架（`reset`、`rig`）與一些舊版基本形體 |
-| `blender/figure.py` | 共用：網格（`ring`、`surface`、`ellipsoid`、`sweep`、`mirror`、`rim`、`planar_front`）、畫布（`Canvas`）、組裝與烘焙（`part`、`assemble`） |
-| `blender/tifa.py` | Tifa 的形體、配色和畫上去的細節 |
+| `blender/figure.py` | 共用：網格（`ring`、`surface`、`ellipsoid`、`sweep`、`mirror`、`rim`、`planar_front`）、畫布（`Canvas`）、動森的頭與臉（`ac_head`、`ac_face`、`ac_ears`、`ac_nose`）、頭髮（`Hair`：髮蓋、髮片、垂下的長髮）、組裝與烘焙（`part`、`assemble`） |
+| `blender/tifa.py`、`ada.py` | 每個人自己的配色、服裝、髮型和畫上去的細節 |
 | `blender/export.py` | 匯出 GLB（需先設定 `OUT`、`BUDGET`） |
 | `blender/build.sh` | 背景執行整條流程：`./build.sh tifa` 寫出 `public/models/characters/tifa.glb` 和 `tifa.blend`（約 45 秒） |
-| `blender/tifa.blend` | 成品，可以直接打開看 |
+| `blender/<avatar_key>.blend` | 成品，可以直接打開看 |
 | `blender/bl.py` | 把腳本送進開著的 Blender（MCP for Blender 附加元件，`localhost:9876`）邊做邊看：`python3 bl.py run lib.py figure.py tifa.py`（約 15 秒）；`shot` 拍視圖截圖 |
 | `blender/render.py`、`montage.py`、`pose.py` | 預覽：背景算圖（可套動畫）、拼圖 |
 
 ## 做下一位
 
-1. 複製 `tifa.py` 成 `<avatar_key>.py`，改形體的數字、配色和畫布上的內容。共用的東西留在 `figure.py`。
+**比例一律照 Tifa**（使用者的決定，D-199）：頭（`ac_head`）、身體、手臂的數字都沿用，頭到腳總高一樣。參考圖的比例不一定一致（例如 Ada 的參考圖腿太長），只取髮型、臉、服裝。
+
+1. 複製最接近的一位（長髮看 `tifa.py`，短髮看 `ada.py`）成 `<avatar_key>.py`，改配色、服裝、髮型和畫布上的內容。共用的東西留在 `figure.py`。
 2. 在參考圖上量比例。可以用 Blender 的 numpy 在圖上打格線、取樣顏色。
 3. 開著 Blender 邊改邊看：`python3 bl.py run lib.py figure.py <avatar_key>.py`。
 4. 完成後執行 `./build.sh <avatar_key>`，再跑 `pnpm -F web check-assets` 和 `pnpm -F web exec vitest run src/office3d`。

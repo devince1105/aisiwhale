@@ -8,70 +8,18 @@ SKIN, HAIR = "#F8C6A2", "#42353A"
 TOP, TRIM, STRAP = "#F2EEEC", "#3A3234", "#322C2F"
 GUARD, BAND, RED, RED_LIGHT, RED_DARK = "#37333B", "#2E2A30", "#A32A2A", "#BC3F3A", "#7A1E21"
 SKIRT, SOCK, SOLE, METAL = "#37302F", "#3A2F30", "#352B2A", "#B6B4BE"
-LINE, IRIS, WHITE, LID, BROW = "#46302A", "#5E4336", "#FAF4EF", "#F2AD9C", "#5A3E32"
 STEEL = Canvas("steel", 0.02, 0.02, 800, "#D5D2D8")
 
 # ---- head ---------------------------------------------------------------------------------------------
-HEAD_Y = 0.02
-head = surface("head", [ring((0, HEAD_Y, z), rx, ry, 24, power=p) for z, rx, ry, p in [
-    (0.350, .066, .070, 2.6), (0.360, .087, .091, 2.6), (0.378, .098, .101, 2.5), (0.400, .1015, .104, 2.4), (0.425, .102, .105, 2.35),
-    (0.455, .100, .104, 2.35), (0.490, .095, .100, 2.35), (0.520, .088, .093, 2.35), (0.548, .074, .079, 2.35), (0.568, .050, .054, 2.35)]],
-    start=(0, HEAD_Y, 0.345), end=(0, HEAD_Y, 0.580))
-FX, FZ, FW, FH = -0.115, 0.335, 0.23, 0.29             # the face canvas: the front of the head, and a strip above
-planar_front(head, FX, FZ, FW, FH, wrap=(0.83, 0.99))  # for the rest of the head, unrolled
-face = Canvas("face", FW, FH, 3400, SKIN)
-fx, fz = (lambda x: x - FX), (lambda z: z - FZ)
-
-
-def eye(cx, cz, outer):
-    """An Animal Crossing eye, as in the reference: a round white ringed in dark brown - heavy over
-    the top and down her right of it, fine elsewhere - with a tall iris pushed to her left (she
-    glances that way), two thick lashes at the outer corner and a blush of pink over the lid."""
-    a, b = 0.0235, 0.0232
-    X, Y = face.X - fx(cx), face.Y - fz(cz)
-    e = face.ellipse(fx(cx), fz(cz), a, b)
-    ang = np.degrees(np.arctan2(Y / b, X / a)) % 360       # 0 = toward her left, 90 = up
-    face.put(LID, 0.55 * np.clip(np.sin(np.radians(ang)), 0, 1) ** 0.8 * np.clip(1 - e / 0.0065, 0, 1) * (e > 0))
-    face.fill(WHITE, e)
-    iris = np.maximum(face.ellipse(fx(cx + 0.0070), fz(cz - 0.0005), 0.0152, 0.0222), e)
-    face.fill(IRIS, iris)
-    face.put(LINE, 0.35 * face.cover(iris) * np.clip(Y / b, 0, 1))          # the lid's shadow on the iris
-    t = np.interp(ang, [0, 45, 90, 135, 180, 215, 250, 270, 315, 360],
-                  [0.0011, 0.0022, 0.0027, 0.0027, 0.0024, 0.0016, 0.0008, 0.0005, 0.0006, 0.0011])
-    face.fill(LINE, np.abs(e) - t)
-    for at, tilt, length in ((36, 26, 0.0115), (9, -8, 0.0075)):
-        th = math.radians(at if outer > 0 else 180 - at)
-        d = math.radians(tilt if outer > 0 else 180 - tilt)
-        bx, bz = fx(cx) + a * math.cos(th), fz(cz) + b * math.sin(th)
-        face.fill(LINE, face.stroke([(bx - math.cos(d) * 0.003, bz - math.sin(d) * 0.003),
-                                     (bx + math.cos(d) * length, bz + math.sin(d) * length)], 0.0023, 0.0009))
-    face.fill(BROW, face.stroke([(fx(cx - 0.0165), fz(cz + 0.0375)), (fx(cx), fz(cz + 0.0425)), (fx(cx + 0.0165), fz(cz + 0.039))],
-                                0.0014, 0.0015, 0.0027))
-
-
-for s in (1, -1):
-    eye(s * 0.055, 0.437, s)
-    bx, bz = fx(s * 0.074), fz(0.392)
-    face.put("#F4A090", 0.5 * np.clip(1 - np.hypot((face.X - bx) / 0.021, (face.Y - bz) / 0.012), 0, 1) ** 1.3)
-    for k in (-1, 0, 1):
-        hx = bx + k * 0.0068
-        face.fill("#EE8F84", face.stroke([(hx - 0.0026, bz - 0.0052), (hx + 0.0026, bz + 0.0052)], 0.0008), alpha=0.7)
-face.fill("#6E3A28", face.stroke([(fx(-0.0245), fz(0.4025)), (fx(-0.014), fz(0.3935)), (fx(0), fz(0.3900)),
-                                  (fx(0.014), fz(0.3935)), (fx(0.0245), fz(0.4025))], 0.0019))
+head, face = ac_head(SKIN)
+ac_face(face)
 part(head, face, "head")
-
-ear = ellipsoid("ear-l", (0.110, 0.040, 0.414), (0.034, 0.019, 0.034), 8, 6)
-lobe = Canvas("ear", 0.06, 0.06, 2000, SKIN)
-lobe.fill("#E6A27C", np.abs(lobe.ellipse(0.75 * lobe.width, 0.5 * lobe.height, 0.0050, 0.0150)) - 0.0012, soft=0.001)   # the fold inside
-part(ear, lobe, "head")
-part(mirror(ear, "ear-r"), lobe, "head")
+ac_ears(SKIN)
 ring_l = surface("earring-l", [ring((0.127, 0.038, z), 0.0048, 0.0034, 4) for z in (0.353, 0.378)],
                  start=(0.127, 0.038, 0.352), end=(0.127, 0.038, 0.380))
 part(ring_l, STEEL, "head")
 part(mirror(ring_l, "earring-r"), STEEL, "head")
-nose_c = Canvas("nose", 0.03, 0.02, 2000, "#F6894B")
-nose_c.shade(0.93 + 0.16 * nose_c.Y / nose_c.height)                     # lighter on top
-part(ellipsoid("nose", (0, HEAD_Y - 0.1055, 0.417), (0.0125, 0.0085, 0.0068), 8, 5), nose_c, "head")
+ac_nose()
 
 # ---- torso and neck ---------------------------------------------------------------------------------
 TORSO = [(0.190, .050, .042, .022), (0.215, .047, .040, .020), (0.236, .0455, .038, .018), (0.250, .046, .039, .016),
@@ -209,99 +157,39 @@ part(mirror(boot_l, "boot-r"), leather, "leg-right")
 # swept across the forehead to her right; a long lock in front of her right ear, a short one in front
 # of her left; behind, a lock to the right shoulder blade and a heavy one gathered low at her left
 # into a red tie and a teardrop tail. Every piece carries strands painted along its length.
-HC, HR = Vector((0, 0.024, 0.468)), Vector((0.134, 0.130, 0.132))
-AXIS = lambda co: Vector((0, 0.024, co.z))
-
-
-def hscale(z):
-    """The hair's horizontal scale at a height: an ellipsoid above its middle; below, it stands
-    away from the head a little more as it falls (the reference's hair is widest at the jaw)."""
-    k = z - HC.z
-    return math.sqrt(max(1e-4, 1 - (k / HR.z) ** 2)) if k >= 0 else 1 + 0.13 * smooth(0, 0.07, -k)
-
-
-def on_hair(x, z, lift=0.0):
-    """The point on the front of the hair's surface at (x, z), ``lift`` off it."""
-    rx, ry = HR.x * hscale(z) + lift, HR.y * hscale(z) + lift
-    x = max(-0.995 * rx, min(0.995 * rx, x))
-    return Vector((x, HC.y - ry * math.sqrt(1 - (x / rx) ** 2), z))
-
-
-def strands(name, o, count, weights, ppm=1100, length=0.2, girth=0.14, seed=0):
-    cv = Canvas(name, girth, length, ppm, HAIR)
-    cv.streaks(count, groove=0.3, drift=0.14, seed=seed)
-    cv.shade(1.06 - 0.16 * (cv.Y / cv.height))                             # a little darker toward the ends
-    return part(o, cv, weights)
-
-
-# the cap: columns from the crown, each ending at its own height - the hairline on her left forehead,
-# above the ears, the bowl over the nape
-COLS, ROWS = 32, 9
-hem = lambda az: float(np.interp(az, [-180, -150, -128, -112, -75, -50, -20, 20, 29, 46, 60, 75, 112, 128, 150, 180],
-                                 [.340, .345, .360, .452, .455, .500, .520, .535, .525, .500, .465, .455, .452, .360, .345, .340]))
-polar = lambda z: math.acos(min(1, (z - HC.z) / HR.z)) if z >= HC.z else math.pi / 2 + (HC.z - z) / HR.z
-height = lambda ph: HC.z + HR.z * math.cos(ph) if ph <= math.pi / 2 else HC.z - (ph - math.pi / 2) * HR.z
-rows = []
-for j in range(1, ROWS + 1):
-    row = []
-    for i in range(COLS):
-        az = -180 + 360 * i / COLS
-        z = height(polar(hem(az)) * j / ROWS)
-        a = math.radians(az)
-        row.append(Vector((HC.x + HR.x * hscale(z) * math.sin(a), HC.y - HR.y * hscale(z) * math.cos(a), z)))
-    rows.append(row)
-cap = surface("cap", rows, start=(HC.x, HC.y, HC.z + HR.z), inside=HC)
-rim(cap, 0.026, AXIS)
-crown = Canvas("cap", 2 * math.pi * 0.134, 0.30, 940, HAIR)
-crown.streaks(72, groove=0.3, drift=0.14, seed=3)
-crown.shade(1.0 + 0.16 * np.exp(-((crown.Y / crown.height - 0.32) / 0.14) ** 2))       # a soft sheen round the crown
-px = (0.5 + 22 / 360) * crown.width                                        # the parting, above her left eye
-crown.fill("#231B1E", np.maximum(crown.column(px - 0.0012, px + 0.0012), 0.03 - crown.Y), alpha=0.85)
-part(cap, crown, "head")
-
-
-def blade(name, pts, widths, thicks, seed, weights="head", seg=6):
-    """A lock lying on the hair: ``pts`` are (x, z) on the front of the head, or full positions."""
-    path = [Vector(p) if len(p) == 3 else on_hair(p[0], p[1], thicks[min(i, len(thicks) - 1)] / 2 - 0.006) for i, p in enumerate(pts)]
-    o = sweep(name, path, widths, thicks, HC, seg=seg)
-    return strands(name, o, max(4, int(max(widths) / 0.007)), weights, length=0.16, girth=2.2 * max(widths), seed=seed)
-
-
-hang = lambda z0, z1: (lambda co: {"head": smooth(z0, z1, co.z), "torso": 1 - smooth(z0, z1, co.z)})
-blade("fringe-a", [(0.045, 0.585), (0.016, 0.554), (-0.010, 0.515), (-0.019, 0.480), (-0.022, 0.452)],
-      [.016, .060, .045, .025, .003], [.004, .016, .016, .012, .003], 11)
-blade("fringe-b", [(0.015, 0.592), (-0.020, 0.565), (-0.046, 0.525), (-0.062, 0.482), (-0.068, 0.443)],
-      [.016, .066, .052, .030, .003], [.004, .016, .016, .012, .003], 12)
+hair = Hair((0, 0.024, 0.468), (0.134, 0.130, 0.132), HAIR)
+# the cap's hem: the hairline on her left forehead, above the ears, the bowl over the nape
+hair.cap(lambda az: float(np.interp(az, [-180, -150, -128, -112, -75, -50, -20, 20, 29, 46, 60, 75, 112, 128, 150, 180],
+                                    [.340, .345, .360, .452, .455, .500, .520, .535, .525, .500, .465, .455, .452, .360, .345, .340])))
+hair.blade("fringe-a", [(0.045, 0.585), (0.016, 0.554), (-0.010, 0.515), (-0.019, 0.480), (-0.022, 0.452)],
+           [.016, .060, .045, .025, .003], [.004, .016, .016, .012, .003], 11)
+hair.blade("fringe-b", [(0.015, 0.592), (-0.020, 0.565), (-0.046, 0.525), (-0.062, 0.482), (-0.068, 0.443)],
+           [.016, .066, .052, .030, .003], [.004, .016, .016, .012, .003], 12)
 # the long lock: from the crown over the temple, then close along the cheek in front of the ear (the
 # ear shows outside it), and forward over the shoulder to the chest
-blade("lock-right", [(-0.030, 0.590), (-0.085, 0.555), (-0.108, 0.510), (-0.099, -0.040, 0.455), (-0.099, -0.038, 0.405),
-                     (-0.095, -0.036, 0.368), (-0.092, -0.031, 0.338), (-0.081, -0.031, 0.305), (-0.060, -0.031, 0.272)],
-      [.016, .066, .054, .048, .046, .042, .036, .026, .003], [.004, .016, .018, .018, .018, .016, .014, .011, .003], 13,
-      weights=hang(0.30, 0.35))
-blade("lock-left", [(0.088, 0.548), (0.112, 0.505), (0.123, 0.465), (0.118, 0.430)],
-      [.014, .046, .036, .003], [.004, .016, .014, .003], 14)
+hair.blade("lock-right", [(-0.030, 0.590), (-0.085, 0.555), (-0.108, 0.510), (-0.099, -0.040, 0.455), (-0.099, -0.038, 0.405),
+                          (-0.095, -0.036, 0.368), (-0.092, -0.031, 0.338), (-0.081, -0.031, 0.305), (-0.060, -0.031, 0.272)],
+           [.016, .066, .054, .048, .046, .042, .036, .026, .003], [.004, .016, .018, .018, .018, .016, .014, .011, .003], 13,
+           weights=hang(0.30, 0.35))
+hair.blade("lock-left", [(0.088, 0.548), (0.112, 0.505), (0.123, 0.465), (0.118, 0.430)],
+           [.014, .046, .036, .003], [.004, .016, .014, .003], 14)
 
 back = hang(0.30, 0.38)
 # the long hair is a layer under the cap: each mass starts inside it, lies just under its surface
 # down to the hem (so it reads as the same head of hair, and covers the skull behind the ears), then
 # swells out below - the left one over the shoulder to the tie, the right one to a point
-strands("mass-left", sweep("mass-left", [(0.055, 0.095, 0.480), (0.067, 0.110, 0.440), (0.072, 0.117, 0.390), (0.088, 0.122, 0.350),
-                                         (0.108, 0.132, 0.310), (0.130, 0.147, 0.270), (0.145, 0.153, 0.240)],
-                           [.090, .120, .125, .120, .100, .060, .034], [.040, .050, .055, .085, .090, .060, .034], AXIS, seg=10, tip=False),
-        24, back, length=0.25, girth=0.34, seed=21)
-strands("mass-right", sweep("mass-right", [(-0.055, 0.095, 0.480), (-0.067, 0.110, 0.440), (-0.072, 0.117, 0.390), (-0.090, 0.118, 0.350),
-                                           (-0.100, 0.118, 0.315), (-0.100, 0.112, 0.285)],
-                            [.090, .120, .125, .100, .060, .004], [.040, .050, .055, .070, .050, .004], AXIS, seg=10),
-        22, back, length=0.20, girth=0.34, seed=22)
+hair.mass("mass-left", [(0.055, 0.095, 0.480), (0.067, 0.110, 0.440), (0.072, 0.117, 0.390), (0.088, 0.122, 0.350),
+                        (0.108, 0.132, 0.310), (0.130, 0.147, 0.270), (0.145, 0.153, 0.240)],
+          [.090, .120, .125, .120, .100, .060, .034], [.040, .050, .055, .085, .090, .060, .034], 24, back, 0.25, 0.34, 21, tip=False)
+hair.mass("mass-right", [(-0.055, 0.095, 0.480), (-0.067, 0.110, 0.440), (-0.072, 0.117, 0.390), (-0.090, 0.118, 0.350),
+                         (-0.100, 0.118, 0.315), (-0.100, 0.112, 0.285)],
+          [.090, .120, .125, .100, .060, .004], [.040, .050, .055, .070, .050, .004], 22, back, 0.20, 0.34, 22)
 band = Canvas("tie", 0.12, 0.02, 1400, "#9E2626")
 band.shade(0.9 + 0.2 * np.abs(np.sin(band.Y / band.height * math.pi)))
-part(sweep("tie", [(0.1445, 0.153, 0.244), (0.1465, 0.1535, 0.228)], [.042, .042], [.042, .042], AXIS, seg=10, tip=False), band, "torso")
-strands("tail", sweep("tail", [(0.146, 0.1535, 0.232), (0.153, 0.156, 0.212), (0.160, 0.160, 0.190), (0.166, 0.163, 0.165)],
-                      [.030, .050, .045, .004], [.030, .045, .040, .004], AXIS, seg=10),
-        9, "torso", length=0.075, girth=0.14, seed=23)
+part(sweep("tie", [(0.1445, 0.153, 0.244), (0.1465, 0.1535, 0.228)], [.042, .042], [.042, .042], hair.axis, seg=10, tip=False), band, "torso")
+hair.mass("tail", [(0.146, 0.1535, 0.232), (0.153, 0.156, 0.212), (0.160, 0.160, 0.190), (0.166, 0.163, 0.165)],
+          [.030, .050, .045, .004], [.030, .045, .040, .004], 9, "torso", 0.075, 0.14, 23)
 
 # the head as a whole follows the reference's front view, where it is larger than in the side views
-for o, _, _ in PARTS:
-    if o.name.split("-")[0] in ("head", "ear", "earring", "nose", "cap", "fringe", "lock", "mass", "tie", "tail"):
-        scale_about(o, (0, HEAD_Y, 0.345), 1.07)
+scale_parts(HEAD_PARTS, HEAD_PIVOT, 1.07)
 assemble("tifa", occlusion_size=2048, samples=32)
