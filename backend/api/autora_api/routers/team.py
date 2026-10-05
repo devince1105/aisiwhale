@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from autora.app import build_embedder
 from autora.company.team_chat import FEED_LIMIT, post_message, team_feed
 from autora.db.models import Company
-from autora.domains.newsroom.sources import SECTION
+from autora.domains.newsroom.sources import SECTION, SECTION_GUESS, section_from_words
 from autora.domains.newsroom.stories import StoryDesk
 from autora_api.deps import Operator, RuntimeDep, Session
 from autora_api.routers.newsroom import start_now
@@ -33,7 +33,7 @@ class TeamMessageIn(BaseModel):
     """``brief``: a story for the newsroom to write — taken up at once, as 開始製作 would."""
     section: Section | None = None
     """A brief's section on the site (D-208): a story started from a sentence has no sources to
-    say where it belongs. Ignored for a note."""
+    say where it belongs. None: guessed from its words (D-212). Ignored for a note."""
 
 
 class TeamMessageOut(BaseModel):
@@ -83,7 +83,13 @@ async def post_team_message(
     ref_type = None
     if body.kind == "brief":
         desk = StoryDesk(build_embedder(None))
-        seed = {"query": text} | ({SECTION: body.section} if body.section else {})
+        # the section a person chose (D-208), else what the brief's words name (D-212)
+        guess = None if body.section else section_from_words(text)
+        seed = (
+            {"query": text}
+            | ({SECTION: body.section} if body.section else {})
+            | ({SECTION_GUESS: guess} if guess else {})
+        )
         story = await desk.create(
             session, company_id=company_id, title=text, seed=seed, actor=operator
         )

@@ -49,7 +49,9 @@ async def test_a_brief_is_a_story_taken_straight_into_production(api, newsroom_r
     assert posted.status_code == 201, posted.text
     story = await db_session.get(Story, posted.json()["story_id"])
     await db_session.refresh(story)
-    assert story.title == "寫一篇 NVDA 財報" and story.seed == {"query": "寫一篇 NVDA 財報"}
+    assert story.title == "寫一篇 NVDA 財報"
+    # no section chosen: its words name one (D-212)
+    assert story.seed == {"query": "寫一篇 NVDA 財報", "section_guess": "us"}
     assert story.state == "IN_PRODUCTION"
     assert posted.json()["workflow_run_id"]
 

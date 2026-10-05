@@ -144,6 +144,106 @@ and tech, Taiwan stocks, US stocks, crypto, institutions' views (D-057); gold, t
 commodities (metals, energy, farm futures) and foreign exchange (D-067)."""
 
 
+SECTION_GUESS = "section_guess"
+"""``stories.seed.section_guess``: the section a story's own words suggest (D-212), for a story a
+person started from a sentence. It counts last — after a section a person gave and after its
+sources — so a story that later gathers sources goes where they say."""
+
+SECTION_WORDS: dict[str, tuple[str, ...]] = {
+    "tw": (
+        "台股",
+        "台積電",
+        "加權",
+        "櫃買",
+        "上櫃",
+        "台指",
+        "集中市場",
+        "台灣股市",
+        "TAIEX",
+        "鴻海",
+        "聯發科",
+        "0050",
+    ),
+    "us": (
+        "美股",
+        "那斯達克",
+        "納斯達克",
+        "標普",
+        "道瓊",
+        "費半",
+        "華爾街",
+        "NASDAQ",
+        "S&P",
+        "DOW JONES",
+        "NVDA",
+        "AAPL",
+        "TSLA",
+        "MSFT",
+        "AMZN",
+        "GOOGL",
+        "META",
+    ),
+    "ai": (
+        "AI",
+        "人工智慧",
+        "輝達",
+        "NVIDIA",
+        "OPENAI",
+        "CHATGPT",
+        "ANTHROPIC",
+        "生成式",
+        "大模型",
+    ),
+    "crypto": ("比特幣", "以太幣", "加密貨幣", "幣圈", "穩定幣", "BITCOIN", "BTC", "ETH", "CRYPTO"),
+    "gold": ("黃金", "金價", "GOLD"),
+    "commodities": ("原油", "油價", "期貨", "玉米", "黃豆", "小麥", "銅價", "天然氣", "OPEC"),
+    "fx": ("新台幣", "匯率", "美元指數", "日圓", "日幣", "歐元", "外匯"),
+    "institutions": (
+        "高盛",
+        "摩根士丹利",
+        "摩根大通",
+        "貝萊德",
+        "BLACKROCK",
+        "GOLDMAN",
+        "JPMORGAN",
+        "研究報告",
+    ),
+    "holdings": ("13F", "持股申報", "巴菲特", "波克夏", "BERKSHIRE", "大戶持股"),
+    "figures": ("川普", "裴洛西", "名人持股", "議員交易", "TRUMP", "PELOSI"),
+}
+"""The words that say a section (D-212), matched without regard to case. Ordered as ``SECTIONS``
+breaks a tie: 「台積電 AI 伺服器」 names a stock first, and goes to 台股 over AI."""
+
+
+_WORD = {
+    word: re.compile(
+        rf"(?<![A-Z0-9]){re.escape(word)}(?![A-Z0-9])" if word.isascii() else re.escape(word)
+    )
+    for words in SECTION_WORDS.values()
+    for word in words
+}
+"""A word in Latin letters counts only whole: TAIEX is not AI, GOLDMAN is not GOLD."""
+
+
+def section_from_words(text: str) -> str | None:
+    """The section ``text`` names most often, or None when it names none (D-212).
+
+    A brief is a sentence, not a feed: there is no source to say where it belongs, only what it is
+    about. Counting is enough for that — "台積電衝上2580元、帶動台股大漲" names Taiwan stocks twice
+    and nothing else — and a person can always choose otherwise."""
+    upper = text.upper()
+    counts = {
+        section: sum(len(_WORD[word].findall(upper)) for word in SECTION_WORDS[section])
+        for section in SECTIONS
+        if section in SECTION_WORDS
+    }
+    best = max(counts.values(), default=0)
+    if best == 0:
+        return None
+    ties = [section for section in ("tw", "us", *SECTIONS) if counts.get(section) == best]
+    return ties[0]
+
+
 def content_hash(url: str, title: str) -> str:
     normalized = _SPACE.sub(" ", title).strip().lower()
     return hashlib.sha256(f"{canonical_url(url)}\n{normalized}".encode()).hexdigest()

@@ -159,6 +159,7 @@ describe("taking an article off the site (D-044)", () => {
     const { rerender } = render(view({ section: null, section_given: false }));
     const box = () => within(screen.getByTestId("section-control"));
     expect(box().getByText(/只出現在首頁「全部」/)).toBeTruthy();
+    expect(box().getByRole("option", { name: "自動" })).toBeTruthy();
     fireEvent.change(box().getByRole("combobox", { name: "分類" }), { target: { value: "tw" } });
     expect(controls.setSection).toHaveBeenCalledWith("tw");
 

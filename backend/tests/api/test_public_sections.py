@@ -144,6 +144,27 @@ async def test_a_section_a_person_gives_wins_and_can_be_taken_back(api, public, 
     assert missing.status_code == 404
 
 
+async def test_a_story_s_own_words_count_last(api, public, newsroom_room):
+    """D-212: the words of a brief place it — but its sources, when it gathers some, come first,
+    and a person's choice before both."""
+    room = newsroom_room
+    article_id = await room.publish()
+    async with room.committed() as session:
+        story = await session.get(Story, room.story.id)
+        story.seed = {"query": "台股收盤", "section_guess": "tw"}
+        await session.commit()
+    detail = (await api.get(f"/api/articles/{article_id}")).json()
+    assert (detail["section"], detail["section_given"]) == ("tw", False)
+
+    async with room.committed() as session:
+        await _from_sources(session, room.company.id, room.story.id, ["ai"])
+        await session.commit()
+    assert (await api.get(f"/api/articles/{article_id}")).json()["section"] == "ai"
+
+    await api.post(f"/api/articles/{article_id}/section", json={"section": "us"})
+    assert (await api.get(f"/api/articles/{article_id}")).json()["section"] == "us"
+
+
 async def test_pages_and_the_next_article_along(public, newsroom_room):
     room = newsroom_room
     first_id = uuid.UUID(await room.publish())

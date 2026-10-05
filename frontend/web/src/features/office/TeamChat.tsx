@@ -353,14 +353,15 @@ function Composer({ companyId, onSent }: { companyId: string; onSent: () => void
         </button>
         <span className="text-[11px] text-muted">{brief ? "送出後新聞室會立刻開始製作這個題材" : "一般留言"}</span>
         {brief ? (
-          // D-208: a story from a sentence has no sources to say where on the site it belongs
+          // D-208: a story from a sentence has no sources to say where on the site it belongs; left
+          // to itself, its words do (D-212)
           <select
             aria-label="題材的分類"
             value={section ?? ""}
             onChange={(e) => setSection(isSection(e.target.value) ? e.target.value : null)}
             className="ml-auto rounded-md border border-line bg-canvas px-1.5 py-0.5 text-[11px]"
           >
-            <option value="">分類：只在首頁</option>
+            <option value="">分類：自動判斷</option>
             {SECTIONS.map((s) => (
               <option key={s} value={s}>
                 {SECTION_NAMES[s]}

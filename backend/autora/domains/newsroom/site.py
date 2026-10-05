@@ -60,7 +60,7 @@ from autora.domains.newsroom.models import (
     SupportType,
 )
 from autora.domains.newsroom.publisher import article_path
-from autora.domains.newsroom.sources import SECTION, SECTIONS
+from autora.domains.newsroom.sources import SECTION, SECTION_GUESS, SECTIONS
 from autora.infra.ids import uuid7
 
 MAX_LIST = 50
@@ -266,8 +266,8 @@ def _named(version: ArticleVersion, section: str | None) -> list[PublicNamedStoc
 
 def _section():
     """The section a person gave the article's story (D-208), else the one most of its sources
-    name; ties go to the first in alphabetical order, so an article does not change section from
-    one read to the next.
+    name — ties go to the first in alphabetical order, so an article does not change section from
+    one read to the next — else the one its story's own words name (D-212).
 
     A story a person started — a brief from the team chat — has no sources at all, so without a
     section given it is on the front page only: 10/05's close of the TAIEX at a record was not
@@ -285,14 +285,18 @@ def _section():
         .correlate(Article)
         .scalar_subquery()
     )
-    given = Story.seed[SECTION].astext
-    by_person = (
-        select(given)
-        .where(Story.id == Article.story_id, given.in_(SECTIONS))
-        .correlate(Article)
-        .scalar_subquery()
-    )
-    return func.coalesce(by_person, by_sources)
+
+    def from_seed(key: str):
+        value = Story.seed[key].astext
+        return (
+            select(value)
+            .where(Story.id == Article.story_id, value.in_(SECTIONS))
+            .correlate(Article)
+            .scalar_subquery()
+        )
+
+    # a person's choice, then the sources, then what the story's own words say (D-212)
+    return func.coalesce(from_seed(SECTION), by_sources, from_seed(SECTION_GUESS))
 
 
 async def section_of(session: AsyncSession, article_id: uuid.UUID) -> str | None:

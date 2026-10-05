@@ -143,7 +143,7 @@ function SectionControl({ article, onSite }: { article: ArticleDetail; onSite: O
           onChange={(e) => onSite.setSection!(isSection(e.target.value) ? e.target.value : null)}
           className="rounded-lg border border-line bg-canvas px-2 py-1"
         >
-          <option value="">{`自動（${!article.section_given && now ? now : "依新聞來源"}）`}</option>
+          <option value="">{!article.section_given && now ? `自動（${now}）` : "自動"}</option>
           {SECTIONS.map((section) => (
             <option key={section} value={section}>
               {SECTION_NAMES[section]}
@@ -155,8 +155,8 @@ function SectionControl({ article, onSite }: { article: ArticleDetail; onSite: O
         {article.section_given
           ? "你指定的分類。"
           : now
-            ? "依新聞來源自動分類，可在這裡改。"
-            : "沒有新聞來源可判斷（例如交辦的題材），只出現在首頁「全部」；請選一個分類。"}
+            ? "自動分類（依新聞來源；沒有來源時依題材文字），可在這裡改。"
+            : "新聞來源和題材文字都看不出分類，只出現在首頁「全部」；請選一個分類。"}
       </span>
     </section>
   );
