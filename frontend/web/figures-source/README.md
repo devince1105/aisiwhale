@@ -40,7 +40,7 @@ D-198 改成直接做乾淨的低模，所有細節用畫的：
 | `blender/figure.py` | 共用：網格（`ring`、`surface`、`ellipsoid`、`sweep`、`mirror`、`rim`、`planar_front`）、畫布（`Canvas`）、動森的頭與臉（`ac_head`、`ac_face`、`ac_ears`、`ac_nose`）、頭髮（`Hair`：髮蓋、髮片、垂下的長髮）、組裝與烘焙（`part`、`assemble`） |
 | `blender/tifa.py`、`ada.py` | 每個人自己的配色、服裝、髮型和畫上去的細節 |
 | `blender/export.py` | 匯出 GLB（需先設定 `OUT`、`BUDGET`） |
-| `blender/build.sh` | 背景執行整條流程：`./build.sh tifa` 寫出 `public/models/characters/tifa.glb` 和 `tifa.blend`（約 45 秒） |
+| `blender/build.sh` | 背景執行整條流程：`./build.sh tifa` 寫出 `public/models/characters/tifa.glb` 和 `tifa.blend`（約 45 秒），並複製一份到使用者本機的存檔區 `data/blender/tifa-9999.blend`（「9999」代表照 1 萬三角形上限做的版本；`data/` 不進 git） |
 | `blender/<avatar_key>.blend` | 成品，可以直接打開看 |
 | `blender/bl.py` | 把腳本送進開著的 Blender（MCP for Blender 附加元件，`localhost:9876`）邊做邊看：`python3 bl.py run lib.py figure.py tifa.py`（約 15 秒）；`shot` 拍視圖截圖 |
 | `blender/render.py`、`montage.py`、`pose.py` | 預覽：背景算圖（可套動畫）、拼圖 |
