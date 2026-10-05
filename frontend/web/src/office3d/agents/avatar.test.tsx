@@ -3,7 +3,7 @@ import ReactThreeTestRenderer from "@react-three/test-renderer";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Profiler, type ReactNode } from "react";
-import { AnimationClip, Bone, Box3, Group, Quaternion, VectorKeyframeTrack, type Mesh, type Object3D } from "three";
+import { AnimationClip, Bone, Box3, Group, Quaternion, Vector3, VectorKeyframeTrack, type Mesh, type Object3D } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { realtimeStore, serverNow } from "@/stores/realtime";
@@ -12,10 +12,10 @@ import { REQUIRED_CLIPS } from "../assets/characters";
 import { assignSeats, seatsForRole } from "../scene/layout";
 import { visualForAgent } from "../visual/mapping";
 import { AgentAvatar, placeFor, type AvatarModel } from "./AgentAvatar";
-import { AvatarController, HEAD_SCALE, upperBody } from "./AvatarController";
+import { AvatarController, GAZE_LIMIT, HEAD_SCALE, upperBody } from "./AvatarController";
 
 // A stand-in for a Kenney character: the same bone names, a 1 s clip per name the office plays.
-function fakeModel(): AvatarModel {
+function fakeModel(bendy = false): AvatarModel {
   const scene = new Group();
   scene.name = "character";
   const bone = (name: string, parent: Object3D) => {
@@ -27,6 +27,8 @@ function fakeModel(): AvatarModel {
   const root = bone("root", scene);
   const torso = bone("torso", root);
   for (const name of ["head", "arm-left", "arm-right"]) bone(name, torso);
+  // an own figure's rig (D-201): a forearm bone at each elbow
+  if (bendy) for (const side of ["left", "right"]) bone(`forearm-${side}`, scene.getObjectByName(`arm-${side}`)!);
   bone("leg-left", root);
   bone("leg-right", root);
   const clip = (name: string) => new AnimationClip(name, 1, [new VectorKeyframeTrack("root.position", [0, 1], [0, 0, 0, 0, 0.1, 0])]);
@@ -227,6 +229,46 @@ describe("AvatarController", () => {
     controller.setPose("sit_type");
     for (let i = 0; i < 5; i++) controller.update(0.1);
     expect([head.scale.x, head.scale.y, head.scale.z]).toEqual([HEAD_SCALE, HEAD_SCALE, HEAD_SCALE]);
+  });
+
+  it("an own figure's arms hang at her sides standing, and reach the desk seated (D-201)", () => {
+    const model = fakeModel(true);
+    const controller = new AvatarController(model.scene, model.animations, 1);
+    const hand = (side: "left" | "right") => {
+      model.scene.updateMatrixWorld(true);
+      const arm = model.scene.getObjectByName(`arm-${side}`)!;
+      return new Vector3(side === "left" ? 1 : -1, 0, 0).applyQuaternion(arm.getWorldQuaternion(new Quaternion()));
+    };
+    controller.setPose("walk");
+    controller.update(0.1);
+    for (const side of ["left", "right"] as const) {
+      expect(hand(side).y, side).toBeLessThan(-0.85); // mostly down, not out like wings
+    }
+    expect(model.scene.getObjectByName("forearm-left")!.quaternion.angleTo(new Quaternion())).toBeGreaterThan(0.2); // a little bent
+    controller.setPose("sit_type");
+    controller.update(0.1);
+    const fore = (side: "left" | "right") => model.scene.getObjectByName(`forearm-${side}`)!.quaternion;
+    expect(fore("left").angleTo(new Quaternion())).toBeGreaterThan(0.4); // bent at the elbow
+    // the two arms mirror each other (resting, so neither is tapping)
+    controller.setPose("sit_idle");
+    controller.update(0.1);
+    const [l, r] = [fore("left"), fore("right")];
+    expect(l.x).toBeCloseTo(r.x, 1);
+    expect(l.y).toBeCloseTo(-r.y, 1);
+  });
+
+  it("an own figure turns her head toward the camera, no further than 45 degrees (D-203)", () => {
+    const model = fakeModel(true);
+    const controller = new AvatarController(model.scene, model.animations, 1);
+    const head = model.scene.getObjectByName("head")!;
+    controller.setPose("sit_idle");
+    controller.gaze = 1.4; // the camera well off to her left
+    for (let i = 0; i < 40; i++) controller.update(0.05);
+    const turned = new Vector3(0, 0, 1).applyQuaternion(head.quaternion);
+    expect(Math.atan2(turned.x, turned.z)).toBeCloseTo(GAZE_LIMIT, 1);
+    controller.gaze = 0;
+    for (let i = 0; i < 40; i++) controller.update(0.05);
+    expect(Math.abs(Math.atan2(new Vector3(0, 0, 1).applyQuaternion(head.quaternion).x, 1))).toBeLessThan(0.05);
   });
 
   it("an own figure keeps the head she was modelled with (D-198)", () => {

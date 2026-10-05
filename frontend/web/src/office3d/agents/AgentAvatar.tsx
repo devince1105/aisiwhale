@@ -3,9 +3,9 @@
 // through React state — so a burst of events re-renders nothing (05 §5). While a walk cue is
 // running (T-408) the avatar itself is the courier: up, along the corridor with a document, a
 // hand-over, and back; when the walk ends or is aborted (a new run) it is back in its chair.
-import { useFrame } from "@react-three/fiber";
+import { createPortal, useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import type { AnimationClip, Group, Mesh, Object3D } from "three";
+import { Vector3, type AnimationClip, type Group, type Mesh, type Object3D } from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import { realtimeStore, serverNow } from "@/stores/realtime";
@@ -18,8 +18,8 @@ import type { Outfit } from "../assets/outfits";
 import { AvatarController } from "./AvatarController";
 import type { Character } from "../assets/characters";
 import { dress, strip } from "./dress";
-import { Standee, standeeLift, type Pictures, type Waiting } from "./Standee";
-import { AVATAR_SCALE, SEAT_LIFT, STAND_BACK } from "./body";
+import { isSeated, Standee, standeeLift, type Pictures, type Waiting } from "./Standee";
+import { AVATAR_SCALE, SEAT_FORWARD, SEAT_LIFT, SIT_HIP, STAND_BACK } from "./body";
 
 export { AVATAR_SCALE, SEAT_LIFT };
 import { courierState } from "./courier";
@@ -35,10 +35,11 @@ export interface AvatarModel {
   animations: AnimationClip[];
 }
 
-export function placeFor(seat: Seat, pose: Pose): [number, number, number] {
-  // standing up is a step back from the desk: toward +z, or -z at a turned desk (D-119)
+export function placeFor(seat: Seat, pose: Pose, forward = 0): [number, number, number] {
+  // standing up is a step back from the desk: toward +z, or -z at a turned desk (D-119); sitting,
+  // ``forward`` nearer the desk (an own figure, D-201)
   const back = seat.turn ? -1 : 1;
-  return pose === "stand" ? [seat.chair[0], 0, seat.chair[1] + back * STAND_BACK] : [seat.chair[0], SEAT_LIFT, seat.chair[1]];
+  return pose === "stand" ? [seat.chair[0], 0, seat.chair[1] + back * STAND_BACK] : [seat.chair[0], SEAT_LIFT, seat.chair[1] - back * forward];
 }
 
 export function AgentAvatar({
@@ -49,6 +50,7 @@ export function AgentAvatar({
   figure = null,
   character,
   headScale,
+  bodyScale = 1,
 }: {
   /** Her figure: what it leaves off applies dressed or not (D-186). */
   character?: Character;
@@ -62,6 +64,8 @@ export function AgentAvatar({
   figure?: Pictures | null;
   /** The head bone's scale (default: the pack's figures' smaller heads, T-413). */
   headScale?: number;
+  /** How much larger than the pack's figures the model is drawn (an own figure, D-201). */
+  bodyScale?: number;
 }) {
   const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
@@ -72,6 +76,10 @@ export function AgentAvatar({
   }, [model.scene, outfit, character]);
   useEffect(() => () => dressed?.dispose(), [dressed]);
   const controller = useMemo(() => new AvatarController(body, model.animations, headScale), [body, model.animations, headScale]);
+  // an own figure's bending arms (D-201): she sits nearer the desk, and carries a document in her hand
+  const hand = useMemo(() => body.getObjectByName("forearm-right") ?? null, [body]);
+  const forward = hand ? SEAT_FORWARD : 0;
+  const eye = useMemo(() => new Vector3(), []);
   const group = useRef<Group>(null);
   const paper = useRef<Mesh>(null);
   const dirty = useRef(true);
@@ -89,9 +97,16 @@ export function AgentAvatar({
   useEffect(() => realtimeStore.subscribe(() => void (dirty.current = true)), []);
   useEffect(() => () => controller.dispose(), [controller]);
 
-  useFrame((_, dt) => {
+  useFrame(({ camera }, dt) => {
     const now = performance.now();
     const g = group.current;
+    // seated, an own figure turns her head toward the camera (D-203): up to GAZE_LIMIT either way, and
+    // not round to look behind her
+    if (hand && g) {
+      const at = g.worldToLocal(eye.copy(camera.position));
+      const turn = Math.atan2(at.x, at.z);
+      controller.gaze = isSeated(controller.pose) && Math.abs(turn) < Math.PI * 0.6 ? turn : 0;
+    }
 
     // a walk cue in progress: the courier
     const active = cues?.queue.walk(agentId);
@@ -109,6 +124,7 @@ export function AgentAvatar({
       if (g) g.rotation.y = step.heading;
       if (paper.current) paper.current.visible = step.carrying;
       controller.update(Math.min(dt, 0.1));
+      seatModel();
       if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000, Boolean(figure?.sit));
       return;
     }
@@ -132,17 +148,23 @@ export function AgentAvatar({
         agent?.activity?.stored_state === "WAITING" ? (agent.activity.detail.reason === "approval" ? "approval" : "other") : null;
       if (pose !== controller.pose) {
         controller.setPose(pose);
-        group.current?.position.set(...placeFor(seat, pose));
+        group.current?.position.set(...placeFor(seat, pose, forward));
       }
     }
     controller.update(Math.min(dt, 0.1));
+    seatModel();
     if (standee.current) standee.current.position.y = standeeLift(controller.pose, now / 1000, Boolean(figure?.sit));
   });
+
+  /** A larger model sits a little lower, so its hips stay on the seat. */
+  function seatModel() {
+    body.position.y = isSeated(controller.pose) ? -(bodyScale - 1) * SIT_HIP : 0;
+  }
 
   return (
     <group
       ref={group}
-      position={placeFor(seat, "sit_idle")}
+      position={placeFor(seat, "sit_idle", forward)}
       rotation-y={seat.facing}
       scale={AVATAR_SCALE}
       userData={{ agentId }}
@@ -153,7 +175,7 @@ export function AgentAvatar({
           <Standee pictures={figure} pose={() => controller.pose} waiting={() => waiting.current} />
         </group>
       ) : (
-        <primitive object={body} />
+        <primitive object={body} scale={bodyScale} />
       )}
       {/*
         What a click hits: a box a bit larger than the figure (and its chair), never drawn. At the
@@ -163,11 +185,23 @@ export function AgentAvatar({
       <mesh name="hit-box" visible={false} position={[0, HIT_BOX[1] / 2, 0]}>
         <boxGeometry args={HIT_BOX} />
       </mesh>
-      {/* the document a courier carries, held at the chest (model units: the group is scaled) */}
-      <mesh ref={paper} name="paper" visible={false} position={[0, 0.3, 0.17]} rotation-x={-0.35}>
-        <boxGeometry args={[0.11, 0.15, 0.01]} />
-        <meshStandardMaterial color="#fbfbf7" />
-      </mesh>
+      {/* the document a courier carries: the pack's figures hold it at the chest (model units: the group is scaled) */}
+      {hand ? (
+        // gripped by its edge in her right fist, hanging flat at her side (the bone's units: the figure's
+        // own, so the size of a sheet of A4 once she is drawn at the standees' height)
+        createPortal(
+          <mesh ref={paper} name="paper" visible={false} position={[-0.17, 0, 0.005]}>
+            <boxGeometry args={[0.1, 0.006, 0.072]} />
+            <meshStandardMaterial color="#fbfbf7" />
+          </mesh>,
+          hand,
+        )
+      ) : (
+        <mesh ref={paper} name="paper" visible={false} position={[0, 0.3, 0.17]} rotation-x={-0.35}>
+          <boxGeometry args={[0.11, 0.15, 0.01]} />
+          <meshStandardMaterial color="#fbfbf7" />
+        </mesh>
+      )}
     </group>
   );
 }

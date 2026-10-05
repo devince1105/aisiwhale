@@ -9,3 +9,11 @@ export const SEAT_LIFT = 0.41;
 
 /** Standing up (done), the avatar steps behind its chair. */
 export const STAND_BACK = 0.6;
+
+/** An own figure (D-201) sits this much nearer its desk (m): her bending arms reach the keyboard from
+ * there; the chair is where it was. */
+export const SEAT_FORWARD = 0.22;
+
+/** Where the pack's sit clip puts the hips, above a figure's origin (model units): a figure drawn
+ * larger is lowered by its extra share of this when seated, so it still sits on the seat. */
+export const SIT_HIP = 0.026;

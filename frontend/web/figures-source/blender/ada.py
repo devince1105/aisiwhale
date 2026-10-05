@@ -7,6 +7,7 @@
 # go where they show - the bob sculpted into fat clumps ending in points, the harness, belt, buckles,
 # pouches and holster standing off the body; pointed stilettos with crossed straps, after photos the owner sent.
 reset("ada")
+fit_arms()
 PARTS.clear()
 
 # the reference reads black and red: every dark keeps red at or above blue, so nothing turns lilac
@@ -53,47 +54,12 @@ part(surface("collar", [ring((0, cy, z), rx, ry, 20) for z, rx, ry, cy in COLLAR
 
 
 # ---- the harness: flat leather bands lying on the body, gunmetal buckles ---------------------------------
-def on(profile, deg, z, lift=0.0):
-    """The point on a lofted part's surface at azimuth ``deg`` (0 the front, + toward her left) and
-    height z, ``lift`` off it; ``profile`` rows are (z, rx, ry, cy)."""
-    zs = [p[0] for p in profile]
-    rx, ry, cy = (float(np.interp(z, zs, [p[k] for p in profile])) for k in (1, 2, 3))
-    d = math.radians(deg)
-    n = Vector((math.sin(d) / rx, -math.cos(d) / ry, 0)).normalized()
-    return Vector((math.sin(d) * rx, cy - math.cos(d) * ry, z)) + n * lift
-
-
+on = on_profile
 CHEST = Vector((0, 0.014, 0.27))         # straps face away from here: outward round the body, up over the shoulder
-strap_c = Canvas("strap", 0.03, 0.30, 1400, STRAP)
-strap_c.shade(0.80 + 0.35 * np.abs(np.sin(np.pi * strap_c.X / strap_c.width)) ** 0.5)    # rounded edges
-for u in (0.30, 0.70):                                                    # stitching
-    strap_c.fill("#3A3236", np.maximum(strap_c.column(u * strap_c.width - 0.0003, u * strap_c.width + 0.0003),
-                                       np.sin(strap_c.Y / 0.0016 * math.pi) - 0.2), alpha=0.6)
-
-
-def strap(name, pts, profile=TORSO, width=0.011, thick=0.0018, lift=0.0008, weights="torso"):
-    """A flat strap lying on a lofted part through (deg, z) points, its broad face on the surface."""
-    path = []
-    for d, z in pts:
-        p = on(profile, d, z)
-        path.append(p + (p - CHEST).normalized() * (lift + thick / 2))
-    o = sweep(name, path, [width] * len(path), [thick] * len(path), CHEST, seg=6, steps=2, tip=False)
-    return part(o, strap_c, weights)
-
-
-# painted round the buckle's box: its front face is the middle quarter of the canvas (u 0.385-0.615)
-buckle_c = Canvas("buckle", 0.04, 0.02, 1600, METAL_DARK)
-box_d = lambda a, b: np.maximum(np.abs(buckle_c.X / buckle_c.width - 0.5) - a, np.abs(buckle_c.Y / buckle_c.height - 0.5) - b)
-buckle_c.fill(METAL, box_d(0.105, 0.40) * buckle_c.width)                  # the frame
-buckle_c.fill(STRAP, box_d(0.060, 0.22) * buckle_c.width)                  # its opening, the strap behind
-buckle_c.fill(METAL, box_d(0.006, 0.22) * buckle_c.width)                  # the prong
-buckle_c.put("#C9C4C8", 0.6 * np.exp(-((buckle_c.Y / buckle_c.height - 0.78) / 0.06) ** 2) * (box_d(0.105, 0.40) < 0) * (box_d(0.060, 0.22) > 0))
-
-
-def buckle(name, at, deg, size=(0.0060, 0.0010, 0.0068), weights="torso"):
-    """A square frame buckle at ``at``, facing out at azimuth ``deg``."""
-    o = ellipsoid(name, at, size, 12, 4, power=8)
-    return part(turn(o, at, (0, 0, math.radians(deg))), buckle_c, weights)
+strap_c = strap_canvas(STRAP, "#3A3236")
+strap = lambda name, pts: flat_strap(name, pts, TORSO, CHEST, strap_c)
+buckle_c = buckle_canvas(METAL, METAL_DARK, STRAP)
+buckle = lambda name, at, deg, size=(0.0060, 0.0010, 0.0068), weights="torso": frame_buckle(name, at, deg, buckle_c, size, weights)
 
 
 for s in (1, -1):
@@ -141,13 +107,13 @@ sleeve.fill("#141012", sleeve.ellipse(top, y_of(0.1715), 0.0098, 0.0062))  # the
 sleeve.fill(SKIN, sleeve.ellipse(top, y_of(0.1715), 0.0085, 0.0050))
 for u in (0.34, 0.45, 0.56, 0.67):                                        # between the fingers
     sleeve.fill("#DDA07E", sleeve.stroke([(u * sleeve.width, y_of(0.190)), (u * sleeve.width, y_of(0.209))], 0.0008))
-arm_w = lambda side: (lambda co: {f"arm-{side}": smooth(0.062, 0.100, abs(co.x)), "torso": 1 - smooth(0.062, 0.100, abs(co.x))})
+arm_w = arm_weights
 part(arm_l, sleeve, arm_w("left"))
 part(mirror(arm_l, "arm-r"), sleeve, arm_w("right"))
 thumb = ellipsoid("thumb-l", (0.184, AY - 0.024, AZ + 0.004), (0.011, 0.010, 0.010), 6, 4)
 knuckle = Canvas("thumb", 0.03, 0.03, 1000, SKIN)
-part(thumb, knuckle, "arm-left")
-part(mirror(thumb, "thumb-r"), knuckle, "arm-right")
+part(thumb, knuckle, "forearm-left")
+part(mirror(thumb, "thumb-r"), knuckle, "forearm-right")
 
 # ---- skirt: a belted pencil skirt, slit up the front of her left thigh and at her right side ------------
 SKIRT_Z = [(0.166, .067, .056, .022), (0.178, .0668, .0558, .0215), (0.190, .066, .055, .021), (0.214, .062, .052, .020),
@@ -212,8 +178,7 @@ leg_r = lambda z: float(np.interp(z, [p[0] for p in LEG], [p[1] for p in LEG]))
 
 
 def thigh_strap(name, z0, z1):
-    rows = [ring((LX, LY, z), leg_r(z) + k, (leg_r(z) + k) * 1.05, 16) for z, k in ((z0, 0.0004), (z0 + 0.0008, 0.0016), (z1 - 0.0008, 0.0016), (z1, 0.0004))]
-    return surface(name, rows)
+    return wrap_band(name, (LX, LY), leg_r, z0, z1, squash=1.05)
 
 
 band_c = Canvas("thigh-strap", 2 * math.pi * 0.03, 0.01, 2000, STRAP)

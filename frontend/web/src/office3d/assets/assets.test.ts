@@ -2,9 +2,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { CHARACTER_DIR, CHARACTERS, characterFor, OWN_FIGURES, ownFigure, POSE_CLIP, REQUIRED_CLIPS } from "./characters";
+import { CHARACTER_DIR, CHARACTERS, characterFor, OWN_FIGURE_HEIGHT, OWN_FIGURES, ownFigure, POSE_CLIP, REQUIRED_CLIPS } from "./characters";
 
 interface Gltf {
+  meshes?: { primitives: { attributes: { POSITION: number } }[] }[];
+  accessors?: { max?: number[]; min?: number[] }[];
   animations?: { name: string }[];
   skins?: unknown[];
   images?: { uri?: string; bufferView?: number }[];
@@ -40,6 +42,9 @@ describe("character assets (Kenney Mini Characters, CC0)", () => {
       }
       const clips = new Set(json.animations?.map((a) => a.name));
       for (const clip of REQUIRED_CLIPS) expect(clips.has(clip), `${figure} has ${clip}`).toBe(true);
+      // built to Tifa's proportions, so one height scales them all to the standees' (D-201)
+      const top = Math.max(...(json.meshes ?? []).flatMap((m) => m.primitives.map((p) => json.accessors![p.attributes.POSITION].max![1])));
+      expect(top, figure).toBeCloseTo(OWN_FIGURE_HEIGHT, 2);
       // the baked atlas (D-197) travels inside the GLB: nothing beside it to fetch
       for (const image of json.images ?? []) {
         expect(image.uri, figure).toBeUndefined();

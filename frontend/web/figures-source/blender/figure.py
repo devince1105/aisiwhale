@@ -11,6 +11,12 @@ def smooth(e0, e1, x):
     return k * k * (3 - 2 * k)
 
 
+def smooth_np(e0, e1, x):
+    """``smooth`` over an array."""
+    k = np.clip((x - e0) / (e1 - e0), 0, 1)
+    return k * k * (3 - 2 * k)
+
+
 def srgb(hexcolor):
     h = hexcolor.lstrip("#")
     return np.array([int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)], dtype=np.float32)
@@ -456,22 +462,34 @@ class Hair:
         cv.shade(1.06 - 0.16 * (cv.Y / cv.height))                         # a little darker toward the ends
         return part(o, cv, weights)
 
-    def cap(self, hem, cols=32, rows=9, rim_depth=0.026, parting=22, ppm=940, seed=3, ridges=None):
+    def cap(self, hem, cols=32, rows=9, rim_depth=0.026, parting=22, ppm=940, seed=3, ridges=None, weights="head",
+            grow=(0.15, 0.8), paint_grow=(0.0, 3.0), highlight=0.22, partings=0.55, side_fade=False, parting_color="#231B1E", sweep=0.0,
+            crown_shade=(0.45, 0.35)):
         """The cap: columns from the crown, each ending at ``hem(azimuth)`` - azimuth in degrees, 0 the
         front, + toward her left - with an edge ``rim_depth`` thick, and a parting at ``parting``.
         ``ridges`` = (count, depth, clear[, phase]): the hair is sculpted into ``count`` rounded clumps
         around the head, standing out by up to ``depth`` of its radius with sharp partings between,
         growing in from the crown and kept off the front within ``clear`` degrees (the hairline stays
         smooth); ``phase`` (in clumps) turns them round, so a clump's middle can sit at the nape. The
-        paint follows the clumps: dark partings, a soft highlight down each, a strand or two in it."""
+        paint follows the clumps: dark partings, a soft highlight down each, a strand or two in it.
+        Tuning (the defaults are what Ada was built with): ``grow`` (polar angle, radians) and
+        ``paint_grow`` (start, rate down the canvas) say where the clumps begin below the crown, so they
+        do not all meet at its top; ``highlight`` and ``partings`` set the paint's contrast;
+        ``side_fade`` keeps the clumps off the hem beside the face; ``sweep`` (in clumps) combs them back
+        toward the nape as they fall; the cap's ``weights`` let a curtain down the back follow the torso.
+        ``crown_shade`` = (depth, extent): the top of the head is painted darker by up to ``depth``,
+        easing off over the top ``extent`` of the canvas. The office lights a crown from straight above
+        with its key, its sky and its ceiling panels at once; unshaded, dark hair there reads as a bald
+        patch (D-201)."""
         c, r = self.c, self.r
 
-        def bulge(az, ph):
+        def bulge(az, ph, f=0.0):
             if not ridges:
                 return 1.0
             count, depth, clear, phase = (tuple(ridges) + (0.0,))[:4]
-            u = ((az + 180) / 360 * count + phase) % 1
-            return 1 + depth * (abs(math.sin(math.pi * u)) ** 0.45 - 0.7) * smooth(0.15, 0.8, ph) * smooth(clear, clear + 30, abs(az))
+            u = ((az + 180) / 360 * count + phase + sweep * (1 - math.cos(math.radians(az))) / 2 * smooth(0.3, 1.0, f)) % 1
+            fade = 1 - 0.7 * smooth(0.85, 1.0, f) * (smooth(55, 75, abs(az)) - smooth(100, 110, abs(az))) if side_fade else 1.0
+            return 1 + depth * (abs(math.sin(math.pi * u)) ** 0.45 - 0.7) * smooth(grow[0], grow[1], ph) * smooth(clear, clear + 30, abs(az)) * fade
 
         polar = lambda z: math.acos(min(1, (z - c.z) / r.z)) if z >= c.z else math.pi / 2 + (c.z - z) / r.z
         height = lambda ph: c.z + r.z * math.cos(ph) if ph <= math.pi / 2 else c.z - (ph - math.pi / 2) * r.z
@@ -483,7 +501,7 @@ class Hair:
                 ph = polar(hem(az)) * j / rows
                 z = height(ph)
                 a = math.radians(az)
-                k = self.scale(z) * bulge(az, ph)
+                k = self.scale(z) * bulge(az, ph, j / rows)
                 row.append(Vector((c.x + r.x * k * math.sin(a), c.y - r.y * k * math.cos(a), z)))
             grid.append(row)
         cap = surface("cap", grid, start=(c.x, c.y, c.z + r.z), inside=c)
@@ -492,17 +510,21 @@ class Hair:
         if ridges:
             count, phase = ridges[0], (tuple(ridges) + (0.0,))[3]
             crown.streaks(count * 2, groove=0.15, drift=0.10, seed=seed)
-            u = (crown.X / crown.width * count + phase) % 1
-            grow = np.clip(crown.Y / crown.height * 3, 0, 1)
-            crown.shade(1 - 0.55 * (1 - np.abs(np.sin(np.pi * u)) ** 0.15) * grow)          # the partings
-            crown.shade(1 + 0.22 * np.exp(-((u - 0.5) / 0.16) ** 2) * grow)                  # a highlight down each clump
+            tt = np.clip((crown.Y / crown.height - 0.3) / 0.7, 0, 1)
+            sw = sweep * (1 - np.cos(np.radians(crown.X / crown.width * 360 - 180))) / 2 * tt * tt * (3 - 2 * tt)
+            u = (crown.X / crown.width * count + phase + sw) % 1
+            g = np.clip((crown.Y / crown.height - paint_grow[0]) * paint_grow[1], 0, 1)
+            crown.shade(1 - partings * (1 - np.abs(np.sin(np.pi * u)) ** 0.15) * g)          # the partings
+            crown.shade(1 + highlight * np.exp(-((u - 0.5) / 0.16) ** 2) * g)                # a highlight down each clump
         else:
             crown.streaks(72, groove=0.3, drift=0.14, seed=seed)
-        crown.shade(1.0 + 0.16 * np.exp(-((crown.Y / crown.height - 0.32) / 0.14) ** 2))      # a soft sheen round the crown
+        if crown_shade:
+            depth, extent = crown_shade
+            crown.shade(1 - depth * (1 - smooth_np(0.0, extent, crown.Y / crown.height)))
         if parting is not None:
             px = (0.5 + parting / 360) * crown.width
-            crown.fill("#231B1E", np.maximum(crown.column(px - 0.0012, px + 0.0012), 0.03 - crown.Y), alpha=0.85)
-        return part(cap, crown, "head")
+            crown.fill(parting_color, np.maximum(crown.column(px - 0.0012, px + 0.0012), 0.03 - crown.Y), alpha=0.85)
+        return part(cap, crown, weights)
 
     def blade(self, name, pts, widths, thicks, seed, weights="head", seg=6, steps=3, strands=None):
         """A lock lying on the hair: ``pts`` are (x, z) on the front of the head, or full positions.
@@ -522,6 +544,126 @@ class Hair:
 def hang(z0, z1):
     """Weights for hair that hangs past the neck: the head's above z1, the torso's below z0."""
     return lambda co: {"head": smooth(z0, z1, co.z), "torso": 1 - smooth(z0, z1, co.z)}
+
+
+# ---- straps, bands and buckles that stand off the body (the 9999 versions, D-200) ------------------------
+def on_profile(profile, deg, z, lift=0.0, bulge=None):
+    """The point on a lofted part's surface at azimuth ``deg`` (0 the front, + toward her left) and
+    height z, ``lift`` off it; ``profile`` rows are (z, rx, ry, cy), the part centred on x = 0. A part
+    whose rings were pushed out by ``bulge(deg, z)`` along this normal (see ``bulged_rings``) passes
+    the same function, so what lies on it follows."""
+    zs = [p[0] for p in profile]
+    rx, ry, cy = (float(np.interp(z, zs, [p[k] for p in profile])) for k in (1, 2, 3))
+    d = math.radians(deg)
+    n = Vector((math.sin(d) / rx, -math.cos(d) / ry, 0)).normalized()
+    return Vector((math.sin(d) * rx, cy - math.cos(d) * ry, z)) + n * (lift + (bulge(deg, z) if bulge else 0.0))
+
+
+def bulged_rings(profile, seg, bulge):
+    """The rings of a lofted part (rows (z, rx, ry, cy), centred on x = 0), each point pushed out by
+    ``bulge(deg, z)`` metres along its normal - a bust, say."""
+    rows = []
+    for z, rx, ry, cy in profile:
+        row = ring((0, cy, z), rx, ry, seg)
+        for k, p in enumerate(row):
+            deg = 360 * k / seg - 180                    # ring() starts at the back
+            d = math.radians(deg)
+            n = Vector((math.sin(d) / rx, -math.cos(d) / ry, 0)).normalized()
+            p += n * bulge(deg, z)
+        rows.append(row)
+    return rows
+
+
+def strap_canvas(color, stitch):
+    """Leather strap: rounded edges, a stitched line down each side."""
+    c = Canvas("strap", 0.03, 0.30, 1400, color)
+    c.shade(0.80 + 0.35 * np.abs(np.sin(np.pi * c.X / c.width)) ** 0.5)
+    for u in (0.30, 0.70):
+        c.fill(stitch, np.maximum(c.column(u * c.width - 0.0003, u * c.width + 0.0003), np.sin(c.Y / 0.0016 * math.pi) - 0.2), alpha=0.6)
+    return c
+
+
+def flat_strap(name, pts, profile, toward, canvas, width=0.011, thick=0.0018, lift=0.0008, weights="torso", bulge=None):
+    """A flat strap lying on a lofted part through (deg, z) points, its broad face turned away from the
+    point ``toward`` (inside the body: outward round it, up over a shoulder)."""
+    path = []
+    for d, z in pts:
+        p = on_profile(profile, d, z, bulge=bulge)
+        path.append(p + (p - toward).normalized() * (lift + thick / 2))
+    o = sweep(name, path, [width] * len(path), [thick] * len(path), toward, seg=6, steps=2, tip=False)
+    return part(o, canvas, weights)
+
+
+def buckle_canvas(metal, dark, strap, shine="#C9C4C8"):
+    """A square frame buckle with its prong, painted round a box whose front face is the middle quarter
+    of the canvas (u 0.385-0.615)."""
+    c = Canvas("buckle", 0.04, 0.02, 1600, dark)
+    box_d = lambda a, b: np.maximum(np.abs(c.X / c.width - 0.5) - a, np.abs(c.Y / c.height - 0.5) - b)
+    c.fill(metal, box_d(0.105, 0.40) * c.width)                  # the frame
+    c.fill(strap, box_d(0.060, 0.22) * c.width)                  # its opening, the strap behind
+    c.fill(metal, box_d(0.006, 0.22) * c.width)                  # the prong
+    c.put(shine, 0.6 * np.exp(-((c.Y / c.height - 0.78) / 0.06) ** 2) * (box_d(0.105, 0.40) < 0) * (box_d(0.060, 0.22) > 0))
+    return c
+
+
+def frame_buckle(name, at, deg, canvas, size=(0.0060, 0.0010, 0.0068), weights="torso", tilt=(0.0, 0.0), seg=12):
+    """A square frame buckle at ``at``, facing out at azimuth ``deg`` (and tipped by ``tilt``, radians
+    about x then y, for one on an arm or a slope)."""
+    o = ellipsoid(name, at, size, seg, 4, power=8)
+    return part(turn(o, at, (tilt[0], tilt[1], math.radians(deg))), canvas, weights)
+
+
+def wrap_band(name, center, radius, t0, t1, seg=16, plane="XY", squash=1.0, rise=0.0016):
+    """A band round a part from t0 to t1 along its axis (z for "XY", x for "YZ"), standing ``rise``
+    off ``radius(t)`` with rounded edges; ``center`` is the axis' other two coordinates."""
+    rows = []
+    for t, k in ((t0, 0.0004), (t0 + 0.0008, rise), (t1 - 0.0008, rise), (t1, 0.0004)):
+        r = radius(t) + k
+        at = (center[0], center[1], t) if plane == "XY" else (t, center[0], center[1])
+        rows.append(ring(at, r, r * squash, seg, plane=plane))
+    return surface(name, rows)
+
+
+# ---- arms that bend (D-201) --------------------------------------------------------------------------------
+# The pack's arm bones pivot 5 cm out from where these figures' shoulders are, and have no elbow: its sit
+# clip swings the arm 45 degrees down and out, so the long straight arm stuck out like a wing. The arm
+# bones are moved to the shoulder and given a forearm bone at the elbow, which no clip moves; the office
+# bends it (AvatarController).
+SHOULDER_X, ELBOW_X, ARM_Y, ARM_Z = 0.058, 0.086, 0.017, 0.292
+
+
+def fit_arms(shoulder_x=SHOULDER_X, elbow_x=ELBOW_X, y=ARM_Y, z=ARM_Z):
+    """Move the rig's arm pivots to the shoulders and add a forearm bone at each elbow, oriented as the
+    arm bones are (so a clip's rotations mean the same)."""
+    arm = rig()
+    bpy.ops.object.select_all(action="DESELECT")
+    arm.select_set(True)
+    bpy.context.view_layer.objects.active = arm
+    bpy.ops.object.mode_set(mode="EDIT")
+    bones = arm.data.edit_bones
+    for s, side in ((1, "left"), (-1, "right")):
+        upper = bones[f"arm-{side}"]
+        length, roll = upper.length, upper.roll
+        upper.head = (s * shoulder_x, y, z)
+        upper.tail = (s * shoulder_x, y, z + length)
+        upper.roll = roll
+        fore = bones.new(f"forearm-{side}")
+        fore.head = (s * elbow_x, y, z)
+        fore.tail = (s * elbow_x, y, z + length)
+        fore.roll = roll
+        fore.parent = upper
+        fore.use_connect = False
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def arm_weights(side, shoulder=(0.050, 0.066), elbow=(ELBOW_X - 0.008, ELBOW_X + 0.004)):
+    """Weights along an arm (the rest pose's x): the torso's at the body, the arm's past the shoulder,
+    the forearm's past the elbow, each blending into the next."""
+    def weights(co):
+        x = abs(co.x)
+        a, f = smooth(*shoulder, x), smooth(*elbow, x)
+        return {"torso": 1 - a, f"arm-{side}": a * (1 - f), f"forearm-{side}": a * f}
+    return weights
 
 
 # ---- the figure -----------------------------------------------------------------------------------------
@@ -572,26 +714,46 @@ def _bake_occlusion(o, size, samples, margin):
     img = bpy.data.images.new("occlusion", size, size, alpha=False, float_buffer=True)
     img.colorspace_settings.name = "Non-Color"
     img.pixels[:] = np.ones(size * size * 4, dtype=np.float32)
-    nt = o.data.materials[0].node_tree
-    node = nt.nodes.new("ShaderNodeTexImage")
-    node.image = img
-    nt.nodes.active = node
+    nodes = []
+    for m in o.data.materials:              # every material bakes into the same image
+        node = m.node_tree.nodes.new("ShaderNodeTexImage")
+        node.image = img
+        m.node_tree.nodes.active = node
+        nodes.append((m.node_tree, node))
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True)
     bpy.context.view_layer.objects.active = o
     bpy.ops.object.bake(type="AO", margin=margin, use_clear=False)
     a = np.array(img.pixels[:], dtype=np.float32).reshape(size, size, 4)[..., 0]
     a = sum(np.roll(np.roll(a, i, 0), j, 1) for i in (-1, 0, 1) for j in (-1, 0, 1)) / 9      # take the grain off
-    nt.nodes.remove(node)
+    for nt, node in nodes:
+        nt.nodes.remove(node)
     bpy.data.images.remove(img)
     sc.render.engine = engine
     return a
 
 
-def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, samples=48):
-    """Pack the canvases, join the parts into one mesh on the rig with one material, and multiply the
-    mesh's own (warm-tinted) ambient occlusion into the paint: the soft shadow under the fringe, the
-    chin, the skirt."""
+HAIR_PARTS = ("cap", "fringe", "lock", "mass", "tail")
+
+
+def _material(name, matte):
+    """The figure's material; a matte one has no specular at all (glTF KHR_materials_specular 0): the
+    office's light panels would otherwise shine on the top of dark hair like a bald crown (D-201)."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    m.use_backface_culling = False       # the skirt and the hair's hems are single sheets
+    bsdf = next(n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    bsdf.inputs["Roughness"].default_value = 1.0 if matte else 0.85
+    if matte:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.0
+    return m
+
+
+def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, samples=48, fade_face_seam=False, matte=HAIR_PARTS):
+    """Pack the canvases, join the parts into one mesh on the rig, and multiply the mesh's own
+    (warm-tinted) ambient occlusion into the paint: the soft shadow under the fringe, the chin, the
+    skirt. Two materials share the one atlas: the parts named in ``matte`` (by the name before its
+    first "-") get the matte one."""
     arm = rig()
     canvases = []
     for _, c, _ in PARTS:
@@ -614,6 +776,8 @@ def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, sample
         bm.to_mesh(o.data)
         bm.free()
         _weigh(o, weights)
+        flag = 1 if o.name.split("-")[0] in matte else 0
+        o.data.attributes.new("matte", "INT", "FACE").data.foreach_set("value", [flag] * len(o.data.polygons))
     print("parts", ", ".join(f"{o.name} {sum(len(p.vertices) - 2 for p in o.data.polygons)}" for o, _, _ in PARTS))
     bpy.ops.object.select_all(action="DESELECT")
     for o, _, _ in PARTS:
@@ -624,26 +788,36 @@ def assemble(name, size=2048, pad=8, occlusion=0.42, occlusion_size=1024, sample
     mesh.name = mesh.data.name = name + "-mesh"
     PARTS.clear()
 
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    m.use_backface_culling = False       # the skirt and the hair's hems are single sheets
-    nt = m.node_tree
-    bsdf = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
-    bsdf.inputs["Roughness"].default_value = 0.85
     mesh.data.materials.clear()
-    mesh.data.materials.append(m)
+    materials = [_material(name, False), _material(name + "-matte", True)]
+    for m in materials:
+        mesh.data.materials.append(m)
+    flags = [0] * len(mesh.data.polygons)
+    mesh.data.attributes["matte"].data.foreach_get("value", flags)
+    mesh.data.polygons.foreach_set("material_index", flags)
+    mesh.data.attributes.remove(mesh.data.attributes["matte"])
     if occlusion:
         ao = _bake_occlusion(mesh, occlusion_size, samples, pad * occlusion_size // size)
         k = size // occlusion_size
         dark = occlusion * (1 - np.repeat(np.repeat(ao, k, axis=0), k, axis=1))[..., None]
+        face = next((c for c in canvases if c.name == "face"), None)
+        if fade_face_seam and face is not None:
+            # the head's projected front and its wrapped back meet in a seam the occlusion would draw:
+            # fade it out toward the projection's edge and off the wrapped strip
+            ramp = lambda e0, e1, t: (lambda q: q * q * (3 - 2 * q))(np.clip((t - e0) / (e1 - e0), 0, 1))
+            keep = (1 - ramp(0.080, 0.095, np.abs(face.X + FACE_BOX[0]))) * ramp(0.020, 0.032, face.Y) * (face.Y < 0.83 * face.height)
+            x, y = rects[face.name]
+            dark[y:y + face.h, x:x + face.w, 0] *= keep.astype(np.float32)
         atlas = atlas * (1 - dark * np.array([0.7, 1.0, 1.1], dtype=np.float32))      # warm shadows, as on skin
     img = bpy.data.images.new(name, size, size, alpha=False)
     img.pixels[:] = np.concatenate([np.clip(atlas, 0, 1), np.ones((size, size, 1), dtype=np.float32)], axis=2).ravel()
     img.file_format = "PNG"
     img.pack()
-    tex = nt.nodes.new("ShaderNodeTexImage")
-    tex.image = img
-    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    for m in materials:
+        nt = m.node_tree
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = img
+        nt.links.new(tex.outputs["Color"], next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"])
     mesh.parent = arm
     mesh.modifiers.new("Armature", "ARMATURE").object = arm
     print("triangles", sum(len(p.vertices) - 2 for p in mesh.data.polygons))

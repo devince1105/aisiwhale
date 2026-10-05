@@ -41,6 +41,11 @@ export function ownFigure(avatarKey: string | null | undefined): OwnFigure | nul
 
 export const ownFigureUrl = (figure: OwnFigure) => `${CHARACTER_DIR}/${figure}.glb`;
 
+/** How tall an own figure stands, in model units: all of them are built to Tifa's proportions
+ * (D-199), smaller than the standees they replace; the office draws them at the standees' height
+ * (D-201). */
+export const OWN_FIGURE_HEIGHT = 0.618;
+
 /**
  * Clips per pose (02 §7 poses). The pack has one sitting clip; thinking, typing and reading are
  * the same seat with a different upper-body accent that T-405 layers on. `once` plays one time

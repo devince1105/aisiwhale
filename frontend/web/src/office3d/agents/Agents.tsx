@@ -14,12 +14,12 @@ import { Suspense, useMemo } from "react";
 import { figureBackPhoto, figurePhoto, figureSitBackPhoto, figureSidePhotos, figureSitPhoto, figureThinkPhotos, figureWaitPhotos, figureWalkPhotos } from "@/people";
 import { useUi, type EnteredDepartment } from "@/stores/ui";
 
-import { characterUrl, ownFigure, ownFigureUrl } from "../assets/characters";
+import { characterUrl, OWN_FIGURE_HEIGHT, ownFigure, ownFigureUrl } from "../assets/characters";
 import { outfitFor } from "../assets/outfits";
 import type { Seat } from "../scene/layout";
 import { AgentAvatar } from "./AgentAvatar";
 import { useRoster, type Member } from "./roster";
-import type { Pictures } from "./Standee";
+import { STANDEE_HEIGHT, type Pictures } from "./Standee";
 
 export { rosterKey } from "./roster";
 
@@ -43,7 +43,7 @@ function picturesOf(avatar: string | null | undefined): Pictures | null {
 
 function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
   // her own figure (D-196) is already dressed, leaves nothing off, and is proportioned as her
-  // reference: her head is not scaled down (D-198)
+  // reference: her head is not scaled down (D-198), and she stands as tall as the standees (D-201)
   const own = ownFigure(member.avatar);
   const gltf = useGLTF(own ? ownFigureUrl(own) : characterUrl(member.character), false);
   const model = useMemo(() => ({ scene: gltf.scene, animations: gltf.animations }), [gltf]);
@@ -56,6 +56,7 @@ function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
       character={own ? undefined : member.character}
       figure={own ? null : picturesOf(member.avatar)}
       headScale={own ? 1 : undefined}
+      bodyScale={own ? STANDEE_HEIGHT / OWN_FIGURE_HEIGHT : undefined}
     />
   );
 }
