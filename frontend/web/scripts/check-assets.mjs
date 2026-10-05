@@ -1,7 +1,7 @@
 // Checks the 3D assets (T-404): `pnpm -F web check-assets`.
 //   1. every glTF under public/models passes the Khronos glTF validator (no errors);
 //   2. every file under public/models is listed in src/office3d/assets/LICENSES.md;
-//   3. a triangle report, and no character over the per-avatar budget (04 §10: <= 3k).
+//   3. a triangle report, and no character over the per-avatar budget (04 §10: <= 10k, D-198).
 // Which clips exist per character is checked by src/office3d/assets/assets.test.ts.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -11,7 +11,7 @@ import validator from "gltf-validator";
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..");
 const MODELS = join(WEB, "public", "models");
 const LICENSES = readFileSync(join(WEB, "src", "office3d", "assets", "LICENSES.md"), "utf8");
-const AVATAR_BUDGET = 3000;
+const AVATAR_BUDGET = 10000;
 
 function files(dir) {
   return readdirSync(dir).flatMap((name) => {

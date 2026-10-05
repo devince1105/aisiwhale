@@ -48,6 +48,7 @@ export function AgentAvatar({
   outfit = null,
   figure = null,
   character,
+  headScale,
 }: {
   /** Her figure: what it leaves off applies dressed or not (D-186). */
   character?: Character;
@@ -59,6 +60,8 @@ export function AgentAvatar({
   /** Her Q-version pictures (D-118, D-123, D-124): a standee facing the camera instead of the
    * model, standing or seated, from the front or behind. */
   figure?: Pictures | null;
+  /** The head bone's scale (default: the pack's figures' smaller heads, T-413). */
+  headScale?: number;
 }) {
   const { body, dressed } = useMemo(() => {
     const copy = cloneSkinned(model.scene);
@@ -68,7 +71,7 @@ export function AgentAvatar({
     return { body: copy, dressed: outfit ? dress(copy, outfit) : character ? strip(copy, character) : null };
   }, [model.scene, outfit, character]);
   useEffect(() => () => dressed?.dispose(), [dressed]);
-  const controller = useMemo(() => new AvatarController(body, model.animations), [body, model.animations]);
+  const controller = useMemo(() => new AvatarController(body, model.animations, headScale), [body, model.animations, headScale]);
   const group = useRef<Group>(null);
   const paper = useRef<Mesh>(null);
   const dirty = useRef(true);

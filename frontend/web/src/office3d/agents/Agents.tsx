@@ -42,7 +42,8 @@ function picturesOf(avatar: string | null | undefined): Pictures | null {
 }
 
 function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
-  // her own figure (D-196) is already dressed and leaves nothing off
+  // her own figure (D-196) is already dressed, leaves nothing off, and is proportioned as her
+  // reference: her head is not scaled down (D-198)
   const own = ownFigure(member.avatar);
   const gltf = useGLTF(own ? ownFigureUrl(own) : characterUrl(member.character), false);
   const model = useMemo(() => ({ scene: gltf.scene, animations: gltf.animations }), [gltf]);
@@ -54,6 +55,7 @@ function LoadedAvatar({ member, seat }: { member: Member; seat: Seat }) {
       outfit={own ? null : outfitFor(member.avatar)}
       character={own ? undefined : member.character}
       figure={own ? null : picturesOf(member.avatar)}
+      headScale={own ? 1 : undefined}
     />
   );
 }

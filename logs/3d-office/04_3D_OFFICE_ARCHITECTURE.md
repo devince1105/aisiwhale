@@ -33,7 +33,7 @@ apps/web/src/office3d/
 ├── fallback/
 │   └── OfficeBoard2D.tsx       無 WebGL / 行動裝置：同一個 store 的 2D 卡片牆
 └── assets/
-    ├── avatar.glb              一個低模人形（≤ 3k tris），6 個 clips
+    ├── avatar.glb              一個低模人形（≤ 10k tris，D-198 起；原為 3k），6 個 clips
     ├── desk.glb, chair.glb, monitor.glb（各 ≤ 500 tris）
     └── palette.ts              role → 顏色（用 vertex color / material color，不用貼圖）
 ```
@@ -158,7 +158,7 @@ WS event ──▶ realtimeStore.applyEvent(event)      // domain 投影更新�
 |---|---|
 | 目標 FPS | 桌機 60、筆電 ≥30。`<Canvas dpr={[1, 1.5]}>`。 |
 | frameloop | `always`（有 idle 動畫）。頁面不可見時瀏覽器自動節流；額外：`document.hidden` 時 `mixer.timeScale=0`，並停止 cue 執行（cue 不丟，恢復時快進）。 |
-| 幾何 | 全部低模，總三角形 < 50k。**（D-010 修訂）靜態家具與建築以程式產生的基本形狀組成，合併成一個頂點色網格（一次繪製）**；會隨狀態變化的螢幕用 `<Instances>`。目前靜態場景約 2.1 萬三角形、每幀 16 次繪製（含陰影）。 |
+| 幾何 | 全部低模，總三角形 < 150k（不含陰影；D-198 起，原為 50k：成員自己的人物每個上限 1 萬，估計 20 人含陰影約 44 萬，內建顯示卡的筆電仍可 60 fps；人物的瓶頸先是貼圖記憶體——2048 圖集每個約 21 MB——其次才是三角形）。**（D-010 修訂）靜態家具與建築以程式產生的基本形狀組成，合併成一個頂點色網格（一次繪製）**；會隨狀態變化的螢幕用 `<Instances>`。目前靜態場景約 2.1 萬三角形、每幀 16 次繪製（含陰影）。 |
 | 貼圖 | 不使用圖片素材。**（D-010）木地板與磁磚是執行時以 canvas 畫出的 256² 材質**（`scene/textures.ts`）。若日後加圖片，≤1024²、KTX2 壓縮。 |
 | 動畫 | 一個 mixer / avatar；crossFade；不用 morph targets。 |
 | Culling | Three.js 預設 frustum culling；房間小，效益有限但不關。 |

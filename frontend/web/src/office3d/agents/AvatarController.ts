@@ -19,7 +19,8 @@ import type { Pose } from "../visual/mapping";
 const FADE = 0.3;
 /**
  * The pack's heads are big (a toy look); scaled down from the neck (T-413) the figures read more
- * like office staff. Applied after the clips, which may key the head's scale.
+ * like office staff. Applied after the clips, which may key the head's scale. A member's own figure
+ * (D-198) is modelled to her reference's proportions and keeps her head at 1.
  */
 export const HEAD_SCALE = 0.8;
 const BONES = ["torso", "head", "arm-left", "arm-right"] as const;
@@ -80,6 +81,7 @@ export class AvatarController {
   constructor(
     private readonly root: Object3D,
     clips: readonly AnimationClip[],
+    private readonly headScale = HEAD_SCALE,
   ) {
     this.mixer = new AnimationMixer(root);
     for (const clip of clips) this.actions.set(clip.name, this.mixer.clipAction(clip));
@@ -87,7 +89,7 @@ export class AvatarController {
       const bone = root.getObjectByName(name);
       if (bone) this.bones.set(name, { bone, rest: bone.quaternion.clone() });
     }
-    this.bones.get("head")?.bone.scale.setScalar(HEAD_SCALE);
+    this.bones.get("head")?.bone.scale.setScalar(this.headScale);
     this.mixer.addEventListener("finished", (event) => {
       if (event.action === this.once && this.base) {
         this.base.reset().setEffectiveWeight(1).fadeIn(FADE).play();
@@ -130,7 +132,7 @@ export class AvatarController {
     this.time += dt;
     for (const { bone, rest } of this.bones.values()) bone.quaternion.copy(rest);
     this.mixer.update(dt);
-    this.bones.get("head")?.bone.scale.setScalar(HEAD_SCALE);
+    this.bones.get("head")?.bone.scale.setScalar(this.headScale);
     if (!this.pose) return;
     for (const [name, [x, y, z]] of Object.entries(upperBody(this.pose, this.time)) as [BoneName, [number, number, number]][]) {
       const entry = this.bones.get(name);

@@ -228,4 +228,13 @@ describe("AvatarController", () => {
     for (let i = 0; i < 5; i++) controller.update(0.1);
     expect([head.scale.x, head.scale.y, head.scale.z]).toEqual([HEAD_SCALE, HEAD_SCALE, HEAD_SCALE]);
   });
+
+  it("an own figure keeps the head she was modelled with (D-198)", () => {
+    const model = fakeModel();
+    const controller = new AvatarController(model.scene, model.animations, 1);
+    const head = model.scene.getObjectByName("head")!;
+    controller.setPose("sit_type");
+    for (let i = 0; i < 5; i++) controller.update(0.1);
+    expect([head.scale.x, head.scale.y, head.scale.z]).toEqual([1, 1, 1]);
+  });
 });

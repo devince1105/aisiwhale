@@ -1,47 +1,54 @@
-# 成員自己的 3D 人物（D-196、D-197）
+# 成員自己的 3D 人物（D-196、D-197、D-198）
 
 不對外提供的原始檔。網站載入的是匯出後的 `public/models/characters/<avatar_key>.glb`。
 
-## 做法：高模雕刻 → 低模 → 烘焙（D-197）
+## 做法：乾淨的低模加上畫出來的細節（D-198）
 
-D-196 第一版是把球、管、方塊拼起來，各自上平面顏色。接縫明顯、頭髮薄得像紙、轉折生硬，跟參考圖差很遠。D-197 改用遊戲角色常見的流程：
+動森的人物是「簡單平滑的形體，加上畫得很銳利的細節」。前兩版都沒做到：
 
-1. **高模**（`<名字>_hi.py`，約 16 萬面，只當烘焙來源，不會出貨）
-   - **身體**：先把軀幹、四肢、手、大腿等形體合在一起，用體素重建網格（voxel remesh）成一整塊，再用平滑把接合處抹順。這等於雕刻師手動「融合」的步驟，所以沒有插進去的接縫。
-   - **頭**：照動森的樣子做：圓頭、臉頰較飽滿、下巴略平。五官是貼在雕好的臉上的薄片，位置用射線打到真正的表面上（`Surface`），不是理想的橢球。
-   - **衣服**：從身體表面切一塊出來往外推，切口的邊緣先順過，再沿著邊緣加滾邊（`layer`、`trim`）。所以衣服不會和皮膚重疊、互相穿插。
-   - **頭髮**：一整片從頭頂往下的殼（使用者希望頭髮是「一整片」），加上厚度。髮束用圓脊和尖銳的分線雕出來，每束的尾端收成尖。瀏海從分線斜掃過去；太陽穴的髮束和馬尾另外用掃掠（`sweep`）做。
-2. **低模**（`lowpoly.py`，每個人的設定在 `<名字>_low.py`）
-   - 每組高模（頭、頭髮、身體、靴子）各自合併、粗略重建網格，再減到分配好的三角形數。身體的外殼往外撐 4 mm，把衣服層包在裡面。
-   - 裙子、腰帶、耳環直接做成低模（32 面的百褶）。
-   - 全部合在 3,000 個三角形以內（`check-assets` 的上限），超過時 `export.py` 仍會減面。
-3. **權重**：頭、頭髮、裙子、靴子整塊綁在一根骨頭上。身體依部位分配權重，關節處平滑過渡（`body_weights`）。不能用 Blender 的自動權重（bone heat）：Kenney 的腿骨是從髖部往上長的，自動權重會把小腿分給兩腿中間的 `root` 骨。
-4. **烘焙**（Cycles）：顏色、法線、環境遮蔽烘到同一張 1024 的圖集，遮蔽再乘進顏色。每塊低模只從自己那組高模烘焙（`BAKE_FROM`），所以頭髮邊緣不會吃到底下的皮膚。臉另外用正面投影當成一個 UV 島，給 3.5 倍的解析度；被頭髮蓋住的頭皮只給 0.6 倍（`UV_SCALE`）。
-5. **匯出**：一個網格、一個材質，顏色貼圖和法線貼圖以 JPEG 包在 GLB 裡。
+- D-196 用基本形體拼裝，接縫明顯。
+- D-197 先雕高模再減面、烘焙，結果表面坑坑疤疤，細節糊成一片。
 
-座標：Blender 是 Z 軸朝上，人物面向 −Y，她的左邊是 +X。靜止姿勢是 T 字（手臂平舉），必須和 Kenney 一樣，動畫才會對。
+D-198 改成直接做乾淨的低模，所有細節用畫的：
+
+1. **形體**（`figure.py` 的 `surface`、`ring`、`sweep`）：每個部位是一圈圈刻意擺放的環，連成四邊形網格，對稱的部位用 `mirror` 鏡射。表面平滑，沒有減面造成的碎面。每個部位在建立時就有自己的 UV：
+   - 環狀部位（身體、手臂、腿、靴子、裙子）：u 繞一圈、v 沿著長度。
+   - 頭：正面平面投影（`planar_front`），畫在那裡的就是正面看到的樣子；側面和後面捲成一條帶子。
+   - 頭髮：每一束沿著長度展開。
+2. **細節全部用畫的**（`figure.py` 的 `Canvas`）：每個部位一張自己的畫布，單位是公尺。用抗鋸齒的形狀（橢圓、圓角方塊、色帶）和頭尾粗細不同的筆畫來畫眼睛、眉毛、腮紅、背心滾邊、吊帶、扣環、護臂、手套、靴子綁帶、髮絲。
+3. **組裝**（`assemble`）：
+   - 畫布排進一張 2048 的圖集。
+   - 部位合成一個網格、一個材質，再依部位給權重。頭、頭髮、耳朵整塊跟 `head`；手臂在肩膀和軀幹平滑過渡；裙子前襬部分跟腿，坐下時會被大腿撐起。
+   - 最後烘一次整個模型自己的環境遮蔽，乘進圖集，讓瀏海下、下巴下、裙子裡有柔和的陰影。
+4. **匯出**（`export.py`）：GLB 內含 JPEG 貼圖。
+
+比例是在參考圖上打格線量的，顏色從參考圖取樣：正面 `avatars-source/q`、背面 `back`、側面 `stand-side`。座標：Blender 是 Z 軸朝上，人物面向 −Y，她的左邊是 +X。靜止姿勢是 Kenney 的 T 字（手臂平舉），動畫才會對；手臂在待機時垂多低，是 Kenney 的 `idle` 決定的。
+
+辦公室會把 Kenney 人物的頭縮成 0.8 倍（T-413）。自有人物是照參考圖的比例做的，所以頭維持 1 倍（`AvatarController` 的 `headScale`）。
+
+## 預算
+
+- 每個人物最多 10,000 個三角形（`check-assets`，D-198 起；原為 3,000）。
+- Tifa 用了 5,616 個，GLB 645 KB。
+- 每個人物的貼圖在顯示卡裡約佔 21 MB（2048 圖集），這比三角形更吃資源。人數變多時，先考慮把圖集降到 1024 或改用壓縮貼圖。
 
 ## 檔案
 
 | 檔案 | 用途 |
 |---|---|
-| `blender/lib.py` | 載入 Kenney 骨架（`reset`）、材質、基本形體（橢球、圓管、`lathe`、圓角方塊、曲線） |
-| `blender/sculpt.py` | 高模工具：`union`（合併＋體素重建＋平滑）、`layer`、`trim`、`sweep`、`Surface`、`pleated_skirt` |
-| `blender/tifa_hi.py` | Tifa 的高模 |
-| `blender/tifa_low.py` | Tifa 的低模設定：三角形分配、權重、烘焙來源、UV 密度 |
-| `blender/lowpoly.py` | 通用：建低模、權重、UV、烘焙、組材質 |
+| `blender/lib.py` | 載入 Kenney 骨架（`reset`、`rig`）與一些舊版基本形體 |
+| `blender/figure.py` | 共用：網格（`ring`、`surface`、`ellipsoid`、`sweep`、`mirror`、`rim`、`planar_front`）、畫布（`Canvas`）、組裝與烘焙（`part`、`assemble`） |
+| `blender/tifa.py` | Tifa 的形體、配色和畫上去的細節 |
 | `blender/export.py` | 匯出 GLB（需先設定 `OUT`、`BUDGET`） |
-| `blender/tifa.blend` | 成品低模（含烘焙圖），可以直接打開；高模不存，重跑 `tifa_hi.py` 約 1 秒 |
-| `blender/bl.py` | 把腳本送進開著的 Blender（MCP for Blender 附加元件，`localhost:9876`）；`shot` 拍視圖截圖 |
+| `blender/build.sh` | 背景執行整條流程：`./build.sh tifa` 寫出 `public/models/characters/tifa.glb` 和 `tifa.blend`（約 45 秒） |
+| `blender/tifa.blend` | 成品，可以直接打開看 |
+| `blender/bl.py` | 把腳本送進開著的 Blender（MCP for Blender 附加元件，`localhost:9876`）邊做邊看：`python3 bl.py run lib.py figure.py tifa.py`（約 15 秒）；`shot` 拍視圖截圖 |
 | `blender/render.py`、`montage.py`、`pose.py` | 預覽：背景算圖（可套動畫）、拼圖 |
 
-## 重做一位
+## 做下一位
 
-1. 在 Blender 開啟 MCP for Blender 附加元件，按 Start MCP Server。
-2. `python3 blender/bl.py run blender/lib.py blender/sculpt.py blender/tifa_hi.py`：建高模（約 1 秒）。
-3. `python3 blender/bl.py run blender/lib.py blender/sculpt.py blender/tifa_low.py blender/lowpoly.py`：低模與烘焙（約 1.5 分鐘）。
-4. `python3 blender/bl.py run <(echo "OUT='$PWD/../public/models/characters/tifa.glb'; BUDGET=2990") blender/export.py`
-5. 套動畫看關節：`Blender -b --python blender/render.py -- <glb> <輸出前綴> sit 0.5`
-6. `pnpm -F web check-assets`、`pnpm -F web exec vitest run src/office3d/assets`
-
-新增一位時，複製 `tifa_hi.py`、`tifa_low.py` 改造型和設定，把她的 `avatar_key` 加進 `src/office3d/assets/characters.ts` 的 `OWN_FIGURES`，並在 `src/office3d/assets/LICENSES.md` 登記檔案。
+1. 複製 `tifa.py` 成 `<avatar_key>.py`，改形體的數字、配色和畫布上的內容。共用的東西留在 `figure.py`。
+2. 在參考圖上量比例。可以用 Blender 的 numpy 在圖上打格線、取樣顏色。
+3. 開著 Blender 邊改邊看：`python3 bl.py run lib.py figure.py <avatar_key>.py`。
+4. 完成後執行 `./build.sh <avatar_key>`，再跑 `pnpm -F web check-assets` 和 `pnpm -F web exec vitest run src/office3d`。
+5. 把 `avatar_key` 加進 `src/office3d/assets/characters.ts` 的 `OWN_FIGURES`，並在 `src/office3d/assets/LICENSES.md` 登記檔案。
