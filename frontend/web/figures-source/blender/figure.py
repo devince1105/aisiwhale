@@ -3,7 +3,7 @@
 # Blender: Z up, the figure faces -Y, her left is +X.
 import bpy, bmesh, math
 import numpy as np
-from mathutils import Vector
+from mathutils import Euler, Vector
 
 
 def smooth(e0, e1, x):
@@ -117,13 +117,19 @@ def _se(t, power):
 def ring(center, rx, ry, seg, plane="XY", power=2.0):
     """A superellipse of points. "XY": around Z, from the back toward her right first, so u = 0.5 is the
     front and the texture reads as seen from the front. "YZ": around X, from underneath toward the
-    front first (rx is the front-back radius, ry the vertical one), so u = 0.5 is the top."""
+    front first (rx is the front-back radius, ry the vertical one), so u = 0.5 is the top. "XZ": around
+    Y (along a foot), from underneath toward her right first (rx across, ry vertical); u = 0.5 is the top."""
     cx, cy, cz = center
     pts = []
     for k in range(seg):
         a = 2 * math.pi * k / seg
         s, c = _se(math.sin(a), power), _se(math.cos(a), power)
-        pts.append(Vector((cx - s * rx, cy + c * ry, cz)) if plane == "XY" else Vector((cx, cy - s * rx, cz - c * ry)))
+        if plane == "XY":
+            pts.append(Vector((cx - s * rx, cy + c * ry, cz)))
+        elif plane == "YZ":
+            pts.append(Vector((cx, cy - s * rx, cz - c * ry)))
+        else:
+            pts.append(Vector((cx - s * rx, cy, cz - c * ry)))
     return pts
 
 
@@ -233,6 +239,15 @@ def scale_about(o, pivot, k):
     return o
 
 
+def turn(o, pivot, euler):
+    """Rotate a part about a point (an Euler in radians)."""
+    pivot = Vector(pivot)
+    m = Euler(euler).to_matrix()
+    for v in o.data.vertices:
+        v.co = pivot + m @ (v.co - pivot)
+    return o
+
+
 def mirror(o, name):
     """The same part on her other side: mirrored across X, sharing the canvas."""
     me = o.data.copy()
@@ -312,16 +327,24 @@ FACE_COLORS = {"line": "#46302A", "iris": "#5E4336", "white": "#FAF4EF", "lid": 
                "blush": "#F4A090", "hatch": "#EE8F84", "mouth": "#6E3A28"}
 
 
-def ac_head(skin, ppm=3400):
+HEAD_PROFILE = [(0.350, .066, .070, 2.6), (0.360, .087, .091, 2.6), (0.378, .098, .101, 2.5), (0.400, .1015, .104, 2.4),
+                (0.425, .102, .105, 2.35), (0.455, .100, .104, 2.35), (0.490, .095, .100, 2.35), (0.520, .088, .093, 2.35),
+                (0.548, .074, .079, 2.35), (0.568, .050, .054, 2.35)]
+
+
+def ac_head(skin, ppm=3400, seg=24, rings=None):
     """The head: rounder than a ball, with a wide jaw and a flat soft chin, from the chin at 0.345 to
     the crown at 0.58. Returns the object and its face canvas, whose coordinates are the head's
     (x across, z up) less FACE_BOX's corner: paint at (x - x0, z - z0). The back of the head is
-    unrolled into the canvas' top strip, so it shades with the rest."""
-    head = surface("head", [ring((0, HEAD_Y, z), rx, ry, 24, power=p) for z, rx, ry, p in [
-        (0.350, .066, .070, 2.6), (0.360, .087, .091, 2.6), (0.378, .098, .101, 2.5), (0.400, .1015, .104, 2.4),
-        (0.425, .102, .105, 2.35), (0.455, .100, .104, 2.35), (0.490, .095, .100, 2.35), (0.520, .088, .093, 2.35),
-        (0.548, .074, .079, 2.35), (0.568, .050, .054, 2.35)]],
-        start=(0, HEAD_Y, 0.345), end=(0, HEAD_Y, 0.580))
+    unrolled into the canvas' top strip, so it shades with the rest. ``seg`` and ``rings`` (the
+    profile resampled to that many rings) make it rounder for a bigger budget."""
+    profile = HEAD_PROFILE
+    if rings:
+        zs = [p[0] for p in HEAD_PROFILE]
+        z_new = np.linspace(zs[0], zs[-1], rings)
+        profile = [(z, *(float(np.interp(z, zs, [p[k] for p in HEAD_PROFILE])) for k in (1, 2, 3))) for z in z_new]
+    head = surface("head", [ring((0, HEAD_Y, z), rx, ry, seg, power=p) for z, rx, ry, p in profile],
+                   start=(0, HEAD_Y, 0.345), end=(0, HEAD_Y, 0.580))
     x0, z0, w, h = FACE_BOX
     planar_front(head, x0, z0, w, h, wrap=(0.83, 0.99))
     return head, Canvas("face", w, h, ppm, skin)
@@ -368,11 +391,16 @@ def ac_face(face, eye_x=0.055, eye_z=0.437, gaze=0.0070, brows=(True, True), col
                                        (fx(0.014), fz(mz - 0.009)), (fx(0.0245), fz(mz))], 0.0019))
 
 
-def ac_ears(skin, center=(0.110, 0.040, 0.414), radii=(0.034, 0.019, 0.034), weights="head"):
-    """Round ears standing off the sides of the head, with a fold painted inside."""
+def ac_ears(skin, center=(0.110, 0.040, 0.414), radii=(0.034, 0.019, 0.034), weights="head", seg=8, rings=6, soft_fold=False):
+    """Round ears standing off the sides of the head, with a fold painted inside - a crisp ring, or with
+    ``soft_fold`` just a soft shadow, so the ear reads as a smooth round nub."""
     lobe = Canvas("ear", 0.06, 0.06, 2000, skin)
-    lobe.fill("#E6A27C", np.abs(lobe.ellipse(0.75 * lobe.width, 0.5 * lobe.height, 0.0050, 0.0150)) - 0.0012, soft=0.001)
-    ear = ellipsoid("ear-l", center, radii, 8, 6)
+    if soft_fold:
+        fold = lobe.ellipse(0.75 * lobe.width, 0.5 * lobe.height, 0.0060, 0.0150)
+        lobe.put("#E3A07F", 0.35 * np.clip(1 - np.abs(fold) / 0.004, 0, 1))
+    else:
+        lobe.fill("#E6A27C", np.abs(lobe.ellipse(0.75 * lobe.width, 0.5 * lobe.height, 0.0050, 0.0150)) - 0.0012, soft=0.001)
+    ear = ellipsoid("ear-l", center, radii, seg, rings)
     part(ear, lobe, weights)
     part(mirror(ear, "ear-r"), lobe, weights)
 
@@ -401,10 +429,10 @@ class Hair:
     under it. Every piece carries strands painted along its length.
     ``flare``: how far the hair stands further out below its middle (over ``flare_depth`` metres);
     ``tuck``: how far it comes back in toward its ends (between ``tuck_from`` and ``tuck_to`` metres
-    below the middle) - a bob's ends turn under."""
+    below the middle) - a bob's ends turn under. ``dome`` above 2 makes the top fuller (a helmet bob)."""
 
-    def __init__(self, center, radii, color, flare=0.13, flare_depth=0.07, tuck=0.0, tuck_from=0.09, tuck_to=0.14):
-        self.c, self.r, self.color = Vector(center), Vector(radii), color
+    def __init__(self, center, radii, color, flare=0.13, flare_depth=0.07, tuck=0.0, tuck_from=0.09, tuck_to=0.14, dome=2.0):
+        self.c, self.r, self.color, self.dome = Vector(center), Vector(radii), color, dome
         self.flare, self.flare_depth = flare, flare_depth
         self.tuck, self.tuck_from, self.tuck_to = tuck, tuck_from, tuck_to
         self.axis = lambda co: Vector((self.c.x, self.c.y, co.z))
@@ -413,7 +441,7 @@ class Hair:
         """The horizontal scale at a height: an ellipsoid above the middle; below, the flare."""
         k = z - self.c.z
         if k >= 0:
-            return math.sqrt(max(1e-4, 1 - (k / self.r.z) ** 2))
+            return max(1e-4, 1 - abs(k / self.r.z) ** self.dome) ** (1 / self.dome)
         return 1 + self.flare * smooth(0, self.flare_depth, -k) - self.tuck * smooth(self.tuck_from, self.tuck_to, -k)
 
     def on(self, x, z, lift=0.0):
@@ -428,10 +456,23 @@ class Hair:
         cv.shade(1.06 - 0.16 * (cv.Y / cv.height))                         # a little darker toward the ends
         return part(o, cv, weights)
 
-    def cap(self, hem, cols=32, rows=9, rim_depth=0.026, parting=22, ppm=940, seed=3):
+    def cap(self, hem, cols=32, rows=9, rim_depth=0.026, parting=22, ppm=940, seed=3, ridges=None):
         """The cap: columns from the crown, each ending at ``hem(azimuth)`` - azimuth in degrees, 0 the
-        front, + toward her left - with an edge ``rim_depth`` thick, and a parting at ``parting``."""
+        front, + toward her left - with an edge ``rim_depth`` thick, and a parting at ``parting``.
+        ``ridges`` = (count, depth, clear[, phase]): the hair is sculpted into ``count`` rounded clumps
+        around the head, standing out by up to ``depth`` of its radius with sharp partings between,
+        growing in from the crown and kept off the front within ``clear`` degrees (the hairline stays
+        smooth); ``phase`` (in clumps) turns them round, so a clump's middle can sit at the nape. The
+        paint follows the clumps: dark partings, a soft highlight down each, a strand or two in it."""
         c, r = self.c, self.r
+
+        def bulge(az, ph):
+            if not ridges:
+                return 1.0
+            count, depth, clear, phase = (tuple(ridges) + (0.0,))[:4]
+            u = ((az + 180) / 360 * count + phase) % 1
+            return 1 + depth * (abs(math.sin(math.pi * u)) ** 0.45 - 0.7) * smooth(0.15, 0.8, ph) * smooth(clear, clear + 30, abs(az))
+
         polar = lambda z: math.acos(min(1, (z - c.z) / r.z)) if z >= c.z else math.pi / 2 + (c.z - z) / r.z
         height = lambda ph: c.z + r.z * math.cos(ph) if ph <= math.pi / 2 else c.z - (ph - math.pi / 2) * r.z
         grid = []
@@ -439,26 +480,38 @@ class Hair:
             row = []
             for i in range(cols):
                 az = -180 + 360 * i / cols
-                z = height(polar(hem(az)) * j / rows)
+                ph = polar(hem(az)) * j / rows
+                z = height(ph)
                 a = math.radians(az)
-                row.append(Vector((c.x + r.x * self.scale(z) * math.sin(a), c.y - r.y * self.scale(z) * math.cos(a), z)))
+                k = self.scale(z) * bulge(az, ph)
+                row.append(Vector((c.x + r.x * k * math.sin(a), c.y - r.y * k * math.cos(a), z)))
             grid.append(row)
         cap = surface("cap", grid, start=(c.x, c.y, c.z + r.z), inside=c)
         rim(cap, rim_depth, self.axis)
         crown = Canvas("cap", 2 * math.pi * r.x, 0.30, ppm, self.color)
-        crown.streaks(72, groove=0.3, drift=0.14, seed=seed)
+        if ridges:
+            count, phase = ridges[0], (tuple(ridges) + (0.0,))[3]
+            crown.streaks(count * 2, groove=0.15, drift=0.10, seed=seed)
+            u = (crown.X / crown.width * count + phase) % 1
+            grow = np.clip(crown.Y / crown.height * 3, 0, 1)
+            crown.shade(1 - 0.55 * (1 - np.abs(np.sin(np.pi * u)) ** 0.15) * grow)          # the partings
+            crown.shade(1 + 0.22 * np.exp(-((u - 0.5) / 0.16) ** 2) * grow)                  # a highlight down each clump
+        else:
+            crown.streaks(72, groove=0.3, drift=0.14, seed=seed)
         crown.shade(1.0 + 0.16 * np.exp(-((crown.Y / crown.height - 0.32) / 0.14) ** 2))      # a soft sheen round the crown
         if parting is not None:
             px = (0.5 + parting / 360) * crown.width
             crown.fill("#231B1E", np.maximum(crown.column(px - 0.0012, px + 0.0012), 0.03 - crown.Y), alpha=0.85)
         return part(cap, crown, "head")
 
-    def blade(self, name, pts, widths, thicks, seed, weights="head", seg=6):
-        """A lock lying on the hair: ``pts`` are (x, z) on the front of the head, or full positions."""
+    def blade(self, name, pts, widths, thicks, seed, weights="head", seg=6, steps=3, strands=None):
+        """A lock lying on the hair: ``pts`` are (x, z) on the front of the head, or full positions.
+        ``strands``: how many strands to paint on it (by default one per 7 mm of its width)."""
         path = [Vector(p) if len(p) == 3 else self.on(p[0], p[1], thicks[min(i, len(thicks) - 1)] / 2 - 0.006)
                 for i, p in enumerate(pts)]
-        o = sweep(name, path, widths, thicks, self.c, seg=seg)
-        return self.strands(name, o, max(4, int(max(widths) / 0.007)), weights, length=0.16, girth=2.2 * max(widths), seed=seed)
+        o = sweep(name, path, widths, thicks, self.c, seg=seg, steps=steps)
+        count = strands or max(4, int(max(widths) / 0.007))
+        return self.strands(name, o, count, weights, length=0.16, girth=2.2 * max(widths), seed=seed)
 
     def mass(self, name, path, widths, thicks, count, weights, length, girth, seed, tip=True):
         """A heavy lock hanging from under the cap."""
