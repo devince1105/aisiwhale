@@ -5,7 +5,6 @@ import createClient, { type Client } from "openapi-fetch";
 
 import { API_URL } from "@/config";
 
-import { getToken } from "./auth";
 import type { components, paths } from "./schema.gen";
 
 export type Schemas = components["schemas"];
@@ -33,6 +32,8 @@ export class ApiError extends Error {
 
 export interface ApiClientOptions {
   baseUrl?: string;
+  /** A bearer token to send (scripts and tests). The browser never has one: its sign-in is the
+   * API's httpOnly cookie, and no credential is kept in browser storage (D-230). */
   getToken?: () => string | null;
   fetch?: typeof fetch;
 }
@@ -41,17 +42,19 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const client = createClient<paths>({
     baseUrl: options.baseUrl ?? API_URL,
     fetch: options.fetch,
-    // the back office's sign-in is the API's cookie (D-055); the token header still works too
+    // the back office's sign-in is the API's cookie (D-055, D-230)
     credentials: "include",
   });
-  const token = options.getToken ?? getToken;
-  client.use({
-    onRequest({ request }) {
-      const value = token();
-      if (value) request.headers.set("Authorization", `Bearer ${value}`);
-      return request;
-    },
-  });
+  const token = options.getToken;
+  if (token) {
+    client.use({
+      onRequest({ request }) {
+        const value = token();
+        if (value) request.headers.set("Authorization", `Bearer ${value}`);
+        return request;
+      },
+    });
+  }
   return client;
 }
 

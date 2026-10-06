@@ -26,6 +26,10 @@ dependencies = [
   "pillow>=11,<13",
   # the roots a TLS connection to the managed database is checked against (D-153)
   "certifi>=2024.2.2",
+  # readers' passwords, hashed with Argon2id (D-230); nothing reversible is ever stored
+  "argon2-cffi>=23.1,<26",
+  # Google's ID token checked against its published keys (D-230), through the cryptography above
+  "PyJWT>=2.8,<3",
 ]
 
 [project.optional-dependencies]

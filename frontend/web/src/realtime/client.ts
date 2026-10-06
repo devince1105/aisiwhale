@@ -37,7 +37,8 @@ export interface RealtimeClientOptions {
   apiUrl: string;
   wsUrl: string;
   companyId: string;
-  getToken: () => string | null;
+  /** A bearer token (scripts and tests). Without one the admin's cookie goes along (D-230). */
+  getToken?: () => string | null;
   store?: StoreApi<RealtimeStoreState>;
   createSocket?: (url: string) => SocketLike;
   fetchImpl?: typeof fetch;
@@ -150,10 +151,10 @@ export class RealtimeClient {
     if (!this.running) return;
 
     const since = this.store.getState().company?.lastSeq ?? 0;
-    const token = this.options.getToken() ?? "";
+    const token = this.options.getToken?.() ?? null;
     const url =
       `${this.options.wsUrl}/ws/companies/${this.options.companyId}` +
-      `?token=${encodeURIComponent(token)}&since=${since}`;
+      (token ? `?token=${encodeURIComponent(token)}&since=${since}` : `?since=${since}`);
     const socket = this.createSocket(url);
     this.socket = socket;
     let opened = false;
@@ -175,11 +176,16 @@ export class RealtimeClient {
     this.armWatchdog(socket);
   }
 
+  private authorization(): Record<string, string> {
+    const token = this.options.getToken?.() ?? null;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   private async hydrate(): Promise<void> {
     const response = await this.fetchImpl(
       `${this.options.apiUrl}/api/companies/${this.options.companyId}/realtime/snapshot`,
-      // the token, or the admin's cookie (D-055)
-      { headers: { Authorization: `Bearer ${this.options.getToken() ?? ""}` }, credentials: "include" },
+      // the admin's cookie (D-055, D-230), or a token where one was given
+      { headers: this.authorization(), credentials: "include" },
     );
     if (response.status === 401 || response.status === 404) {
       this.halt(response.status === 401 ? "unauthorized" : "not_found");

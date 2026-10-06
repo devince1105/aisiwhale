@@ -3026,6 +3026,26 @@
     "title": "FinanceOut",
     "type": "object"
    },
+   "Forgot": {
+    "properties": {
+     "email": {
+      "maxLength": 254,
+      "title": "Email",
+      "type": "string"
+     },
+     "lang": {
+      "default": "zh-TW",
+      "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+      "title": "Lang",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email"
+    ],
+    "title": "Forgot",
+    "type": "object"
+   },
    "GoalLine": {
     "properties": {
      "current": {
@@ -3381,11 +3401,37 @@
     "title": "Lead",
     "type": "object"
    },
+   "Login": {
+    "properties": {
+     "email": {
+      "maxLength": 254,
+      "title": "Email",
+      "type": "string"
+     },
+     "password": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "Login",
+    "type": "object"
+   },
    "Me": {
     "properties": {
      "email": {
       "title": "Email",
       "type": "string"
+     },
+     "email_verified": {
+      "default": false,
+      "title": "Email Verified",
+      "type": "boolean"
      },
      "member_until": {
       "anyOf": [
@@ -5606,6 +5652,68 @@
     "title": "RealtimeSnapshot",
     "type": "object"
    },
+   "Register": {
+    "properties": {
+     "email": {
+      "maxLength": 254,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+      "title": "Email",
+      "type": "string"
+     },
+     "lang": {
+      "default": "zh-TW",
+      "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+      "title": "Lang",
+      "type": "string"
+     },
+     "password": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "Register",
+    "type": "object"
+   },
+   "Resend": {
+    "properties": {
+     "lang": {
+      "default": "zh-TW",
+      "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+      "title": "Lang",
+      "type": "string"
+     }
+    },
+    "title": "Resend",
+    "type": "object"
+   },
+   "Reset": {
+    "properties": {
+     "password": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     },
+     "token": {
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token",
+     "password"
+    ],
+    "title": "Reset",
+    "type": "object"
+   },
    "RestartOut": {
     "properties": {
      "decision": {
@@ -7299,68 +7407,6 @@
     "title": "ProjectLine",
     "type": "object"
    },
-   "autora_api__routers__admin_auth__LinkRequest": {
-    "properties": {
-     "email": {
-      "maxLength": 254,
-      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "title": "Email",
-      "type": "string"
-     },
-     "next_path": {
-      "anyOf": [
-       {
-        "maxLength": 200,
-        "pattern": "^/admin(/[^\\s]*)?$",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Next Path"
-     }
-    },
-    "required": [
-     "email"
-    ],
-    "title": "LinkRequest",
-    "type": "object"
-   },
-   "autora_api__routers__auth__LinkRequest": {
-    "properties": {
-     "email": {
-      "maxLength": 254,
-      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
-      "title": "Email",
-      "type": "string"
-     },
-     "lang": {
-      "default": "zh-TW",
-      "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
-      "title": "Lang",
-      "type": "string"
-     },
-     "next_path": {
-      "anyOf": [
-       {
-        "maxLength": 200,
-        "pattern": "^/[^\\s]*$",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Next Path"
-     }
-    },
-    "required": [
-     "email"
-    ],
-    "title": "LinkRequest",
-    "type": "object"
-   },
    "autora_api__routers__finance__ProjectLine": {
     "properties": {
      "id": {
@@ -7399,22 +7445,31 @@
  },
  "openapi": "3.1.0",
  "paths": {
-  "/api/admin/auth/link": {
-   "post": {
-    "description": "Email a one-time link to an admin. 202 for any address, on the list or not.",
-    "operationId": "send_link_api_admin_auth_link_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/autora_api__routers__admin_auth__LinkRequest"
-       }
+  "/api/admin/auth/google/start": {
+   "get": {
+    "operationId": "google_start_api_admin_auth_google_start_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "next",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "pattern": "^/admin(/[^\\s]*)?$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Next"
       }
-     },
-     "required": true
-    },
+     }
+    ],
     "responses": {
-     "202": {
+     "200": {
       "content": {
        "application/json": {
         "schema": {}
@@ -7433,7 +7488,48 @@
       "description": "Validation Error"
      }
     },
-    "summary": "Send Link",
+    "summary": "Google Start",
+    "tags": [
+     "admin-auth"
+    ]
+   }
+  },
+  "/api/admin/auth/login": {
+   "post": {
+    "operationId": "login_api_admin_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Login"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminMe"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Login",
     "tags": [
      "admin-auth"
     ]
@@ -7531,47 +7627,6 @@
      }
     ],
     "summary": "Me",
-    "tags": [
-     "admin-auth"
-    ]
-   }
-  },
-  "/api/admin/auth/verify": {
-   "post": {
-    "operationId": "verify_api_admin_auth_verify_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/Verify"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/AdminMe"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     }
-    },
-    "summary": "Verify",
     "tags": [
      "admin-auth"
     ]
@@ -8371,15 +8426,33 @@
     ]
    }
   },
-  "/api/auth/link": {
+  "/api/auth/email/resend": {
    "post": {
-    "description": "Email a one-time link. Answers 202 whether or not the address has been seen before.",
-    "operationId": "send_link_api_auth_link_post",
+    "description": "A new link to prove the signed-in reader's address; nothing when it is already proven.",
+    "operationId": "resend_verification_api_auth_email_resend_post",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
     "requestBody": {
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/autora_api__routers__auth__LinkRequest"
+        "$ref": "#/components/schemas/Resend"
        }
       }
      },
@@ -8405,7 +8478,261 @@
       "description": "Validation Error"
      }
     },
-    "summary": "Send Link",
+    "summary": "Resend Verification",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/email/verify": {
+   "post": {
+    "description": "Prove the address the link was sent to. Signs nobody in.",
+    "operationId": "verify_address_api_auth_email_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Verify"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Verify Address",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/google/callback": {
+   "get": {
+    "description": "Finish a Google sign-in: claim its state, trade the code, check the token, find the\nreader, sign them in. Every failure goes back to the login page with a reason code.",
+    "operationId": "google_callback_api_auth_google_callback_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "state",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
+      }
+     },
+     {
+      "in": "query",
+      "name": "code",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 2000,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Code"
+      }
+     },
+     {
+      "in": "query",
+      "name": "error",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Error"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_oauth",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Oauth"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Google Callback",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/google/start": {
+   "get": {
+    "operationId": "google_start_api_auth_google_start_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": false,
+      "schema": {
+       "default": "zh-TW",
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "next",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "pattern": "^/[^\\s]*$",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Next"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Google Start",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/login": {
+   "post": {
+    "operationId": "login_api_auth_login_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Login"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Me"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Login",
     "tags": [
      "auth"
     ]
@@ -8527,9 +8854,50 @@
     ]
    }
   },
-  "/api/auth/verify": {
+  "/api/auth/password/forgot": {
    "post": {
-    "operationId": "verify_api_auth_verify_post",
+    "description": "Email a link to set a new password. 202 whether or not the address has an account.",
+    "operationId": "forgot_password_api_auth_password_forgot_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Forgot"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Forgot Password",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/password/reset": {
+   "post": {
+    "description": "Set the new password; every other session of the reader ends, and this browser gets a\nnew one.",
+    "operationId": "set_password_api_auth_password_reset_post",
     "parameters": [
      {
       "in": "query",
@@ -8553,7 +8921,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Verify"
+        "$ref": "#/components/schemas/Reset"
        }
       }
      },
@@ -8581,7 +8949,47 @@
       "description": "Validation Error"
      }
     },
-    "summary": "Verify",
+    "summary": "Set Password",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/auth/register": {
+   "post": {
+    "description": "Make an account with an unverified address and email a link to prove it. An address that\nalready has an account is left as it is and its owner is emailed; the answer is the same.\n\nAn address on ADMIN_EMAILS that has no account yet is not given one here (D-230): somebody\nregistering it first, with a password of their own, would hold an account the admin might\nthen prove by opening our link. Its owner is emailed the ways in that prove the address\nthemselves — Google, or a password reset — and the answer is the same as for anybody.",
+    "operationId": "register_reader_api_auth_register_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Register"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Register Reader",
     "tags": [
      "auth"
     ]

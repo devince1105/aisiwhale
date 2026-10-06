@@ -2,36 +2,21 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
-
-import { getToken, setToken } from "@/api/auth";
+import { useCallback, useEffect, type ReactNode } from "react";
 
 import { fetchAdminMe, loginHref, signOutAdmin } from "./adminAuth";
-
-// localStorage is not observable; this tiny subscription lets the gate re-render when the token
-// changes in this tab (sign in / out).
-const listeners = new Set<() => void>();
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-};
-export function storeToken(token: string | null): void {
-  setToken(token);
-  listeners.forEach((listener) => listener());
-}
 
 export const ADMIN_ME_KEY = ["admin-me"] as const;
 
 /**
- * The back office's door (D-055). Children render for an admin signed in with an emailed link
- * (the API's cookie) or for the operator token; anybody else is sent to /admin/login and back.
- * A 401 anywhere calls storeToken(null), which asks again.
+ * The back office's door (D-055, D-230). Children render for an admin signed in — the API's
+ * httpOnly cookie, nothing in browser storage; anybody else is sent to /admin/login and back.
+ * A 401 anywhere calls `useAskAgain()`'s function, which asks the API again.
  */
 export function TokenGate({ children }: { children: ReactNode }) {
-  const token = useSyncExternalStore(subscribe, getToken, () => null);
   const router = useRouter();
   const pathname = usePathname();
-  const me = useQuery({ queryKey: [...ADMIN_ME_KEY, token], queryFn: fetchAdminMe, retry: false, staleTime: 60_000 });
+  const me = useQuery({ queryKey: ADMIN_ME_KEY, queryFn: fetchAdminMe, retry: false, staleTime: 60_000 });
   const signedOut = me.isSuccess && me.data === null;
 
   useEffect(() => {
@@ -61,7 +46,6 @@ function AdminBar({ email }: { email: string | null }) {
   const router = useRouter();
   const signOut = async () => {
     await signOutAdmin().catch(() => undefined);
-    storeToken(null);
     queryClient.clear(); // nothing fetched as this admin survives
     router.replace("/admin/login");
   };
@@ -75,4 +59,11 @@ function AdminBar({ email }: { email: string | null }) {
       </div>
     </div>
   );
+}
+
+/** After a 401: ask the API again who is signing in, so the gate sends a signed-out visit to
+ * /admin/login. */
+export function useAskAgain(): () => void {
+  const queryClient = useQueryClient();
+  return useCallback(() => void queryClient.invalidateQueries({ queryKey: ADMIN_ME_KEY }), [queryClient]);
 }

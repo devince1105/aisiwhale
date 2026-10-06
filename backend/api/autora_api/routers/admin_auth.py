@@ -1,52 +1,50 @@
-"""Signing in to the back office (D-055): an emailed link, for the addresses on ADMIN_EMAILS.
+"""Signing in to the back office (D-055, D-230): the readers' own sign-in, through its own door.
 
-- POST /api/admin/auth/link    {email, next_path?} -> 202, always
-- POST /api/admin/auth/verify  {token} -> who signed in, and the admin cookie
-- GET  /api/admin/auth/me      -> who is calling the back office, or 401
-- POST /api/admin/auth/logout  -> 204, the session revoked and the cookie cleared
+- POST /api/admin/auth/login         {email, password} -> who signed in, and the admin cookie
+- GET  /api/admin/auth/google/start  ?next -> 303 to Google; back through the shared callback
+- GET  /api/admin/auth/me            -> who is calling the back office, or 401
+- POST /api/admin/auth/logout        -> 204, the session revoked and the cookie cleared
 
-The same links and sessions as a reader's (``autora.accounts``), with three differences: a link
-is only sent to an address on the list — and the answer is 202 either way, so the form does not
-say who the admins are; the session lasts 14 days, not 60; and it lives in its own cookie.
-Being on the list is checked again on every request (``deps.require_operator``), not only here.
+There is no separate admin account: an admin is a reader who signed in — with their password or
+with Google — and whom the back office lets in (authorization, apart from authentication):
+an address on ADMIN_EMAILS **and** proven to be theirs (``deps.is_admin``). The session lasts 14
+days, not 60, and lives in its own cookie. Being let in is checked again on every request
+(``deps.require_operator``), not only here.
 """
 
 from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
-from autora.accounts import AccountError, normalise, redeem, request_link, sign_out
-from autora.accounts import emails as account_emails
-from autora.accounts.service import ADDRESS_PATTERN
-from autora.infra.email import EmailError
+from autora.accounts import OAuthPurpose, authenticate, ratelimit, sign_out, start_session
 from autora.infra.settings import Settings
 from autora_api.deps import (
     ADMIN_COOKIE,
     ADMIN_SESSION_VALID_FOR,
-    EmailSender,
+    ClientIp,
+    Google,
     Session,
     admin_for,
+    is_admin,
     require_operator,
     settings_dep,
 )
+from autora_api.routers.auth import WRONG, begin_google, limit, set_admin_cookie
 
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 
 SettingsDep = Annotated[Settings, Depends(settings_dep)]
 AdminCookie = Annotated[str | None, Cookie(alias=ADMIN_COOKIE)]
+ADMIN_NEXT = r"^/admin(/[^\s]*)?$"
+"""Where to go after signing in: a page of the back office, never another address."""
 
 
-class LinkRequest(BaseModel):
-    email: str = Field(max_length=254, pattern=ADDRESS_PATTERN)
-    next_path: str | None = Field(default=None, max_length=200, pattern=r"^/admin(/[^\s]*)?$")
-    """Where to go after signing in: a page of the back office, never another address."""
-
-
-class Verify(BaseModel):
-    token: str = Field(min_length=10, max_length=200)
+class Login(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(min_length=1, max_length=1024)
 
 
 class AdminMe(BaseModel):
@@ -55,57 +53,35 @@ class AdminMe(BaseModel):
     """The admin's address, to show them who they are signed in as; None with the token."""
 
 
-def _set_cookie(response: Response, token: str, settings: Settings) -> None:
-    response.set_cookie(
-        ADMIN_COOKIE,
-        token,
-        max_age=int(ADMIN_SESSION_VALID_FOR.total_seconds()),
-        httponly=True,
-        samesite="lax",
-        secure=settings.site_base_url.startswith("https://"),
-        path="/",
-        domain=settings.cookie_domain or None,
-    )
-
-
-@router.post("/link", status_code=status.HTTP_202_ACCEPTED)
-async def send_link(
-    body: LinkRequest, session: Session, settings: SettingsDep, sender: EmailSender
-) -> Response:
-    """Email a one-time link to an admin. 202 for any address, on the list or not."""
-    try:
-        address = normalise(body.email)
-    except AccountError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
-    if address not in settings.admin_emails:
-        return Response(status_code=status.HTTP_202_ACCEPTED)
-    link = await request_link(session, address)
-    url = account_emails.admin_login_url(
-        settings.site_base_url, link.token, next_path=body.next_path
-    )
-    try:
-        await sender.send(account_emails.admin_login_email(address, url, link.expires_at))
-    except EmailError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "the link could not be sent") from exc
-    await session.commit()
-    return Response(status_code=status.HTTP_202_ACCEPTED)
-
-
-@router.post("/verify")
-async def verify(
-    body: Verify, session: Session, settings: SettingsDep, response: Response
+@router.post("/login")
+async def login(
+    body: Login, session: Session, settings: SettingsDep, response: Response, ip: ClientIp
 ) -> AdminMe:
-    try:
-        reader, token = await redeem(session, body.token, valid_for=ADMIN_SESSION_VALID_FOR)
-    except AccountError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    if reader.email not in settings.admin_emails:  # taken off the list since the link was sent
-        await sign_out(session, token)
-        await session.commit()
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "this address may not open the back office")
+    await limit(session, ratelimit.LOGIN, ip, body.email)
+    reader = await authenticate(session, body.email, body.password)
+    if reader is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
+    if not await is_admin(session, reader, settings):
+        await session.commit()  # a rehashed password, if any
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "this account may not open the back office")
+    token = await start_session(session, reader, valid_for=ADMIN_SESSION_VALID_FOR)
     await session.commit()
-    _set_cookie(response, token, settings)
+    set_admin_cookie(response, token, settings)
     return AdminMe(via="email", email=reader.email)
+
+
+@router.get("/google/start")
+async def google_start(
+    session: Session,
+    settings: SettingsDep,
+    google: Google,
+    ip: ClientIp,
+    next: Annotated[str | None, Query(max_length=200, pattern=ADMIN_NEXT)] = None,  # noqa: A002
+) -> Response:
+    await limit(session, ratelimit.GOOGLE_START, ip)
+    return await begin_google(
+        session, google, settings, OAuthPurpose.ADMIN, lang="zh-TW", next_path=next
+    )
 
 
 @router.get("/me", dependencies=[Depends(require_operator)])

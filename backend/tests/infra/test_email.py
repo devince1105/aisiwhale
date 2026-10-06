@@ -54,12 +54,15 @@ async def test_a_refusal_says_why_in_the_error_and_the_server_log(caplog):
     assert reason in caplog.text
 
 
-def test_a_sign_in_email_says_whose_it_is():
-    """D-043: a link from nobody-in-particular looks like phishing."""
-    from datetime import UTC, datetime
+def test_an_account_email_says_whose_it_is():
+    """D-043: a link from nobody-in-particular looks like phishing (D-230: the emails a reader
+    gets now are a confirmation, a reset and a note that their address was registered again)."""
+    from autora.accounts import emails
 
-    from autora.accounts.emails import login_email
-
-    message = login_email("reader@example.com", "https://aisiwhale.com/x", datetime.now(UTC))
-    assert message.subject.startswith("艾矽鯨")
-    assert "登入艾矽鯨" in message.text and "登入艾矽鯨" in (message.html or "")
+    for message in (
+        emails.verify_email("reader@example.com", "https://aisiwhale.com/x"),
+        emails.reset_email("reader@example.com", "https://aisiwhale.com/x"),
+        emails.account_exists_email("reader@example.com", "https://aisiwhale.com"),
+    ):
+        assert message.subject.startswith("艾矽鯨")
+        assert "艾矽鯨" in message.text and "艾矽鯨" in (message.html or "")

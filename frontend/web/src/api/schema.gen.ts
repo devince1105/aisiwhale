@@ -4,7 +4,24 @@
  */
 
 export interface paths {
-    "/api/admin/auth/link": {
+    "/api/admin/auth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Start */
+        get: operations["google_start_api_admin_auth_google_start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,11 +30,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Send Link
-         * @description Email a one-time link to an admin. 202 for any address, on the list or not.
-         */
-        post: operations["send_link_api_admin_auth_link_post"];
+        /** Login */
+        post: operations["login_api_admin_auth_login_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -55,23 +69,6 @@ export interface paths {
         get: operations["me_api_admin_auth_me_get"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/auth/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Verify */
-        post: operations["verify_api_admin_auth_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -298,7 +295,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/link": {
+    "/api/auth/email/resend": {
         parameters: {
             query?: never;
             header?: never;
@@ -308,10 +305,85 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Send Link
-         * @description Email a one-time link. Answers 202 whether or not the address has been seen before.
+         * Resend Verification
+         * @description A new link to prove the signed-in reader's address; nothing when it is already proven.
          */
-        post: operations["send_link_api_auth_link_post"];
+        post: operations["resend_verification_api_auth_email_resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/email/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Address
+         * @description Prove the address the link was sent to. Signs nobody in.
+         */
+        post: operations["verify_address_api_auth_email_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google Callback
+         * @description Finish a Google sign-in: claim its state, trade the code, check the token, find the
+         *     reader, sign them in. Every failure goes back to the login page with a reason code.
+         */
+        get: operations["google_callback_api_auth_google_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Start */
+        get: operations["google_start_api_auth_google_start_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -352,7 +424,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/verify": {
+    "/api/auth/password/forgot": {
         parameters: {
             query?: never;
             header?: never;
@@ -361,8 +433,58 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verify */
-        post: operations["verify_api_auth_verify_post"];
+        /**
+         * Forgot Password
+         * @description Email a link to set a new password. 202 whether or not the address has an account.
+         */
+        post: operations["forgot_password_api_auth_password_forgot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Password
+         * @description Set the new password; every other session of the reader ends, and this browser gets a
+         *     new one.
+         */
+        post: operations["set_password_api_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register Reader
+         * @description Make an account with an unverified address and email a link to prove it. An address that
+         *     already has an account is left as it is and its owner is emailed; the answer is the same.
+         *
+         *     An address on ADMIN_EMAILS that has no account yet is not given one here (D-230): somebody
+         *     registering it first, with a password of their own, would hold an account the admin might
+         *     then prove by opening our link. Its owner is emailed the ways in that prove the address
+         *     themselves — Google, or a password reset — and the answer is the same as for anybody.
+         */
+        post: operations["register_reader_api_auth_register_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2751,6 +2873,16 @@ export interface components {
             /** Spent Today */
             spent_today: string;
         };
+        /** Forgot */
+        Forgot: {
+            /** Email */
+            email: string;
+            /**
+             * Lang
+             * @default zh-TW
+             */
+            lang: string;
+        };
         /** GoalLine */
         GoalLine: {
             /** Current */
@@ -2884,10 +3016,22 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** Login */
+        Login: {
+            /** Email */
+            email: string;
+            /** Password */
+            password: string;
+        };
         /** Me */
         Me: {
             /** Email */
             email: string;
+            /**
+             * Email Verified
+             * @default false
+             */
+            email_verified: boolean;
             /** Member Until */
             member_until?: string | null;
             /**
@@ -3721,6 +3865,33 @@ export interface components {
             /** Tasks */
             tasks: components["schemas"]["TaskView"][];
         };
+        /** Register */
+        Register: {
+            /** Email */
+            email: string;
+            /**
+             * Lang
+             * @default zh-TW
+             */
+            lang: string;
+            /** Password */
+            password: string;
+        };
+        /** Resend */
+        Resend: {
+            /**
+             * Lang
+             * @default zh-TW
+             */
+            lang: string;
+        };
+        /** Reset */
+        Reset: {
+            /** Password */
+            password: string;
+            /** Token */
+            token: string;
+        };
         /** RestartOut */
         RestartOut: {
             /** Decision */
@@ -4410,25 +4581,6 @@ export interface components {
             /** State */
             state: string;
         };
-        /** LinkRequest */
-        autora_api__routers__admin_auth__LinkRequest: {
-            /** Email */
-            email: string;
-            /** Next Path */
-            next_path?: string | null;
-        };
-        /** LinkRequest */
-        autora_api__routers__auth__LinkRequest: {
-            /** Email */
-            email: string;
-            /**
-             * Lang
-             * @default zh-TW
-             */
-            lang: string;
-            /** Next Path */
-            next_path?: string | null;
-        };
         /** ProjectLine */
         autora_api__routers__finance__ProjectLine: {
             /**
@@ -4450,7 +4602,38 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    send_link_api_admin_auth_link_post: {
+    google_start_api_admin_auth_google_start_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_admin_auth_login_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -4459,17 +4642,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["autora_api__routers__admin_auth__LinkRequest"];
+                "application/json": components["schemas"]["Login"];
             };
         };
         responses: {
             /** @description Successful Response */
-            202: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AdminMe"];
                 };
             };
             /** @description Validation Error */
@@ -4522,39 +4705,6 @@ export interface operations {
             };
         };
         requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminMe"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    verify_api_admin_auth_verify_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Verify"];
-            };
-        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -4968,16 +5118,18 @@ export interface operations {
             };
         };
     };
-    send_link_api_auth_link_post: {
+    resend_verification_api_auth_email_resend_post: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: never;
+            cookie?: {
+                autora_reader?: string | null;
+            };
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["autora_api__routers__auth__LinkRequest"];
+                "application/json": components["schemas"]["Resend"];
             };
         };
         responses: {
@@ -4988,6 +5140,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_address_api_auth_email_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Verify"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_callback_api_auth_google_callback_get: {
+        parameters: {
+            query?: {
+                state?: string | null;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_oauth?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    google_start_api_auth_google_start_get: {
+        parameters: {
+            query?: {
+                lang?: string;
+                next?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_auth_login_post: {
+        parameters: {
+            query?: {
+                company?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Login"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             /** @description Validation Error */
@@ -5063,7 +5348,40 @@ export interface operations {
             };
         };
     };
-    verify_api_auth_verify_post: {
+    forgot_password_api_auth_password_forgot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Forgot"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_password_api_auth_password_reset_post: {
         parameters: {
             query?: {
                 company?: string | null;
@@ -5074,7 +5392,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Verify"];
+                "application/json": components["schemas"]["Reset"];
             };
         };
         responses: {
@@ -5085,6 +5403,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_reader_api_auth_register_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Register"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -23,8 +23,8 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async ({ context }) => {
-  // What the token form stores; this is the e2e API's own token.
-  await context.addInitScript((token) => window.localStorage.setItem("autora.operatorToken", token), TOKEN);
+  // signed in to the back office as its admin: the API's cookie, nothing in browser storage
+  await context.addCookies(await stack.adminCookies());
 });
 
 const auth = { Authorization: `Bearer ${TOKEN}` };

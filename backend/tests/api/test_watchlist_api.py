@@ -1,9 +1,9 @@
 """D-060: a signed-in reader's own watchlist."""
 
-import re
-
 import httpx
 import pytest
+
+from tests.api.readers import sign_in
 
 URL = "/api/me/watchlist"
 
@@ -22,10 +22,7 @@ async def other(api):
 
 
 async def _sign_in(client, mailbox, address):
-    mailbox.sent.clear()
-    assert (await client.post("/api/auth/link", json={"email": address})).status_code == 202
-    token = re.search(r"token=([A-Za-z0-9_\-]+)", mailbox.sent[0].text).group(1)
-    assert (await client.post("/api/auth/verify", json={"token": token})).status_code == 200
+    await sign_in(client, address)
 
 
 async def test_a_new_list_starts_with_the_strip_s_stocks_once(site, mailbox):
@@ -67,9 +64,11 @@ async def test_only_stocks_with_a_page_and_only_when_signed_in(site, mailbox):
 
 async def test_stocks_added_together_keep_the_order_they_were_added_in(db_session):
     """Three in one transaction share created_at: the id (uuid7) keeps them in order."""
-    from autora.accounts import request_link, watchlist
+    from autora.accounts import Reader, watchlist
 
-    reader = (await request_link(db_session, "order@example.com")).reader
+    reader = Reader(email="order@example.com")
+    db_session.add(reader)
+    await db_session.flush()
     for market, symbol in (("us", "NVDA"), ("tw", "2330"), ("us", "TSM"), ("us", "AAPL")):
         await watchlist.add(db_session, reader.id, market, symbol)
     assert [s for _, s in await watchlist.items(db_session, reader.id)] == [

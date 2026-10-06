@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// The back office's door (D-055): a signed-out visit goes to /admin/login and comes back, a
-// signed-in admin sees the page and who they are, and the login form asks for a link.
+// The back office's door (D-055, D-230): a signed-out visit goes to /admin/login and comes back,
+// a signed-in admin sees the page and who they are, and the login form signs in with a password
+// or Google — keeping nothing in browser storage.
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -14,9 +15,9 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => search,
 }));
 
-import { afterLogin, loginHref } from "./adminAuth";
+import { adminGoogleUrl, afterLogin, loginHref } from "./adminAuth";
 import { AdminLogin } from "./AdminLogin";
-import { storeToken, TokenGate } from "./TokenGate";
+import { TokenGate } from "./TokenGate";
 
 const calls: { url: string; init: RequestInit }[] = [];
 function answer(status: number, body: unknown = null) {
@@ -34,7 +35,7 @@ beforeEach(() => {
   calls.length = 0;
   replace.mockReset();
   search = new URLSearchParams();
-  storeToken(null);
+  window.localStorage.clear();
 });
 afterEach(() => {
   cleanup();
@@ -68,14 +69,44 @@ describe("the back office's door", () => {
 });
 
 describe("the login page", () => {
-  it("asks for a link for the address, and says what happens next", async () => {
-    answer(202);
+  it("signs in with the password and goes on to the page that was asked for", async () => {
+    answer(200, { via: "email", email: "admin@aisiwhale.test" });
     search = new URLSearchParams("next=/admin/approvals");
     wrap(<AdminLogin />);
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: " admin@aisiwhale.test " } });
-    fireEvent.click(screen.getByRole("button", { name: "寄送登入連結" }));
-    expect(await screen.findByTestId("admin-login-sent")).toBeTruthy();
-    expect(calls[0].url).toMatch(/\/api\/admin\/auth\/link$/);
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ email: "admin@aisiwhale.test", next_path: "/admin/approvals" });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "correct horse battery" } });
+    fireEvent.click(screen.getByRole("button", { name: "登入" }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/admin/approvals"));
+    expect(calls[0].url).toMatch(/\/api\/admin\/auth\/login$/);
+    expect(calls[0].init.credentials).toBe("include");
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      email: "admin@aisiwhale.test",
+      password: "correct horse battery",
+    });
+    expect(window.localStorage.length).toBe(0); // nothing that proves who they are is kept here
+  });
+
+  it("says why when the account may not come in", async () => {
+    answer(403);
+    wrap(<AdminLogin />);
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "someone@example.com" } });
+    fireEvent.change(screen.getByLabelText("密碼"), { target: { value: "whatever pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "登入" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("不能進入後台");
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("offers Google through the API, and shows why a Google sign-in came back", () => {
+    search = new URLSearchParams("error=not_admin");
+    wrap(<AdminLogin />);
+    expect(screen.getByTestId("admin-google").getAttribute("href")).toMatch(/\/api\/admin\/auth\/google\/start$/);
+    expect(screen.getByRole("alert").textContent).toContain("管理員名單");
+    expect(adminGoogleUrl("/admin/approvals")).toMatch(/google\/start\?next=%2Fadmin%2Fapprovals$/);
+    expect(adminGoogleUrl("https://evil.example")).toMatch(/google\/start$/);
+  });
+
+  it("no longer takes an operator token", () => {
+    wrap(<AdminLogin />);
+    expect(screen.queryByLabelText("操作者權杖")).toBeNull();
   });
 });

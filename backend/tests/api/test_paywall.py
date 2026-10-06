@@ -4,7 +4,6 @@ The point of these is the negative one: without a membership the rest of the tex
 the server, so "hidden" cannot mean "hidden with CSS".
 """
 
-import re
 import uuid
 from decimal import Decimal
 
@@ -18,6 +17,7 @@ from autora.company.organization import add_business_unit, add_product
 from autora.db.models import BusinessUnitState, Company, Customer, ProductState
 from autora.domains.newsroom.models import Article, ArticleAccess
 from autora.runtime.actor import Actor
+from tests.api.readers import sign_in_id
 
 OPERATOR = Actor.human("operator")
 PAYUNI = Actor.system("payments:payuni")
@@ -45,10 +45,7 @@ async def _members_only(newsroom_room, article):
 
 
 async def _sign_in(site, mailbox, address=ADDRESS):
-    await site.post("/api/auth/link", json={"email": address})
-    token = re.search(r"token=([A-Za-z0-9_\-]+)", mailbox.sent[-1].text).group(1)
-    verified = await site.post("/api/auth/verify", json={"token": token})
-    return uuid.UUID(verified.json()["reader_id"])
+    return await sign_in_id(site, address)
 
 
 async def _buy(session, company_id, reader_id):

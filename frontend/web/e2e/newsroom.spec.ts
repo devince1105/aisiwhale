@@ -20,10 +20,8 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async ({ context }) => {
-  await context.addInitScript(
-    (token) => window.localStorage.setItem("autora.operatorToken", token),
-    TOKEN,
-  );
+  // signed in to the back office as its admin: the API's cookie, nothing in browser storage
+  await context.addCookies(await stack.adminCookies());
   // the office at its full width, as these clicks and timings were measured: the team group
   // beside it (D-109) is its own business, closed here
   await context.addInitScript(() => window.localStorage.setItem("autora:team-chat", "closed"));

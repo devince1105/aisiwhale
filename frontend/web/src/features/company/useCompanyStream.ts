@@ -3,7 +3,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
-import { getToken } from "@/api/auth";
 import { connectQueryInvalidation } from "@/api/invalidation";
 import { API_URL, toWebSocketUrl } from "@/config";
 import { attachToDocument, RealtimeClient } from "@/realtime/client";
@@ -23,7 +22,6 @@ export function useCompanyStream(companyId: string | null): void {
       apiUrl: API_URL,
       wsUrl: toWebSocketUrl(API_URL),
       companyId,
-      getToken,
     });
     const stopInvalidation = connectQueryInvalidation(queryClient, realtimeStore);
     const detach = attachToDocument(client);

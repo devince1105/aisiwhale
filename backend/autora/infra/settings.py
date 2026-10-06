@@ -220,9 +220,18 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     """CORS_ORIGINS as a JSON list: browser origins allowed to call the API (the web app)."""
     admin_emails: list[str] = []
-    """ADMIN_EMAILS as a JSON list: who may sign in to /admin with an emailed link (D-055).
-    Checked on every request, so taking an address off the list ends its access at once. The
-    API_BEARER_TOKEN still works beside it, for scripts, CI and the day email does not."""
+    """ADMIN_EMAILS as a JSON list: whose sign-in opens /admin (D-055, D-230). Being on it is not
+    enough: the address must also be proven (D-230). Checked on every request, so taking an
+    address off the list ends its access at once. The API_BEARER_TOKEN still works beside it, for
+    scripts, CI and server-to-server calls — never kept in a browser (D-230)."""
+
+    # --- Google sign-in (D-230) ---
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    """The OAuth client made in Google Cloud. Both unset: signing in with Google is off (503)."""
+    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    """Where Google sends the browser back: this API's callback, exactly as registered with
+    Google (production: https://api.aisiwhale.com/api/auth/google/callback)."""
 
     @field_validator("database_url")
     @classmethod
@@ -291,6 +300,8 @@ class Settings(BaseSettings):
         "fugle_api_key",
         "openfigi_api_key",
         "resend_api_key",
+        "google_client_id",
+        "google_client_secret",
         "payuni_mer_id",
         "payuni_hash_key",
         "payuni_hash_iv",

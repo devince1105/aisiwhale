@@ -48,7 +48,7 @@ async def company_stream(
 
     expected = settings.api_bearer_token.get_secret_value()
     allowed = token is not None and secrets.compare_digest(token, expected)
-    if not allowed:  # or an admin signed in with an emailed link: the cookie comes along (D-055)
+    if not allowed:  # or an admin signed in: the cookie comes along (D-055, D-230)
         async with hub.session_factory() as session:
             allowed = (
                 await admin_for(session, websocket.cookies.get(ADMIN_COOKIE), settings)

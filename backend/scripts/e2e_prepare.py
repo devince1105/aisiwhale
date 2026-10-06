@@ -4,8 +4,11 @@
 
 Uses ``<dev database>_e2e`` (never the dev database): creates it if missing, empties it, applies
 the migrations, seeds the echo company (``seed_echo.py``) and the demo newsroom with its stories
-(``seed_newsroom.py --gather``), and prints one JSON line: ``{"database_url": ...,
-"company_id": ..., "project_id": ..., "newsroom_company_id": ..., "newsroom_project_id": ...}``.
+(``seed_newsroom.py --gather``), makes the back office's admin account when
+``E2E_ADMIN_EMAIL`` and ``E2E_ADMIN_PASSWORD`` are set (D-230: the browser signs in with a
+password and keeps a cookie; no token in browser storage), and prints one JSON line:
+``{"database_url": ..., "company_id": ..., "project_id": ..., "newsroom_company_id": ...,
+"newsroom_project_id": ...}``.
 The browser tests then start their own API and worker against that database.
 """
 
@@ -18,6 +21,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.session import build_engine
 from autora.infra.settings import load_settings
@@ -42,6 +46,23 @@ async def _reset(admin_url: str, url: str, name: str) -> None:
         async with engine.begin() as conn:
             await conn.execute(text("DROP SCHEMA public CASCADE"))
             await conn.execute(text("CREATE SCHEMA public"))
+    finally:
+        await engine.dispose()
+
+
+async def _admin(url: str, email: str, password: str) -> None:
+    """An admin as the site makes one: registered, then the address proven (D-230)."""
+    from datetime import UTC, datetime
+
+    from autora.accounts import credentials
+
+    engine = build_engine(url)
+    try:
+        async with engine.begin() as conn:
+            session = AsyncSession(bind=conn)
+            outcome = await credentials.register(session, email, password)
+            await credentials.verify_email(session, outcome.verify_token, now=datetime.now(UTC))
+            await session.flush()
     finally:
         await engine.dispose()
 
@@ -79,6 +100,12 @@ def main() -> None:
             text=True,
         ).stdout
     )
+    admin_email, admin_password = (
+        os.environ.get("E2E_ADMIN_EMAIL"),
+        os.environ.get("E2E_ADMIN_PASSWORD"),
+    )
+    if admin_email and admin_password:
+        asyncio.run(_admin(url, admin_email, admin_password))
     print(
         json.dumps(
             {

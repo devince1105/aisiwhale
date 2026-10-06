@@ -103,7 +103,7 @@ const percentile = (values: number[], p: number) => {
 test("the office stays lean and smooth for hours (Phase 4 AC)", async ({ page, request }, info) => {
   test.setTimeout(MINUTES * 60_000 + WARMUP_MS + 10 * 60_000);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.addInitScript((token) => window.localStorage.setItem("autora.operatorToken", token), TOKEN);
+  await page.context().addCookies(await stack.adminCookies());
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(`/admin/office?company=${stack.newsroomCompanyId}`);

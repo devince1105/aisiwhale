@@ -7,7 +7,7 @@ import { useEffect, type ReactNode } from "react";
 import { ApiError, type Schemas } from "@/api/client";
 import { companiesQuery } from "@/api/queries";
 import { SITE_COMPANY } from "@/config";
-import { storeToken } from "@/features/auth/TokenGate";
+import { useAskAgain } from "@/features/auth/TokenGate";
 
 export type Company = Schemas["CompanyOut"];
 
@@ -40,9 +40,10 @@ export function CompanyScope({ children }: { children: (company: Company) => Rea
   }, [company]);
 
   const unauthorized = companies.error instanceof ApiError && companies.error.status === 401;
+  const askAgain = useAskAgain();
   useEffect(() => {
-    if (unauthorized) storeToken(null);
-  }, [unauthorized]);
+    if (unauthorized) askAgain();
+  }, [unauthorized, askAgain]);
 
   if (companies.isPending) return message("載入中…");
   if (companies.error) return message(`無法載入公司列表：${companies.error.message}`, true);

@@ -23,10 +23,8 @@ test.afterAll(async () => {
 });
 
 test.beforeEach(async ({ context }) => {
-  await context.addInitScript(
-    (token) => window.localStorage.setItem("autora.operatorToken", token),
-    TOKEN,
-  );
+  // signed in to the back office as its admin: the API's cookie, nothing in browser storage
+  await context.addCookies(await stack.adminCookies());
   // the office at its full width, as these clicks and timings were measured: the team group
   // beside it (D-109) is its own business, closed here
   await context.addInitScript(() => window.localStorage.setItem("autora:team-chat", "closed"));
@@ -147,10 +145,7 @@ test("?view=2d, a narrow screen, or no WebGL 2: the 2D board with the company's 
   const phone = await browser.newContext({
     viewport: { width: 390, height: 844 },
   });
-  await phone.addInitScript(
-    (token) => window.localStorage.setItem("autora.operatorToken", token),
-    TOKEN,
-  );
+  await phone.addCookies(await stack.adminCookies());
   const small = await phone.newPage();
   await open(small);
   await expect(office(small)).toHaveAttribute("data-office-mode", "2d");
@@ -158,8 +153,8 @@ test("?view=2d, a narrow screen, or no WebGL 2: the 2D board with the company's 
   await phone.close();
 
   const noGl = await browser.newContext();
-  await noGl.addInitScript((token) => {
-    window.localStorage.setItem("autora.operatorToken", token);
+  await noGl.addCookies(await stack.adminCookies());
+  await noGl.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (
       this: HTMLCanvasElement,
@@ -170,7 +165,7 @@ test("?view=2d, a narrow screen, or no WebGL 2: the 2D board with the company's 
         ? null
         : (original as (...a: unknown[]) => unknown).call(this, type, ...rest);
     } as typeof original;
-  }, TOKEN);
+  });
   const plain = await noGl.newPage();
   await open(plain, "&view=3d");
   await expect(office(plain)).toHaveAttribute("data-office-mode", "2d");

@@ -22,7 +22,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -72,6 +71,7 @@ sys.path.insert(0, str(API_DIR))
 
 from autora_api.app import create_app  # noqa: E402
 from autora_api.deps import get_session, runtime_dep, sender_dep, settings_dep  # noqa: E402
+from tests.api.readers import sign_in  # noqa: E402
 
 OPERATOR = Actor.human("acceptance-operator")
 TOKEN = "acceptance-operator-token"
@@ -166,9 +166,7 @@ async def _buy_a_year(client: httpx.AsyncClient, mailbox: ConsoleSender, slug: s
     """A reader signs in, checks out, and PAYUNi says the money arrived. Returns PAYUNi's number."""
     # an address of its own: this test commits, and readers are shared by every company
     address = f"reader-{uuid.uuid4().hex[:8]}@example.com"
-    await client.post("/api/auth/link", json={"email": address, "company": slug})
-    token = re.search(r"token=([A-Za-z0-9_\-]+)", mailbox.sent[-1].text).group(1)
-    assert (await client.post("/api/auth/verify", json={"token": token})).status_code == 200
+    await sign_in(client, address, company=slug)
     checkout = await client.post("/api/checkout", json={"company": slug})
     assert checkout.status_code == 201, checkout.text
     trade_no = f"UNI{uuid.uuid4().hex[:12]}"

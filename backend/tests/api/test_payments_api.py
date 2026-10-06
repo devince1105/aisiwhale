@@ -8,7 +8,6 @@ only a sandbox store can, and the crypto is cross-checked against an independent
 in ``tests/infra/test_payuni.py``.
 """
 
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -33,6 +32,7 @@ from autora.infra.payments import payuni
 from autora.infra.settings import load_settings
 from autora.runtime.actor import Actor
 from autora_api.deps import settings_dep
+from tests.api.readers import sign_in_id
 
 OPERATOR = Actor.human("operator")
 ADDRESS = "buyer@example.com"
@@ -110,10 +110,7 @@ async def _for_sale(db_session, company, amount="360", month=None):
 
 
 async def _sign_in(client, mailbox, address=ADDRESS):
-    await client.post("/api/auth/link", json={"email": address})
-    token = re.search(r"token=([A-Za-z0-9_\-]+)", mailbox.sent[-1].text).group(1)
-    verified = await client.post("/api/auth/verify", json={"token": token})
-    return uuid.UUID(verified.json()["reader_id"])
+    return await sign_in_id(client, address)
 
 
 def _notification(mer_trade_no, *, amount="360", trade_status=payuni.TRADE_PAID, trade_no=None):
