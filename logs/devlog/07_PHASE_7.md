@@ -3177,6 +3177,59 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 
 **驗證**：`vitest run src/office3d/agents` 49 項通過（D-215 的測試讀這兩個常數，新的上限與比例都涵蓋到）；`tsc --noEmit`、`eslint src/office3d/agents` 沒有錯誤。Blender 裡用網頁的算法擺 Tifa 閒置坐姿，和 20° 並排比較：從鏡頭看臉更正對鏡頭，從側面看是明顯但自然的抬頭，後腦的頭髮沒有壓扁或穿模。還沒在網頁上看過（瀏覽器面板被隱藏時辦公室不畫）。
 
+## D-218～D-229：會員、鯨幣與 AI Office 架構藍圖（P0）
+
+**目標**：使用者要求先不寫程式，以產品、系統與商業模式的角度設計「矽鯨 AI 情報局」未來的會員制度、鯨幣經濟與 AI Office，並拆成可派工的階段。
+
+**過程**：
+- v1.0：三個唯讀子代理分別盤點帳號與金流、AI Office 執行環境、決策紀錄，再對照現況寫出藍圖（Current Architecture 與 Recommended Architecture 的差異）。
+- v1.1：使用者先拍板五項前提（研究需法律確認、鯨幣只送不賣、角色全部原創、每月發放上限、鯨幣不是現金），藍圖據此簡化（不做 lots 與到期、P6 拆成 P6a／P6b）。
+- v1.2：使用者再拍板十項決定，加上補充 A（Admin 授予 VIP）與 C（以鯨幣消費比例驗證 MVP），共 12 項，寫成 D-218～D-229。
+- 編號先查 git、工作目錄與其他三個工作階段，確認 D-218～D-229 沒人用才寫。
+
+**結果**：`logs/platform/18_MONETIZATION_BLUEPRINT.md`（22 節：上層約束、Domain Model、權限、身分、鯨幣帳務、AI Office、研究任務、付款、資料流、P0～P8 派工與依賴圖、風險、需法律確認的項目、明確延後的項目）；`DECISIONS.md` 新增 12 列；`logs/README.md` 的 platform 索引加上這份藍圖並把份數改成 18。D-218 寫明在新架構中取代 D-161 的 NT$30 定價，D-161 本身保留不動。
+
+**驗證**：`git diff --check` 無誤；只動了這三個文件，沒有改任何程式。
+
+## D-230：P1 登入改為 Email＋密碼與 Google OAuth
+
+**目標**：讀者與後台改用 Email＋密碼和 Google 登入，同一個人不論用哪一種都進同一個 `readers` 列；Magic Link 不再是登入方式（使用者在 P1 改了方案，取代藍圖 §7 把密碼延後的部分）。
+
+**開工前的決定**（先盤點現況，回報後由使用者逐項拍板）：
+- 保留既有的 `/admin/login`（D-055），改成和讀者同一套登入；後台權限＝`ADMIN_EMAILS` 且 email 已驗證。
+- 移除瀏覽器 localStorage 的操作者權杖；`API_BEARER_TOKEN` 只留給腳本、CI 與伺服器之間。
+- 註冊後 email 未驗證；未驗證的 email／密碼身分不得當作 Google 自動連結的依據，也不清除既有密碼。
+- 新增 `argon2-cffi`、`PyJWT`；頻率限制存在 Postgres，不存在程序記憶體。
+- 移除 `/api/auth/link`，`login_tokens` 保留並改為重設密碼與驗證 email 的機制。
+
+**做了什麼**：
+- `accounts/`：`passwords.py`（Argon2id、8～128 字元、查無帳號時也跑一次雜湊）、`credentials.py`（註冊、登入、驗證 email、忘記與重設密碼）、`google.py`（授權碼流程＋PKCE S256、state 一次性且綁定發起的瀏覽器、nonce、以 JWKS 驗證 ID token 的簽章／`iss`／`aud`／`exp`、綁定規則）、`ratelimit.py`（每個 key 一列、一條 SQL 原子遞增、先算 IP 再算 email、key 只存雜湊）。
+- 遷移 0066：`reader_identities`（`(provider, subject)` 唯一）、`oauth_states`、`auth_rate_limits`、`login_tokens.purpose`。
+- API：`/api/auth/register|login|logout|me|email/verify|email/resend|password/forgot|password/reset|google/start|google/callback`；後台 `/api/admin/auth/login|google/start|me|logout`。`deps.is_admin` 每次請求重新判斷。
+- 前端：`/news/[lang]/login`、`register`、`forgot-password`、`reset-password`、`verify-email`；`/admin/login` 改成密碼與 Google；刪除兩個 magic link 驗證頁與 `api/auth.ts`（localStorage 權杖）；API 與即時連線的客戶端改成只靠 cookie。e2e 改成用 admin 帳號登入拿 cookie。
+
+**我犯的錯，以及審查時修正的**：
+- **既有讀者的驗證狀態用錯依據**：遷移原本用 `last_seen_at` 判斷「已經用 magic link 證明過信箱」。使用者要求以實際證據為準。改用 `login_tokens.used_at`（只有兌換連結時才會寫，舊程式從不刪 `login_tokens`），取最早一次；沒有兌換過的維持未驗證。用臨時資料庫測了四種情況（兌換兩次、兌換一次、有 `last_seen_at` 但只有未兌換的連結、完全沒有連結），結果正確。正式環境唯讀查詢：4 位讀者都有兌換過的連結（18 個連結中 15 個兌換過），和 `last_seen_at` 沒有不一致。我在第一次回報裡把臨時資料庫的「3 位已驗證、1 位只要求過連結」和正式環境的「4 位都登入過」寫在一起，讓人以為兩者矛盾，是我說明不清。
+- **Google 連結的條件不夠嚴格**：原本用 `email_verified()` 判斷既有讀者的 email 是否已證明，它也會把已驗證的 Google 身分算進去。實際上走不到（已有 Google 身分的讀者會先被拒），但改成只看讀者自己的 email 身分已由本系統驗證、且地址完全相同，並補了「沒有 email 身分的讀者不連結」的測試。Google 給了本站不接受的地址時，原本會 500，改成一般的 Google 登入失敗。
+- **頻率限制的 IP 可以偽造**：uvicorn 的 `--forwarded-allow-ips '*'` 會拿 X-Forwarded-For 最左邊的值，那是客戶端自己寫的。實測 `api.aisiwhale.com` 和直接打 `aisiwhale-api.onrender.com` 都經過 Cloudflare，Cloudflare 會用真實連線位址覆寫 `CF-Connecting-IP`，所以改成讀這個標頭（沒有時才用 socket 位址），並補兩個測試。
+- **ADMIN_EMAILS 的搶註風險（C1）**：有人先用尚未有帳號的 admin 信箱註冊並設好密碼，admin 若點了驗證信，對方就能進後台。正式環境的 admin 都已有帳號（重複註冊不會改任何東西），所以只有新增 admin 時才有這個空窗。使用者決定在 P1 補上：公開註冊不為 `ADMIN_EMAILS` 上、還沒有帳號的地址建立帳號，回應和其他情況完全相同，只寄信告訴信箱擁有者改用 Google 或忘記密碼。
+- 全套測試第一次有 1 項失敗：`test_email.py` 還在 import 已移除的登入信函式，改成檢查三封新信。另外一次在 pytest 跑的同時跑 vitest，11 個和這次無關的前端測試逾時；pytest 結束後單獨重跑全部通過。
+
+**仍存在的風險**（不在 P1 處理）：
+- 一般讀者被人先註冊、自己又點了驗證信時，對方仍知道密碼（業界常見的接受風險，靠驗證信文字提醒）。
+- admin 自己的讀者 session 權杖放進 admin cookie 也有效（同一個人，沒有提權；D-055 以來就是如此）。
+- 對某個 email 連續猜錯 10 次會暫時鎖住它 15 分鐘。
+- 重設與驗證連結的權杖在網址裡，會出現在 Vercel 的請求紀錄（一次性、有時限）。
+- 服務條款與隱私權政策仍描述 magic link 登入，使用者決定 P1 之後另外一個提交處理。
+
+**上線前要做的**：在 Google Cloud 建立 OAuth client，登記 `https://api.aisiwhale.com/api/auth/google/callback`（本機另加 `http://localhost:8000/api/auth/google/callback`）；在 Render 設定 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`GOOGLE_REDIRECT_URI`。部署後既有 admin 的後台 session 最多再撐 14 天，之後要用 Google 或「忘記密碼」設定密碼才能登入。遷移 0066 會在 Render 部署時的 `preDeployCommand` 自動執行。
+
+**驗證**：
+- 新測試：`test_credentials.py` 35 項、`test_google.py` 27 項、`test_auth_api.py` 22 項、`test_google_api.py` 17 項、`test_admin_auth.py` 14 項（含 C1 的 5 項）；前端 `auth-pages.test.tsx` 6 項、`admin-auth.test.tsx` 7 項。Google 的測試用自己的 RSA 金鑰簽 token、網路層換成 `httpx.MockTransport`，驗證走的是正式程式碼。
+- `pytest backend` 全部：2,241 項通過、11 項未選（integration）。
+- vitest 71 個檔案、869 項通過；`make lint`（ruff、格式、`lint-imports` 3 條、eslint、tsc）、`pnpm build`、`gen_openapi.py --check`、`alembic check`、`git diff --check` 都通過。
+- 本機沒有 Playwright 瀏覽器，e2e 沒在本機跑，留給 CI。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
@@ -3350,3 +3403,5 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `2fc7134` | 2026-10-06 | D-217：名人持股與機構排行的計畫（`logs/holdings/01_HOLDINGS_PLAN.md`）；HD-01 多追蹤輝達（公司）、淡馬錫、索羅斯三份 13F（CIK 對過 SEC）；當天 seed 到 Neon 並寫入持股，NVDA 等個股頁已出現新持有人 | ✅ 執行編號 `37386051002`（e2e 6 分 35 秒、python 5 分 6 秒、web 1 分 6 秒） |
 | `a21242b` | 2026-10-06 | D-217（HD-02）：保留每個 13F 來源最近 6 季的完整持股（`portfolio_quarters`、`portfolio_positions`，遷移 0063）；`recent_quarters` 與「上一季」共用同一條規則；每份申報每次執行只下載一次 | ✅ 執行編號 `37399262705`（第一次 e2e 的 3D 辦公室 2D→3D 一項偶發逾時，重跑失敗的工作後通過；e2e 6 分 58 秒、python 6 分 5 秒、web 48 秒） |
 | `2e22706` | 2026-10-06 | D-217（HD-03）：13F 的 CUSIP 對應美股代號（OpenFIGI；CINS、含未上市股票；`cusip_symbols`，遷移 0064）；9 位前 90% 持股 295／301、以市值算 99.9% | ✅ 執行編號 `37404307915` |
+| `c47c6f8` | 2026-10-06 | D-218～D-229：會員、鯨幣與 AI Office 架構藍圖 v1.2（`logs/platform/18_MONETIZATION_BLUEPRINT.md`）與 12 項決定；`logs/README.md` 索引 | ⏳ 尚未推送（P1 的正式環境設定完成後再推） |
+| `89b69a1` | 2026-10-06 | D-230（P1）：Email＋密碼與 Google OAuth 登入、`reader_identities`（遷移 0066）、驗證 email、忘記與重設密碼、存在資料庫的頻率限制、後台改用同一套登入（`ADMIN_EMAILS` 且 email 已驗證）、移除 magic link 登入與瀏覽器的操作者權杖 | ⏳ 尚未推送（同上） |
