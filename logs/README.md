@@ -7,7 +7,7 @@ Autora 是一個 AI Autonomous Company 平台。第一個 Business Domain 是 **
 
 | 資料夾 | 內容 | 狀態 |
 |---|---|---|
-| `platform/` | 平台層架構（Company Model、Agent Runtime、Agent Spec、Newsroom Domain、Business/Revenue、Permission、Memory、Model Gateway、Database、Event Catalog、API、Roadmap、Task Breakdown、Acceptance、Risks）— 16 份 | ✅ |
+| `platform/` | 平台層架構（Company Model、Agent Runtime、Agent Spec、Newsroom Domain、Business/Revenue、Permission、Memory、Model Gateway、Database、Event Catalog、API、Roadmap、Task Breakdown、Acceptance、Risks）— 18 份 | ✅ |
 | `3d-office/` | 3D Office / Realtime / Agent State / Event Model / Newsroom Integration 與對應的 Roadmap、Task Breakdown、Acceptance、Risks — 12 份 | ✅ |
 | `trading/` | AI 交易代理（第二個真實業務 `domains/trading`）：架構提案、OKX 整合、Risk Engine、Phase 0 模擬盤與 Phase 1 計畫（D-037）— 1 份 | 📝 提案 |
 | `holdings/` | 名人持股與機構排行（「持股觀察」改版）：13F 模擬報酬、全體 13F 機構排行、台灣用語對照、資料模型與 HD-01 ~ HD-12 開發步驟 — 1 份 | 🚧 實作中（D-217） |
@@ -34,6 +34,8 @@ Autora 是一個 AI Autonomous Company 平台。第一個 Business Domain 是 **
 ## 閱讀順序（platform）
 
 `01` 架構與原則 → `02` Company Model 與 Cycle loop → `03` Runtime → `04` Agent Spec → `05` Newsroom Domain → `06` Business → `07` Permission → `08` Memory → `09` Model Gateway → `10` DB → `11` Events → `12` API → `13`–`16`
+
+會員、鯨幣與 AI Office 架構藍圖：`18_MONETIZATION_BLUEPRINT.md`（D-218～D-229）
 
 ## 閱讀順序（3d-office）
 
