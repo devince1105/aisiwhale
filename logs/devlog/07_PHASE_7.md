@@ -3234,6 +3234,12 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 
 服務條款「三、登入」與隱私權政策（蒐集的資料、第三方、保存期間）中英兩版改寫，最後更新日改為 2026-10-06（`frontend/web/src/features/site/legal.ts`）：Email＋密碼或 Google 登入、密碼只存雜湊、確認信 24 小時與重設連結 30 分鐘、重設後登出所有裝置、Google 只取得帳號編號／email／是否已確認、Google 登入時 10 分鐘的 cookie、登入嘗試以雜湊計數約一天後刪除。舊文字寫「過期的登入連結與登入狀態會被刪除」，但程式從未刪除它們；改成只描述實際行為（token 只存雜湊、何時失效），不承諾實體刪除。是否加清理工作另案處理。驗證：`vitest run src/features/site` 179 項通過，eslint、tsc 沒有錯誤。
 
+### D-230 後續：e2e 每個測試都登入 admin，撞到自己的頻率限制
+
+推送 `c47c6f8`～`c6ae1d3` 後，CI 執行編號 `37426944928` 的 e2e 失敗（web、python 通過），Render 因此沒有部署，正式站仍是舊版。原因是我在 P1 寫的 `e2e/stack.ts`：`adminCookies()` 在每個測試前都呼叫 `/api/admin/auth/login`，`office.spec.ts` 到第 11 次登入（`a hand-off walks across the 2D floor too`）時，被同一個 email 每 15 分鐘 10 次的登入上限擋下，回 429。頻率限制照設計運作，錯在測試登入太多次；本機沒有 Playwright 瀏覽器，所以推送前沒有跑到。
+
+修法只改 `frontend/web/e2e/stack.ts`：同一個測試環境只登入一次，之後重用同一個 cookie（登入失敗時不記住，下一個測試會重試）；正式程式、頻率限制、Google OAuth、CI 設定都沒動。驗證：用臨時腳本啟動真正的 e2e 環境（資料庫、API、worker），呼叫 `adminCookies()` 15 次——只登入 1 次、拿到同一個 cookie，`/api/admin/auth/me` 回 200；重啟 API 後同一個 cookie 仍是 200（session 存在資料庫）。`eslint e2e`、`tsc --noEmit` 沒有錯誤。完整的瀏覽器 e2e 留給 CI。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
@@ -3407,5 +3413,6 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `2fc7134` | 2026-10-06 | D-217：名人持股與機構排行的計畫（`logs/holdings/01_HOLDINGS_PLAN.md`）；HD-01 多追蹤輝達（公司）、淡馬錫、索羅斯三份 13F（CIK 對過 SEC）；當天 seed 到 Neon 並寫入持股，NVDA 等個股頁已出現新持有人 | ✅ 執行編號 `37386051002`（e2e 6 分 35 秒、python 5 分 6 秒、web 1 分 6 秒） |
 | `a21242b` | 2026-10-06 | D-217（HD-02）：保留每個 13F 來源最近 6 季的完整持股（`portfolio_quarters`、`portfolio_positions`，遷移 0063）；`recent_quarters` 與「上一季」共用同一條規則；每份申報每次執行只下載一次 | ✅ 執行編號 `37399262705`（第一次 e2e 的 3D 辦公室 2D→3D 一項偶發逾時，重跑失敗的工作後通過；e2e 6 分 58 秒、python 6 分 5 秒、web 48 秒） |
 | `2e22706` | 2026-10-06 | D-217（HD-03）：13F 的 CUSIP 對應美股代號（OpenFIGI；CINS、含未上市股票；`cusip_symbols`，遷移 0064）；9 位前 90% 持股 295／301、以市值算 99.9% | ✅ 執行編號 `37404307915` |
-| `c47c6f8` | 2026-10-06 | D-218～D-229：會員、鯨幣與 AI Office 架構藍圖 v1.2（`logs/platform/18_MONETIZATION_BLUEPRINT.md`）與 12 項決定；`logs/README.md` 索引 | ⏳ 尚未推送（P1 的正式環境設定完成後再推） |
-| `89b69a1` | 2026-10-06 | D-230（P1）：Email＋密碼與 Google OAuth 登入、`reader_identities`（遷移 0066）、驗證 email、忘記與重設密碼、存在資料庫的頻率限制、後台改用同一套登入（`ADMIN_EMAILS` 且 email 已驗證）、移除 magic link 登入與瀏覽器的操作者權杖 | ⏳ 尚未推送（同上） |
+| `c47c6f8` | 2026-10-06 | D-218～D-229：會員、鯨幣與 AI Office 架構藍圖 v1.2（`logs/platform/18_MONETIZATION_BLUEPRINT.md`）與 12 項決定；`logs/README.md` 索引 | ❌ 執行編號 `37426944928`（與 `c6ae1d3` 一起推送；web、python 通過，e2e 的 admin 登入撞到頻率限制，見「D-230 後續：e2e」） |
+| `89b69a1` | 2026-10-06 | D-230（P1）：Email＋密碼與 Google OAuth 登入、`reader_identities`（遷移 0066）、驗證 email、忘記與重設密碼、存在資料庫的頻率限制、後台改用同一套登入（`ADMIN_EMAILS` 且 email 已驗證）、移除 magic link 登入與瀏覽器的操作者權杖 | ❌ 執行編號 `37426944928`（與 `c6ae1d3` 一起推送；web、python 通過，e2e 的 admin 登入撞到頻率限制，見「D-230 後續：e2e」） |
+| `c6ae1d3` | 2026-10-06 | D-230 後續：服務條款與隱私權政策改成 Email＋密碼與 Google 的說法；保存期間只描述實際行為 | ❌ 執行編號 `37426944928`（同上） |

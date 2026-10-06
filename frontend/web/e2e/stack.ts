@@ -80,6 +80,15 @@ async function reachable(url: string): Promise<boolean> {
   }
 }
 
+/** A cookie as Playwright's `addCookies` takes it. */
+interface AdminCookie {
+  name: string;
+  value: string;
+  url: string;
+  httpOnly: boolean;
+  sameSite: "Lax";
+}
+
 export class Stack {
   readonly api: Proc;
   readonly worker: Proc;
@@ -144,8 +153,21 @@ export class Stack {
     }
   }
 
-  /** The back office's cookie for the e2e admin, to add to a browser context (D-230). */
-  async adminCookies(): Promise<{ name: string; value: string; url: string; httpOnly: boolean; sameSite: "Lax" }[]> {
+  private adminCookie: Promise<AdminCookie[]> | null = null;
+
+  /** The back office's cookie for the e2e admin, to add to a browser context (D-230). Signed in
+   * once per stack and the cookie reused, as a real admin's browser does: signing in before every
+   * test would run into the API's own limit on sign-ins per address (10 in 15 minutes). The
+   * session lives in the database, so it outlasts the API restarts some tests make. */
+  adminCookies(): Promise<AdminCookie[]> {
+    this.adminCookie ??= this.signInAdmin().catch((error: unknown) => {
+      this.adminCookie = null; // a failed sign-in is not kept: the next test asks again
+      throw error;
+    });
+    return this.adminCookie;
+  }
+
+  private async signInAdmin(): Promise<AdminCookie[]> {
     const response = await fetch(`${API_URL}/api/admin/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
