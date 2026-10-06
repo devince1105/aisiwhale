@@ -104,6 +104,10 @@ MAINLAND_TERMS: dict[str, str] = {
     "納斯達克": "那斯達克",
     "回調": "回檔",
     "谷歌": "Google",
+    # the 13F filers' names (HD-09)
+    "惠靈頓": "威靈頓",
+    "蒙特利爾": "蒙特婁",
+    "富蘭克林鄧普頓": "富蘭克林坦伯頓",
 }
 """Mainland usage, written in Traditional characters, and Taiwan's own word for it. Only terms
 that mean the same in a finance story either way: 程序 is left out (in Taiwan it is a procedure,
