@@ -3616,6 +3616,20 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 預覽（本機 Next，伺服器端連正式 API，唯讀）：定價頁顯示「即將開放」橫幅、月繳 NT$30 與年繳 NT$300 的按鈕都停用、沒有 NT$149。後台 `/admin/memberships` 沒有在瀏覽器實際登入操作（需要本機 admin 帳號與套用 0071 的開發資料庫），以元件測試涵蓋。
 
 
+### P2-B 部署與正式環境驗證
+
+**部署**：`325b414`（P2-B）推送，CI 執行編號 `37488235449` 三個工作都通過（python 6 分 22 秒、web 1 分 21 秒、e2e 6 分 46 秒），Render 隨即部署；以讀正式 API 的 `/openapi.json` 確認，23:40 起付款通知的說明出現 `payment_events`，新版已上線。Vercel 也已部署：`/admin/memberships` 回 200，定價頁改為動態（`cache-control: no-store`）。
+
+**正式環境冒煙測試**（唯讀；付款通知端點沒有打，送一則就會在正式環境寫入一筆 `payment_events`）：
+- 正式 Neon 唯讀查詢：遷移版本 `0071`，`payment_events` 已建立（含 outcome 限制）；membership 價格仍只有一筆 NT$30／月、ACTIVE（2026-10-02 建立），NT$149 的價格 0 筆；payment_events、orders、payments、memberships、membership_grants、customers 都是 0，冒煙測試沒有新增任何資料。
+- `/api/checkout/offer`：月繳 `amount: 30`、`available: false`；年繳 `amount: 0`（目錄沒有年繳價格）、`available: false`。
+- `POST /api/checkout`（月繳、年繳）：都回 403「membership is not on sale yet」。PayUni 不開放。
+- 方案頁：「VIP 會員即將開放」橫幅、月繳 NT$30、年繳 NT$300（前端備用價）都在，頁面沒有 NT$149。
+- P2-A：`/api/admin/memberships/comps` 未授權 401，`membership_grants` 0 筆。
+- D-217：`/api/public/holdings` 15 筆、巴菲特個人頁 API 與網站都是 200；`thirteenf_filings` 已建立、0 筆（HD-08 的排程要等 worker 10/07 上班後才開始讀）。
+- P1：`/api/auth/google/start` 303 到 Google，未登入的 `/api/auth/me` 回 `null`；讀者 5 位、身分 7 筆（Google 3 筆）全部已驗證，P2-B 沒有動登入程式。
+- 沒有確認到的：worker 上的 `expire_unpaid_orders` 是否已開始跑（正式環境 0 筆訂單，跑了也不會有變化）。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
@@ -3803,3 +3817,4 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `112b136` | 2026-10-06 | P2-A（D-228、D-231、D-232）：`membership_grants` 與 `customers.kind = comp`（遷移 0069，不動價格）、admin_comp 授予與撤銷 API、伺服器端權限判斷（`/api/auth/me` 的 `tier`／`capabilities`）、comp 不算付費客戶、結帳由後端一律回 403；方案頁維持月繳 NT$30、年繳 NT$300 半透明「即將開放」；記下 P8 前置條件 | ✅ 執行編號 `37463401303`（與 `9aabaee` 一起推送；e2e 7 分 7 秒、python 3 分 58 秒、web 59 秒），已部署並通過正式環境冒煙測試 |
 | `9aabaee` | 2026-10-06 | D-217：機構持股（大戶分頁改名，多追蹤 Bridgewater、蓋茲基金會信託、高瓴 HHLR、沙烏地公共投資基金） | ✅ 執行編號 `37463401303`（同上），已部署 |
 | `ca59325` | 2026-10-06 | D-217（HD-08）：機構排行的資料（SEC 每日索引＋每份 13F 封面頁，遷移 0070，排程每 10 分鐘、每次 1 分鐘內）；修正申報規則改為 NEW HOLDINGS 加總；新聞分類「大戶持股」改名「機構持股」、「機構觀點」移進持股觀察 | ✅ 執行編號 `37479414222`，已部署（正式資料庫 0070、排程已建立；worker 22:38 已下班，10/07 15:00 上班後開始讀） |
+| `325b414` | 2026-10-06 | P2-B：`payment_events`（遷移 0071，通知先存再處理）；退役價格照既有訂單履約、已付款訂單收到失敗通知不變（兩個 500 修正）；PENDING 超過 24 小時由 worker 標 EXPIRED、EXPIRED 後付款仍履約；後台 `/admin/memberships`（VIP 授予與撤銷）；移除 `SITE_MEMBERSHIP_OPEN`，能否購買只看 API；藍圖同步 D-231／D-232 | ✅ 執行編號 `37488235449`（python 6 分 22 秒、web 1 分 21 秒、e2e 6 分 46 秒），Render、Vercel 已部署；正式資料庫 0071，結帳 403，價格維持 NT$30／NT$300，NT$149 0 筆，冒煙測試沒有新增資料 |
