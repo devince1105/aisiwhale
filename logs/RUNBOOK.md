@@ -592,6 +592,7 @@ make up
 | 前端指令出現 `internal/modules/cjs/loader.js` 錯誤 | Node 版本太舊，執行 `nvm use 22` |
 | Python 測試大量「skipped」 | 資料庫沒啟動。執行 `make dev`，並加上 `AUTORA_REQUIRE_DB=1` 讓它直接報錯 |
 | `database unavailable at ...` | 同上；或 5434 埠被佔用，可在 `.env` 改 `AUTORA_DB_PORT` 與 `DATABASE_URL` |
+| 測試中途出現 `connection is closed`，`docker logs autora-db-1` 有 `untracked child process … exited with exit code 2` 與 `terminating any other active server processes` | 容器是在 compose 加上 `init: true`（2026-10-07）之前建立的：Postgres 自己當 PID 1，負載高時健康檢查被砍掉留下的孤兒程序結束碼 2，被當成子程序當掉而全部重啟。`docker inspect autora-db-1 --format '{{.HostConfig.Init}}'` 不是 `true` 就用 `docker compose -f infra/docker-compose.yml up -d db` 重建（資料卷保留；所有連線會斷十幾秒，先確認沒有其他工作階段在用） |
 | 任何程序啟動時出現 `Invalid configuration` | `.env` 不完整。例如 `MODEL_PROVIDER=nvidia` 卻缺少 `NVIDIA_API_KEY`、模型 ID 或 `MODEL_PRICES`；訊息會列出缺哪一項 |
 | 工作程序日誌出現 `RateLimited` | NVIDIA 免費端點限流。程式已自動重試；經常發生時調低 `WORKER_CONCURRENCY` |
 | 工作程序日誌出現 `NotFound` 或 `BadRequest` 且提到模型 | 模型 ID 寫錯。NVIDIA 要用頁面程式範例中的 ID（例如 `z-ai/glm-5.3`），不是卡片名稱 |

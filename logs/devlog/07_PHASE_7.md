@@ -3680,6 +3680,50 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - P1：`/api/auth/google/start` 303 到 Google，未登入的 `/api/auth/me` 回 `null`；讀者 5 位、身分 7 筆（Google 3 筆）全部已驗證，P2-B 沒有動登入程式。
 - 沒有確認到的：worker 上的 `expire_unpaid_orders` 是否已開始跑（正式環境 0 筆訂單，跑了也不會有變化）。
 
+## 本機 Postgres 在負載下自己重啟：容器加上 init、健康檢查改為 exec 形式（10/07）
+
+只動本機開發用的 `infra/docker-compose.yml`，產品程式、CI、正式環境（Neon）都沒有動。
+
+**現象**：10/06 13:24、13:38、13:43（UTC）兩個完整 pytest 與一支讀 SEC 資料的長腳本同時在跑，本機資料庫容器 `autora-db-1` 裡的 Postgres 連續三次當掉重來。每次 `docker logs` 都是同樣的順序：`untracked child process (PID N) exited with exit code 2` → `terminating any other active server processes` → 當機復原。所有連線被切斷，測試出現 `InterfaceError: connection is closed`（P2-B 全套測試的第一、二次就是這樣中斷的，見上文）。容器本身沒有重啟（`docker ps` 仍是 Up 5 days），是 Postgres 主程序在容器裡把所有程序重來一次。
+
+**原因**：
+- 容器沒有 init，Postgres 的主程序（postmaster）自己就是 PID 1（`docker inspect` 的 `HostConfig.Init` 是空的）。
+- 健康檢查是 `CMD-SHELL` 形式，每 2 秒一次、逾時 3 秒。負載高時檢查逾時，外層的 `sh -c` 被砍掉，裡面的 `pg_isready` 成了孤兒，被過繼給 PID 1，也就是 postmaster。
+- postmaster 收到一個不認得的子程序結束、結束碼又不是 0（`pg_isready` 等不到回應時是 2），就當成有後端程序當掉，照它的安全規則終止所有程序、做當機復原。
+- 同一天的紀錄另有十幾筆 `untracked child process … exited with exit code 0`：一樣是被過繼的孤兒，結束碼 0 所以沒事。孤兒一直都有，只是負載高時才會出現結束碼 2 的那種。
+
+**修正**（`infra/docker-compose.yml` 的 `db`）：
+- `init: true`：由 Docker 內建的 tini（`docker-init`）當 PID 1，孤兒由它回收，postmaster 不會再看到不認得的子程序。
+- 健康檢查改成 exec 形式 `["CMD", "pg_isready", "-U", "autora", "-d", "autora"]`，中間沒有 shell；間隔 2 秒改 5 秒、逾時 3 秒改 5 秒，`retries: 30` 不變。
+- `api`、`worker` 的 `depends_on: db: condition: service_healthy` 不必改。`make dev` 自己用 `pg_isready` 輪詢，不受健康檢查間隔影響。
+- 沒改的：CI 的 Postgres 服務容器（`.github/workflows/ci.yml`）同樣沒有 init、同樣用 shell 形式的檢查，但 CI 一次只跑一套測試，沒有發生過。
+- `logs/RUNBOOK.md` 常見問題加一列：看到這組紀錄時先查容器有沒有 init，沒有就重建。其他電腦或舊的容器要重建一次才會套用。
+
+**重建容器**（23:09 UTC，台灣時間 10/07 07:09）：先用 ListAgents 找到另外兩個工作階段（持股觀察、會員與鯨幣），各傳訊息說明會斷線十幾秒、資料卷保留；兩邊都回覆沒有連線、可以重建（持股觀察提醒 `autora_hd08` 裡有 HD-10 要用的 Q2 13F 資料），使用者確認後才執行 `docker compose -f infra/docker-compose.yml up -d --wait db`，約 10 秒後回到 healthy。之後 `docker inspect autora-db-1 --format '{{.HostConfig.Init}}'` 是 `true`，`docker top` 看到 PID 1 是 `/sbin/docker-init -- docker-entrypoint.sh postgres`，postmaster 是它的子程序。
+
+資料：資料卷 `autora_autora-db-data-18` 原樣掛回。重建前後五個資料庫（`autora`、`autora_e2e`、`autora_hd08`、`autora_test`、`postgres`）的大小一致；`autora_test` 一開始少 157 KB，連線一次後回到原值（Postgres 啟動時刪掉、第一次連線時重建的 relcache 快取檔）。`autora` 的遷移版本仍是 `0069`，`autora_hd08` 的 `thirteenf_filings` 仍是 9,967 筆。
+
+**驗證**：
+
+1. **重現原因**（兩個拋棄式容器，同一個映像檔，不掛資料卷、不開埠，用完即刪）：一個沒有 init、一個加 `--init`，各開一條連線，再各在裡面製造一個結束碼 2 的孤兒（`sh -c '(sleep 2; exit 2) & exit 0'`：sh 先結束，子 shell 被過繼給 PID 1）。沒有 init 的那個（PID 1 是 `postgres`）印出和 10/06 一模一樣的 `untracked child process (PID 117) exited with exit code 2` → `terminating any other active server processes` → `all server processes terminated; reinitializing`；有 init 的那個（PID 1 是 `docker-init`）Postgres 紀錄裡什麼都沒有。
+2. **負載下的真正容器**（`autora-db-1`，23:12～23:24 UTC，比 10/06 出事時還重）：
+   - 兩個完整的 `pytest backend` 同時跑，各用自己的資料庫（`autora_dbfix_test`、`autora_dbfix2_test`，不碰共用的 `autora_test`），環境照 CI（`AUTORA_REQUIRE_DB=1`、不讀 `.env`、模型用 fake）。
+   - 同時跑 `pgbench`（16 條連線、讀寫、scale 20）當重量級的客戶端：12 分鐘處理 2,612,285 筆交易，平均每秒約 3,550 筆，0 筆失敗。
+   - 每 20 秒在容器裡製造一個結束碼 2 的孤兒（同上），共 34 個。
+   - 結果：兩套測試都是 2,316 項通過、11 項未選、0 項略過，各花 12 分 5 秒左右，沒有任何 `connection is closed`。Docker 紀錄到的 144 次健康檢查全部結束碼 0。Postgres 紀錄裡 `untracked child`、`terminating any other active server processes`、`reinitializing` 都是 0 筆（另開一個監看 `docker logs -f` 的程序，全程沒有觸發）。結束後容器裡沒有殭屍程序，PID 1 底下只有 postmaster。紀錄裡的 16 筆 `terminating connection due to administrator command` 是收尾時我自己用 `pg_terminate_backend` 結束 pgbench 的 16 條連線；其餘 `ERROR` 是測試故意觸發的限制條件。
+   - 要說清楚的一點：這次負載沒有讓健康檢查逾時，所以「檢查逾時 → 孤兒」這一段沒有在真正的容器上自然發生；結束碼 2 的孤兒是手動製造的，和第 1 點的重現是同一個機制。
+3. **`service_healthy` 仍有效**：`docker compose --profile full config` 展開後，`api`、`worker` 對 `db` 仍是 `condition: service_healthy`。再用一個拋棄式的 override 加一個 `probe` 服務，同樣 `depends_on: db: condition: service_healthy`，以 `up --no-recreate probe` 啟動：compose 先等 `autora-db-1` 回報 Healthy 才啟動 probe，probe 透過 compose 網路連到 `db:5432`、結束碼 0；`autora-db-1` 的容器編號前後一樣（沒有被重建），probe 用完即刪。
+4. 收尾：刪掉 `autora_dbfix_bench`、`autora_dbfix_test`、`autora_dbfix2_test`，並通知另外兩個工作階段資料庫已恢復可用。（會員與鯨幣的工作階段在重建後已用自己的 `autora_p3a_test` 跑過測試，沒有斷線。）
+
+| 宣稱 | 結果 |
+|---|---|
+| 孤兒程序以結束碼 2 結束，會讓沒有 init 的 Postgres 全部重來、切斷所有連線 | **真**：拋棄式容器重現，紀錄和 10/06 相同 |
+| 加上 `init: true` 之後，同樣的孤兒不會影響 Postgres | **真**：拋棄式容器 1 次、真正的容器在負載下 34 次，都沒有反應 |
+| 負載下跑完整測試不再斷線 | **真**：兩套同時跑，各 2,316 項通過 |
+| 健康檢查逾時本身已經不會發生 | **沒有驗證到**：這次 144 次檢查都沒逾時，所以只能說「就算逾時也不會再造成重啟」 |
+| 重建容器不會遺失資料 | **真**：五個資料庫大小一致，`autora_hd08` 9,967 筆 |
+| `api`、`worker` 等待資料庫 healthy 的設定仍然有效 | **真**：config 展開與 probe 實測 |
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
