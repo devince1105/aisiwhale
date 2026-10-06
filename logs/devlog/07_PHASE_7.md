@@ -3495,6 +3495,18 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 遷移 0069：臨時資料庫升級、重跑、降級、再升級正常；有 comp 時降級被拒絕；本機開發資料庫 `alembic check` 無差異。
 - `pytest backend`（單獨跑）2,277 項通過；vitest 72 個檔案 882 項通過；`make lint`、OpenAPI、event schema、`pnpm build` 通過。
 
+### P2-A 部署與正式環境驗證
+
+**部署**：`112b136`（P2-A）與持股觀察的 `9aabaee` 一起推送，CI 執行編號 `37463401303` 三個工作都通過，Render 隨即部署；以讀正式 API 的 `/openapi.json` 確認，20:36 起出現 `/api/admin/memberships/comps`，新版已上線。
+
+**正式環境冒煙測試**（唯讀；結帳只用未登入的請求確認被拒）：
+- `/api/checkout/offer`：月繳 `amount: 30`、`available: false`；年繳 `amount: 0`（目錄沒有年繳價格）、`available: false`，不可購買。
+- `POST /api/checkout`（月繳、年繳）：都回 403「membership is not on sale yet」。
+- `/api/admin/memberships/comps` 未授權：401。
+- 正式 Neon 唯讀查詢：遷移版本 `0069`，`membership_grants` 已建立，`customers.kind` 允許 `comp`；membership 價格仍只有一筆 NT$30／月、ACTIVE（2026-10-02 建立），NT$149 的價格 0 筆；orders、payments、memberships、membership_grants、customers 都是 0，冒煙測試沒有新增任何資料。
+- 方案頁：提示文字為「VIP 會員即將開放，以下是方案與價格。VIP 報導將於會員開放後提供。」；月繳 NT$30 正常顯示、按鈕為停用的「即將開放」；年繳 NT$300 半透明、按鈕為停用的「即將開放」；頁面沒有出現 NT$149。
+- PayUni、真實付款與 P3～P8 都沒有開啟。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
@@ -3679,3 +3691,5 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `0826acc` | 2026-10-06 | D-217（HD-06）：頭像照片（維基共享資源公有領域或 CC BY，裁成 256 px 並標出處）；七巨頭執行長；輝達卡片用黃仁勳 | ✅ 執行編號 `37436323038` |
 | `a680990` | 2026-10-06 | D-217（HD-06）：持股觀察分成名人持股／大戶（集團）持股／新聞三分頁；個人頁持股表在排程未算時由 API 當場算；使用者提供的四張照片 | ✅ 執行編號 `37441519285` |
 | `fc3ad00` | 2026-10-06 | D-217（HD-07）：川普、裴洛西的卡片與個人頁（只顯示人工核對過的交易）；轉錄重開、只讀最近 180 天；裴洛西改用台灣譯名 | ✅ 執行編號 `37444105873` |
+| `112b136` | 2026-10-06 | P2-A（D-228、D-231、D-232）：`membership_grants` 與 `customers.kind = comp`（遷移 0069，不動價格）、admin_comp 授予與撤銷 API、伺服器端權限判斷（`/api/auth/me` 的 `tier`／`capabilities`）、comp 不算付費客戶、結帳由後端一律回 403；方案頁維持月繳 NT$30、年繳 NT$300 半透明「即將開放」；記下 P8 前置條件 | ✅ 執行編號 `37463401303`（與 `9aabaee` 一起推送；e2e 7 分 7 秒、python 3 分 58 秒、web 59 秒），已部署並通過正式環境冒煙測試 |
+| `9aabaee` | 2026-10-06 | D-217：機構持股（大戶分頁改名，多追蹤 Bridgewater、蓋茲基金會信託、高瓴 HHLR、沙烏地公共投資基金） | ✅ 執行編號 `37463401303`（同上），已部署 |
