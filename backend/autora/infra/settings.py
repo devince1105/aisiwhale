@@ -148,6 +148,9 @@ class Settings(BaseSettings):
     """Fugle (富果), free for its members: Taiwan stocks' 15-minute bars for the stock pages'
     charts (D-074). Without it a Taiwan page has days, weeks and months only. Its terms for a
     public site to be checked before the site is public."""
+    openfigi_api_key: SecretStr | None = None
+    """OpenFIGI, free: which US ticker a 13F CUSIP is, for the holdings dashboard (HD-03). Works
+    without a key (10 CUSIPs a request, 25 requests a minute); a free key asks 100 at a time."""
 
     # --- Articles' cover images (D-142) ---
     pixabay_api_key: SecretStr | None = None
@@ -286,6 +289,7 @@ class Settings(BaseSettings):
         "finnhub_api_key",
         "tiingo_api_key",
         "fugle_api_key",
+        "openfigi_api_key",
         "resend_api_key",
         "payuni_mer_id",
         "payuni_hash_key",

@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
 from autora.domains.newsroom import thirteenf
+from autora.domains.newsroom.cusips import CusipError, OpenFigi, map_cusips
 from autora.domains.newsroom.models import (
     InvestorPosition,
     PortfolioPosition,
@@ -326,8 +327,10 @@ async def refresh_holdings(session: AsyncSession, company_id: uuid.UUID, fetch: 
 
 
 class HoldingsKeeper:
-    def __init__(self, fetcher: PageFetcher) -> None:
+    def __init__(self, fetcher: PageFetcher, figi: OpenFigi | None = None) -> None:
         self.fetcher = fetcher
+        self.figi = figi
+        """Who says which ticker a CUSIP is (HD-03); None offline, and nobody is asked."""
 
     async def fetch(self, url: str) -> bytes:
         return (await self.fetcher.fetch(url)).body
@@ -339,6 +342,12 @@ class HoldingsKeeper:
             session: AsyncSession, schedule: Schedule, scheduled_for: datetime
         ) -> None:
             await refresh_holdings(session, schedule.company_id, self.fetch)
+            if self.figi is not None:
+                # the kept quarters' new CUSIPs, while they are new (HD-03)
+                try:
+                    await map_cusips(session, schedule.company_id, self.figi)
+                except CusipError as error:
+                    log.warning("holdings: tickers not mapped this time: %s", error)
 
         return handler
 

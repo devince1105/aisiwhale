@@ -291,7 +291,16 @@ def build_scheduler(
     )
     scheduler.register(CLUSTER_SCHEDULE, desk.schedule_handler())
     scheduler.register(ANALYTICS_SCHEDULE, AnalyticsCollector().schedule_handler())
-    scheduler.register(HOLDINGS_SCHEDULE, HoldingsKeeper(fetcher).schedule_handler())
+    # the 13F positions, and which ticker each CUSIP is (HD-03) — asked of OpenFIGI only live
+    from autora.domains.newsroom.cusips import OpenFigi, http_post
+
+    figi_key = settings.openfigi_api_key if settings else None
+    figi = (
+        OpenFigi(http_post(figi_key.get_secret_value() if figi_key else None), keyed=bool(figi_key))
+        if settings is not None and settings.tools_profile == "live"
+        else None
+    )
+    scheduler.register(HOLDINGS_SCHEDULE, HoldingsKeeper(fetcher, figi).schedule_handler())
     # the charts' daily prices, from the exchange (D-059)
     # (the exchange only when the tools are live: a test's scheduler must not ask TWSE)
     live = settings is not None and settings.tools_profile == "live"

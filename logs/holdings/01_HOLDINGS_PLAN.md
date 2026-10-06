@@ -112,7 +112,7 @@ OXY    減碼  −12.0%                ╰──────╯
 - 季末價：如果下一季還持有，**直接用 13F 自己算出的價格（市值 ÷ 股數）**，不必呼叫外部 API。
 - 已經出清的持股、最新收盤價：用 `price_history`（Tiingo）。每人只取權重前段、合計涵蓋 90% 以上的持股，每人最多 40 檔。
 
-**CUSIP 對應代號**（13F 只寫 CUSIP，不寫代號）：用 OpenFIGI 的對應 API（免費；可以申請免費金鑰提高上限），結果存在 `cusip_symbols` 表裡，同一個 CUSIP 只查一次。查不到的再用發行人名稱比對 `securities`。
+**CUSIP 對應代號**（13F 只寫 CUSIP，不寫代號）：用 OpenFIGI 的對應 API（免費；可以申請免費金鑰提高上限），結果存在 `cusip_symbols` 表裡，同一個 CUSIP 只查一次。英文字母開頭的是外國公司的 CINS 碼，要用 CINS 查；已被併購下市的要加上「含未上市股票」才查得到。HD-03 實測：9 位的前 90% 持股 301 個代碼對到 295 個（98%，以市值算 99.9%），剩下的都是特別股。**不做發行人名稱比對**：查不到的只剩特別股，用名稱比對反而會把 Alphabet 的特別股對成 GOOGL，是錯的。
 
 ### 3.4 川普與佩洛西（沒有 13F）
 
@@ -203,7 +203,7 @@ OXY    減碼  −12.0%                ╰──────╯
 |---|---|---|
 | `portfolio_quarters` | 每位申報人每季一列：組成這一季的申報（CIK、accession）、申報日、總市值、是否以千元申報；保留最近 6 季（HD-02 實作時從原本的 `holding_snapshots` 拆成兩張表，季的資料不必每個部位重複一次） | 約 60 列 |
 | `portfolio_positions` | 每季的每個部位（CUSIP、股數、市值、類別、選擇權別），隨季刪除 | 約 1 萬列 |
-| `cusip_symbols` | CUSIP → 代號、名稱、交易所、來源（OpenFIGI／名稱比對）、查詢時間 | 約 3,000 列 |
+| `cusip_symbols` | CUSIP → 代號（沒有美國普通股時是空的）、名稱、證券類別、查詢時間（遷移 0064） | 約 3,000 列 |
 | `portfolio_stats` | 每位名人一列：模擬報酬、起算日、涵蓋率、前 10 大、兩筆動作、計算時間 | 十幾列 |
 | `thirteenf_filers` | CIK → 英文名稱、中文名稱（取自名稱表） | 約 1.2 萬列 |
 | `thirteenf_summaries` | 每份 13F 申報一列：CIK、accession、季度、申報日、持股市值、持股檔數、是否為修正 | 每季約 1 萬列，保留 8 季 |
@@ -244,7 +244,7 @@ OXY    減碼  −12.0%                ╰──────╯
 |---|---|---|---|
 | HD-01 | 新增輝達、淡馬錫、索羅斯三個 13F 來源；在 Neon 上執行 `seed_markets.py` | — | 三家的 `investor_positions` 有資料；跑馬燈個股頁出現新持有人（淡馬錫：NVDA、GOOGL；索羅斯：AMZN、TSM、GOOGL、NVDA）。輝達持有的英特爾、SpaceX 等不是跑馬燈個股，個股頁沒有 CUSIP，看不到——要等個人頁（HD-06） |
 | HD-02 | `portfolio_quarters`、`portfolio_positions`（遷移 0063）：`refresh_holdings` 改為保留最近 6 季，第一次執行時往回補 | HD-01 | 9 位都有 5 季以上的資料；遷移可以升級也可以降級 |
-| HD-03 | `cusip_symbols`：OpenFIGI 用戶端加上名稱比對 | — | 用固定資料測試；名單內前 90% 權重的持股對應率 ≥ 95% |
+| HD-03 | `cusip_symbols`：OpenFIGI 用戶端（CINS、含未上市股票；不做名稱比對，見 §3.3） | — | 用固定資料測試；名單內前 90% 權重的持股對應率 ≥ 95% |
 | HD-04 | `portfolio_stats`：模擬報酬、兩筆動作、環圈資料 | HD-02、03 | 用手算的固定資料測試（含出清、新建倉、對不到代號的持股）；巴菲特的結果與一個公開追蹤網站比較，差距寫進 devlog |
 | HD-05 | 公開 API：`GET /api/public/holdings`、`/holdings/people/{slug}`；OpenAPI 與 `schema.gen.ts` | HD-04 | API 測試；未登入時只給前 10 大 |
 | HD-06 | 前端：持股觀察儀表板的卡片區（SVG 環圈）、個人頁、i18n 中英文、用語測試 | HD-05 | 網站測試、手機與深色模式截圖、§2 用語測試通過 |

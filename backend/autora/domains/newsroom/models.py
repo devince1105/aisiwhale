@@ -269,6 +269,24 @@ class PortfolioPosition(IdMixin, Base):
     value_usd: Mapped[int] = mapped_column(Numeric(20, 0))
 
 
+class CusipSymbol(Base):
+    """Which US ticker a CUSIP is (HD-03), as OpenFIGI answered (``cusips.py``): 13F filings name
+    CUSIPs, never tickers, and a price needs one. A CUSIP with no common-stock listing (a
+    preferred share, a bond) is kept too, without a ticker, so it is not asked about again
+    until ``cusips.RECHECK`` has passed."""
+
+    __tablename__ = "cusip_symbols"
+
+    cusip: Mapped[str] = mapped_column(primary_key=True)
+    """Or a CINS, a company incorporated abroad (``G54950103``, Linde)."""
+    symbol: Mapped[str | None]
+    """As the site writes it: ``BRK.B``, not OpenFIGI's ``BRK/B``. None: no US common stock."""
+    name: Mapped[str | None]
+    security_type: Mapped[str | None]
+    """OpenFIGI's: ``Common Stock``, ``ADR``, ``ETP``, ``NY Reg Shrs``…"""
+    checked_at: Mapped[datetime]
+
+
 class OfficialReportStatus(StrEnum):
     PENDING = "pending"
     """Transcribed, waiting for a person to check it against the scan."""
