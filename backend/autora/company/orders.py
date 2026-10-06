@@ -21,13 +21,25 @@ Only then does the money become a payment, a ledger row and a membership, all in
 transaction. Repeating a notification (providers do) changes nothing: the payment is idempotent
 by the provider's own reference, and an order that is already PAID is answered with what it
 bought the first time.
+
+What an order promised is kept (P2-B): a price retired after the order was opened still buys
+what was ordered, and an order nobody paid for within ``PENDING_FOR`` is marked EXPIRED but
+still settles if the money turns up after all. A notification that is not a payment never undoes
+one: an order already PAID stays PAID.
+
+The states, and what moves them::
+
+    PENDING ──paid──► PAID
+       │  ╲──failed──► FAILED ──paid──► PAID
+       ╰──24 h──► EXPIRED ──paid──► PAID          (PAID never moves again)
 """
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -39,7 +51,13 @@ from autora.db.models import Order, OrderState, Payment, Price, PriceState
 from autora.infra.ids import uuid7
 from autora.runtime.actor import Actor
 
+log = logging.getLogger(__name__)
+
 TRADE_NO_PREFIX = "AU"
+
+PENDING_FOR = timedelta(hours=24)
+"""How long an order waits for its payment before it is marked EXPIRED (P2-B). Marking it
+changes what it is called, not what it can do: a payment that arrives later still settles it."""
 
 
 class OrderError(Exception):
@@ -112,6 +130,9 @@ async def settle(
 ) -> Settled:
     """A payment the provider says happened: check it against its order, then grant the year.
 
+    The order is honoured whatever has happened since it was opened: its price retired, or the
+    order itself marked FAILED or EXPIRED. The money is the fact.
+
     Raises ``NotificationRefused`` when it does not match an order of ours, for the amount that
     was ordered. The caller answers the provider the same way either way — a handler that says
     *why* it refused is a handler that helps somebody find a way through.
@@ -138,6 +159,7 @@ async def settle(
         currency=order.currency,
         paid_at=paid_at or datetime.now(UTC),
         ledger=ledger,
+        ordered=True,
     )
     if order.state != OrderState.PAID.value:
         order.state = OrderState.PAID.value
@@ -153,3 +175,54 @@ async def abandon(session: AsyncSession, order: Order, *, state: OrderState) -> 
     order.state = state.value
     await session.flush()
     return order
+
+
+async def hear_unpaid(
+    session: AsyncSession, *, provider: str, mer_trade_no: str, waiting: bool
+) -> tuple[Order | None, bool]:
+    """A notification that is not a payment: still waiting (an ATM code was issued) or failed.
+
+    Returns ``(order, changed)``. A failure marks an order that was not paid FAILED; waiting
+    changes nothing. An order already PAID is left alone — a late or stray "failed" never undoes
+    money that arrived — and so is an order we never issued.
+    """
+    order = await by_trade_number(session, provider, mer_trade_no)
+    if order is None or waiting or order.state == OrderState.PAID.value:
+        return order, False
+    if order.state == OrderState.FAILED.value:
+        return order, False
+    await abandon(session, order, state=OrderState.FAILED)
+    return order, True
+
+
+async def expire_stale(
+    session: AsyncSession, *, now: datetime, after: timedelta = PENDING_FOR
+) -> list[Order]:
+    """Mark EXPIRED every order still PENDING ``after`` it was opened. Safe to repeat.
+
+    Rows another transaction is settling are skipped, not waited for: whatever it decides wins,
+    and the next run looks again.
+    """
+    stale = list(
+        await session.scalars(
+            select(Order)
+            .where(Order.state == OrderState.PENDING.value, Order.created_at <= now - after)
+            .order_by(Order.created_at)
+            .with_for_update(skip_locked=True)
+        )
+    )
+    for order in stale:
+        order.state = OrderState.EXPIRED.value
+    await session.flush()
+    return stale
+
+
+def maintenance_job():
+    """The worker's periodic job (``Worker.maintenance_jobs``): expire the orders nobody paid."""
+
+    async def expire(session: AsyncSession) -> None:
+        expired = await expire_stale(session, now=datetime.now(UTC))
+        if expired:
+            log.info("expired %d unpaid order(s)", len(expired))
+
+    return expire

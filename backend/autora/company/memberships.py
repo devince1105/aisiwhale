@@ -180,6 +180,7 @@ async def purchase(
     currency: str | None = None,
     paid_at: datetime | None = None,
     ledger: Ledger | None = None,
+    ordered: bool = False,
 ) -> tuple[Payment, bool]:
     """Money arrived for ``price``: record it, book it, and grant what it bought.
 
@@ -187,11 +188,15 @@ async def purchase(
     and ``False`` and writes nothing. ``amount`` is what the provider says was charged, the
     price's amount when omitted; checking that the two agree is the caller's job, because only
     the caller knows what the order said.
+
+    A retired price buys nothing new — unless ``ordered``: the money is for an order opened
+    while the price was on sale (``orders.open_order`` checks that), and an order is kept even
+    when the price is retired before the provider says it was paid (P2-B).
     """
     existing = await by_provider_ref(session, provider, external_ref)
     if existing is not None:
         return existing, False
-    if price.state != PriceState.ACTIVE.value:
+    if price.state != PriceState.ACTIVE.value and not ordered:
         raise MembershipError("this price is retired; nothing new can be bought at it")
     product = await session.get(Product, price.product_id)
     assert product is not None

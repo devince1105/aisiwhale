@@ -571,6 +571,7 @@ def build_worker(
     """
     from zoneinfo import ZoneInfo
 
+    from autora.company import orders
     from autora.company.cycle import maintenance_job as cycle_maintenance_job
     from autora.db.session import get_sessionmaker
     from autora.infra.blobstore import build_blob_store
@@ -658,5 +659,6 @@ def build_worker(
         maintenance_jobs=[
             ("advance_cycles", cycle_maintenance_job(runtime.cycles, companies)),
             ("forget_stale_memories", runner.memory.maintenance_job()),
+            ("expire_unpaid_orders", orders.maintenance_job()),
         ],
     )

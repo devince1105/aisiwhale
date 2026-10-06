@@ -3577,6 +3577,45 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - 方案頁：提示文字為「VIP 會員即將開放，以下是方案與價格。VIP 報導將於會員開放後提供。」；月繳 NT$30 正常顯示、按鈕為停用的「即將開放」；年繳 NT$300 半透明、按鈕為停用的「即將開放」；頁面沒有出現 NT$149。
 - PayUni、真實付款與 P3～P8 都沒有開啟。
 
+**P2-A 完成**：使用者於 2026-10-06 宣告 P2-A 完成。下一步定為 P2-B（收掉付款通知與訂單的已知問題），之後是 P8；D-232 是 P8 的硬性前提，必須在重新開放 PayUni 與結帳之前完成。
+
+## P2-B：付款通知的紀錄與修正、未付款訂單過期、VIP 授予後台、前端權限收尾
+
+**目標**：把藍圖 §13 列給 P2 的付款問題收掉，讓 admin 可以在後台授予與撤銷 VIP，前端不再自己判斷能不能購買。不改價格、不開結帳、不開 PayUni、不做 P3，D-232 留到 P8 第一階段。
+
+**開工前的唯讀盤點**（使用者看過結果才派工）：用臨時測試檔與獨立的資料庫 `autora_p2b_test` 重現兩個付款通知的 500（共用的 `autora_test` 在測試開始時會清空 schema，會打斷持股觀察的測試）：
+- 已付款的訂單收到失敗通知（TradeStatus=2）：`orders.abandon()` 拋 `OrderError`，回 500；資料沒壞，但 PayUni 會一直重送。
+- 下單後價格退役，再收到付款通知：`memberships.purchase()` 拋 `MembershipError`（notify 只攔 `NotificationRefused`），回 500；訂單仍 PENDING、0 筆付款、0 筆會籍——錢收了、什麼都沒給、也沒留下紀錄。
+- 未付款訂單沒有任何過期機制（`OrderState.EXPIRED` 有定義，沒有程式設定它）。
+
+**使用者的決定**：退役價格照既有訂單履約（退役只禁止新下單）；PENDING 超過 24 小時標為 EXPIRED；EXPIRED 之後收到合法付款仍要履約。
+
+**做了什麼**：
+- 遷移 0071（0070 是持股觀察 HD-08 的 `thirteenf_index`，兩個工作階段協調過編號）：新增 `payment_events`——posted 的原始表單（`payload`，加密的信封本身）、解開後的欄位（`fields`）、`mer_trade_no`、`external_ref`、`trade_status`、`amount`、`outcome`、`error`、`order_id`、`payment_id`、`processed_at`。`outcome` 有 received／settled／repeated／unpaid／ignored／refused／unreadable／error。有資料時降級會拒絕。
+- `company/payment_events.py`：`receive` 先存、`record` 以 id 更新（呼叫端 rollback 之後也能寫），超過 64 KiB 的內容只記大小。
+- `/api/payments/payuni/notify`：每則通知先存下並**單獨 commit**，再解開、處理；結果與處理本身在同一個交易裡寫入（紀錄不會說 settled 卻什麼都沒做）。解不開→400＋unreadable；對不上→400＋refused（原因只寫進紀錄，不回給呼叫端）；處理時拋出例外→rollback、記 error、回 500 讓 PayUni 重送。
+- `orders.py`：
+  - `settle()` 以 `purchase(..., ordered=True)` 呼叫，價格在下單後退役仍照訂單成立；直接呼叫 `purchase()` 對退役價格仍然拒絕。
+  - `hear_unpaid()`：等待中不變；失敗把未付款的訂單標 FAILED；**已 PAID 的訂單不動**（回 ignored），查無訂單也不動。
+  - `expire_stale()`：PENDING 超過 `PENDING_FOR`（24 小時）標 EXPIRED，`FOR UPDATE SKIP LOCKED`，可重複執行。worker 的 `maintenance_jobs` 加 `expire_unpaid_orders`。
+- 訂單狀態機（變更後）：PENDING→PAID／FAILED／EXPIRED；FAILED→PAID；EXPIRED→PAID；EXPIRED→FAILED（之後收到失敗通知）；PAID 不再改變。新增的是「時間到 → EXPIRED」與「PAID 收到失敗通知不變」；FAILED／EXPIRED 收到付款仍成立是原本就有的行為，這次加了 API 層的測試。
+- 後台 `/admin/memberships`（`features/memberships/CompsPage.tsx`）：授予（email、到期時間、理由）、列表（可只看有效中）、輸入理由後撤銷；Dashboard 加「VIP 授予」連結。後端 API 沒改。
+- 前端權限：
+  - 移除 `SITE_MEMBERSHIP_OPEN` 與 `membershipOpen()`：能不能買只看 API 的 `available`。`PlanPicker` 在 API 回答前所有按鈕停用（以前預設可按）；API 連不上一律當成「即將開放」。定價頁的「即將開放」橫幅改由伺服器端問 API（`SERVER_API_URL`），頁面改成 `force-dynamic`。
+  - 新增 `can(me, capability)`；頭像選單的觀察清單連結改看 `watchlist` 能力。
+  - VIP 日期改成 `member_until` 有值才顯示，拿掉非空斷言。
+- 文件：藍圖開頭加註 D-231（NT$149 暫緩、目錄維持 30／300）與 D-232（P8 第一階段、重開結帳前完成），§1 價格表、§13、§17、§18 的 P2 與 P8 列同步；`17_DEPLOYMENT.md` 標明 `SITE_MEMBERSHIP_OPEN` 不再使用。`DECISIONS.md` 不改（D-231 那列已寫明和 D-218 的關係）。
+
+**沒有做的**（留給 P8）：D-232 的權益區間；`purchase()` 在 comp 期間接續期間的問題（D-232 的根源）仍在，結帳關著所以不會觸發；付款紀錄的重放工具（資料已經存了，工具等 P8 需要時再做）；通知解開後的欄位會原樣存在 `fields`（PayUni 的通知可能含卡號前後幾碼等付款資訊，尚未用真實通知確認），隱私權政策是否要提，等 P8 開放付款前一起看。
+
+**驗證**（測試一律跑在獨立的 `autora_p2b_test`，不碰共用的 `autora_test`）：
+- 新測試：`test_orders.py` 8 項（退役價格照單成立、已付款收到失敗不變、等待／失敗、查無訂單、24 小時過期與年輕訂單、過期不碰 PAID／FAILED、過期後仍可履約）；`test_payments_api.py` 7 項（每則通知都存且結果正確、兩個舊 500 改回 `1|OK`、未付款前失敗標 FAILED、EXPIRED 後付款、解不開與對不上也有紀錄、處理失敗記 error 並回 500）；前端 `comps.test.tsx` 5 項、`checkout.test.tsx` 新增 2 項（API 回答前不可按、連不上當即將開放）、`site.test.tsx` 新增 1 項（沒有 watchlist 能力就不顯示連結）。
+- `pytest backend` 全部：2,309 項通過、11 項未選。第一、二次全套跑到一半，本機 Postgres（`autora-db-1`）的子程序兩度當掉重啟（docker 紀錄「untracked child process … exited with exit code 2」，持股觀察工作階段也看到），所有連線中斷；第三次完整跑完全過。
+- 遷移 0071：升級、降級、再升級正常；有資料時降級被拒絕；`alembic check` 無差異。
+- vitest 73 個檔案 889 項：887 項通過（全套同時跑 pytest 時，未修改的 `timeline.test.tsx` 有 2 項逾時，單獨重跑 8 項全過）；`make lint`（ruff、格式、`lint-imports` 3 條、eslint、tsc）、`make gen-api-check`（notify 的說明文字改了，重新產生 `openapi.json` 與 `schema.gen.ts`）、`pnpm build`（`/admin/memberships` 靜態、`/news/[lang]/pricing` 改為動態）、`git diff --check` 都通過。
+- 預覽（本機 Next，伺服器端連正式 API，唯讀）：定價頁顯示「即將開放」橫幅、月繳 NT$30 與年繳 NT$300 的按鈕都停用、沒有 NT$149。後台 `/admin/memberships` 沒有在瀏覽器實際登入操作（需要本機 admin 帳號與套用 0071 的開發資料庫），以元件測試涵蓋。
+
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

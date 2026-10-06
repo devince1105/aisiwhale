@@ -12,16 +12,7 @@ import { filterName, formatDate, isLang, isSection, LANG_NAMES, revisedOn, tagsO
 import { MembersOnly } from "./MembersOnly";
 import { ListenButton, PrintButton, TOOL_BUTTON } from "./ReadingTools";
 
-/** ``membersOpen``: membership can be bought (D-161); the page passes ``membershipOpen()``. */
-export function ArticleView({
-  article,
-  lang,
-  membersOpen = true,
-}: {
-  article: PublicArticle;
-  lang: Lang;
-  membersOpen?: boolean;
-}) {
+export function ArticleView({ article, lang }: { article: PublicArticle; lang: Lang }) {
   const w = words(lang);
   const others = Object.entries(article.langs).filter(([other]) => other !== lang && isLang(other));
   const section = isSection(article.section) ? article.section : null;
@@ -124,7 +115,6 @@ export function ArticleView({
           path={article.path}
           company={article.company_slug}
           lock={article.lock ?? "members"}
-          open={membersOpen}
         />
       ) : null}
 

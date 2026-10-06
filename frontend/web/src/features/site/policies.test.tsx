@@ -9,7 +9,6 @@ import { POST } from "@/app/(site)/news/[lang]/membership/return/route";
 import { LANGS } from "./i18n";
 import { LEGAL_PAGES, legalDoc } from "./legal";
 import { LegalView } from "./LegalView";
-import { membershipOpen } from "./membership";
 import { operator } from "./operator";
 import { PaymentDone } from "./PaymentDone";
 import { yearlySaving } from "./PlanPicker";
@@ -58,12 +57,6 @@ describe("who runs the site", () => {
     expect(screen.getByTestId("site-footer").lastElementChild).toBe(strip);
     expect(strip.className).toContain("bg-alert");
     expect(strip.getAttribute("role")).toBe("note");
-  });
-
-  it("is free until somebody says otherwise", () => {
-    expect(membershipOpen({})).toBe(false);
-    expect(membershipOpen({ SITE_MEMBERSHIP_OPEN: "false" })).toBe(false);
-    expect(membershipOpen({ SITE_MEMBERSHIP_OPEN: " TRUE " })).toBe(true);
   });
 
   it("in English too, the footer says Contact us; the operator's details stay with the policies (D-165)", () => {

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { SITE_COMPANY } from "@/config";
 
-import { fetchMe, isMember, signOut, type Me } from "./auth";
+import { can, fetchMe, isMember, signOut, type Me } from "./auth";
 import { useDismiss } from "./dismiss";
 import { formatDate, words, type Lang } from "./i18n";
 
@@ -95,15 +95,17 @@ function ReaderMenu({ lang, me, onSignOut }: { lang: Lang; me: Me; onSignOut: ()
           <p className="truncate px-4 pb-2 text-muted" title={me.email}>
             {me.email}
           </p>
-          {isMember(me) ? (
+          {isMember(me) && me.member_until ? (
             <p className="px-4 pb-2 text-xs">
-              {w.member}・{w.memberUntil} {formatDate(lang, me.member_until!)}
+              {w.member}・{w.memberUntil} {formatDate(lang, me.member_until)}
             </p>
           ) : null}
           <div className="border-t border-line pt-1">
-            <a href={`/news/${lang}/watchlist`} className="block px-4 py-1.5 hover:bg-canvas hover:text-accent">
-              {w.watch.title}
-            </a>
+            {can(me, "watchlist") ? (
+              <a href={`/news/${lang}/watchlist`} className="block px-4 py-1.5 hover:bg-canvas hover:text-accent">
+                {w.watch.title}
+              </a>
+            ) : null}
             <button
               type="button"
               onClick={() => {

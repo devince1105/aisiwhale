@@ -13057,7 +13057,7 @@
   },
   "/api/payments/payuni/notify": {
    "post": {
-    "description": "PAYUNi, server to server: this order was paid. The only thing that grants a year.\n\nAnswers ``1|OK`` once it has been dealt with, and 400 when it has not, because PAYUNi keeps\nsending a notification nobody acknowledged — which is what we want when the database was\nbriefly unreachable, and harmless when the message was never PAYUNi's to begin with.",
+    "description": "PAYUNi, server to server: this order was paid. The only thing that grants a year.\n\nEvery notification is written down first (``payment_events``, committed on its own), then\nopened and dealt with, and the record says how that went (P2-B).\n\nAnswers ``1|OK`` once it has been dealt with — including a notification that is heard but\nchanges nothing: a repeat, an ATM code, a \"failed\" for an order already paid. Answers 400\nwhen it is not PAYUNi's or does not add up, and 500 when dealing with it failed, because\nPAYUNi keeps sending a notification nobody acknowledged — which is what we want when the\ndatabase was briefly unreachable, and harmless when the message was never PAYUNi's.",
     "operationId": "payuni_notify_api_payments_payuni_notify_post",
     "responses": {
      "200": {

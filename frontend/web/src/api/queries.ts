@@ -36,6 +36,8 @@ export const queryKeys = {
   finance: (companyId: string) => ["finance", companyId] as const,
   /** Projects, with who paused them and why (D-056). */
   projects: (companyId: string) => ["projects", companyId] as const,
+  /** VIP given by an admin for internal testing (D-228): by company slug, all or running only. */
+  comps: (companySlug: string, running: boolean) => ["memberships", "comps", companySlug, running] as const,
   /** The office's team group (D-109). */
   team: (companyId: string) => ["team", companyId] as const,
 };
@@ -547,6 +549,37 @@ export async function decideProject(
   return unwrap(
     await api.POST(paths[action], {
       params: { path: { company_id: companyId, project_id: projectId } },
+      body: { reason },
+    }),
+  );
+}
+
+export type Comp = Schemas["Comp"];
+export type GrantCompInput = Schemas["GrantComp"];
+
+/** VIP given by an admin (D-228, P2): newest first; ``running`` keeps only those giving access now. */
+export function compsQuery(companySlug: string, running = false, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.comps(companySlug, running),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/admin/memberships/comps", {
+          params: { query: { company: companySlug, running } },
+        }),
+      ),
+  });
+}
+
+/** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
+export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
+  return unwrap(await api.POST("/api/admin/memberships/comps", { body }));
+}
+
+/** End a comp now. The row keeps who, when and why; access falls back to whatever else runs. */
+export async function revokeComp(grantId: string, reason: string, api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.POST("/api/admin/memberships/comps/{grant_id}/revoke", {
+      params: { path: { grant_id: grantId } },
       body: { reason },
     }),
   );

@@ -29,6 +29,13 @@ function respond(body: unknown, status = 200) {
 /** The paywall shows its button first; the plans are a click away (D-159). */
 const openPlans = () => fireEvent.click(screen.getByRole("button", { name: "我要成為 VIP 會員看全文" }));
 
+/** A plan's button once the API has said it is on sale: until then none can be pressed (P2-B). */
+async function pressable(name: string): Promise<HTMLButtonElement> {
+  const button = (await screen.findByRole("button", { name })) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  return button;
+}
+
 afterEach(() => {
   cleanup();
   document.body.innerHTML = ""; // the forms are appended to the body, not rendered by React
@@ -194,15 +201,15 @@ describe("the paywall", () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
     openPlans();
-    fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
+    fireEvent.click(await pressable("選擇年繳"));
     await waitFor(() => expect(document.querySelector("form")?.action).toBe(PAGE.url));
   });
 
   it("says so when the site has no store yet, instead of a dead end", async () => {
-    mockCalls({ ...OFFER, available: false }, () => respond({}, 503));
+    mockCalls(OFFER, () => respond({}, 503));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
     openPlans();
-    fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
+    fireEvent.click(await pressable("選擇年繳"));
     expect((await screen.findByRole("status")).textContent).toContain("即將開放");
   });
 
@@ -210,7 +217,7 @@ describe("the paywall", () => {
     mockCalls(OFFER, () => respond({}, 500));
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
     openPlans();
-    fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
+    fireEvent.click(await pressable("選擇年繳"));
     expect((await screen.findByRole("status")).textContent).toContain("請稍後再試");
   });
 
@@ -220,7 +227,7 @@ describe("the paywall", () => {
     Object.defineProperty(window, "location", { value: { assign }, writable: true });
     render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" />);
     openPlans();
-    fireEvent.click(screen.getByRole("button", { name: "選擇年繳" }));
+    fireEvent.click(await pressable("選擇年繳"));
     await waitFor(() =>
       expect(assign).toHaveBeenCalledWith(
         "/news/zh-TW/login?next=%2Fnews%2Fzh-TW%2Farticles%2Fx",
@@ -232,7 +239,7 @@ describe("the paywall", () => {
     mockCalls(OFFER, () => respond(PAGE, 201));
     render(<MembersOnly lang="en" path="/news/en/articles/x" company="lumen" />);
     fireEvent.click(screen.getByRole("button", { name: "Become a VIP member to read on" }));
-    fireEvent.click(screen.getByRole("button", { name: "Choose yearly" }));
+    fireEvent.click(await pressable("Choose yearly"));
     await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
     const sent = Array.from(document.querySelectorAll("form input")).map((i) => i.getAttribute("name"));
     expect(sent).toEqual(["MerID", "Version", "EncryptInfo", "HashInfo"]);
@@ -253,9 +260,9 @@ describe("持股觀察 (D-159)", () => {
 
 describe("before membership opens (D-161)", () => {
   it("shows what will be sold and at what price, and 即將開放 where the button would be", async () => {
-    const fetchMock = vi.fn<(url: RequestInfo | URL) => Promise<Response>>(async () => new Response(JSON.stringify({ amount: "30.000000", currency: "TWD", interval: "month", available: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetchMock = vi.fn<(url: RequestInfo | URL) => Promise<Response>>(async () => new Response(JSON.stringify({ amount: "30.000000", currency: "TWD", interval: "month", available: false }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
-    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" open={false} />);
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
     openPlans();
     await waitFor(() => expect(screen.getByTestId("members-only").textContent).toContain("NT$30"));
     const buttons = screen.getAllByRole("button", { name: "即將開放" }) as HTMLButtonElement[];
@@ -277,8 +284,8 @@ describe("while checkout is closed (P2, D-231)", () => {
       );
     });
     vi.stubGlobal("fetch", fetchMock);
-    // even with the page's flag on: the API decides what is for sale
-    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" open />);
+    // the API decides what is for sale: the page has no switch of its own (P2-B)
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
     openPlans();
     await waitFor(() => expect(screen.getByTestId("plan-year").getAttribute("data-reserved")).toBe("true"));
 
@@ -354,5 +361,31 @@ describe("聯絡我們 (D-165)", () => {
     expect(await sendContact(body, busy)).toBe("busy");
     const down = vi.fn(async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
     expect(await sendContact(body, down)).toBe("failed");
+  });
+});
+
+describe("until the API has said what is for sale (P2-B)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("no plan can be pressed, and nothing is ordered", async () => {
+    const fetchMock = vi.fn<(url: RequestInfo | URL) => Promise<Response>>(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
+    const buttons = within(screen.getByTestId("members-only")).getAllByRole("button") as HTMLButtonElement[];
+    const plans = buttons.filter((b) => b.textContent?.startsWith("選擇"));
+    expect(plans).toHaveLength(2);
+    expect(plans.every((b) => b.disabled)).toBe(true);
+    for (const plan of plans) fireEvent.click(plan);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/checkout"))).toBe(false);
+  });
+
+  it("an API that cannot be reached reads as not yet", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" />);
+    openPlans();
+    expect((await screen.findByRole("status")).textContent).toContain("即將開放");
+    const plans = screen.getAllByRole("button", { name: "即將開放" }) as HTMLButtonElement[];
+    expect(plans.every((b) => b.disabled)).toBe(true);
   });
 });

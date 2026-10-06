@@ -5,6 +5,10 @@
 
 來源：v1.0（現況盤點＋完整藍圖）→ v1.1（五項前提）→ 使用者拍板十項 → v1.2（本文件）→ 補充決定 A、C。
 
+> **之後的決定（以這兩條為準，本文其餘段落保留 v1.2 原文）**
+> - **D-231（價格）**：D-218 的「VIP NT$149／月」**暫緩**。正式目錄維持 D-161：月繳 NT$30、年繳 NT$300（即將開放），因為 PayUni 申請與審核的就是這兩個價格。本文所有寫 NT$149 的地方（§1、§3、§17、§18 的 P2 與 P8、§19 R-15、§21），在 D-231 之下都讀作「目錄價格，目前是 NT$30／NT$300」。日後若真的改成 NT$149：先完成 PayUni 申請變更與審核，再以一筆新的決策改目錄，最後由 P8 開放付款。D-161、D-218 本身都不修改。
+> - **D-232（P8 前置條件）**：comp 在 T 被撤銷時，期間內買的付費權益從 T 開始、給完整的購買期間；撤銷 comp 不得縮短付費權益，也不得把 comp 剩下的期間算進付費期間。Payment／Order 保持不可變；有效 VIP 改由各筆 grant（paid、comp）的區間計算。**這是 P8 第一階段的工作，必須在重新開放 PayUni 與結帳之前完成**（見 §18 的 P8）。
+
 ---
 
 ## 1. 已拍板的上層約束
@@ -37,6 +41,7 @@
 | P2 | 在**後端**關閉現有 NT$30 結帳路徑（`membership_open` 閘門） |
 | P8 | 才重新開放 NT$149 實際收款 |
 | P8 之前 | 以 Admin 授予（`source = admin_comp`，D-228）取得 VIP |
+| **D-231（之後）** | NT$149 暫緩；目錄維持 D-161 的月繳 NT$30、年繳 NT$300。上面寫 NT$149 的兩列，目前讀作「目錄價格」 |
 
 ---
 
@@ -360,6 +365,8 @@ QUOTED → CONFIRMED(hold) → QUEUED → RUNNING → DELIVERED(capture)
 3. 後端 `/api/checkout` 不檢查 `membership_open`，只要 PayUni 金鑰在就能以 NT$30 下單。
 4. PENDING 訂單永遠不會變 EXPIRED。
 
+> **處理狀態**：第 3 項在 P2-A 完成（結帳一律 403）；第 1、2、4 項與 `payment_events` 在 P2-B 完成——退役價格照既有訂單履約（退役只禁止新下單）、已付款訂單收到失敗通知時確認收到但不變更、PENDING 超過 24 小時由 worker 標為 EXPIRED，EXPIRED 之後收到合法付款仍正常履約。見 `logs/devlog/07_PHASE_7.md` 的 P2-B 一節。
+
 ---
 
 ## 14. 資料流
@@ -419,7 +426,7 @@ Buy Me a Coffee ──► 外部平台 ──► 經營者（系統帳外）
 | MVP 內 | MVP 外 |
 |---|---|
 | Google 登入與身分綁定 | Email＋密碼登入 |
-| Entitlement 服務、後端擋結帳 | 開放 VIP NT$149 實際收款（P8） |
+| Entitlement 服務、後端擋結帳 | 開放 VIP 實際收款（P8；價格依 D-231，目前是 NT$30／NT$300） |
 | Admin 授予 VIP（admin_comp） | 定期定額 |
 | Coin Core：grant／spend／refund／adjustment／cap／對帳 | 購幣、Coin Store、轉讓、提領 |
 | COIN 文章 | 使用者發布、Creator Economy |
@@ -436,14 +443,14 @@ Buy Me a Coffee ──► 外部平台 ──► 經營者（系統帳外）
 |---|---|---|---|---|---|---|---|
 | **P0 文件化** | — | 本文件與 D-218～D-229；律師提問清單（§21） | — | — | — | 列出 diff | 編號衝突 |
 | **P1 Authentication** | P0 | Google OAuth、身分綁定、magic link 與登入頻率限制 | `reader_identities`（回填既有 email_link） | OAuth start／callback、綁定規則、`ReaderSignedIn` | Google 按鈕、帳號頁顯示登入方式 | 綁定矩陣（先 Google／先 email／未驗證／換 email）、不產生重複使用者、CSRF | 重複使用者、帳號被接管 |
-| **P2 Membership & Entitlement** | P1 | `can()`、`/api/me` capabilities、後端 `membership_open` 閘門、Admin 授予 VIP、`payment_events`、修 §13 四個問題、VIP 文案 NT$149（不改 PayUni） | memberships 加 source／reason／actor；`payment_events` | Entitlement 服務、授予 API、notify 修正 | 移除前端權限判斷、授予 VIP 後台 | 授予與到期、降級、notify 重放與並發、退役價格 | 動到正式付款路徑（只關閉與修正） |
+| **P2 Membership & Entitlement** | P1 | `can()`、`/api/me` capabilities、後端 `membership_open` 閘門、Admin 授予 VIP、`payment_events`、修 §13 四個問題、~~VIP 文案 NT$149~~（D-231：價格不改，維持 NT$30／NT$300） | memberships 加 source／reason／actor；`payment_events` | Entitlement 服務、授予 API、notify 修正 | 移除前端權限判斷、授予 VIP 後台 | 授予與到期、降級、notify 重放與並發、退役價格 | 動到正式付款路徑（只關閉與修正） |
 | **P3 Whale Coin Core** | P2 | 帳戶、txn／entries、錢包快取、Grant＋Eligibility、上限、退款、調整、每日對帳 | `coin_accounts`／`coin_txns`／`coin_entries`／`coin_wallets`；只增不改 trigger | Wallet 服務（只有內部 API）、延遲發放 hook、後台調整 | 餘額與明細頁、後台調整頁 | **100 個並發消費、重複發放、上限邊界（849／850／1000）、退款超上限、降級保留、對帳等式** | 並發、錯誤鑄幣路徑 |
 | **P4 Paid Content** | P3 | COIN 文章 | articles 加 `coin`、`coin_price`；`article_unlocks` | 解鎖交易、`lock_for` 擴充、admin 定價 | 解鎖按鈕、已解鎖標示 | 重複解鎖不扣款、餘額不足、改價 | 重複扣款 |
 | **P5 AI Office** | P2（與 P3、P4 可並行） | 去敏 projection＋讀者頻道、`offices`、委託席部門與預算、工具成本計量、job_id、CostGuard 補 per_day | `offices`；budgets；`model_calls.job_id`；工具成本欄位 | projection、gateway 頻道、CostGuard | 依 tier 分層的 Office 頁 | 去敏（不得出現成本與 prompt）、成本計量 | 資料外洩、Neon 運算 |
 | **P6a Research Infra** | P3、P5 | 請求、報價、預扣、job、交付、退款、分類器（R5 拒絕）、`allowed_types = []`、internal_only | `research_requests`、`jobs` | 第二 LLM 啟動來源、`research_commission_v1`、SLA 逾時、outbox 交接 | 只有後台與內測介面 | 失敗、逾時、政策拒絕全額退；成本對報價；一般 VIP 被擋 | 成本超支、誤對外開放 |
 | **P6b Public Research** | P6a＋**律師結論** | 依結論設定 `allowed_types`、文案、輸出格式 | — | 設定值 | 讀者研究介面 | 每個開放類型的政策測試 | **LEGAL REVIEW REQUIRED** |
 | **P7 Employee／Gacha** | P3＋原創素材 | 模板、卡池、抽卡、收藏、Office 擺放（只展示） | `employee_templates`（含 IP metadata）、`gacha_pools`／`gacha_draws`、`user_employees`、`office_assignments` | 抽卡交易、保底、機率版本、只抽 ACTIVE＋可商用模板 | 抽卡、公開機率、圖鑑 | 機率統計、保底、並發、重複 | 機率型商品規範（需法律確認）、IP |
-| **P8 Payment（VIP 收款）** | P2＋法律與稅務確認 | PayUni 改 NT$149 商品、打開 `membership_open`；定期定額另決；Buy Me a Coffee 外部連結 | prices 新增一筆；（如需要）`subscriptions` | 修正後的 notify 流程 | 定價頁開放購買 | 正式環境小額實測 | 消保、稅務、個人帳戶額度 |
+| **P8 Payment（VIP 收款）** | P2＋法律與稅務確認＋**D-232** | **第一階段：D-232 的權益區間（paid grant 與 comp grant 各自計算，Payment／Order 不可變），完成前不得重開結帳**；之後打開 `membership_open`（價格依 D-231，改價須先改 PayUni 申請）；定期定額另決；Buy Me a Coffee 外部連結 | prices 新增一筆；（如需要）`subscriptions` | 修正後的 notify 流程 | 定價頁開放購買 | 正式環境小額實測 | 消保、稅務、個人帳戶額度 |
 | **T-IP（獨立小任務）** | 無 | 公開 Demo 換掉或下架 placeholder 角色 | — | — | `public/` 素材、Demo 腳本 | 視覺檢查 | 已在公開站展示 |
 
 **不能放在同一個 Phase**：

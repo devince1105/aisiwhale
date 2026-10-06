@@ -1216,9 +1216,14 @@ export interface paths {
          * Payuni Notify
          * @description PAYUNi, server to server: this order was paid. The only thing that grants a year.
          *
-         *     Answers ``1|OK`` once it has been dealt with, and 400 when it has not, because PAYUNi keeps
-         *     sending a notification nobody acknowledged — which is what we want when the database was
-         *     briefly unreachable, and harmless when the message was never PAYUNi's to begin with.
+         *     Every notification is written down first (``payment_events``, committed on its own), then
+         *     opened and dealt with, and the record says how that went (P2-B).
+         *
+         *     Answers ``1|OK`` once it has been dealt with — including a notification that is heard but
+         *     changes nothing: a repeat, an ATM code, a "failed" for an order already paid. Answers 400
+         *     when it is not PAYUNi's or does not add up, and 500 when dealing with it failed, because
+         *     PAYUNi keeps sending a notification nobody acknowledged — which is what we want when the
+         *     database was briefly unreachable, and harmless when the message was never PAYUNi's.
          */
         post: operations["payuni_notify_api_payments_payuni_notify_post"];
         delete?: never;

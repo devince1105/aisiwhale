@@ -94,7 +94,7 @@
 | `API_INTERNAL_URL` | `https://api.aisiwhale.com` | 伺服器端用 |
 | `NEXT_PUBLIC_SITE_COMPANY`、`SITE_COMPANY` | `aisiwhale` | 公司代號（原 `autora-finance`，D-154） |
 | `SITE_OPERATOR`、`SITE_OPERATOR_OWNER`、`SITE_CONTACT_EMAIL`、`SITE_CONTACT_PHONE` | 經營者資訊 | 個人資料只放 Vercel，不進 repo |
-| `SITE_MEMBERSHIP_OPEN` | | |
+| ~~`SITE_MEMBERSHIP_OPEN`~~ | 不再使用（P2-B） | 能否購買只看 API 的 `available`（後端 `CHECKOUT_OPEN`）；Vercel 上留著也沒有作用，可以刪 |
 
 ## 6. 資料搬家
 

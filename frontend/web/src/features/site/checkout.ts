@@ -37,12 +37,17 @@ export class CheckoutError extends Error {
 
 /** What a month or a year costs here, or null when the catalogue has no price for it. A price
  * that cannot be bought yet still comes back, with ``available: false`` (P2: checkout is closed
- * by the API until P8, D-231), so the page can show it without offering to sell it. */
-export async function fetchOffer(company?: string, interval: Interval = "year"): Promise<Offer | null> {
+ * by the API until P8, D-231), so the page can show it without offering to sell it. ``base`` is
+ * the server's own way to the API when a page asks while rendering (``SERVER_API_URL``). */
+export async function fetchOffer(
+  company?: string,
+  interval: Interval = "year",
+  base: string = API_URL,
+): Promise<Offer | null> {
   const query = new URLSearchParams({ interval });
   if (company) query.set("company", company);
   try {
-    const response = await fetch(`${API_URL}/api/checkout/offer?${query}`, {
+    const response = await fetch(`${base}/api/checkout/offer?${query}`, {
       credentials: "include",
     });
     if (!response.ok) return null;

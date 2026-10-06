@@ -165,12 +165,22 @@ describe("the article page", () => {
   });
 
   it("the become-a-member button asks this article's company for a checkout (T-702)", async () => {
+    // the API, as P8 will open it: the year on sale (the page has no switch of its own, P2-B)
+    vi.mocked(globalThis.fetch).mockImplementation((input) =>
+      Promise.resolve(
+        String(input).includes("/api/checkout/offer")
+          ? new Response(JSON.stringify({ amount: "300", currency: "TWD", interval: "year", available: true }), { status: 200 })
+          : new Response(null, { status: 204 }),
+      ),
+    );
     render(<ArticleView article={MEMBERS_ONLY} lang="zh-TW" />);
     const notice = screen.getByTestId("members-only");
     expect(within(notice).queryByRole("status")).toBeNull();
 
     fireEvent.click(within(notice).getByRole("button", { name: "我要成為 VIP 會員看全文" }));
-    fireEvent.click(within(notice).getByRole("button", { name: "選擇年繳" }));
+    const year = within(notice).getByRole("button", { name: "選擇年繳" }) as HTMLButtonElement;
+    await vi.waitFor(() => expect(year.disabled).toBe(false)); // once the API says it is on sale
+    fireEvent.click(year);
 
     const started = await vi.waitFor(() =>
       vi.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).endsWith("/api/checkout")),
@@ -203,7 +213,7 @@ describe("the header's member badge", () => {
   });
 
   it("signed in: an avatar with the address's first letter, which opens who they are (D-087)", async () => {
-    answer({ reader_id: "r", email: "reader@example.com", member_until: null, tier: "free", capabilities: [] });
+    answer({ reader_id: "r", email: "reader@example.com", member_until: null, tier: "free", capabilities: ["read_sign_in_sections", "watchlist"] });
     render(<MemberBadge lang="zh-TW" />);
     const avatar = await screen.findByRole("button", { name: "帳號：reader@example.com" });
     expect(avatar.textContent).toBe("R");
@@ -215,6 +225,14 @@ describe("the header's member badge", () => {
     expect(screen.getByRole("button", { name: "登出" })).toBeTruthy();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("button", { name: "登出" })).toBeNull();
+  });
+
+  it("the watchlist is offered only when the server says this reader may keep one (P2-B)", async () => {
+    answer({ reader_id: "r", email: "reader@example.com", member_until: null, tier: "free", capabilities: [] });
+    render(<MemberBadge lang="zh-TW" />);
+    fireEvent.click(await screen.findByRole("button", { name: "帳號：reader@example.com" }));
+    expect(screen.queryByRole("link", { name: "我的觀察清單" })).toBeNull();
+    expect(screen.getByRole("button", { name: "登出" })).toBeTruthy();
   });
 
   it("asks again when the tab comes back: the link may have signed the reader in elsewhere", async () => {

@@ -86,6 +86,11 @@ export async function signOut(): Promise<void> {
   await call("/api/auth/logout", { method: "POST" });
 }
 
+/** Whether the server said this reader may do ``capability`` (P2). Never worked out here. */
+export function can(me: Me | null, capability: string): boolean {
+  return me?.capabilities.includes(capability) ?? false;
+}
+
 /** VIP, as the server decided it (P2): a running membership, bought or given by an admin. */
 export function isMember(me: Me | null): boolean {
   return me?.tier === "vip";

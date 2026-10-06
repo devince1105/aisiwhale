@@ -392,3 +392,57 @@ class Order(IdMixin, TimestampMixin, Base):
     state: Mapped[str] = mapped_column(server_default=OrderState.PENDING.value)
     payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"))
     """The payment that settled it. Set with PAID, in the same transaction."""
+
+
+class PaymentEventOutcome(StrEnum):
+    RECEIVED = "received"
+    """Written down, not dealt with yet — or dealing with it stopped before saying how."""
+    SETTLED = "settled"
+    """A payment, and the membership it bought."""
+    REPEATED = "repeated"
+    """A payment already settled, heard again. Nothing new was written."""
+    UNPAID = "unpaid"
+    """Not a payment: waiting (an ATM code) or failed. An order not yet paid may be marked."""
+    IGNORED = "ignored"
+    """Not a payment, for an order already paid. The order is left as it is."""
+    REFUSED = "refused"
+    """Sealed, but it does not add up: no such order, or not the amount ordered."""
+    UNREADABLE = "unreadable"
+    """Not sealed by the provider, or not a form at all."""
+    ERROR = "error"
+    """Dealing with it failed. The provider is not acknowledged, so it will send it again."""
+
+
+class PaymentEvent(IdMixin, CreatedAtMixin, Base):
+    """Every notification a payment provider posted, kept before anything is done with it (P2).
+
+    Written first, in its own transaction, so a notification that cannot be dealt with is still
+    on record — what was posted, what it said once opened, and what became of it. Append-only in
+    spirit: only ``outcome``, ``error``, ``processed_at`` and the links are filled in afterwards.
+    A provider sending the same notification twice makes two rows; the payment it describes is
+    still one (``payments`` is idempotent by the provider's reference).
+    """
+
+    __tablename__ = "payment_events"
+    __table_args__ = (
+        check_in("outcome", PaymentEventOutcome),
+        check_regex("provider", "^[a-z][a-z0-9_]*$"),
+        Index("ix_payment_events_provider_mer_trade_no", "provider", "mer_trade_no"),
+    )
+
+    provider: Mapped[str]
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """The form as it was posted — the sealed envelope, not its contents."""
+    fields: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    """What the envelope said once opened. None when it could not be opened."""
+    mer_trade_no: Mapped[str | None]
+    external_ref: Mapped[str | None]
+    trade_status: Mapped[str | None]
+    amount: Mapped[Decimal | None]
+    outcome: Mapped[str] = mapped_column(server_default=PaymentEventOutcome.RECEIVED.value)
+    error: Mapped[str | None]
+    """Why dealing with it failed or was refused, for whoever reads the record. Never sent back
+    to the caller."""
+    order_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("orders.id"), index=True)
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"))
+    processed_at: Mapped[datetime | None]

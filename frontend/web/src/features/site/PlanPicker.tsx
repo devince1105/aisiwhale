@@ -3,8 +3,9 @@
 // Used by the paywall under a locked story and by the pricing page. Each plan's price is what
 // the API charges; the fallback numbers only fill the moment before it answers. A plan the API
 // says is not for sale yet is kept, faded, at its intended price, with 即將開放 for its button
-// (D-161): the yearly plan, until it opens. Before membership opens at all, every button says
-// 即將開放.
+// (D-161): the yearly plan, until it opens. Whether anything can be bought is the API's to say
+// (``available``, P2-B): the page has no switch of its own, and until the API has answered no
+// button is pressable.
 "use client";
 
 import Link from "next/link";
@@ -30,18 +31,8 @@ export function yearlySaving(month: number, year: number): number | null {
   return Math.round(((twelve - year) / twelve) * 100);
 }
 
-/** ``open`` false (D-161): the plans and their prices, and 即將開放 where the button would be. */
-export function PlanPicker({
-  lang,
-  loginHref,
-  company,
-  open = true,
-}: {
-  lang: Lang;
-  loginHref: string;
-  company?: string;
-  open?: boolean;
-}) {
+/** The plans and their prices; 即將開放 where the API says a plan is not for sale (D-161). */
+export function PlanPicker({ lang, loginHref, company }: { lang: Lang; loginHref: string; company?: string }) {
   const w = words(lang);
   const [offers, setOffers] = useState<Offers | null>(null);
   const [state, setState] = useState<State>("idle");
@@ -76,11 +67,12 @@ export function PlanPicker({
   // every plan is shown (D-161): one with no price in the catalogue yet (the year) is kept, faded,
   // at its intended price and with 即將開放; one priced but not on sale (every plan in P2: the API
   // closes checkout until P8, D-231) shows its price and 即將開放; before the API has answered,
-  // each is taken to be on sale
+  // none can be pressed — on sale is what the API says, never what the page assumes
   const shown = INTERVALS;
+  const loading = offers === null;
   const reserved = (interval: Interval) => offers !== null && offers[interval] === null;
-  const onSale = (interval: Interval) =>
-    open && !reserved(interval) && offers?.[interval]?.available !== false;
+  const onSale = (interval: Interval) => offers?.[interval]?.available === true;
+  const closed = !loading && !shown.some(onSale);
   const price = (interval: Interval) => {
     const offer = offers?.[interval];
     return offer ? formatOffer(offer, lang) : fallback(lang, interval);
@@ -88,7 +80,7 @@ export function PlanPicker({
   const amount = (interval: Interval) => Number(offers?.[interval]?.amount ?? MEMBERSHIP_PRICES_TWD[interval]);
   const saving = shown.length === 2 ? yearlySaving(amount("month"), amount("year")) : null;
   const note =
-    !open || state === "unavailable" ? w.membersSoon : state === "failed" ? w.membersFailed : null;
+    closed || state === "unavailable" ? w.membersSoon : state === "failed" ? w.membersFailed : null;
 
   return (
     <div>
@@ -117,7 +109,9 @@ export function PlanPicker({
               aria-describedby={note ? "plan-note" : undefined}
               className="mt-4 rounded-lg bg-accent px-4 py-2 font-medium text-canvas disabled:opacity-60"
             >
-              {!onSale(interval)
+              {loading
+                ? w.planChoose[interval]
+                : !onSale(interval)
                 ? w.planSoon
                 : state === "starting" && chosen === interval
                   ? w.membersStarting

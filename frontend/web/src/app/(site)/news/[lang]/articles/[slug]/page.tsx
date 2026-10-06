@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { fetchArticle } from "@/features/site/api";
-import { membershipOpen } from "@/features/site/membership";
 import { ArticleView } from "@/features/site/ArticleView";
 import { coverSrc } from "@/features/site/Cover";
 import { isLang, LANGS, words } from "@/features/site/i18n";
@@ -70,7 +69,7 @@ export default async function Page({ params }: { params: Params }) {
     // the same box as the front page's (D-146): the article starts where the list does
     <div className="mx-auto max-w-6xl px-4 lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-x-10">
       <div className="min-w-0">
-        <ArticleView article={article} lang={lang} membersOpen={membershipOpen()} />
+        <ArticleView article={article} lang={lang} />
       </div>
       <Sidebar lang={lang} {...sidebar} />
     </div>

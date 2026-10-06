@@ -28,7 +28,7 @@ export function PaymentDone({ lang, email, every = EVERY_MS }: { lang: Lang; ema
     async function ask(tries: number) {
       const me = await fetchMe(SITE_COMPANY).catch(() => null);
       if (!live) return;
-      if (me && isMember(me)) return setState({ status: "member", until: me.member_until! });
+      if (me && isMember(me) && me.member_until) return setState({ status: "member", until: me.member_until });
       if (!me && tries === TRIES) return setState({ status: "signed-out" });
       if (tries <= 1) return setState({ status: "waiting" });
       timer = setTimeout(() => void ask(tries - 1), every);

@@ -21,7 +21,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from autora.company import memberships
+from autora.company import memberships, orders
 from autora.company.organization import add_business_unit, add_product
 from autora.db.models import (
     BusinessUnitState,
@@ -29,6 +29,8 @@ from autora.db.models import (
     Order,
     OrderState,
     Payment,
+    PaymentEvent,
+    Price,
     PriceInterval,
     ProductState,
 )
@@ -395,6 +397,172 @@ async def test_a_second_year_extends_the_first(shop, db_session, company, mailbo
 
     assert after_two > after_one
     assert await _count(db_session, Payment, Payment.company_id == company.id) == 2
+
+
+# --- what is kept, and the notifications that used to fail (P2-B) -------------------------------
+
+
+async def _events(db_session, mer_trade_no):
+    db_session.expire_all()
+    return list(
+        await db_session.scalars(
+            select(PaymentEvent)
+            .where(PaymentEvent.mer_trade_no == mer_trade_no)
+            .order_by(PaymentEvent.created_at, PaymentEvent.id)
+        )
+    )
+
+
+async def _checkout(shop, db_session, company, mailbox, **sale):
+    price = await _for_sale(db_session, company, **sale)
+    await _sign_in(shop, mailbox)
+    checkout = (await shop.post("/api/checkout", json={"company": company.slug})).json()
+    return price.id, checkout
+
+
+async def test_every_notification_is_kept_with_what_became_of_it(
+    shop, db_session, company, mailbox
+):
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    form = _notification(no, trade_no="UNI-KEPT")
+
+    await shop.post("/api/payments/payuni/notify", data=form)
+    await shop.post("/api/payments/payuni/notify", data=form)
+
+    first, again = await _events(db_session, no)
+    assert (first.outcome, again.outcome) == ("settled", "repeated")
+    assert first.payment_id == again.payment_id is not None
+    assert first.order_id == uuid.UUID(checkout["order_id"])
+    assert first.payload == form, "the form as it was posted, sealed"
+    assert first.fields["MerTradeNo"] == no, "and what the envelope said"
+    assert (first.external_ref, first.trade_status, first.amount) == ("UNI-KEPT", "1", 360)
+    assert first.processed_at is not None and first.error is None
+    assert await _count(db_session, Payment, Payment.company_id == company.id) == 1
+
+
+async def test_a_failure_after_the_payment_is_acknowledged_and_undoes_nothing(
+    shop, db_session, company, mailbox
+):
+    """Was a 500 that PAYUNi would have sent again all day (P2-B inventory, case 1)."""
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    await shop.post("/api/payments/payuni/notify", data=_notification(no, trade_no="UNI-1"))
+    until = await _member_until(shop, company)
+
+    response = await shop.post(
+        "/api/payments/payuni/notify", data=_notification(no, trade_status="2", trade_no="UNI-1")
+    )
+
+    assert (response.status_code, response.text) == (200, "1|OK")
+    order = await db_session.get(Order, uuid.UUID(checkout["order_id"]))
+    await db_session.refresh(order)
+    assert order.state == OrderState.PAID.value
+    assert await _member_until(shop, company) == until
+    assert [e.outcome for e in await _events(db_session, no)] == ["settled", "ignored"]
+
+
+async def test_a_failure_before_any_payment_marks_the_order_failed(
+    shop, db_session, company, mailbox
+):
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    response = await shop.post(
+        "/api/payments/payuni/notify", data=_notification(no, trade_status="2")
+    )
+    assert response.text == "1|OK"
+    order = await db_session.get(Order, uuid.UUID(checkout["order_id"]))
+    await db_session.refresh(order)
+    assert order.state == OrderState.FAILED.value
+    assert [e.outcome for e in await _events(db_session, no)] == ["unpaid"]
+
+
+async def test_a_price_retired_before_the_notification_still_buys_the_order(
+    shop, db_session, company, mailbox
+):
+    """Was a 500 with the money taken and nothing given (P2-B inventory, case 2)."""
+    price_id, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    await memberships.retire_price(db_session, await db_session.get(Price, price_id))
+    await db_session.commit()
+
+    response = await shop.post("/api/payments/payuni/notify", data=_notification(no))
+
+    assert (response.status_code, response.text) == (200, "1|OK")
+    assert await _member_until(shop, company) is not None
+    order = await db_session.get(Order, uuid.UUID(checkout["order_id"]))
+    await db_session.refresh(order)
+    assert order.state == OrderState.PAID.value
+    assert [e.outcome for e in await _events(db_session, no)] == ["settled"]
+    nothing_new = await shop.post("/api/checkout", json={"company": company.slug})
+    assert nothing_new.status_code == 404, "retired: no new order at it"
+
+
+async def test_an_order_expired_unpaid_is_still_honoured_when_the_money_arrives(
+    shop, db_session, company, mailbox
+):
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    await orders.expire_stale(db_session, now=datetime.now(UTC) + orders.PENDING_FOR * 2)
+    await db_session.commit()
+    order = await db_session.get(Order, uuid.UUID(checkout["order_id"]))
+    await db_session.refresh(order)
+    assert order.state == OrderState.EXPIRED.value
+
+    response = await shop.post("/api/payments/payuni/notify", data=_notification(no))
+
+    assert response.text == "1|OK"
+    await db_session.refresh(order)
+    assert order.state == OrderState.PAID.value
+    assert await _member_until(shop, company) is not None
+
+
+async def test_unreadable_and_refused_notifications_are_kept_too(
+    shop, db_session, company, mailbox
+):
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+    forged = _notification(no) | {"HashInfo": "0" * 64}
+    wrong = _notification(no, amount="1")
+
+    assert (await shop.post("/api/payments/payuni/notify", data=forged)).status_code == 400
+    assert (await shop.post("/api/payments/payuni/notify", data=wrong)).status_code == 400
+
+    db_session.expire_all()
+    unreadable = await db_session.scalar(
+        select(PaymentEvent).where(PaymentEvent.payload["HashInfo"].astext == "0" * 64)
+    )
+    assert unreadable.outcome == "unreadable"
+    assert unreadable.fields is None and unreadable.mer_trade_no is None
+    assert "HashInfo" in unreadable.error
+    (refused,) = await _events(db_session, no)
+    assert refused.outcome == "refused"
+    assert "the notification says 1" in refused.error, "the record says why; the reply does not"
+    assert refused.payment_id is None
+
+
+async def test_a_notification_that_fails_is_kept_with_its_error_and_not_acknowledged(
+    shop, db_session, company, mailbox, monkeypatch
+):
+    _, checkout = await _checkout(shop, db_session, company, mailbox)
+    no = checkout["mer_trade_no"]
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(orders, "settle", broken)
+    lax = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=shop._transport.app, raise_app_exceptions=False),
+        base_url="http://test",
+    )
+    response = await lax.post("/api/payments/payuni/notify", data=_notification(no))
+
+    assert response.status_code == 500, "not acknowledged: PAYUNi will send it again"
+    (event,) = await _events(db_session, no)
+    assert event.outcome == "error"
+    assert event.error == "RuntimeError: the database went away"
+    assert event.fields["MerTradeNo"] == no
+    assert await _member_until(shop, company) is None
 
 
 async def _count(session, model, *where) -> int:

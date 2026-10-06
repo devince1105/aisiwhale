@@ -240,6 +240,9 @@ export function DashboardView({
           <Link href={withCompany("/admin/timeline", companyId)} className="text-sm text-accent underline">
             事件時間軸
           </Link>
+          <Link href={withCompany("/admin/memberships", companyId)} className="text-sm text-accent underline">
+            VIP 授予
+          </Link>
           <ConnectionBadge connection={model.connection} />
         </div>
       </header>

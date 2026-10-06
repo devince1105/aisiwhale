@@ -2,7 +2,8 @@
 
 - GET  /api/checkout/offer[?interval=month|year&company=<slug>] -> what it costs, or nothing
 - POST /api/checkout                        -> an order, and the form that opens PAYUNi's page
-- POST /api/payments/payuni/notify          -> PAYUNi telling us the money arrived
+- POST /api/payments/payuni/notify          -> PAYUNi telling us the money arrived (kept first,
+                                               in ``payment_events``)
 
 The first two belong to the reader's browser and go by the session cookie, like the rest of the
 public site. The third belongs to PAYUNi's servers and goes by the shared secret: it carries no
@@ -33,8 +34,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from autora.accounts import SESSION_COOKIE, customer_ref, entitlement, reader_for
-from autora.company import memberships, orders
+from autora.company import memberships, orders, payment_events
 from autora.db.models import Company, Price, PriceInterval
+from autora.db.models import PaymentEventOutcome as Outcome
 from autora.infra.payments import payuni
 from autora.infra.settings import Settings
 from autora.runtime.actor import Actor
@@ -191,44 +193,88 @@ async def start_checkout(
 async def payuni_notify(request: Request, session: Session, settings: SettingsDep) -> Response:
     """PAYUNi, server to server: this order was paid. The only thing that grants a year.
 
-    Answers ``1|OK`` once it has been dealt with, and 400 when it has not, because PAYUNi keeps
-    sending a notification nobody acknowledged — which is what we want when the database was
-    briefly unreachable, and harmless when the message was never PAYUNi's to begin with.
+    Every notification is written down first (``payment_events``, committed on its own), then
+    opened and dealt with, and the record says how that went (P2-B).
+
+    Answers ``1|OK`` once it has been dealt with — including a notification that is heard but
+    changes nothing: a repeat, an ATM code, a "failed" for an order already paid. Answers 400
+    when it is not PAYUNi's or does not add up, and 500 when dealing with it failed, because
+    PAYUNi keeps sending a notification nobody acknowledged — which is what we want when the
+    database was briefly unreachable, and harmless when the message was never PAYUNi's.
     """
     _, key, iv = _secrets(settings)
     # PAYUNi posts application/x-www-form-urlencoded, which is a query string in the body. Reading
     # it directly keeps the one endpoint that strangers can reach off the multipart parser.
-    form = dict(
-        parse_qsl((await request.body()).decode("utf-8", "replace"), keep_blank_values=True)
+    body = await request.body()
+    form = dict(parse_qsl(body.decode("utf-8", "replace"), keep_blank_values=True))
+    event_id = await payment_events.receive(
+        session, provider=PROVIDER, payload=payment_events.payload_of(body, form)
     )
+    await session.commit()
+
     try:
         notification = payuni.read_notification(form, key=key, iv=iv)
-    except payuni.EnvelopeError:
+    except payuni.EnvelopeError as exc:
+        await payment_events.record(session, event_id, Outcome.UNREADABLE, error=str(exc))
+        await session.commit()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unreadable") from None
+    envelope = payment_events.opened(
+        fields=notification.fields,
+        mer_trade_no=notification.mer_trade_no,
+        external_ref=notification.trade_no,
+        trade_status=notification.trade_status,
+        amount=notification.trade_amt,
+    )
 
+    try:
+        outcome, order_id, payment_id = await _deal_with(session, notification)
+    except orders.NotificationRefused as exc:
+        await session.rollback()
+        await payment_events.record(session, event_id, Outcome.REFUSED, error=str(exc), **envelope)
+        await session.commit()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "refused") from None
+    except Exception as exc:
+        await session.rollback()
+        await payment_events.record(
+            session, event_id, Outcome.ERROR, error=f"{type(exc).__name__}: {exc}", **envelope
+        )
+        await session.commit()
+        raise
+    # in the same transaction as what it did: the record never says settled when nothing was
+    await payment_events.record(
+        session, event_id, outcome, order_id=order_id, payment_id=payment_id, **envelope
+    )
+    await session.commit()
+    return Response(payuni.acknowledge(), media_type="text/plain")
+
+
+async def _deal_with(
+    session, notification: payuni.Notification
+) -> tuple[Outcome, uuid.UUID | None, uuid.UUID | None]:
+    """Act on an opened notification. Does not commit. Raises ``NotificationRefused``."""
     if not notification.paid:
         # nothing is granted, but this is PAYUNi's message and it has been heard: acknowledge it,
         # or it will be sent again all day. An ATM code was issued, or a card was declined.
-        order = await orders.by_trade_number(session, PROVIDER, notification.mer_trade_no)
-        if order is not None and notification.trade_status != payuni.TRADE_AWAITING:
-            await orders.abandon(session, order, state=orders.OrderState.FAILED)
-            await session.commit()
-        return Response(payuni.acknowledge(), media_type="text/plain")
-
-    try:
-        await orders.settle(
+        order, _ = await orders.hear_unpaid(
             session,
             provider=PROVIDER,
             mer_trade_no=notification.mer_trade_no,
-            external_ref=notification.trade_no or notification.mer_trade_no,
-            amount=notification.trade_amt,
-            actor=Actor.system("payments"),
+            waiting=notification.trade_status == payuni.TRADE_AWAITING,
         )
-    except orders.NotificationRefused:
-        await session.rollback()
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "refused") from None
-    await session.commit()
-    return Response(payuni.acknowledge(), media_type="text/plain")
+        if order is not None and order.state == orders.OrderState.PAID.value:
+            return Outcome.IGNORED, order.id, order.payment_id
+        return Outcome.UNPAID, order.id if order is not None else None, None
+
+    settled = await orders.settle(
+        session,
+        provider=PROVIDER,
+        mer_trade_no=notification.mer_trade_no,
+        external_ref=notification.trade_no or notification.mer_trade_no,
+        amount=notification.trade_amt,
+        actor=Actor.system("payments"),
+    )
+    outcome = Outcome.SETTLED if settled.granted else Outcome.REPEATED
+    return outcome, settled.order.id, settled.payment.id
 
 
 __all__ = ["Checkout", "Offer", "Price", "router"]

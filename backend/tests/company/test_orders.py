@@ -7,7 +7,7 @@ which providers do — has to leave exactly one payment, one ledger row and one 
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -261,6 +261,108 @@ async def test_a_notification_for_an_order_that_was_given_up_on_still_pays(db_se
     company, price = await _offer(db_session)
     order = await _order(db_session, price)
     await orders.abandon(db_session, order, state=OrderState.EXPIRED)
+    settled = await _settle(db_session, order)
+    assert settled.granted is True
+    assert order.state == OrderState.PAID.value
+    assert (
+        await memberships.access_until(
+            db_session, company_id=company.id, customer_ref=READER, at=DAY
+        )
+        is not None
+    )
+
+
+async def test_a_price_retired_after_the_order_still_buys_what_was_ordered(db_session):
+    """P2-B: retiring a price stops new orders, not the ones already opened at it."""
+    company, price = await _offer(db_session)
+    order = await _order(db_session, price)
+    await memberships.retire_price(db_session, price)
+
+    settled = await _settle(db_session, order)
+
+    assert settled.granted is True
+    assert order.state == OrderState.PAID.value
+    assert settled.payment.price_id == price.id
+    assert await memberships.access_until(
+        db_session, company_id=company.id, customer_ref=READER, at=DAY
+    ) == datetime(2027, 9, 22, 12, 0, tzinfo=UTC)
+    with pytest.raises(orders.OrderError, match="retired"):
+        await _order(db_session, price)
+
+
+async def test_a_failure_heard_after_the_payment_undoes_nothing(db_session):
+    _, price = await _offer(db_session)
+    order = await _order(db_session, price)
+    settled = await _settle(db_session, order)
+
+    found, changed = await orders.hear_unpaid(
+        db_session, provider="payuni", mer_trade_no=order.mer_trade_no, waiting=False
+    )
+    assert (found.id, changed) == (order.id, False)
+    assert order.state == OrderState.PAID.value
+    assert order.payment_id == settled.payment.id
+
+
+@pytest.mark.parametrize(
+    ("waiting", "state"), [(True, OrderState.PENDING), (False, OrderState.FAILED)]
+)
+async def test_waiting_changes_nothing_and_a_failure_marks_the_order(db_session, waiting, state):
+    _, price = await _offer(db_session)
+    order = await _order(db_session, price)
+    _, changed = await orders.hear_unpaid(
+        db_session, provider="payuni", mer_trade_no=order.mer_trade_no, waiting=waiting
+    )
+    assert changed is (not waiting)
+    assert order.state == state.value
+
+
+async def test_an_order_we_never_issued_is_heard_and_left_alone(db_session):
+    found, changed = await orders.hear_unpaid(
+        db_session, provider="payuni", mer_trade_no="AU000000000000000000", waiting=False
+    )
+    assert (found, changed) == (None, False)
+
+
+async def test_an_order_unpaid_for_a_day_expires_and_a_younger_one_waits(db_session):
+    _, price = await _offer(db_session)
+    old = await _order(db_session, price)
+    young = await _order(db_session, price, reader="reader:8")
+    await db_session.refresh(old)
+    await db_session.refresh(young)
+    now = old.created_at + orders.PENDING_FOR + timedelta(minutes=1)
+    young.created_at = now - orders.PENDING_FOR + timedelta(minutes=1)
+    await db_session.flush()
+
+    expired = await orders.expire_stale(db_session, now=now)
+
+    assert old.id in {o.id for o in expired}
+    assert young.id not in {o.id for o in expired}
+    assert (old.state, young.state) == (OrderState.EXPIRED.value, OrderState.PENDING.value)
+    again = await orders.expire_stale(db_session, now=now)
+    assert old.id not in {o.id for o in again}, "safe to repeat"
+
+
+async def test_expiring_leaves_paid_and_failed_orders_alone(db_session):
+    _, price = await _offer(db_session)
+    paid = await _order(db_session, price)
+    await _settle(db_session, paid)
+    failed = await _order(db_session, price, reader="reader:8")
+    await orders.abandon(db_session, failed, state=OrderState.FAILED)
+
+    later = datetime.now(UTC) + orders.PENDING_FOR * 2
+    expired = {o.id for o in await orders.expire_stale(db_session, now=later)}
+
+    assert paid.id not in expired and failed.id not in expired
+    assert (paid.state, failed.state) == (OrderState.PAID.value, OrderState.FAILED.value)
+
+
+async def test_an_order_expired_by_the_clock_still_settles(db_session):
+    """P2-B: EXPIRED is a name for "nobody paid yet", not a refusal."""
+    company, price = await _offer(db_session)
+    order = await _order(db_session, price)
+    await orders.expire_stale(db_session, now=datetime.now(UTC) + orders.PENDING_FOR * 2)
+    assert order.state == OrderState.EXPIRED.value
+
     settled = await _settle(db_session, order)
     assert settled.granted is True
     assert order.state == OrderState.PAID.value
