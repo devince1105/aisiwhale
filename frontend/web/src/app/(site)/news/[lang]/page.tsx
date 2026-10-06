@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage } from "@/features/site/api";
+import { fetchArticlePage, fetchPortfolios } from "@/features/site/api";
+import { PortfolioCards } from "@/features/site/Portfolios";
 import { loadSidebar, taipeiToday } from "@/features/site/sidebarData";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
 import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
@@ -36,7 +37,10 @@ export default async function Page({ params, searchParams }: { params: Params; s
   const { section, page, day } = await where(searchParams);
   const company = process.env.SITE_COMPANY || undefined;
   // the calendar opens on the day's month, else this one, its days already marked (D-084)
-  const [{ articles, total }, sidebar] = await Promise.all([
+  // 持股觀察's first page opens with the followed filers' cards (HD-06); none to show leaves the
+  // stories as they were, and a card that cannot be loaded does not take the page down with it
+  const portfolios = section === "watch" && page === 1 && !day;
+  const [{ articles, total }, sidebar, cards] = await Promise.all([
     fetchArticlePage(lang, {
       company,
       section: section ? sectionsOf(section) : undefined,
@@ -45,6 +49,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
       day: day ?? undefined,
     }),
     loadSidebar(lang, { section, month: (day ?? taipeiToday()).slice(0, 7) }),
+    portfolios ? fetchPortfolios(lang, { company }).catch(() => []) : Promise.resolve([]),
   ]);
   return (
     <ArticleList
@@ -59,6 +64,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
       markets={sidebar.markets}
       events={sidebar.events}
       sentiment={sidebar.sentiment}
+      top={cards.length ? <PortfolioCards cards={cards} lang={lang} /> : null}
     />
   );
 }

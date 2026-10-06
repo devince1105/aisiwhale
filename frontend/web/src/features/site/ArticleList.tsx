@@ -3,6 +3,7 @@
 // the page numbers (D-065). The tabs are in the header (SectionNav); a tab of several sections
 // (持股觀察, D-050) has its tags here, and every story says its section as a tag.
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote, PublicSentiment } from "./api";
 import { ArticleCalendar } from "./ArticleCalendar";
@@ -137,6 +138,7 @@ export function ArticleList({
   markets = [],
   events = [],
   sentiment = [],
+  top = null,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -157,6 +159,8 @@ export function ArticleList({
   events?: PublicEvent[];
   /** 新聞情緒 of the strip's stocks (D-091), for the sidebar. */
   sentiment?: PublicSentiment[];
+  /** What a tab shows above its stories: 持股觀察's cards (HD-06). */
+  top?: ReactNode;
 
 }) {
   const w = words(lang);
@@ -182,6 +186,7 @@ export function ArticleList({
             </div>
           ) : null}
         </div>
+        {top}
         {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
         {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
         {articles.length === 0 ? (

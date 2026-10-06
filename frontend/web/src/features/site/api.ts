@@ -24,6 +24,8 @@ export type PublicDay = Schemas["PublicDay"];
 export type PublicEvent = Schemas["PublicEvent"];
 export type PublicSentiment = Schemas["PublicSentiment"];
 export type PublicRatings = Schemas["PublicRatings"];
+export type PublicPortfolioCard = Schemas["PublicPortfolioCard"];
+export type PublicPortfolio = Schemas["PublicPortfolio"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -228,6 +230,33 @@ export async function fetchStock(
       path: { symbol },
       query: { lang, company: options.company, articles_offset: options.articlesOffset || undefined },
     },
+  });
+  if (response.status === 404) return null;
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+/** The holdings dashboard's cards (HD-05): each followed 13F filer, in the site's order. */
+export async function fetchPortfolios(
+  lang: string,
+  options: SiteClientOptions & { company?: string } = {},
+): Promise<PublicPortfolioCard[]> {
+  const { data, error, response } = await client(options).GET("/api/public/holdings", {
+    params: { query: { lang, company: options.company } },
+  });
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+/** A person page (HD-05), or null for nobody the site follows. The reader's cookie decides how
+ * much of the table comes back (D-159): pass it when the server renders for a reader. */
+export async function fetchPortfolio(
+  slug: string,
+  lang: string,
+  options: SiteClientOptions & { company?: string } = {},
+): Promise<PublicPortfolio | null> {
+  const { data, error, response } = await client(options).GET("/api/public/holdings/people/{slug}", {
+    params: { path: { slug }, query: { lang, company: options.company } },
   });
   if (response.status === 404) return null;
   if (error !== undefined || !data) throw ApiError.from(response, error);
