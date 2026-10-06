@@ -35,7 +35,9 @@ export class CheckoutError extends Error {
   }
 }
 
-/** What a month or a year costs here, or null when that one is not for sale. */
+/** What a month or a year costs here, or null when the catalogue has no price for it. A price
+ * that cannot be bought yet still comes back, with ``available: false`` (P2: checkout is closed
+ * by the API until P8, D-231), so the page can show it without offering to sell it. */
 export async function fetchOffer(company?: string, interval: Interval = "year"): Promise<Offer | null> {
   const query = new URLSearchParams({ interval });
   if (company) query.set("company", company);
@@ -45,7 +47,7 @@ export async function fetchOffer(company?: string, interval: Interval = "year"):
     });
     if (!response.ok) return null;
     const offer = (await response.json()) as Offer;
-    return offer.available ? offer : null;
+    return offer.available || Number(offer.amount) > 0 ? offer : null;
   } catch {
     return null; // a price we could not fetch is not an error the reader can do anything about
   }

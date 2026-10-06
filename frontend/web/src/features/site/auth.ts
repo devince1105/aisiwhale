@@ -8,6 +8,10 @@ export interface Me {
   email: string;
   email_verified: boolean;
   member_until: string | null;
+  /** Who they are to the site, decided by the server (P2): never worked out here. */
+  tier: "public" | "free" | "vip";
+  /** What the server says they may do: ``read_vip_articles``, ``watchlist``, ``admin``… */
+  capabilities: string[];
 }
 
 /** How a call that the API may refuse came out. */
@@ -82,6 +86,7 @@ export async function signOut(): Promise<void> {
   await call("/api/auth/logout", { method: "POST" });
 }
 
-export function isMember(me: Me | null, now: Date = new Date()): boolean {
-  return me?.member_until != null && new Date(me.member_until) > now;
+/** VIP, as the server decided it (P2): a running membership, bought or given by an admin. */
+export function isMember(me: Me | null): boolean {
+  return me?.tier === "vip";
 }

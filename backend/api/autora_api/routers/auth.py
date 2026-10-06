@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
@@ -40,7 +40,6 @@ from autora.accounts import (
     Reader,
     authenticate,
     by_email,
-    customer_ref,
     email_verified,
     normalise,
     passwords,
@@ -57,8 +56,8 @@ from autora.accounts import (
 )
 from autora.accounts import emails as reader_emails
 from autora.accounts import google as google_signin
+from autora.accounts.entitlement import entitlement_for
 from autora.accounts.service import SESSION_VALID_FOR
-from autora.company import memberships
 from autora.db.models import Company
 from autora.infra.email import EmailError
 from autora.infra.settings import Settings
@@ -133,6 +132,11 @@ class Me(BaseModel):
     """Whether the address is proven (D-230). Until it is, it opens nothing that depends on it."""
     member_until: datetime | None = None
     """When their access runs out. None: they are not a member of this company."""
+    tier: Literal["public", "free", "vip"] = "free"
+    """Who they are to the site (P2), decided by the server: ``vip`` while a membership of this
+    company is running, bought or given (D-228). The browser shows it, never works it out."""
+    capabilities: list[str] = []
+    """What the tier and being an admin allow (``accounts.entitlement.Capability``)."""
 
     @property
     def member(self) -> bool:
@@ -144,18 +148,18 @@ async def _company_id(session, slug: str | None) -> uuid.UUID | None:
     return await session.scalar(query.order_by(Company.created_at).limit(1))
 
 
-async def _me(session, reader, slug: str | None) -> Me:
+async def _me(session, reader, slug: str | None, settings: Settings) -> Me:
     company_id = await _company_id(session, slug)
-    until = None
-    if company_id is not None:
-        until = await memberships.access_until(
-            session, company_id=company_id, customer_ref=customer_ref(reader.id)
-        )
+    granted = await entitlement_for(
+        session, reader, company_id=company_id, admin_emails=settings.admin_emails
+    )
     return Me(
         reader_id=reader.id,
         email=reader.email,
         email_verified=await email_verified(session, reader),
-        member_until=until,
+        member_until=granted.vip_until,
+        tier=granted.tier.value,
+        capabilities=sorted(c.value for c in granted.capabilities),
     )
 
 
@@ -258,7 +262,7 @@ async def login(
     if reader is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, WRONG)
     token = await start_session(session, reader)
-    me = await _me(session, reader, company)
+    me = await _me(session, reader, company, settings)
     await session.commit()
     _set_cookie(response, token, settings)
     return me
@@ -266,12 +270,15 @@ async def login(
 
 @router.get("/api/auth/me")
 async def me(
-    session: Session, autora_reader: SessionCookie = None, company: CompanySlug = None
+    session: Session,
+    settings: SettingsDep,
+    autora_reader: SessionCookie = None,
+    company: CompanySlug = None,
 ) -> Me | None:
     reader = await reader_for(session, autora_reader)
     if reader is None:
         return None
-    answer = await _me(session, reader, company)
+    answer = await _me(session, reader, company, settings)
     await session.commit()  # last_seen_at
     return answer
 
@@ -358,7 +365,7 @@ async def set_password(
     except AccountError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     token = await start_session(session, reader)
-    me = await _me(session, reader, company)
+    me = await _me(session, reader, company, settings)
     await session.commit()
     _set_cookie(response, token, settings)
     return me

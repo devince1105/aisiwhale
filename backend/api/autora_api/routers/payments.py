@@ -10,6 +10,13 @@ cookie, and it is the only one of the three that grants anything. A browser comi
 payment page is told nothing it did not already know — the return page asks ``/api/auth/me``
 again, and the answer is whatever the notification has made true by then.
 
+**Closed in P2** (D-228, D-231): the catalogue keeps what PayUni was applied with (D-161: NT$30
+a month), but nothing is sold until P8 opens payments. The offer says what it costs and
+``available: false``; checkout is refused
+before anything else — before the sign-in, before the shop's keys, before any order — whatever
+``SITE_MEMBERSHIP_OPEN`` says and whether or not the shop is configured
+(``accounts.entitlement.CHECKOUT_OPEN``). VIP is given for testing instead (admin_comp).
+
 Refusals are deliberately dull. A notification that does not add up gets 400 and a sentence with
 nothing in it, because the only reader of that sentence is somebody guessing at trade numbers.
 """
@@ -25,7 +32,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, R
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
+from autora.accounts import SESSION_COOKIE, customer_ref, entitlement, reader_for
 from autora.company import memberships, orders
 from autora.db.models import Company, Price, PriceInterval
 from autora.infra.payments import payuni
@@ -53,6 +60,8 @@ class Offer(BaseModel):
     currency: str
     interval: str
     available: bool = True
+    """Whether it can be bought now. False in P2 for every price (D-231): the amount is still
+    the catalogue's, so the page can say what it will cost."""
 
 
 class CheckoutRequest(BaseModel):
@@ -105,7 +114,12 @@ async def get_offer(
     )
     if price is None:
         return Offer(amount=Decimal(0), currency="TWD", interval=interval, available=False)
-    return Offer(amount=price.amount, currency=price.currency, interval=price.interval)
+    return Offer(
+        amount=price.amount,
+        currency=price.currency,
+        interval=price.interval,
+        available=entitlement.CHECKOUT_OPEN,
+    )
 
 
 @router.post("/api/checkout", status_code=status.HTTP_201_CREATED)
@@ -120,7 +134,11 @@ async def start_checkout(
     Signing in comes first: the order records who a year is for, and a reader id is the only
     name this layer has for anybody (D-018). Nothing is granted here — the order is PENDING
     until PAYUNi says otherwise, even if the reader never comes back.
+
+    Closed in P2 (D-231): refused first, so no order is ever opened, at any price.
     """
+    if not entitlement.CHECKOUT_OPEN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "membership is not on sale yet")
     reader = await reader_for(session, autora_reader)
     if reader is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "sign in before buying a membership")

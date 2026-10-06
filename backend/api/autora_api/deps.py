@@ -10,7 +10,8 @@ from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.accounts import Reader, email_verified, reader_for
+from autora.accounts import Reader, reader_for
+from autora.accounts.entitlement import admin_authorized
 from autora.accounts.google import GoogleOAuth
 from autora.app import Runtime, build_runtime
 from autora.db.session import get_sessionmaker
@@ -86,7 +87,7 @@ ADMIN_SESSION_VALID_FOR = timedelta(days=14)
 async def is_admin(session: AsyncSession, reader: Reader, settings: Settings) -> bool:
     """Authorization, apart from how they signed in (D-230): an address on ADMIN_EMAILS **and**
     proven to be theirs. Knowing an admin's address — even registering it — opens nothing."""
-    return reader.email in settings.admin_emails and await email_verified(session, reader)
+    return await admin_authorized(session, reader, settings.admin_emails)
 
 
 async def admin_for(session: AsyncSession, token: str | None, settings: Settings) -> Reader | None:

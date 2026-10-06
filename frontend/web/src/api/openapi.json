@@ -1543,6 +1543,123 @@
     "title": "ClaimView",
     "type": "object"
    },
+   "Comp": {
+    "properties": {
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
+     "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "reader_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reader Id"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "revoke_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoke Reason"
+     },
+     "revoked_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoked At"
+     },
+     "revoked_by": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revoked By"
+     },
+     "running": {
+      "title": "Running",
+      "type": "boolean"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "reader_id",
+     "email",
+     "source",
+     "started_at",
+     "expires_at",
+     "reason",
+     "actor",
+     "revoked_at",
+     "revoked_by",
+     "revoke_reason",
+     "running"
+    ],
+    "title": "Comp",
+    "type": "object"
+   },
    "CompanyCreate": {
     "properties": {
      "mission": {
@@ -3163,6 +3280,45 @@
     "title": "GoalView",
     "type": "object"
    },
+   "GrantComp": {
+    "properties": {
+     "company": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Company"
+     },
+     "email": {
+      "maxLength": 254,
+      "title": "Email",
+      "type": "string"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     },
+     "until": {
+      "format": "date-time",
+      "title": "Until",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "until",
+     "reason"
+    ],
+    "title": "GrantComp",
+    "type": "object"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -3424,6 +3580,14 @@
    },
    "Me": {
     "properties": {
+     "capabilities": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+     },
      "email": {
       "title": "Email",
       "type": "string"
@@ -3448,6 +3612,16 @@
      "reader_id": {
       "format": "uuid",
       "title": "Reader Id",
+      "type": "string"
+     },
+     "tier": {
+      "default": "free",
+      "enum": [
+       "public",
+       "free",
+       "vip"
+      ],
+      "title": "Tier",
       "type": "string"
      }
     },
@@ -6551,6 +6725,21 @@
     "title": "RevisionStarted",
     "type": "object"
    },
+   "Revoke": {
+    "properties": {
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reason"
+    ],
+    "title": "Revoke",
+    "type": "object"
+   },
    "RoleOut": {
     "properties": {
      "held_by": {
@@ -8307,6 +8496,327 @@
     ]
    }
   },
+  "/api/admin/memberships/comps": {
+   "get": {
+    "operationId": "list_comps_api_admin_memberships_comps_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "query",
+      "name": "running",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Running",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Comp"
+         },
+         "title": "Response List Comps Api Admin Memberships Comps Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Comps",
+    "tags": [
+     "admin-memberships"
+    ]
+   },
+   "post": {
+    "description": "Give a reader VIP until ``until``. No order, no payment, no revenue.",
+    "operationId": "grant_comp_api_admin_memberships_comps_post",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GrantComp"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Comp"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Grant Comp",
+    "tags": [
+     "admin-memberships"
+    ]
+   }
+  },
+  "/api/admin/memberships/comps/{grant_id}": {
+   "get": {
+    "operationId": "get_comp_api_admin_memberships_comps__grant_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "grant_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Grant Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Comp"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Comp",
+    "tags": [
+     "admin-memberships"
+    ]
+   }
+  },
+  "/api/admin/memberships/comps/{grant_id}/revoke": {
+   "post": {
+    "description": "End a comp now. The row is kept, with who ended it, when and why.",
+    "operationId": "revoke_comp_api_admin_memberships_comps__grant_id__revoke_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "grant_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Grant Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Revoke"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Comp"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Revoke Comp",
+    "tags": [
+     "admin-memberships"
+    ]
+   }
+  },
   "/api/analytics/beacon": {
    "post": {
     "description": "Count a view or a completed read. A repeat from the same session that day is dropped\n(still 204: the reader's page has nothing to do about it).",
@@ -9672,7 +10182,7 @@
   },
   "/api/checkout": {
    "post": {
-    "description": "Open an order and build the form that opens PAYUNi's page.\n\nSigning in comes first: the order records who a year is for, and a reader id is the only\nname this layer has for anybody (D-018). Nothing is granted here — the order is PENDING\nuntil PAYUNi says otherwise, even if the reader never comes back.",
+    "description": "Open an order and build the form that opens PAYUNi's page.\n\nSigning in comes first: the order records who a year is for, and a reader id is the only\nname this layer has for anybody (D-018). Nothing is granted here — the order is PENDING\nuntil PAYUNi says otherwise, even if the reader never comes back.\n\nClosed in P2 (D-231): refused first, so no order is ever opened, at any price.",
     "operationId": "start_checkout_api_checkout_post",
     "parameters": [
      {

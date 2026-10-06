@@ -20,13 +20,19 @@ EXPIRED and churning the customer is bookkeeping, done once a day by the cycle.
 
 Deliberately absent: refunds, upgrades between products, gifting, tax. When a real case needs
 one, it becomes its own function rather than a flag on these.
+
+**Given, not bought** (D-228, P2): an admin can give a reader access for internal testing — a
+comp. It is its own path (``grant_comp``), never ``purchase``: no order, no payment, no ledger
+row, no revenue, and the customer it makes is ``comp``, never counted as paying. Each comp is a
+``membership_grants`` row; ending one early is ``revoke_grant``, which writes who, when and why
+on that row and works the membership's end out again from what is still running.
 """
 
 from __future__ import annotations
 
 import calendar
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -39,7 +45,9 @@ from autora.db.models import (
     Customer,
     CustomerKind,
     Cycle,
+    GrantSource,
     Membership,
+    MembershipGrant,
     MembershipState,
     Payment,
     Price,
@@ -333,6 +341,200 @@ async def _membership(
         return membership, membership.expires_at, True
     membership.started_at = paid_at
     return membership, paid_at, False
+
+
+# --- given, not bought (D-228) -------------------------------------------------------------------
+
+REASON_MAX = 500
+
+
+async def grant_comp(
+    session: AsyncSession,
+    product: Product,
+    *,
+    customer_ref: str,
+    until: datetime,
+    reason: str,
+    actor: Actor,
+    now: datetime | None = None,
+) -> MembershipGrant:
+    """Give access to ``product`` until ``until``, for internal testing. Nothing is sold.
+
+    The customer is made a ``comp`` if they are not a customer yet; one who paid before keeps
+    their kind (a comp does not reopen a paying customer who left). Access runs to the later of
+    what they already have and ``until``.
+    """
+    now = now or datetime.now(UTC)
+    reason = reason.strip()
+    if not reason:
+        raise MembershipError("a comp needs a reason")
+    if len(reason) > REASON_MAX:
+        raise MembershipError(f"a reason is at most {REASON_MAX} characters")
+    if until <= now:
+        raise MembershipError("a comp has to end in the future")
+    if product.state == ProductState.RETIRED.value:
+        raise MembershipError(f"product {product.key!r} is retired")
+
+    customer = await customers.by_external_ref(session, product.company_id, customer_ref)
+    if customer is None:
+        customer = await customers.acquire(
+            session,
+            company_id=product.company_id,
+            external_ref=customer_ref,
+            kind=CustomerKind.COMP,
+            actor=actor,
+            business_unit_id=product.business_unit_id,
+            product_id=product.id,
+            acquired_at=now,
+        )
+    membership = await session.scalar(
+        select(Membership)
+        .where(Membership.customer_id == customer.id, Membership.product_id == product.id)
+        .with_for_update()
+    )
+    if membership is None:
+        membership = Membership(
+            company_id=product.company_id,
+            business_unit_id=product.business_unit_id,
+            customer_id=customer.id,
+            product_id=product.id,
+            state=MS.ACTIVE.value,
+            started_at=now,
+            expires_at=until,
+        )
+        session.add(membership)
+    elif membership.expires_at > now:
+        membership.expires_at = max(membership.expires_at, until)
+    else:
+        membership.started_at = now
+        membership.expires_at = until
+    await session.flush()
+    if membership.state != MS.ACTIVE.value:
+        await MEMBERSHIP_FSM.transition(session, membership, MS.ACTIVE, actor=actor, reason="comp")
+
+    grant = MembershipGrant(
+        company_id=product.company_id,
+        membership_id=membership.id,
+        customer_id=customer.id,
+        product_id=product.id,
+        source=GrantSource.ADMIN_COMP.value,
+        started_at=now,
+        expires_at=until,
+        reason=reason,
+        actor=actor.model_dump(),
+    )
+    session.add(grant)
+    await session.flush()
+    return grant
+
+
+async def revoke_grant(
+    session: AsyncSession,
+    grant_id: uuid.UUID,
+    *,
+    reason: str,
+    actor: Actor,
+    company_id: uuid.UUID | None = None,
+    now: datetime | None = None,
+) -> MembershipGrant:
+    """End a comp now. The row stays, with who ended it, when and why; the membership's end is
+    worked out again from what is still running (other comps, payments' stretches)."""
+    now = now or datetime.now(UTC)
+    reason = reason.strip()
+    if not reason:
+        raise MembershipError("ending a comp needs a reason")
+    if len(reason) > REASON_MAX:
+        raise MembershipError(f"a reason is at most {REASON_MAX} characters")
+    grant = await session.scalar(
+        select(MembershipGrant).where(MembershipGrant.id == grant_id).with_for_update()
+    )
+    if grant is None or (company_id is not None and grant.company_id != company_id):
+        raise MembershipError("no such grant")
+    if grant.source != GrantSource.ADMIN_COMP.value:
+        raise MembershipError("only a comp can be revoked here; a payment is not undone this way")
+    if grant.revoked_at is not None:
+        raise MembershipError("this comp was already revoked")
+    grant.revoked_at = max(now, grant.started_at)
+    grant.revoked_by = actor.model_dump()
+    grant.revoke_reason = reason
+    await session.flush()
+
+    membership = await session.scalar(
+        select(Membership).where(Membership.id == grant.membership_id).with_for_update()
+    )
+    assert membership is not None
+    membership.expires_at = await _period_end(session, membership, now)
+    await session.flush()
+    return grant
+
+
+async def _period_end(session: AsyncSession, membership: Membership, now: datetime) -> datetime:
+    """Where the membership ends, from what still gives access after ``now``: payments'
+    stretches and comps not revoked. Nothing left: it ends now — or a moment after it started,
+    when it started this instant (the table holds ``expires_at > started_at``)."""
+    paid = await session.scalar(
+        select(func.max(Payment.grants_until)).where(
+            Payment.membership_id == membership.id, Payment.grants_until > now
+        )
+    )
+    given = await session.scalar(
+        select(func.max(MembershipGrant.expires_at)).where(
+            MembershipGrant.membership_id == membership.id,
+            MembershipGrant.revoked_at.is_(None),
+            MembershipGrant.expires_at > now,
+        )
+    )
+    running = [end for end in (paid, given) if end is not None]
+    if running:
+        return max(running)
+    return max(now, membership.started_at + timedelta(microseconds=1))
+
+
+async def comp_grants(
+    session: AsyncSession,
+    company_id: uuid.UUID,
+    *,
+    running_at: datetime | None = None,
+) -> list[tuple[MembershipGrant, str]]:
+    """The company's comps, newest first, each with its customer's reference. ``running_at``:
+    only those giving access at that moment (not revoked, not run out)."""
+    stmt = (
+        select(MembershipGrant, Customer.external_ref)
+        .join(Customer, Customer.id == MembershipGrant.customer_id)
+        .where(
+            MembershipGrant.company_id == company_id,
+            MembershipGrant.source == GrantSource.ADMIN_COMP.value,
+        )
+        .order_by(MembershipGrant.created_at.desc(), MembershipGrant.id.desc())
+    )
+    if running_at is not None:
+        stmt = stmt.where(
+            MembershipGrant.revoked_at.is_(None), MembershipGrant.expires_at > running_at
+        )
+    return [(grant, ref) for grant, ref in (await session.execute(stmt)).all()]
+
+
+async def grant_by_id(
+    session: AsyncSession, grant_id: uuid.UUID, *, company_id: uuid.UUID | None = None
+) -> tuple[MembershipGrant, str] | None:
+    row = (
+        await session.execute(
+            select(MembershipGrant, Customer.external_ref)
+            .join(Customer, Customer.id == MembershipGrant.customer_id)
+            .where(MembershipGrant.id == grant_id)
+        )
+    ).first()
+    if row is None or (company_id is not None and row[0].company_id != company_id):
+        return None
+    return row[0], row[1]
+
+
+async def product_by_key(
+    session: AsyncSession, company_id: uuid.UUID, key: str = PRODUCT_KEY
+) -> Product | None:
+    return await session.scalar(
+        select(Product).where(Product.company_id == company_id, Product.key == key)
+    )
 
 
 # --- lapsing ------------------------------------------------------------------------------------

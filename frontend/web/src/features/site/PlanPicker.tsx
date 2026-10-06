@@ -73,11 +73,14 @@ export function PlanPicker({
     }
   }
 
-  // every plan is shown (D-161): one the API does not sell yet is kept, faded, at its intended
-  // price and with 即將開放; before the API has answered, each is taken to be on sale
+  // every plan is shown (D-161): one with no price in the catalogue yet (the year) is kept, faded,
+  // at its intended price and with 即將開放; one priced but not on sale (every plan in P2: the API
+  // closes checkout until P8, D-231) shows its price and 即將開放; before the API has answered,
+  // each is taken to be on sale
   const shown = INTERVALS;
   const reserved = (interval: Interval) => offers !== null && offers[interval] === null;
-  const onSale = (interval: Interval) => open && !reserved(interval);
+  const onSale = (interval: Interval) =>
+    open && !reserved(interval) && offers?.[interval]?.available !== false;
   const price = (interval: Interval) => {
     const offer = offers?.[interval];
     return offer ? formatOffer(offer, lang) : fallback(lang, interval);

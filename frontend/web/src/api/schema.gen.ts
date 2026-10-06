@@ -75,6 +75,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/memberships/comps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Comps */
+        get: operations["list_comps_api_admin_memberships_comps_get"];
+        put?: never;
+        /**
+         * Grant Comp
+         * @description Give a reader VIP until ``until``. No order, no payment, no revenue.
+         */
+        post: operations["grant_comp_api_admin_memberships_comps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memberships/comps/{grant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Comp */
+        get: operations["get_comp_api_admin_memberships_comps__grant_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memberships/comps/{grant_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Comp
+         * @description End a comp now. The row is kept, with who ended it, when and why.
+         */
+        post: operations["revoke_comp_api_admin_memberships_comps__grant_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analytics/beacon": {
         parameters: {
             query?: never;
@@ -507,6 +565,8 @@ export interface paths {
          *     Signing in comes first: the order records who a year is for, and a reader id is the only
          *     name this layer has for anybody (D-018). Nothing is granted here — the order is PENDING
          *     until PAYUNi says otherwise, even if the reader never comes back.
+         *
+         *     Closed in P2 (D-231): refused first, so no order is ever opened, at any price.
          */
         post: operations["start_checkout_api_checkout_post"];
         delete?: never;
@@ -2299,6 +2359,46 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** Comp */
+        Comp: {
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Email */
+            email: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reader Id */
+            reader_id: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Revoke Reason */
+            revoke_reason: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Revoked By */
+            revoked_by: {
+                [key: string]: unknown;
+            } | null;
+            /** Running */
+            running: boolean;
+            /** Source */
+            source: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
         /** CompanyCreate */
         CompanyCreate: {
             /** Mission */
@@ -2963,6 +3063,20 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** GrantComp */
+        GrantComp: {
+            /** Company */
+            company?: string | null;
+            /** Email */
+            email: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3067,6 +3181,11 @@ export interface components {
         };
         /** Me */
         Me: {
+            /**
+             * Capabilities
+             * @default []
+             */
+            capabilities: string[];
             /** Email */
             email: string;
             /**
@@ -3081,6 +3200,12 @@ export interface components {
              * Format: uuid
              */
             reader_id: string;
+            /**
+             * Tier
+             * @default free
+             * @enum {string}
+             */
+            tier: "public" | "free" | "vip";
         };
         /** NewAgent */
         NewAgent: {
@@ -4211,6 +4336,11 @@ export interface components {
              */
             workflow_run_id: string;
         };
+        /** Revoke */
+        Revoke: {
+            /** Reason */
+            reason: string;
+        };
         /** RoleOut */
         RoleOut: {
             /**
@@ -4974,6 +5104,149 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_comps_api_admin_memberships_comps_get: {
+        parameters: {
+            query?: {
+                company?: string | null;
+                running?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comp"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_comp_api_admin_memberships_comps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantComp"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comp"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_comp_api_admin_memberships_comps__grant_id__get: {
+        parameters: {
+            query?: {
+                company?: string | null;
+            };
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comp"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_comp_api_admin_memberships_comps__grant_id__revoke_post: {
+        parameters: {
+            query?: {
+                company?: string | null;
+            };
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Revoke"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comp"];
                 };
             };
             /** @description Validation Error */

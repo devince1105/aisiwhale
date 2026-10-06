@@ -191,3 +191,38 @@ def test_what_it_takes_to_read_it():
     assert may_read(None, "anyone") and may_read("sign_in", "signed_in")
     assert not may_read("sign_in", "anyone") and not may_read("members", "signed_in")
     assert may_read("members", "member") and may_read("sign_in", "member")
+
+
+async def test_a_comp_reads_the_whole_thing_until_it_is_ended(
+    site, mailbox, article, newsroom_room, db_session
+):
+    """D-228 (P2): VIP given by an admin opens VIP articles exactly as a bought one does — the
+    paywall asks the entitlement, not where the membership came from — and ending it closes them
+    again."""
+    from datetime import UTC, datetime, timedelta
+
+    whole = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    await _members_only(newsroom_room, article)
+    reader_id = await _sign_in(site, mailbox)
+    unit = await add_business_unit(
+        db_session, company_id=article.company_id, key="ai_media", name="AI Media",
+        actor=OPERATOR, state=BusinessUnitState.ACTIVE,
+    )  # fmt: skip
+    product = await add_product(
+        db_session, company_id=article.company_id, key=memberships.PRODUCT_KEY, name="VIP",
+        business_unit_id=unit.id, actor=OPERATOR, state=ProductState.LIVE,
+    )  # fmt: skip
+    grant = await memberships.grant_comp(
+        db_session, product, customer_ref=customer_ref(reader_id),
+        until=datetime.now(UTC) + timedelta(days=7), reason="internal test", actor=OPERATOR,
+    )  # fmt: skip
+    await db_session.commit()
+
+    opened = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    assert opened["locked"] is False
+    assert [b["text"] for b in opened["blocks"]] == [b["text"] for b in whole["blocks"]]
+
+    await memberships.revoke_grant(db_session, grant.id, reason="test over", actor=OPERATOR)
+    await db_session.commit()
+    closed = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+    assert closed["locked"] is True

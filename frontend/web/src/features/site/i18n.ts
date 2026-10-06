@@ -268,7 +268,7 @@ const WORDS = {
     planOnce: "單次付款，不會自動扣款。到期前再買一次，會從原本的到期日往後延長。",
     planAgree: ["付款即表示你同意", "與", "。"],
     pricing: "會員方案",
-    pricingClosed: "VIP 會員即將開放，以下是方案與價格；開放前所有報導都可免費閱讀。",
+    pricingClosed: "VIP 會員即將開放，以下是方案與價格。VIP 報導將於會員開放後提供。",
     pricingIntro: "艾矽鯨的報導大部分免費。成為 VIP 會員，就能閱讀所有標示為 VIP 的報導全文。",
     pricingIncludes: [
       "閱讀全部會員專屬報導，中文與英文版本都包含",
@@ -743,7 +743,7 @@ const WORDS = {
     planOnce: "Paid once; nothing renews by itself. Buying again before it ends adds to the time you have left.",
     planAgree: ["By paying you agree to the ", " and the ", "."],
     pricing: "Membership",
-    pricingClosed: "VIP membership opens soon; these are its plans and prices. Until then every story is free to read.",
+    pricingClosed: "VIP membership opens soon; these are its plans and prices. VIP stories will be available once membership opens.",
     pricingIntro: "Most AiSiWhale stories are free. VIP members can also read every story marked VIP in full.",
     pricingIncludes: [
       "Every members-only story, in Chinese and in English",

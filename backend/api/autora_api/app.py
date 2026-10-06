@@ -14,6 +14,7 @@ from autora.realtime.gateway import EventHub
 from autora_api import problems
 from autora_api.routers import (
     admin_auth,
+    admin_memberships,
     approvals,
     auth,
     companies,
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(public.router)
     app.include_router(auth.router)
     app.include_router(admin_auth.router)
+    app.include_router(admin_memberships.router)
     app.include_router(contact.router)
     app.include_router(payments.router)
     app.include_router(watchlist.router)

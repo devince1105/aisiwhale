@@ -45,8 +45,18 @@ describe("what a year costs", () => {
   });
 
   it("is nothing at all when the site has nothing for sale", async () => {
-    vi.spyOn(globalThis, "fetch").mockReturnValue(respond({ ...OFFER, available: false }));
+    vi.spyOn(globalThis, "fetch").mockReturnValue(respond({ ...OFFER, amount: "0", available: false }));
     expect(await fetchOffer()).toBeNull();
+  });
+
+  it("is the catalogue's price, not for sale, while checkout is closed (P2, D-231)", async () => {
+    vi.spyOn(globalThis, "fetch").mockReturnValue(
+      respond({ amount: "30.000000", currency: "TWD", interval: "month", available: false }),
+    );
+    const offer = await fetchOffer("lumen", "month");
+    expect(offer).not.toBeNull();
+    expect(offer!.available).toBe(false);
+    expect(formatOffer(offer!, "zh-TW")).toBe("NT$30");
   });
 
   it("is nothing at all when the API cannot be reached, rather than an error", async () => {
@@ -121,7 +131,7 @@ describe("the paywall", () => {
   function mockCalls(
     year: unknown,
     checkout: () => Promise<Response>,
-    month: unknown = { ...MONTH, available: false },
+    month: unknown = { ...MONTH, amount: "0", available: false }, // no price in the catalogue
   ) {
     return vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
       const url = String(input);
@@ -252,6 +262,44 @@ describe("before membership opens (D-161)", () => {
     expect(buttons.length).toBeGreaterThan(0);
     expect(buttons.every((b) => b.disabled)).toBe(true);
     expect(screen.getByRole("status").textContent).toContain("即將開放");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/checkout"))).toBe(false);
+  });
+});
+
+describe("while checkout is closed (P2, D-231)", () => {
+  it("shows NT$30 a month, NT$300 a year faded, both 即將開放, and never starts a checkout", async () => {
+    // P2's API: the month priced and not on sale; the year with no price in the catalogue yet
+    const fetchMock = vi.fn<(url: RequestInfo | URL) => Promise<Response>>(async (url) => {
+      const month = String(url).includes("interval=month");
+      return new Response(
+        JSON.stringify({ amount: month ? "30.000000" : "0", currency: "TWD", interval: month ? "month" : "year", available: false }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    // even with the page's flag on: the API decides what is for sale
+    render(<MembersOnly lang="zh-TW" path="/news/zh-TW/articles/x" company="lumen" open />);
+    openPlans();
+    await waitFor(() => expect(screen.getByTestId("plan-year").getAttribute("data-reserved")).toBe("true"));
+
+    const month = screen.getByTestId("plan-month");
+    expect(month.textContent).toContain("NT$30");
+    expect(month.getAttribute("data-reserved")).toBeNull();
+    expect(month.className).not.toContain("opacity-50");
+    const monthButton = within(month).getByRole("button") as HTMLButtonElement;
+    expect(monthButton.disabled).toBe(true);
+    expect(monthButton.textContent).toBe("即將開放");
+
+    const year = screen.getByTestId("plan-year");
+    expect(year.textContent).toContain("NT$300");
+    expect(year.className).toContain("opacity-50");
+    const yearButton = within(year).getByRole("button") as HTMLButtonElement;
+    expect(yearButton.disabled).toBe(true);
+    expect(yearButton.textContent).toBe("即將開放");
+
+    expect(screen.getByTestId("members-only").textContent).not.toContain("NT$149");
+    fireEvent.click(monthButton);
+    fireEvent.click(yearButton);
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/checkout"))).toBe(false);
   });
 });

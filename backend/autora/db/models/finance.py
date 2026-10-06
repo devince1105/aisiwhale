@@ -11,8 +11,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from autora.db.base import (
@@ -26,9 +28,19 @@ from autora.db.base import (
 
 
 class CustomerKind(StrEnum):
+    """What a customer is to the company. The first three pay; ``comp`` does not (D-228)."""
+
     SUBSCRIBER = "subscriber"
     SPONSOR = "sponsor"
     CLIENT = "client"
+    COMP = "comp"
+    """Given access by an admin, for internal testing (D-228): no order, no payment, no revenue,
+    and never counted as a paying customer."""
+
+
+PAYING_KINDS = frozenset(
+    {CustomerKind.SUBSCRIBER.value, CustomerKind.SPONSOR.value, CustomerKind.CLIENT.value}
+)
 
 
 class Customer(IdMixin, TimestampMixin, Base):
@@ -180,6 +192,15 @@ class MembershipState(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+class GrantSource(StrEnum):
+    """Where a stretch of membership came from (D-228)."""
+
+    PAYMENT = "payment"
+    """Bought (P8 writes these; until then a purchase's stretch is on its payment)."""
+    ADMIN_COMP = "admin_comp"
+    """Given by an admin, for internal testing: no order, no payment, no ledger row."""
+
+
 class Price(IdMixin, TimestampMixin, Base):
     """What a product costs, and how long one payment of it lasts (T-701, D-024).
 
@@ -233,6 +254,56 @@ class Membership(IdMixin, TimestampMixin, Base):
     started_at: Mapped[datetime]
     """When the current unbroken stretch began: the first purchase, or the return after a lapse."""
     expires_at: Mapped[datetime]
+
+
+class MembershipGrant(IdMixin, CreatedAtMixin, Base):
+    """One stretch of membership given to a customer, and its history (D-228).
+
+    ``memberships`` keeps where access stands today; this keeps how it got there, one row a
+    grant. An admin's comp is ended by **revoking** it — ``revoked_at``, who and why are written
+    on the row, nothing is deleted — and the membership's end is worked out again from what is
+    still running.
+    """
+
+    __tablename__ = "membership_grants"
+    __table_args__ = (
+        check_in("source", GrantSource),
+        CheckConstraint("expires_at > started_at", name="expires_after_start"),
+        CheckConstraint(
+            "(source = 'payment') = (payment_id IS NOT NULL)", name="payment_only_when_paid"
+        ),
+        CheckConstraint(
+            "source <> 'admin_comp' OR length(btrim(coalesce(reason, ''))) > 0",
+            name="comp_has_a_reason",
+        ),
+        CheckConstraint(
+            "(revoked_at IS NULL) = (revoked_by IS NULL)"
+            " AND (revoked_at IS NULL) = (revoke_reason IS NULL)",
+            name="revocation_complete",
+        ),
+        CheckConstraint(
+            "revoked_at IS NULL OR revoked_at >= started_at", name="revoked_after_start"
+        ),
+    )
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id"), index=True)
+    membership_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("memberships.id"), index=True)
+    customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"), index=True)
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"))
+    source: Mapped[str]
+    started_at: Mapped[datetime]
+    expires_at: Mapped[datetime]
+    """Until when this grant gives access. A comp gives exactly this, not "this long from the
+    end of what they have"."""
+    reason: Mapped[str | None]
+    """Why it was given. Required for a comp."""
+    actor: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    """Who gave it, as the company records anybody (``Actor``): ``admin:<reader id>``, never an
+    address."""
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"))
+    revoked_at: Mapped[datetime | None]
+    revoked_by: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    revoke_reason: Mapped[str | None]
 
 
 class Payment(IdMixin, CreatedAtMixin, Base):

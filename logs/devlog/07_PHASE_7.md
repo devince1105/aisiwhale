@@ -3437,6 +3437,46 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 
 **結論**：P1（D-230）在正式環境完成。
 
+## P2-A：會員與權益的後端基礎（D-228、D-231、D-232）
+
+**目標**：照 `logs/platform/18_MONETIZATION_BLUEPRINT.md` 的 P2，讓 VIP 可以由 admin 給內部測試帳號（admin_comp），權益改由伺服器判斷，同時不實作真正付款。開工前先做唯讀盤點，回報 Reuse／Adapt／Block／New 與七個待決問題，使用者逐項拍板後才實作。
+
+**做了什麼**：
+- 遷移 0069（0067、0068 已被持股觀察用掉）：
+  - 新增 `membership_grants`：一筆授予一列，記錄來源（`payment`／`admin_comp`）、起訖、理由、actor（`admin:<reader id>`，不記 email）、可為空的 `payment_id`，以及撤銷的人、時間、理由；約束包括 `expires_at > started_at`、只有付款來源才有 `payment_id`、comp 必須有理由、撤銷欄位全有或全無。
+  - `customers.kind` 加 `comp`。
+  - 降級時若已有 comp 客戶或授予紀錄就拒絕，不刪歷史。
+- `company/memberships.py`：`grant_comp`、`revoke_grant`、`comp_grants` 等，**不呼叫 `purchase()`**，不建立訂單、付款、ledger，不增加營收。`memberships` 仍是「目前期間」，撤銷時從仍有效的付款期間與未撤銷的 comp 重算結束時間；同一瞬間授予又撤銷時，結束時間設為開始後一微秒以符合約束。
+- `company/customers.py`：`paying()` 只計 subscriber、sponsor、client，comp 不算付費客戶。
+- `accounts/entitlement.py`：伺服器端權限判斷。tier 為 `public`／`free`／`vip`，admin 另為旗標；能力只有 P2 需要的（`read_sign_in_sections`、`watchlist`、`read_vip_articles`、`admin`；`buy_membership` 在 P2 沒有人有）。`/api/auth/me` 回傳 `tier` 與 `capabilities`，文章付費牆改問它，前端 `isMember` 改看 `tier`。
+- `routers/admin_memberships.py`：`/api/admin/memberships/comps` 的授予、列表、查詢、撤銷，只限 admin 或 operator token。
+- 結帳：`entitlement.CHECKOUT_OPEN = False`，`POST /api/checkout` 在登入與商店金鑰檢查之前先回 403，不建立任何訂單；`/api/checkout/offer` 回目錄價格但 `available: false`。PayUni notify、下單與 `purchase()` 本身都沒改。
+
+**價格的轉折（D-231）**：第一版照 D-218 把目錄改成 NT$149（遷移會停用 NT$30、新增 NT$149，隱藏年繳）。使用者指出 PayUni 申請的是 NT$30，網站價格不能先和申請內容不一致，於是改回：遷移 0069 完全不碰價格；正式目錄維持月繳 NT$30（年繳沒有資料庫價格，前端以 NT$300 半透明顯示「即將開放」）；`seed_membership.py` 與前端備用價都和原本相同。為了讓「有價格但不可售」的月繳正常顯示、不被當成沒有價格，`fetchOffer` 對有目錄價的方案照樣回傳（帶 `available: false`），`PlanPicker` 只有 API 說可買才啟用按鈕。第一版遷移曾在本機開發資料庫跑過，把本機價格改成了 NT$149；已只把那次被改動的幾筆恢復原狀，正式環境從頭到尾只有唯讀查詢。
+
+**我犯的錯**：
+- 新測試原本計算「整個資料庫」的訂單數，acceptance 測試會真的寫入訂單，所以單獨跑是 0、跑全套就不是；改成只算該公司。
+- 持股觀察工作階段兩次在我跑全套時同時跑 pytest（共用 `<dev db>_test`），造成無關的隨機失敗；之後約定跑測試前先確認、跑完互相通知。
+
+### P8 前置條件：comp 撤銷後的付費權益（D-232）
+
+**問題**（P2-A review 找到，P2 不會觸發）：讀者在 comp 期間（到 Y）付費一個月時，`purchase()` 的 `_membership()` 會把付費期間接在 `memberships.expires_at` 之後，而這個結束時間已經包含 comp，所以付款紀錄是 Y～Y＋1 月。之後撤銷 comp，`revoke_grant` 的 `_period_end` 只取「仍有效的付款 `grants_until`」與「未撤銷 comp」的最大值；`memberships` 只存一段連續期間，結果「現在～Y」這段已撤銷的 comp 期間仍會給 VIP（多給）。P2 結帳全封鎖、正式環境 0 筆付款，所以現在不會發生。
+
+**定案行為**（D-232，採 B）：comp 在 T 被撤銷，付費權益從 T 立即開始，提供完整的購買期間；撤銷只移除 comp 的權益，不得移除或縮短付費權益，也不得保留 comp 的剩餘期間。
+
+**P8 要做的**：
+- Payment／Order 是交易事實，保持不可變，不為此改寫它們的期間。
+- 付款寫一筆 paid grant（`membership_grants`，`source='payment'`、`payment_id`），admin_comp 是 comp grant，兩者各自計算權益；有效 VIP 由所有有效 grant 的區間決定，不再只看 `memberships.expires_at`（它可以保留為快取或投影）。
+- 一筆在 comp 尚未結束時購買的 paid grant，其權益起點要能在 comp 撤銷時改成撤銷時刻、長度維持完整購買期間（例如把「排在 comp 之後」表示成「comp 結束或撤銷時開始」，而不是寫死的日期）。
+- `purchase()` 接續期間時不能把 comp 算成付費涵蓋的時間。
+- 寫 paid grant 時為 `payment_id` 加部分唯一索引。
+- 測試至少涵蓋：comp→付費→撤銷 comp（付費從撤銷時刻開始、長度完整、沒有空窗）、付費→comp→撤銷（付費不變）、兩筆 comp 重疊撤銷一筆、comp 自然到期後付費期間接續、續費。
+
+**驗證**：
+- 新測試：`test_membership_comps.py` 16 項（服務層）、`test_membership_p2_api.py` 13 項（API：結帳月繳與年繳都 403 且 0 筆訂單、報價 30／不可售、admin 授予與撤銷、非 admin 401、actor 以 id 記錄）、付費牆 comp 回歸 1 項；前端「P2 方案卡片」與「有價格但不可售」2 項。P8 會用到的付款流程測試改成在測試內自行打開結帳，保留為回歸測試。
+- 遷移 0069：臨時資料庫升級、重跑、降級、再升級正常；有 comp 時降級被拒絕；本機開發資料庫 `alembic check` 無差異。
+- `pytest backend`（單獨跑）2,277 項通過；vitest 72 個檔案 882 項通過；`make lint`、OpenAPI、event schema、`pnpm build` 通過。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |

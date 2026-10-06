@@ -135,8 +135,8 @@ describe("coming back from PAYUNi", () => {
     const until = "2026-10-24T08:00:00Z";
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(me({ reader_id: "r", email: "a@b.c", member_until: null }))
-      .mockResolvedValue(me({ reader_id: "r", email: "a@b.c", member_until: until }));
+      .mockResolvedValueOnce(me({ reader_id: "r", email: "a@b.c", member_until: null, tier: "free", capabilities: [] }))
+      .mockResolvedValue(me({ reader_id: "r", email: "a@b.c", member_until: until, tier: "vip", capabilities: ["read_vip_articles"] }));
     render(<PaymentDone lang="zh-TW" email="service@nanguado.com" every={1} />);
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("付款完成"));
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -144,7 +144,7 @@ describe("coming back from PAYUNi", () => {
 
   it("says not yet, and where to write, when the notification never comes", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(() =>
-      Promise.resolve(me({ reader_id: "r", email: "a@b.c", member_until: null })),
+      Promise.resolve(me({ reader_id: "r", email: "a@b.c", member_until: null, tier: "free", capabilities: [] })),
     );
     render(<PaymentDone lang="zh-TW" email="service@nanguado.com" every={1} />);
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("還沒收到付款確認"));

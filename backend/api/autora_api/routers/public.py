@@ -31,8 +31,8 @@ from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
-from autora.company import memberships
+from autora.accounts import SESSION_COOKIE, reader_for
+from autora.accounts.entitlement import Capability, entitlement_for
 from autora.company.office_theme import DEFAULT_OFFICE_THEME, OfficeTheme, office_theme
 from autora.db.models import Company
 from autora.db.session import get_sessionmaker
@@ -240,16 +240,13 @@ async def get_article(
     if not article.locked:
         return article
     reader = await reader_for(session, autora_reader)
-    if reader is None:
-        return article
-    if article.lock == "sign_in":  # 持股觀察: signed in is enough (D-159)
+    granted = await entitlement_for(session, reader, company_id=article.company_id)
+    if granted.can(Capability.READ_VIP_ARTICLES):
+        return await published_article(session, lang, slug, reader="member") or article
+    if article.lock == "sign_in" and granted.can(Capability.READ_SIGN_IN_SECTIONS):
+        # 持股觀察: signed in is enough (D-159)
         return await published_article(session, lang, slug, reader="signed_in") or article
-    until = await memberships.access_until(
-        session, company_id=article.company_id, customer_ref=customer_ref(reader.id)
-    )
-    if until is None:
-        return article
-    return await published_article(session, lang, slug, reader="member") or article
+    return article
 
 
 @lru_cache

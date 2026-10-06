@@ -1,5 +1,9 @@
 """T-702: buying a year over HTTP, from the checkout form to the notification that pays.
 
+**The P8 path, kept working while it is closed.** P2 closes checkout (D-218,
+``accounts.entitlement.CHECKOUT_OPEN``); these tests open it for themselves so the payment path
+P8 will reopen stays tested. That P2 refuses it is ``test_membership_p2_api``.
+
 PAYUNi's own servers are never contacted here. The notifications are sealed with the same shop
 secrets the app is configured with, which is exactly what PAYUNi does — so what these tests
 exercise is every check the handler makes, including the ones that decide a message is not
@@ -40,6 +44,14 @@ ADDRESS = "buyer@example.com"
 MER_ID = "TESTSHOP"
 KEY = "0123456789abcdef0123456789abcdef"
 IV = "0123456789abcdef"
+
+
+@pytest.fixture(autouse=True)
+def p8_checkout_open(monkeypatch):
+    """Checkout as P8 will open it: these tests are that path, not P2's closed door."""
+    from autora.accounts import entitlement
+
+    monkeypatch.setattr(entitlement, "CHECKOUT_OPEN", True)
 
 
 @pytest.fixture

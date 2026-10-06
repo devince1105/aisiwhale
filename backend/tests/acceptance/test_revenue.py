@@ -207,6 +207,10 @@ def _mentions(document: str, amount: Decimal) -> bool:
 async def test_a_payment_the_webhook_wrote_reaches_the_dashboard_and_the_review(
     committed, e2e_settings, monkeypatch
 ):
+    # the payment path as P8 will open it: P2 closes checkout (D-218), this test is the path
+    from autora.accounts import entitlement
+
+    monkeypatch.setattr(entitlement, "CHECKOUT_OPEN", True)
     # what the agents were handed, as the model saw it: the finance officer's review in
     # MEASURING and the CEO's in REVIEWING. Recorded, not changed: the answers are the script's.
     seen: dict[str, list[str]] = {}

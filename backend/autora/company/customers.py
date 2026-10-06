@@ -25,7 +25,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.company import events as company_events
-from autora.db.models import Customer, CustomerKind, Transaction, TransactionKind
+from autora.db.models import PAYING_KINDS, Customer, CustomerKind, Transaction, TransactionKind
 from autora.runtime.actor import Actor
 from autora.runtime.events.outbox import emit
 from autora.runtime.events.schema import new_event
@@ -172,13 +172,15 @@ async def paying(
     business_unit_id: uuid.UUID | None = None,
     at: datetime | None = None,
 ) -> int:
-    """How many customers were paying at a moment. Churned ones are counted until they left."""
+    """How many customers were paying at a moment. Churned ones are counted until they left.
+    A comp (D-228) is a customer the company gave access to, not one who pays: never counted."""
     at = at or datetime.now(UTC)
     stmt = (
         select(func.count())
         .select_from(Customer)
         .where(
             Customer.company_id == company_id,
+            Customer.kind.in_(PAYING_KINDS),
             Customer.acquired_at <= at,
             (Customer.churned_at.is_(None)) | (Customer.churned_at > at),
         )
