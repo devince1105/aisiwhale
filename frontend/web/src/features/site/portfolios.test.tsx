@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { PublicPortfolio, PublicPortfolioCard } from "./api";
 import { words } from "./i18n";
-import { PortfolioCards, PortfolioView, quarterOf, signedPct } from "./Portfolios";
+import { CEOS, PortfolioCards, PortfolioView, quarterOf, signedPct } from "./Portfolios";
 
 afterEach(cleanup);
 
@@ -63,6 +63,11 @@ describe("the 持股觀察 tab's cards", () => {
     expect(within(buffett).getByText(/申報日 2026年8月14日/).parentElement?.textContent).toContain("2026 年第 2 季");
     expect(within(buffett).getByRole("img", { name: "巴菲特的前五大持股" })).toBeTruthy();
 
+    // faces from Wikimedia Commons: Buffett's own; NVIDIA's card its chief's, as the brokers' do
+    expect(buffett.querySelector("image")?.getAttribute("href")).toBe("/people/buffett.jpg");
+    expect(nvidia.querySelector("image")?.getAttribute("href")).toBe("/ceos/nvda.jpg");
+    expect(screen.getByText(/人物照片來自維基共享資源/)).toBeTruthy();
+
     // NVIDIA's 13F is the company's, not Jensen Huang's; its return is still being checked
     expect(within(nvidia).getByRole("heading").textContent).toBe("輝達（公司）持股");
     expect(within(nvidia).getByText("整理中")).toBeTruthy();
@@ -114,6 +119,38 @@ describe("a person page", () => {
     expect(screen.getByText(/不是投資人的實際績效/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "SEC ↗" }).getAttribute("href")).toContain("0001193125-26-352200");
     expect(screen.getByRole("link", { name: "持股觀察" }).getAttribute("href")).toBe("/news/zh-TW?section=watch");
+    // a photo in the public domain is credited all the same, and said to be cropped
+    expect(screen.getByTestId("photo-credit").textContent).toBe(
+      "照片：USA International Trade Administration，公有領域，維基共享資源（已裁切）",
+    );
+  });
+
+  it("credits who is pictured when it is not the card's own subject, with the licence", () => {
+    render(<PortfolioView portfolio={{ ...PAGE, slug: "nvidia", name: "輝達", kind: "company" }} lang="zh-TW" loginHref="/x" />);
+    const credit = screen.getByTestId("photo-credit");
+    expect(credit.textContent).toBe("照片：黃仁勳（輝達執行長）；Peter Dasilva，CC BY 4.0，維基共享資源（已裁切）");
+    expect(within(credit).getByRole("link", { name: "CC BY 4.0" }).getAttribute("href")).toBe(
+      "https://creativecommons.org/licenses/by/4.0/",
+    );
+    expect(screen.getByText("這是公司本身的投資部位，不是負責人個人的持股。")).toBeTruthy();
+  });
+});
+
+describe("the Magnificent Seven's chief executives", () => {
+  it("named as Taiwan's press names them, each photo credited", () => {
+    expect(Object.fromEntries(Object.entries(CEOS).map(([ticker, ceo]) => [ticker, ceo.zh]))).toEqual({
+      AAPL: "John Ternus",
+      MSFT: "納德拉",
+      GOOGL: "皮查伊",
+      AMZN: "賈西",
+      META: "祖克柏",
+      NVDA: "黃仁勳",
+      TSLA: "馬斯克",
+    });
+    for (const ceo of Object.values(CEOS)) {
+      expect(ceo.photo.page).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+      expect(ceo.photo.license === null || /^CC BY \d\.\d$/.test(ceo.photo.license)).toBe(true); // no ShareAlike
+    }
   });
 });
 

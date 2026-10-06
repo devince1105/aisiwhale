@@ -3275,6 +3275,34 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - `vitest`：網站部分 184 項通過。全部 874 項中有 1 項失敗：`timeline.test.tsx` 的篩選測試超過 5 秒，當時機器負載 33，和這次無關，單獨重跑通過。
 - `tsc`、`eslint` 沒有錯誤。
 
+**頭像照片**（同日，使用者：「可以下載這四張照片」「可以下載 七巨頭的 CEO 大頭照片」）：
+- 只從維基共享資源取公有領域或 CC BY 的照片（不用 CC BY-SA），先用 API 讀授權與作者（不下載），列給使用者確認後才下載 600～960 px 的版本。
+- 用 Pillow 以臉為中心裁成正方形、縮成 256×256 JPEG（每張 10～16 KB），放在 `public/people/`、`public/ceos/`。
+- 投資人：
+  - 巴菲特：USA International Trade Administration，公有領域。
+  - 索羅斯：Aris Oikonomou – European Commission，CC BY 4.0。
+  - 木頭姐：Steve Jurvetson，CC BY 2.0。
+  - 艾克曼：Senate Democrats，CC BY 2.0。
+  - 段永平、杜肯米勒、貝瑞找不到可用的，維持文字圓章。
+- 七巨頭的執行長（2026 年 10 月）：
+  - 蘋果：John Ternus（9/1 接任；台灣媒體多直接寫英文名），Tessa Bury，CC BY 4.0，2026。
+  - 微軟：納德拉，OFFICIAL LEWEB PHOTOS，CC BY 2.0，2013。較新的都是 CC BY-SA。
+  - Alphabet：皮查伊，Lukasz Kobus – European Commission，CC BY 4.0。
+  - 亞馬遜：賈西，Steve Jurvetson，CC BY 2.0。原圖臉只有約 100 px，放大後較軟。
+  - Meta：祖克柏，Anthony Quintano，CC BY 2.0。
+  - 輝達：黃仁勳，Peter Dasilva，CC BY 4.0。
+  - 特斯拉：馬斯克，The White House，公有領域。
+- 用途：
+  - 輝達的卡片照截圖改用黃仁勳的照片。標題仍是「輝達（公司）持股」，署名寫「照片：黃仁勳（輝達執行長）；Peter Dasilva，CC BY 4.0，維基共享資源（已裁切）」。
+  - 其餘六位先放在 `CEOS`，等決定用在哪裡。
+- 署名：
+  - 個人頁的大環圈下方：作者、授權（連到授權條款）、原始頁面、已裁切；公有領域的也標。
+  - 卡片區下方一行「人物照片來自維基共享資源，作者與授權列在各人的頁面」（CC BY 允許以連結到載明資訊的頁面來標示）。
+- 測試：
+  - 卡片的照片、個人頁的署名全文（公有領域與 CC BY 各一）、授權連結。
+  - 七位執行長的台灣譯名（祖克柏，不是扎克伯格）。
+  - 每張都是維基共享資源、沒有 ShareAlike。
+
 
 ## D-216：閒置人物抬頭的角度加 10 度
 
@@ -3346,6 +3374,22 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 推送 `c47c6f8`～`c6ae1d3` 後，CI 執行編號 `37426944928` 的 e2e 失敗（web、python 通過），Render 因此沒有部署，正式站仍是舊版。原因是我在 P1 寫的 `e2e/stack.ts`：`adminCookies()` 在每個測試前都呼叫 `/api/admin/auth/login`，`office.spec.ts` 到第 11 次登入（`a hand-off walks across the 2D floor too`）時，被同一個 email 每 15 分鐘 10 次的登入上限擋下，回 429。頻率限制照設計運作，錯在測試登入太多次；本機沒有 Playwright 瀏覽器，所以推送前沒有跑到。
 
 修法只改 `frontend/web/e2e/stack.ts`：同一個測試環境只登入一次，之後重用同一個 cookie（登入失敗時不記住，下一個測試會重試）；正式程式、頻率限制、Google OAuth、CI 設定都沒動。驗證：用臨時腳本啟動真正的 e2e 環境（資料庫、API、worker），呼叫 `adminCookies()` 15 次——只登入 1 次、拿到同一個 cookie，`/api/admin/auth/me` 回 200；重啟 API 後同一個 cookie 仍是 200（session 存在資料庫）。`eslint e2e`、`tsc --noEmit` 沒有錯誤。完整的瀏覽器 e2e 留給 CI。
+
+### D-230 後續：正式環境驗證（部署與 Google OAuth）
+
+**部署**：推送 `cceaa70` 後 CI 執行編號 `37428817341` 全過（web vitest 869 項、python 2,241 項、e2e 15 項通過 1 項跳過），Render 隨即部署，`c47c6f8`～`cceaa70` 一起上線。正式 Neon 唯讀查詢：遷移版本 `0066`；4 位讀者各一筆 email 身分、4 筆都已驗證、0 筆有密碼；`login_tokens` 18 筆保留、`purpose` 都是 `login`；watchlist 95 筆不變。
+
+**唯讀冒煙測試**：`/api/auth/google/start` 回 303 到 Google，`redirect_uri` 與 Google Cloud 一字不差，`state`／`nonce`／`code_challenge`（S256）都在，網址沒有 client secret；`autora_oauth` cookie 為 HttpOnly、Secure、SameSite、Path `/api/auth/google`。不登入直接開授權網址，Google 導到正常的帳號登入頁（不是 `redirect_uri_mismatch`）。沒有 state 或亂寫 state 的 callback 都導回 `?error=google_failed` 且不設 session cookie；`/api/auth/link`、`/api/admin/auth/link` 回 404。
+
+**實際登入**（使用者在自己的 Chrome 選帳號，Claude 只用 Claude in Chrome 讀結果；內建瀏覽器登不了 Google，應是 Google 擋嵌入式瀏覽器）：
+- 讀者：Google 登入綁定到部署前就存在、email 已驗證的讀者（讀者仍 4 位、Google 身分 1 筆、0 筆重複 `sub`）；`/api/auth/me` 回 `email_verified: true`；頁面讀不到任何 cookie（HttpOnly）；localStorage 只有匿名閱讀統計的鍵，沒有登入憑證。
+- 登出：`/api/auth/me` 變 `null`，資料庫那筆 session 標記撤銷。再用同一個 Google 帳號登入：同一個 `reader_id`，沒有新增讀者或 Google 身分。
+- 後台：從後台入口用 Google 登入 `ADMIN_EMAILS` 上的帳號，回到 `/admin/dashboard`，`/api/admin/auth/me` 回 200；建立的是 14 天的 admin session，和 60 天的讀者 session 各自獨立。後台登出後 `/api/admin/auth/me` 與 `/api/companies` 都回 401，那筆 admin session 標記撤銷，讀者 session 不受影響。
+- 全程沒有新增讀者或身分；新增的只有 session、用過的 OAuth state 與頻率限制計數。
+
+**沒有在正式環境測的**：Google 未驗證的 email、對到「既有但未驗證」email 的 Google 帳號（正式環境的讀者都已驗證，不存在這種情況）、非 admin 帳號走後台入口（`not_admin`）。三者都有自動化測試涵蓋，使用者決定不為負向案例在正式環境多產生 OAuth 資料。
+
+**結論**：P1（D-230）在正式環境完成。
 
 ## 提交紀錄
 
@@ -3523,6 +3567,8 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 | `c47c6f8` | 2026-10-06 | D-218～D-229：會員、鯨幣與 AI Office 架構藍圖 v1.2（`logs/platform/18_MONETIZATION_BLUEPRINT.md`）與 12 項決定；`logs/README.md` 索引 | ❌ 執行編號 `37426944928`（與 `c6ae1d3` 一起推送；web、python 通過，e2e 的 admin 登入撞到頻率限制，見「D-230 後續：e2e」） |
 | `89b69a1` | 2026-10-06 | D-230（P1）：Email＋密碼與 Google OAuth 登入、`reader_identities`（遷移 0066）、驗證 email、忘記與重設密碼、存在資料庫的頻率限制、後台改用同一套登入（`ADMIN_EMAILS` 且 email 已驗證）、移除 magic link 登入與瀏覽器的操作者權杖 | ❌ 執行編號 `37426944928`（與 `c6ae1d3` 一起推送；web、python 通過，e2e 的 admin 登入撞到頻率限制，見「D-230 後續：e2e」） |
 | `c6ae1d3` | 2026-10-06 | D-230 後續：服務條款與隱私權政策改成 Email＋密碼與 Google 的說法；保存期間只描述實際行為 | ❌ 執行編號 `37426944928`（同上） |
+| `cceaa70` | 2026-10-06 | D-230 後續：e2e 同一個測試環境只登入 admin 一次、重用 cookie（每個測試都登入會撞到登入頻率限制） | ✅ 執行編號 `37428817341`（e2e 7 分 13 秒、python 6 分 7 秒、web 1 分 19 秒）；`c47c6f8`～`cceaa70` 隨這次一起部署 |
 | `db6a89a` | 2026-10-06 | D-217（HD-04）：名人卡片的數字（前 10 大、兩筆動作、模擬近一年報酬率），13F 自己的價格合用、Tiingo 只補答不出來的、Finnhub 最新價；等 Tiingo 時不給數字（遷移 0065） | ✅ 執行編號 `37408511723` |
 | `2035d5d` | 2026-10-06 | D-217（HD-04）：卡片排程改成每 20 分鐘、每次約 80 秒，不再擋住 worker；報價存在 `stock_quotes`（遷移 0067，接在登入改版的 0066 之後） | ✅ 執行編號 `37430280273` |
 | `a1bea0c` | 2026-10-06 | D-217（HD-05）：公開 API（卡片清單、個人頁，未登入只給 10 列）、名人中英文名稱與網址代號、個股頁持有人的英文名；個人頁的持股表與逐季報酬由卡片排程算好（遷移 0068） | ✅ 執行編號 `37431813635` |
+| `930a5d2` | 2026-10-06 | D-217（HD-06）：網站的持股觀察卡片（環圈、報酬率、兩筆動作）與個人頁（完整持股表、逐季報酬、SEC 申報）；台灣用語測試 | ✅ 執行編號 `37434336139` |

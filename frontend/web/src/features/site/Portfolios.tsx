@@ -49,8 +49,146 @@ const CHANGE_TONE: Record<string, string> = {
   unchanged: "text-muted",
 };
 
-/** The face at the ring's centre until a photo is in (D-217: a freely licensed one, credited):
- * a person's first character, a company's or a fund's name. */
+export interface Photo {
+  src: string;
+  author: string;
+  /** ``CC BY 4.0``; null: in the public domain. */
+  license: string | null;
+  licenseUrl: string | null;
+  /** The file's page at Wikimedia Commons. */
+  page: string;
+  /** Who is in it, where that is not the card's own subject: NVIDIA's card shows its chief. */
+  pictured?: { zh: string; en: string };
+}
+
+export interface Ceo {
+  zh: string;
+  en: string;
+  photo: Photo;
+}
+
+/** The Magnificent Seven's chief executives as of October 2026 (Apple's since 1 September),
+ * their names as Taiwan's press writes them (祖克柏, not 扎克伯格; John Ternus, as he is
+ * written), with photos in the public domain or under CC BY from Wikimedia Commons, cropped
+ * square to the face. */
+export const CEOS: Record<string, Ceo> = {
+  AAPL: {
+    zh: "John Ternus",
+    en: "John Ternus",
+    photo: {
+      src: "/ceos/aapl.jpg",
+      author: "Tessa Bury",
+      license: "CC BY 4.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+      page: "https://commons.wikimedia.org/wiki/File:John_Ternus_at_the_Apple_50th_Anniversary_Kickoff_(cropped).jpg",
+    },
+  },
+  MSFT: {
+    zh: "納德拉",
+    en: "Satya Nadella",
+    photo: {
+      src: "/ceos/msft.jpg",
+      author: "OFFICIAL LEWEB PHOTOS",
+      license: "CC BY 2.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+      page: "https://commons.wikimedia.org/wiki/File:Satya_Nadella.jpg",
+    },
+  },
+  GOOGL: {
+    zh: "皮查伊",
+    en: "Sundar Pichai",
+    photo: {
+      src: "/ceos/googl.jpg",
+      author: "Lukasz Kobus – European Commission",
+      license: "CC BY 4.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+      page: "https://commons.wikimedia.org/wiki/File:Sundar_Pichai_-_2023_(cropped).jpg",
+    },
+  },
+  AMZN: {
+    zh: "賈西",
+    en: "Andy Jassy",
+    photo: {
+      src: "/ceos/amzn.jpg",
+      author: "Steve Jurvetson",
+      license: "CC BY 2.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+      page: "https://commons.wikimedia.org/wiki/File:Andy_Jassy_in_2016.jpg",
+    },
+  },
+  META: {
+    zh: "祖克柏",
+    en: "Mark Zuckerberg",
+    photo: {
+      src: "/ceos/meta.jpg",
+      author: "Anthony Quintano",
+      license: "CC BY 2.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+      page: "https://commons.wikimedia.org/wiki/File:Mark_Zuckerberg_F8_2019_Keynote_(32830578717)_(cropped).jpg",
+    },
+  },
+  NVDA: {
+    zh: "黃仁勳",
+    en: "Jensen Huang",
+    photo: {
+      src: "/ceos/nvda.jpg",
+      author: "Peter Dasilva",
+      license: "CC BY 4.0",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+      page: "https://commons.wikimedia.org/wiki/File:Jensen_Huang_(cropped)_(2024).jpg",
+    },
+  },
+  TSLA: {
+    zh: "馬斯克",
+    en: "Elon Musk",
+    photo: {
+      src: "/ceos/tsla.jpg",
+      author: "The White House",
+      license: null,
+      licenseUrl: null,
+      page: "https://commons.wikimedia.org/wiki/File:The_White_House_-_54409525537_(cropped).jpg",
+    },
+  },
+};
+
+/** Faces at the rings' centres (D-217): photos in the public domain or under CC BY from
+ * Wikimedia Commons, cropped square to the face, credited on each person page. A person without
+ * one (none found for 段永平, 杜肯米勒, 麥可・貝瑞) keeps a monogram; a fund its name. */
+export const PHOTOS: Record<string, Photo> = {
+  buffett: {
+    src: "/people/buffett.jpg",
+    author: "USA International Trade Administration",
+    license: null,
+    licenseUrl: null,
+    page: "https://commons.wikimedia.org/wiki/File:Warren_Buffett_at_the_2015_SelectUSA_Investment_Summit_(cropped).jpg",
+  },
+  soros: {
+    src: "/people/soros.jpg",
+    author: "Aris Oikonomou – European Commission",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+    page: "https://commons.wikimedia.org/wiki/File:George_Soros_-_May_31,_2017.jpg",
+  },
+  "cathie-wood": {
+    src: "/people/cathie-wood.jpg",
+    author: "Steve Jurvetson",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+    page: "https://commons.wikimedia.org/wiki/File:Cathie_Wood.jpg",
+  },
+  ackman: {
+    src: "/people/ackman.jpg",
+    author: "Senate Democrats",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+    page: "https://commons.wikimedia.org/wiki/File:Bill_Ackman,_2016.jpg",
+  },
+  // the company's card shows its chief, as the brokers' cards do; the title says whose holdings
+  // they are (輝達（公司）持股) and the credit who is pictured
+  nvidia: { ...CEOS.NVDA.photo, pictured: { zh: "黃仁勳（輝達執行長）", en: "Jensen Huang, NVIDIA's chief executive" } },
+};
+
+/** Where there is no photo: a person's first character, a company's or a fund's name. */
 function Monogram({ card, lang, size }: { card: Pick<Card, "name" | "kind">; lang: Lang; size: number }) {
   const text =
     card.kind !== "person"
@@ -78,10 +216,12 @@ export function Ring({
   lang,
   size = 112,
 }: {
-  card: Pick<Card, "name" | "kind" | "holdings" | "others_weight">;
+  card: Pick<Card, "slug" | "name" | "kind" | "holdings" | "others_weight">;
   lang: Lang;
   size?: number;
 }) {
+  const photo = PHOTOS[card.slug];
+  const clip = `face-${card.slug}-${size}`;
   const r = 38;
   const around = 2 * Math.PI * r;
   const arcs: { holding: Holding | null; weight: number; start: number }[] = [];
@@ -132,9 +272,18 @@ export function Ring({
         );
       })}
       <circle cx="50" cy="50" r="27" className="fill-surface" />
-      <g className="text-ink">
-        <Monogram card={card} lang={lang} size={100} />
-      </g>
+      {photo ? (
+        <>
+          <clipPath id={clip}>
+            <circle cx="50" cy="50" r="26" />
+          </clipPath>
+          <image href={photo.src} x="24" y="24" width="52" height="52" clipPath={`url(#${clip})`} preserveAspectRatio="xMidYMid slice" />
+        </>
+      ) : (
+        <g className="text-ink">
+          <Monogram card={card} lang={lang} size={100} />
+        </g>
+      )}
     </svg>
   );
 }
@@ -221,7 +370,34 @@ export function PortfolioCards({ cards, lang }: { cards: Card[]; lang: Lang }) {
           </li>
         ))}
       </ul>
+      {cards.some((card) => PHOTOS[card.slug]) ? <p className="mt-3 text-xs text-muted">{w.photosNote}</p> : null}
     </section>
+  );
+}
+
+/** A photo's credit, as its licence asks: who took it, under what, from where, and that it was
+ * cropped. */
+function Credit({ photo, lang }: { photo: Photo; lang: Lang }) {
+  const w = words(lang).portfolio;
+  return (
+    <p className="mt-2 text-xs text-muted" data-testid="photo-credit">
+      {w.photo}
+      {photo.pictured ? w.pictured(lang.startsWith("zh") ? photo.pictured.zh : photo.pictured.en) : null}
+      {photo.author}
+      {w.sep}
+      {photo.licenseUrl ? (
+        <a href={photo.licenseUrl} rel="license noopener" className="hover:text-accent hover:underline">
+          {photo.license}
+        </a>
+      ) : (
+        w.publicDomain
+      )}
+      {w.sep}
+      <a href={photo.page} rel="noopener" className="hover:text-accent hover:underline">
+        {w.commons}
+      </a>
+      {w.cropped}
+    </p>
   );
 }
 
@@ -270,6 +446,7 @@ export function PortfolioView({
           ) : null}
         </div>
       </header>
+      {PHOTOS[portfolio.slug] ? <Credit photo={PHOTOS[portfolio.slug]} lang={lang} /> : null}
 
       <details className="mt-6 rounded-lg border border-line bg-surface px-4 py-3 text-sm">
         <summary className="cursor-pointer font-semibold">{p.method}</summary>
