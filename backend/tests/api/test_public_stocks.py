@@ -57,6 +57,10 @@ async def test_the_stock_page_api(public, committed):
             None,
         )
         assert [h["investor"] for h in body["holders"]] == ["巴菲特"]
+        english = await public.get(
+            "/api/public/stocks/aapl", params={"lang": "en", "company": slug}
+        )
+        assert [h["investor"] for h in english.json()["holders"]] == ["Warren Buffett"]  # HD-05
         assert (body["articles"], body["articles_total"]) == ([], 0)
         en = await public.get("/api/public/stocks/2330", params={"lang": "en", "company": slug})
         assert (en.json()["name"], en.json()["holders"]) == ("TSMC", [])

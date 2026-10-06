@@ -13,6 +13,9 @@ nothing about the reader either way.
   tracked investors' 13F positions in it, our articles that name it (D-049)
 - GET  /api/public/stocks/{symbol}/history: its daily bars for the chart (D-059)
 - GET  /api/public/stocks/{symbol}/intraday: a US stock's last five days in 15-minute bars
+- GET  /api/public/holdings?lang=zh-TW[&company=<slug>]: the holdings dashboard's cards (HD-05)
+- GET  /api/public/holdings/people/{slug}?lang=zh-TW[&company=<slug>]: a person page — the whole
+  table only for a reader signed in (D-159), the first ten for anybody
 - POST /api/analytics/beacon: {article_id, lang, event_type, session_hash} -> 204
 """
 
@@ -26,6 +29,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Path, Query, Response, status
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.accounts import SESSION_COOKIE, customer_ref, reader_for
 from autora.company import memberships
@@ -59,6 +63,12 @@ from autora.domains.newsroom.market_strip import (
 )
 from autora.domains.newsroom.models import AnalyticsEventType
 from autora.domains.newsroom.official_trades import PublicTrade, trades_for
+from autora.domains.newsroom.portfolios import (
+    PublicPortfolio,
+    PublicPortfolioCard,
+    cards,
+    portfolio,
+)
 from autora.domains.newsroom.price_history import (
     IntradayCache,
     PublicHistory,
@@ -493,7 +503,7 @@ async def get_stock(
         market=stock.market,
         name=stock.zh if lang.startswith("zh") else stock.en,
         quote=quote,
-        holders=await holders(session, stock, company_id=company_id),
+        holders=await holders(session, stock, company_id=company_id, lang=lang),
         trades=await trades_for(session, stock.tickers, company_id=company_id),
         articles=await published_articles_mentioning(
             session, lang, _terms(stock), company_slug=company, offset=articles_offset
@@ -505,6 +515,50 @@ async def get_stock(
         tracks_13f=bool(stock.cusips),
         exchange=stock.exchange,
     )
+
+
+async def _company_id(session: AsyncSession, company: str | None) -> uuid.UUID | None:
+    """The company a public page asks about by its slug; None: not narrowed (404: no such)."""
+    if company is None:
+        return None
+    company_id = await session.scalar(select(Company.id).where(Company.slug == company))
+    if company_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no company {company}")
+    return company_id
+
+
+@router.get("/api/public/holdings")
+async def get_holdings(
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+    company: Annotated[str | None, Query(max_length=100)] = None,
+) -> list[PublicPortfolioCard]:
+    """The holdings dashboard's cards (HD-05): each followed 13F filer's largest holdings, its
+    latest moves and its simulated one-year return. Nothing in them depends on the reader."""
+    company_id = await _company_id(session, company)
+    response.headers["Cache-Control"] = "public, max-age=600"  # a run every twenty minutes
+    return await cards(session, company_id, lang)
+
+
+@router.get("/api/public/holdings/people/{slug}")
+async def get_portfolio(
+    slug: Annotated[str, Path(max_length=50)],
+    session: Session,
+    response: Response,
+    lang: Annotated[str, Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)],
+    company: Annotated[str | None, Query(max_length=100)] = None,
+    autora_reader: SessionCookie = None,
+) -> PublicPortfolio:
+    """A person page (HD-05). Open to anybody; the whole table only for a reader signed in —
+    free (D-159) — so the answer differs by reader and is not to be kept by anybody between."""
+    company_id = await _company_id(session, company)
+    reader = await reader_for(session, autora_reader)
+    page = await portfolio(session, company_id, slug, lang, signed_in=reader is not None)
+    if page is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no holdings page for {slug}")
+    response.headers["Cache-Control"] = "private, no-store"
+    return page
 
 
 def _terms(stock) -> tuple[str, ...]:

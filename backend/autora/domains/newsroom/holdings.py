@@ -149,6 +149,123 @@ def investor_name(source: Source) -> str:
     return prefix.split("（")[0].split("(")[0].strip() or source.name
 
 
+@dataclass(frozen=True)
+class Profile:
+    """Who a followed 13F filer is, in both languages (HD-05): the holdings dashboard's cards and
+    pages, and the stock pages' holders in English."""
+
+    slug: str
+    """The person's page: ``/news/<lang>/holdings/people/<slug>``."""
+    zh: str
+    en: str
+    kind: str
+    """``person``; ``company`` — a company's own investments, not its chief's (NVIDIA's 13F is
+    not Jensen Huang's, D-217); ``fund`` — a state investor."""
+    entity_zh: str
+    entity_en: str
+    """Who files: the manager, the company, the fund."""
+
+    def name(self, lang: str) -> str:
+        return self.zh if lang.startswith("zh") else self.en
+
+    def entity(self, lang: str) -> str:
+        return self.entity_zh if lang.startswith("zh") else self.entity_en
+
+
+PROFILES: dict[str, Profile] = {
+    cik: profile
+    for cik, profile in (
+        (
+            "1067983",
+            Profile(
+                "buffett",
+                "巴菲特",
+                "Warren Buffett",
+                "person",
+                "波克夏海瑟威",
+                "Berkshire Hathaway",
+            ),
+        ),
+        ("1045810", Profile("nvidia", "輝達", "NVIDIA", "company", "輝達", "NVIDIA")),
+        (
+            "1021944",
+            Profile("temasek", "淡馬錫", "Temasek", "fund", "淡馬錫控股", "Temasek Holdings"),
+        ),
+        (
+            "1029160",
+            Profile(
+                "soros",
+                "索羅斯",
+                "George Soros",
+                "person",
+                "索羅斯基金管理",
+                "Soros Fund Management",
+            ),
+        ),
+        (
+            "1697748",
+            Profile(
+                "cathie-wood",
+                "木頭姐",
+                "Cathie Wood",
+                "person",
+                "方舟投資",
+                "ARK Investment Management",
+            ),
+        ),
+        (
+            "1759760",
+            Profile(
+                "duan-yongping",
+                "段永平",
+                "Duan Yongping",
+                "person",
+                "H&H 國際投資",
+                "H&H International Investment",
+            ),
+        ),
+        (
+            "1536411",
+            Profile(
+                "druckenmiller",
+                "杜肯米勒",
+                "Stanley Druckenmiller",
+                "person",
+                "杜肯家族辦公室",
+                "Duquesne Family Office",
+            ),
+        ),
+        (
+            "2026053",
+            Profile(
+                "ackman", "比爾・艾克曼", "Bill Ackman", "person", "潘興廣場", "Pershing Square"
+            ),
+        ),
+        (
+            "1649339",
+            Profile(
+                "burry",
+                "麥可・貝瑞",
+                "Michael Burry",
+                "person",
+                "Scion 資產管理",
+                "Scion Asset Management",
+            ),
+        ),
+    )
+}
+"""The followed 13F filers by CIK, in the dashboard's order (D-217): its own cards first — the
+two the screenshot opened with, then the state investor and the macro trader — then the rest."""
+
+
+def holder_name(source: Source, cik: str, lang: str) -> str:
+    """How a page in ``lang`` names a holder: its profile, or the source's own name."""
+    profile = PROFILES.get(cik.lstrip("0"))
+    if profile is not None:
+        return profile.name(lang)
+    return investor_name(source)
+
+
 def thirteenf_sources(sources: list[Source]) -> list[tuple[Source, str]]:
     """The company's 13F sources and each one's filer CIK (from its EDGAR feed's address)."""
     out = []
@@ -376,9 +493,14 @@ class PublicHolder(BaseModel):
 
 
 async def holders(
-    session: AsyncSession, stock: Stock, *, company_id: uuid.UUID | None = None
+    session: AsyncSession,
+    stock: Stock,
+    *,
+    company_id: uuid.UUID | None = None,
+    lang: str = "zh-TW",
 ) -> list[PublicHolder]:
-    """Who, of the tracked investors, holds (or has just sold) the stock, largest first."""
+    """Who, of the tracked investors, holds (or has just sold) the stock, largest first; named
+    in ``lang`` (HD-05)."""
     if not stock.cusips:
         return []
     query = (
@@ -394,7 +516,7 @@ async def holders(
         value = int(row.value_usd)
         out.append(
             PublicHolder(
-                investor=investor_name(source),
+                investor=holder_name(source, row.cik, lang),
                 filer=row.filer,
                 period=row.period,
                 previous_period=row.previous_period,

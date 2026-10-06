@@ -46,14 +46,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
-from autora.domains.newsroom import cusips
-from autora.domains.newsroom.holdings import thirteenf_sources
+from autora.domains.newsroom import cusips, thirteenf
+from autora.domains.newsroom.holdings import PROFILES, STOCKS, Profile, thirteenf_sources
 from autora.domains.newsroom.models import (
     PortfolioPosition,
     PortfolioQuarter,
@@ -302,6 +304,20 @@ class Simulated:
     pending: int = 0
     """Holdings waiting for Tiingo: while any are, no number — the ones it is asked about are the
     biggest moves, and leaving them out would bend the return."""
+    stretches: tuple[Stretch, ...] = ()
+
+
+@dataclass(frozen=True)
+class Stretch:
+    """One quarter's holdings held to the next quarter's end (or the latest quote): a point of
+    the person page's chart (HD-05)."""
+
+    start: date
+    end: date | None
+    """None while the latest quote is not known."""
+    growth: Decimal | None
+    """The stretch's price ratio, weighted; None when nothing in it was priced."""
+    coverage: Decimal
 
 
 def simulate(
@@ -316,6 +332,7 @@ def simulate(
         return Simulated(None, None, None, None)  # not a year of 13Fs kept
     stretches = [(before[-1], start), *((q, q.period) for q in ordered if q.period > start)]
     growth, least, through = Decimal(1), Decimal(1), None
+    done: list[Stretch] = []
     for i, (quarter, begin) in enumerate(stretches):
         end = stretches[i + 1][1] if i + 1 < len(stretches) else None
         total = Decimal(quarter.value)
@@ -338,68 +355,112 @@ def simulate(
         least = min(least, priced / total)
         if priced:
             growth *= grown / priced
+        done.append(
+            Stretch(begin, end or through, grown / priced if priced else None, priced / total)
+        )
     pending = prices.wanted - wanted_before
     if least < MIN_COVERAGE or through is None or pending:
-        return Simulated(None, start, through, least, pending)
-    return Simulated(growth - 1, start, through, least)
+        return Simulated(None, start, through, least, pending, tuple(done))
+    return Simulated(growth - 1, start, through, least, 0, tuple(done))
 
 
 @dataclass(frozen=True)
 class Move:
+    """A holding of the latest quarter, or of the one before, compared (HD-05's table; the card's
+    two biggest moves are its largest)."""
+
     cusip: str
     issuer: str
-    change: str
+    change: str | None
+    """``PositionChange``'s; None while a possible split is not known (it waits for Tiingo)."""
     shares: int
     previous_shares: int
     """Adjusted for a split between the two quarters."""
     value_change: int
     """US$, the shares bought or sold at the quarter's end price (sold out: the one before's)."""
+    value: int = 0
+    """US$ held at the latest quarter's end; 0 when sold out."""
+
+
+def compare(latest: Quarter, previous: Quarter | None, prices: Prices) -> list[Move]:
+    """Every holding of the latest quarter, then the ones sold out since the one before, largest
+    first. A stock whose 13F price moved outside ``CHECK`` may have split — its shares then
+    change without a trade — so its change waits (None) until Tiingo says how much it split."""
+    now = {h.cusip: h for h in latest.held}
+    before = {h.cusip: h for h in previous.held} if previous else {}
+    out = []
+    for cusip in now.keys() | before.keys():
+        n, b = now.get(cusip), before.get(cusip)
+        prev = b.shares if b else 0
+        known = True
+        if n and b:
+            p_now, p_before = (
+                prices.implied.get((cusip, latest.period)),
+                prices.implied.get((cusip, previous.period if previous else latest.period)),
+            )
+            if p_now and p_before and not CHECK[0] <= p_now / p_before <= CHECK[1]:
+                symbol = prices.symbols.get(cusip)
+                factor = (
+                    prices.split_factor(symbol, previous.period, latest.period)
+                    if symbol and previous
+                    else None
+                )
+                if factor is None:
+                    known = False
+                else:
+                    prev = int(prev * factor)
+        shares = n.shares if n else 0
+        holding = n or b
+        assert holding is not None
+        price = Decimal(holding.value) / holding.shares if holding.shares else Decimal(0)
+        if not known:
+            change = None
+        elif previous is None:
+            change = None  # nothing to compare with
+        elif b is None:
+            change = PositionChange.NEW.value
+        elif n is None:
+            change = PositionChange.SOLD_OUT.value
+        elif shares == prev:
+            change = PositionChange.UNCHANGED.value
+        else:
+            change = (PositionChange.INCREASED if shares > prev else PositionChange.DECREASED).value
+        out.append(
+            Move(
+                cusip,
+                holding.issuer,
+                change,
+                shares,
+                prev,
+                int((shares - prev) * price) if change else 0,
+                n.value if n else 0,
+            )
+        )
+    return sorted(
+        out,
+        key=lambda m: (
+            m.value == 0,
+            -m.value,
+            -(before[m.cusip].value if m.cusip in before else 0),
+            m.cusip,
+        ),
+    )
+
+
+MOVED = {
+    PositionChange.NEW,
+    PositionChange.INCREASED,
+    PositionChange.DECREASED,
+    PositionChange.SOLD_OUT,
+}
 
 
 def moves(
     latest: Quarter, previous: Quarter | None, prices: Prices, count: int = MOVES
 ) -> list[Move]:
     """The latest quarter's biggest moves against the one before (none bought or sold: none)."""
-    if previous is None:
-        return []
-    now = {h.cusip: h for h in latest.held}
-    before = {h.cusip: h for h in previous.held}
-    out = []
-    for cusip in now.keys() | before.keys():
-        n, b = now.get(cusip), before.get(cusip)
-        prev = b.shares if b else 0
-        if n and b:
-            p_now, p_before = (
-                prices.implied.get((cusip, latest.period)),
-                prices.implied.get((cusip, previous.period)),
-            )
-            if p_now and p_before and not CHECK[0] <= p_now / p_before <= CHECK[1]:
-                symbol = prices.symbols.get(cusip)
-                factor = (
-                    prices.split_factor(symbol, previous.period, latest.period) if symbol else None
-                )
-                if factor is None:
-                    continue  # it may have split: not a move until Tiingo says how much
-                prev = int(prev * factor)
-        shares = n.shares if n else 0
-        if shares == prev:
-            continue
-        holding = n or b
-        assert holding is not None
-        price = Decimal(holding.value) / holding.shares if holding.shares else Decimal(0)
-        change = (
-            PositionChange.NEW
-            if b is None
-            else PositionChange.SOLD_OUT
-            if n is None
-            else PositionChange.INCREASED
-            if shares > prev
-            else PositionChange.DECREASED
-        )
-        out.append(
-            Move(cusip, holding.issuer, change.value, shares, prev, int((shares - prev) * price))
-        )
-    return sorted(out, key=lambda m: (-abs(m.value_change), m.cusip))[:count]
+    moved = [m for m in compare(latest, previous, prices) if m.change in MOVED]
+    return sorted(moved, key=lambda m: (-abs(m.value_change), m.cusip))[:count]
 
 
 @dataclass(frozen=True)
@@ -668,6 +729,30 @@ async def refresh_portfolio_stats(
                 }
                 for m in moves(latest, previous, prices)
             ],
+            "positions": [
+                {
+                    "cusip": m.cusip,
+                    "symbol": symbols.get(m.cusip),
+                    "issuer": m.issuer,
+                    "change": m.change,
+                    "shares": m.shares,
+                    "previous_shares": m.previous_shares,
+                    "value_usd": m.value,
+                    "weight": float(round(Decimal(m.value) / latest.value, 6))
+                    if latest.value
+                    else 0.0,
+                }
+                for m in compare(latest, previous, prices)
+            ],
+            "stretches": [
+                {
+                    "start": st.start.isoformat(),
+                    "end": st.end.isoformat() if st.end else None,
+                    "growth": float(round(st.growth, 6)) if st.growth is not None else None,
+                    "coverage": float(round(st.coverage, 4)),
+                }
+                for st in result.stretches
+            ],
             "return_pct": round(result.growth, 6) if result.growth is not None else None,
             "return_start": result.start,
             "return_through": result.through,
@@ -717,3 +802,231 @@ class PortfolioKeeper:
             )
 
         return handler
+
+
+# --- what the site reads (HD-05) ----------------------------------------------------------------
+
+RING = 5
+"""The card's ring: the five largest, and the rest as one."""
+FREE_ROWS = 10
+"""A person page's table for a reader not signed in: the ten largest (D-159: the page is open,
+its depth is a free sign-in away)."""
+
+
+class PublicHolding(BaseModel):
+    symbol: str | None
+    name: str
+    """The site's own name for a stock it has a page for (蘋果), else the issuer as filed."""
+    weight: float
+
+
+class PublicMove(BaseModel):
+    symbol: str | None
+    name: str
+    change: str
+    shares: int
+    previous_shares: int
+    shares_change_pct: float | None
+    """Added or cut: by how much (+25.0); a new or sold-out holding has none."""
+    value_change_usd: int
+
+
+class PublicPortfolioCard(BaseModel):
+    slug: str
+    name: str
+    kind: str
+    """``person``, ``company`` (its own investments, not its chief's) or ``fund``."""
+    entity: str
+    """Who files the 13F."""
+    period: date
+    filed: date
+    return_pct: float | None
+    """The simulated one-year return, as a fraction; None when not given (see ``pending``)."""
+    return_start: date | None
+    return_through: date | None
+    coverage: float | None
+    pending: int
+    """Holdings still waiting for a price check: while any are, no return (整理中)."""
+    holdings: list[PublicHolding]
+    others_weight: float
+    moves: list[PublicMove]
+
+
+class PublicPosition(BaseModel):
+    symbol: str | None
+    name: str
+    change: str | None
+    """None: not known yet (a possible split), or nothing to compare with."""
+    shares: int
+    previous_shares: int
+    shares_change_pct: float | None
+    value_usd: int
+    weight: float
+
+
+class PublicStretch(BaseModel):
+    start: date
+    end: date | None
+    growth: float | None
+    coverage: float
+
+
+class PublicFiledQuarter(BaseModel):
+    period: date
+    filed: date
+    filings: list[str]
+    """Each filing's page at SEC."""
+
+
+class PublicPortfolio(PublicPortfolioCard):
+    long_value_usd: int
+    positions: list[PublicPosition]
+    positions_total: int
+    locked: bool
+    """The table stops at ``FREE_ROWS``: signing in (free) shows it all."""
+    stretches: list[PublicStretch]
+    quarters: list[PublicFiledQuarter]
+
+
+def _shown(symbol: str | None, issuer: str, lang: str) -> str:
+    stock = STOCKS.get(symbol or "")
+    if stock is None:
+        return issuer
+    return stock.zh if lang.startswith("zh") else stock.en
+
+
+def _pct(change: str | None, shares: int, previous: int) -> float | None:
+    if change not in (PositionChange.INCREASED, PositionChange.DECREASED) or not previous:
+        return None
+    return round((shares - previous) / previous * 100, 2)
+
+
+async def _followed(
+    session: AsyncSession, company_id: uuid.UUID | None
+) -> list[tuple[Source, str, Profile, PortfolioStat]]:
+    """The company's 13F sources with a profile and a card, in the profiles' order."""
+    query = select(Source)
+    if company_id is not None:
+        query = query.where(Source.company_id == company_id)
+    sources = list((await session.scalars(query)).all())
+    stats = {
+        stat.source_id: stat
+        for stat in (
+            await session.scalars(
+                select(PortfolioStat).where(PortfolioStat.source_id.in_([s.id for s in sources]))
+            )
+        ).all()
+    }
+    order = list(PROFILES)
+    out, seen = [], set()
+    for source, cik in sorted(
+        thirteenf_sources(sources),
+        key=lambda pair: order.index(pair[1]) if pair[1] in PROFILES else len(order),
+    ):
+        profile, stat = PROFILES.get(cik), stats.get(source.id)
+        if profile is None or stat is None or profile.slug in seen:
+            continue
+        seen.add(profile.slug)
+        out.append((source, cik, profile, stat))
+    return out
+
+
+def _card(profile: Profile, stat: PortfolioStat, lang: str) -> dict[str, Any]:
+    ring = stat.holdings[:RING]
+    return {
+        "slug": profile.slug,
+        "name": profile.name(lang),
+        "kind": profile.kind,
+        "entity": profile.entity(lang),
+        "period": stat.period,
+        "filed": stat.filed,
+        "return_pct": float(stat.return_pct) if stat.return_pct is not None else None,
+        "return_start": stat.return_start,
+        "return_through": stat.return_through,
+        "coverage": float(stat.coverage) if stat.coverage is not None else None,
+        "pending": stat.pending,
+        "holdings": [
+            PublicHolding(
+                symbol=h["symbol"], name=_shown(h["symbol"], h["issuer"], lang), weight=h["weight"]
+            )
+            for h in ring
+        ],
+        "others_weight": round(max(0.0, 1 - sum(h["weight"] for h in ring)), 6),
+        "moves": [
+            PublicMove(
+                symbol=m["symbol"],
+                name=_shown(m["symbol"], m["issuer"], lang),
+                change=m["change"],
+                shares=m["shares"],
+                previous_shares=m["previous_shares"],
+                shares_change_pct=_pct(m["change"], m["shares"], m["previous_shares"]),
+                value_change_usd=m["value_change_usd"],
+            )
+            for m in stat.moves
+        ],
+    }
+
+
+async def cards(
+    session: AsyncSession, company_id: uuid.UUID | None, lang: str
+) -> list[PublicPortfolioCard]:
+    """The holdings dashboard's cards, in the profiles' order."""
+    return [
+        PublicPortfolioCard(**_card(profile, stat, lang))
+        for _, _, profile, stat in await _followed(session, company_id)
+    ]
+
+
+async def portfolio(
+    session: AsyncSession,
+    company_id: uuid.UUID | None,
+    slug: str,
+    lang: str,
+    *,
+    signed_in: bool,
+) -> PublicPortfolio | None:
+    """A person page: the card, the whole table (the first ``FREE_ROWS`` for a reader not signed
+    in), the return's stretches, and each kept quarter's filings at SEC. None: no such person."""
+    found = next((f for f in await _followed(session, company_id) if f[2].slug == slug), None)
+    if found is None:
+        return None
+    source, _, profile, stat = found
+    rows = stat.positions if signed_in else stat.positions[:FREE_ROWS]
+    quarters = (
+        await session.scalars(
+            select(PortfolioQuarter)
+            .where(PortfolioQuarter.source_id == source.id)
+            .order_by(PortfolioQuarter.period.desc())
+        )
+    ).all()
+    return PublicPortfolio(
+        **_card(profile, stat, lang),
+        long_value_usd=int(stat.long_value_usd),
+        positions=[
+            PublicPosition(
+                symbol=r["symbol"],
+                name=_shown(r["symbol"], r["issuer"], lang),
+                change=r["change"],
+                shares=r["shares"],
+                previous_shares=r["previous_shares"],
+                shares_change_pct=_pct(r["change"], r["shares"], r["previous_shares"]),
+                value_usd=r["value_usd"],
+                weight=r["weight"],
+            )
+            for r in rows
+        ],
+        positions_total=len(stat.positions),
+        locked=len(rows) < len(stat.positions),
+        stretches=[PublicStretch(**st) for st in stat.stretches],
+        quarters=[
+            PublicFiledQuarter(
+                period=q.period,
+                filed=q.filed,
+                filings=[
+                    thirteenf.FilingRef(cik=f["cik"], accession=f["accession"]).index_url
+                    for f in q.filings
+                ],
+            )
+            for q in quarters
+        ],
+    )

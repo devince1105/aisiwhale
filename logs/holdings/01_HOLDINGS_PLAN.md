@@ -211,7 +211,7 @@ OXY    減碼  −12.0%                ╰──────╯
 | `portfolio_quarters` | 每位申報人每季一列：組成這一季的申報（CIK、accession）、申報日、總市值、是否以千元申報；保留最近 6 季（HD-02 實作時從原本的 `holding_snapshots` 拆成兩張表，季的資料不必每個部位重複一次） | 約 60 列 |
 | `portfolio_positions` | 每季的每個部位（CUSIP、股數、市值、類別、選擇權別），隨季刪除 | 約 1 萬列 |
 | `cusip_symbols` | CUSIP → 代號（沒有美國普通股時是空的）、名稱、證券類別、查詢時間（遷移 0064） | 約 3,000 列 |
-| `portfolio_stats` | 每位名人一列：模擬報酬、起算日、算到哪一天、涵蓋率、前 10 大、兩筆動作、計算時間（遷移 0065） | 十幾列 |
+| `portfolio_stats` | 每位名人一列：模擬報酬、起算日、算到哪一天、涵蓋率、等待中的數量、前 10 大、兩筆動作、計算時間（遷移 0065）；個人頁的完整持股表與逐季報酬（遷移 0068） | 十幾列 |
 | `raw_closes` | Tiingo 未調整的收盤價與分割係數，只存 13F 答不出來的那幾段（遷移 0065） | 約 1 萬列 |
 | `price_asks` | 問過 Tiingo 的段與時間：答不出來的 30 天內不再問（遷移 0065） | 數百列 |
 | `stock_quotes` | Finnhub 最新報價，超過 20 小時才再問（遷移 0067） | 約 250 列 |
@@ -256,7 +256,7 @@ OXY    減碼  −12.0%                ╰──────╯
 | HD-02 | `portfolio_quarters`、`portfolio_positions`（遷移 0063）：`refresh_holdings` 改為保留最近 6 季，第一次執行時往回補 | HD-01 | 9 位都有 5 季以上的資料；遷移可以升級也可以降級 |
 | HD-03 | `cusip_symbols`：OpenFIGI 用戶端（CINS、含未上市股票；不做名稱比對，見 §3.3） | — | 用固定資料測試；名單內前 90% 權重的持股對應率 ≥ 95% |
 | HD-04 | `portfolio_stats`：模擬報酬、兩筆動作、環圈資料 | HD-02、03 | 用手算的固定資料測試（含出清、新建倉、對不到代號的持股）；巴菲特的結果與一個公開追蹤網站比較，差距寫進 devlog |
-| HD-05 | 公開 API：`GET /api/public/holdings`、`/holdings/people/{slug}`；OpenAPI 與 `schema.gen.ts` | HD-04 | API 測試；未登入時只給前 10 大 |
+| HD-05 | 公開 API：`GET /api/public/holdings`、`/holdings/people/{slug}`；OpenAPI 與 `schema.gen.ts`；名人的中英文名稱與網址代號（`holdings.PROFILES`），個股頁大戶持股的英文名 | HD-04 | API 測試；未登入時只給前 10 大 |
 | HD-06 | 前端：持股觀察儀表板的卡片區（SVG 環圈）、個人頁、i18n 中英文、用語測試 | HD-05 | 網站測試、手機與深色模式截圖、§2 用語測試通過 |
 | HD-07 | 川普、佩洛西的卡片（依 §10 第 1 題的決定） | HD-06 | 依決定 |
 

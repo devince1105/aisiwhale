@@ -1328,6 +1328,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Holdings
+         * @description The holdings dashboard's cards (HD-05): each followed 13F filer's largest holdings, its
+         *     latest moves and its simulated one-year return. Nothing in them depends on the reader.
+         */
+        get: operations["get_holdings_api_public_holdings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/holdings/people/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portfolio
+         * @description A person page (HD-05). Open to anybody; the whole table only for a reader signed in —
+         *     free (D-159) — so the answer differs by reader and is not to be kept by anybody between.
+         */
+        get: operations["get_portfolio_api_public_holdings_people__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/markets": {
         parameters: {
             query?: never;
@@ -3517,6 +3559,21 @@ export interface components {
             /** Value */
             value: number;
         };
+        /** PublicFiledQuarter */
+        PublicFiledQuarter: {
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Filings */
+            filings: string[];
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+        };
         /** PublicGold */
         PublicGold: {
             /**
@@ -3604,6 +3661,15 @@ export interface components {
             /** Value Usd */
             value_usd: number;
         };
+        /** PublicHolding */
+        PublicHolding: {
+            /** Name */
+            name: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Weight */
+            weight: number;
+        };
         /** PublicIntraday */
         PublicIntraday: {
             /** Bars */
@@ -3630,6 +3696,23 @@ export interface components {
             t: string;
             /** V */
             v: number;
+        };
+        /** PublicMove */
+        PublicMove: {
+            /** Change */
+            change: string;
+            /** Name */
+            name: string;
+            /** Previous Shares */
+            previous_shares: number;
+            /** Shares */
+            shares: number;
+            /** Shares Change Pct */
+            shares_change_pct: number | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Value Change Usd */
+            value_change_usd: number;
         };
         /**
          * PublicNamedStock
@@ -3660,6 +3743,111 @@ export interface components {
              * @enum {string}
              */
             theme: "muji" | "wabisabi" | "industrial" | "google" | "cyber";
+        };
+        /** PublicPortfolio */
+        PublicPortfolio: {
+            /** Coverage */
+            coverage: number | null;
+            /** Entity */
+            entity: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Holdings */
+            holdings: components["schemas"]["PublicHolding"][];
+            /** Kind */
+            kind: string;
+            /** Locked */
+            locked: boolean;
+            /** Long Value Usd */
+            long_value_usd: number;
+            /** Moves */
+            moves: components["schemas"]["PublicMove"][];
+            /** Name */
+            name: string;
+            /** Others Weight */
+            others_weight: number;
+            /** Pending */
+            pending: number;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Positions */
+            positions: components["schemas"]["PublicPosition"][];
+            /** Positions Total */
+            positions_total: number;
+            /** Quarters */
+            quarters: components["schemas"]["PublicFiledQuarter"][];
+            /** Return Pct */
+            return_pct: number | null;
+            /** Return Start */
+            return_start: string | null;
+            /** Return Through */
+            return_through: string | null;
+            /** Slug */
+            slug: string;
+            /** Stretches */
+            stretches: components["schemas"]["PublicStretch"][];
+        };
+        /** PublicPortfolioCard */
+        PublicPortfolioCard: {
+            /** Coverage */
+            coverage: number | null;
+            /** Entity */
+            entity: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Holdings */
+            holdings: components["schemas"]["PublicHolding"][];
+            /** Kind */
+            kind: string;
+            /** Moves */
+            moves: components["schemas"]["PublicMove"][];
+            /** Name */
+            name: string;
+            /** Others Weight */
+            others_weight: number;
+            /** Pending */
+            pending: number;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Return Pct */
+            return_pct: number | null;
+            /** Return Start */
+            return_start: string | null;
+            /** Return Through */
+            return_through: string | null;
+            /** Slug */
+            slug: string;
+        };
+        /** PublicPosition */
+        PublicPosition: {
+            /** Change */
+            change: string | null;
+            /** Name */
+            name: string;
+            /** Previous Shares */
+            previous_shares: number;
+            /** Shares */
+            shares: number;
+            /** Shares Change Pct */
+            shares_change_pct: number | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Value Usd */
+            value_usd: number;
+            /** Weight */
+            weight: number;
         };
         /** PublicQuote */
         PublicQuote: {
@@ -3785,6 +3973,20 @@ export interface components {
             trades: components["schemas"]["PublicTrade"][];
             /** Us Listing */
             us_listing?: string | null;
+        };
+        /** PublicStretch */
+        PublicStretch: {
+            /** Coverage */
+            coverage: number;
+            /** End */
+            end: string | null;
+            /** Growth */
+            growth: number | null;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
         };
         /** PublicTrade */
         PublicTrade: {
@@ -7085,6 +7287,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicGold"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_holdings_api_public_holdings_get: {
+        parameters: {
+            query: {
+                lang: string;
+                company?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPortfolioCard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portfolio_api_public_holdings_people__slug__get: {
+        parameters: {
+            query: {
+                lang: string;
+                company?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPortfolio"];
                 };
             };
             /** @description Validation Error */

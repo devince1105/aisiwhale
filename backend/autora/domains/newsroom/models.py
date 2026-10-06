@@ -333,6 +333,17 @@ class PortfolioStat(Base):
     """The least share of a stretch's value that was priced."""
     pending: Mapped[int] = mapped_column(server_default="0")
     """Holdings still waiting for Tiingo: while any are, no return (the site says 整理中)."""
+    positions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """The person page's table (HD-05): every holding of the latest quarter, then the ones sold
+    out since the one before — ``cusip``, ``symbol``, ``issuer``, ``change`` (None: may have
+    split, not known yet), ``shares``, ``previous_shares``, ``value_usd``, ``weight``."""
+    stretches: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    """The simulated return's stretches, oldest first: ``start``, ``end``, ``growth``,
+    ``coverage`` — the person page's chart."""
     computed_at: Mapped[datetime]
 
 

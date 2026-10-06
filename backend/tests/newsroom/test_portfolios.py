@@ -311,6 +311,16 @@ async def test_the_run_writes_the_card_and_asks_tiingo_once(db_session, book):
         ("BBB", 0.3529),
     ]
     assert card.moves == [], "Q3 holds what Q2 did"
+    assert [(p["symbol"], p["change"], p["value_usd"]) for p in card.positions] == [
+        ("AAA", "unchanged", 726),
+        ("BBB", "unchanged", 396),
+    ]  # HD-05: the person page's table
+    assert [(st["start"], st["end"], st["growth"]) for st in card.stretches] == [
+        ("2025-09-30", "2025-12-31", 1.02),
+        ("2025-12-31", "2026-03-31", 1.1),
+        ("2026-03-31", "2026-06-30", 1.0),
+        ("2026-06-30", "2026-10-05", 1.1),
+    ]
     assert sorted(finnhub.asked) == ["AAA", "BBB"] and len(tiingo.asked) == 1
     kept = (await db_session.scalars(select(RawClose).where(RawClose.symbol == "BBB"))).all()
     assert len(kept) == 3
