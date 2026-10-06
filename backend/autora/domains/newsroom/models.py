@@ -336,6 +336,19 @@ class PortfolioStat(Base):
     computed_at: Mapped[datetime]
 
 
+class StockQuote(Base):
+    """A US stock's latest quote from Finnhub, kept (HD-04): the holdings dashboard's latest
+    prices, asked a few at a time and again only when old (``portfolios.QUOTE_AGE``)."""
+
+    __tablename__ = "stock_quotes"
+
+    symbol: Mapped[str] = mapped_column(primary_key=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    day: Mapped[date] = mapped_column(Date)
+    """The day of the price, as Finnhub stamps it."""
+    fetched_at: Mapped[datetime]
+
+
 class PriceAsk(Base):
     """A stretch Tiingo was asked for (HD-04): what it could not answer — a stock delisted before
     the stretch's end, one it does not carry — is neither asked again nor waited for until

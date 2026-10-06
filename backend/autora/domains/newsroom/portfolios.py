@@ -25,7 +25,7 @@ and far past its 50 an hour. So:
   the next quarter's end (86 that year), and a move outside ``CHECK`` (95) — a split (Booking's 25
   for 1 reads 0.042) or a real fall (Atlassian, 0.42), which the 13Fs cannot tell apart. Its raw
   closes and split factors are kept (``raw_closes``), so a stretch is asked once; the largest
-  holdings first, ``TIINGO_PER_RUN`` a run;
+  holdings first, ``TIINGO_PER_RUN`` in each run, a run every twenty minutes;
 - the latest price is Finnhub's quote, for the latest quarter's top ``PRICED_SHARE``; a move
   since the quarter's end outside ``CHECK`` is checked against Tiingo's splits too.
 
@@ -62,16 +62,18 @@ from autora.domains.newsroom.models import (
     PriceAsk,
     RawClose,
     Source,
+    StockQuote,
 )
-from autora.domains.newsroom.price_history import TIINGO_DAILY, TIINGO_PAUSE_SECONDS, GetRows
+from autora.domains.newsroom.price_history import TIINGO_DAILY, GetRows
 from autora.runtime.scheduler import Handler
 
 log = logging.getLogger(__name__)
 
 STATS_SCHEDULE = "newsroom.refresh_portfolio_stats"
-STATS_CRON = "40 8,11 * * *"
-"""16:40 and 19:40 in Taipei: on a weekday's shift (D-205), clear of the price refreshes at 15:20
-and 18:20, which use the same hour's 50 Tiingo requests; on a weekend, from clock-in at 18:00."""
+STATS_CRON = "*/20 * * * *"
+"""Every twenty minutes of the worker's shifts (D-205), a little each time: a scheduler handler
+holds up everything else the worker starts — its first version, all quotes and twenty Tiingo
+stretches 75 s apart in one run, held new agent runs back half an hour on its first shift."""
 RETRY = timedelta(days=30)
 """A stretch Tiingo could not answer is asked again after this."""
 
@@ -81,7 +83,15 @@ CHECK = (Decimal("0.7"), Decimal("1.4"))
 reads 0.667) and Tiingo's closes and splits decide."""
 MIN_COVERAGE = Decimal("0.8")
 PRICED_SHARE = Decimal("0.9")
-TIINGO_PER_RUN = 20
+TIINGO_PER_RUN = 2
+"""Six an hour: with the price refreshes' (D-059, up to 48 in an hour twice a weekday) inside
+Tiingo's 50; about 36 stretches a weekday shift."""
+TIINGO_PAUSE = 2.0
+QUOTES_PER_RUN = 50
+"""Finnhub quotes a run (75 s at ``QUOTE_PAUSE``): the latest quarter's top 90% — some 250
+stocks — are all fresh within a shift."""
+QUOTE_AGE = timedelta(hours=20)
+"""A kept quote younger than this is not asked again: the market moves once a day."""
 JUMP = Decimal("0.25")
 """A quote this far from the last kept close may be past a split since: the closes are asked
 again."""
@@ -528,13 +538,15 @@ async def refresh_portfolio_stats(
     tiingo: GetRows | None,
     today: date,
     quote_pause: float = QUOTE_PAUSE,
-    tiingo_pause: float = TIINGO_PAUSE_SECONDS,
+    tiingo_pause: float = TIINGO_PAUSE,
     tiingo_per_run: int = TIINGO_PER_RUN,
+    quotes_per_run: int = QUOTES_PER_RUN,
     now: datetime | None = None,
 ) -> int:
-    """Every followed 13F filer's card brought up to date: the latest quotes, what Tiingo still
-    owes (the largest holdings first, ``tiingo_per_run`` stretches), then the numbers. A price
-    that cannot be had now is next run's. How many cards were written."""
+    """Every followed 13F filer's card brought up to date: the quotes that are missing or old
+    (``quotes_per_run``, the missing first), what Tiingo still owes (the largest holdings first,
+    ``tiingo_per_run`` stretches), then the numbers. A price that cannot be had now is a later
+    run's. How many cards were written."""
     now = now or datetime.now(UTC)
     books, implied = await _books(session, company_id)
     if not books:
@@ -552,20 +564,38 @@ async def refresh_portfolio_stats(
         ).tuples()
     )
 
-    # 1. the latest quotes the latest stretches want
+    # 1. the latest quotes the latest stretches want: the kept ones, and those missing or old
+    fetched_at: dict[str, datetime] = {}
+    for row in (await session.scalars(select(StockQuote))).all():
+        prices.quotes[row.symbol] = Quote(row.price, row.day)
+        fetched_at[row.symbol] = row.fetched_at
     for quarters in books.values():
         simulate(quarters, prices, today)
     if quote is not None:
-        for i, symbol in enumerate(sorted(prices.quoted)):
+        due = sorted(
+            (s for s in prices.quoted if s not in fetched_at or fetched_at[s] < now - QUOTE_AGE),
+            key=lambda s: (s in fetched_at, fetched_at.get(s, now), s),
+        )
+        for i, symbol in enumerate(due[:quotes_per_run]):
             if i:
                 await asyncio.sleep(quote_pause)
             try:
                 got = await quote(symbol)
-            except Exception as error:  # noqa: BLE001 — one quote missing is next run's
+            except Exception as error:  # noqa: BLE001 — one quote missing is a later run's
                 log.warning("portfolios: no quote for %s: %s", symbol, type(error).__name__)
                 continue
-            if got is not None:
-                prices.quotes[symbol] = got
+            if got is None:
+                continue
+            prices.quotes[symbol] = got
+            statement = insert(StockQuote).values(
+                symbol=symbol, price=got.price, day=got.day, fetched_at=now
+            )
+            await session.execute(
+                statement.on_conflict_do_update(
+                    index_elements=["symbol"],
+                    set_={"price": got.price, "day": got.day, "fetched_at": now},
+                )
+            )
 
     # 2. what only Tiingo can tell, now that the quotes are known
     prices.needs.clear()
@@ -661,7 +691,7 @@ class PortfolioKeeper:
         tiingo: GetRows | None,
         *,
         quote_pause: float = QUOTE_PAUSE,
-        tiingo_pause: float = TIINGO_PAUSE_SECONDS,
+        tiingo_pause: float = TIINGO_PAUSE,
     ) -> None:
         self.quote = quote
         """Finnhub's quotes; None offline or without its key: no return is given."""

@@ -191,7 +191,7 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
             (
                 "newsroom.refresh_portfolio_stats",
                 "newsroom.refresh_portfolio_stats",
-                "40 8,11 * * *",
+                "*/20 * * * *",
             ),  # HD-04
             (
                 "newsroom.refresh_official_trades",

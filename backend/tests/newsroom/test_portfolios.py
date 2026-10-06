@@ -2,7 +2,7 @@
 13Fs' own prices, Tiingo where they cannot answer (a split, a stock nobody holds any more), the
 latest quotes, the biggest moves."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -18,6 +18,7 @@ from autora.domains.newsroom.models import (
     PriceAsk,
     RawClose,
     Source,
+    StockQuote,
 )
 from autora.domains.newsroom.portfolios import (
     Close,
@@ -316,10 +317,25 @@ async def test_the_run_writes_the_card_and_asks_tiingo_once(db_session, book):
     asked = (await db_session.scalars(select(PriceAsk).where(PriceAsk.symbol == "BBB"))).all()
     assert [(a.start, a.end) for a in asked] == [(Q1, Q2)]
 
-    # the closes are kept: the next run asks Tiingo nothing
+    # the closes and the quotes are kept: the next run asks Tiingo nothing, Finnhub nothing
     again = Tiingo()
     await refresh_portfolio_stats(db_session, company.id, **{**run, "tiingo": again})
-    assert again.asked == []
+    assert again.asked == [] and sorted(finnhub.asked) == ["AAA", "BBB"]
+
+
+async def test_a_run_asks_a_few_quotes_the_missing_first_and_old_ones_again(db_session, book):
+    """A scheduler handler holds up everything else the worker starts: a run is short."""
+    company, _ = book
+    first = Finnhub()
+    run = dict(tiingo=None, today=TODAY, quote_pause=0, quotes_per_run=1)
+    await refresh_portfolio_stats(db_session, company.id, quote=first, **run)
+    await refresh_portfolio_stats(db_session, company.id, quote=first, **run)
+    assert first.asked == ["AAA", "BBB"], "one a run, each asked once"
+    later = datetime.now(UTC) + portfolios.QUOTE_AGE + timedelta(hours=1)
+    await refresh_portfolio_stats(db_session, company.id, quote=first, now=later, **run)
+    assert first.asked[2:] == ["AAA"], "old: asked again, the oldest first"
+    kept = await db_session.get(StockQuote, "BBB")
+    assert kept.price == Decimal("54.45") and kept.day == date(2026, 10, 5)
 
 
 async def test_without_tiingo_the_split_quarter_leaves_no_number(db_session, book):
