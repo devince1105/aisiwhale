@@ -16,8 +16,8 @@ export function portfolioHref(lang: Lang, slug: string): string {
   return `/news/${lang}/holdings/people/${slug}`;
 }
 
-/** 持股觀察's three tabs (HD-06): the big names' cards, the big holders' (groups: a company's
- * own investments, a state fund), and the stories. */
+/** 持股觀察's three tabs (HD-06): the big names' cards, the institutions' (機構持股: a company's
+ * own investments, a state fund, an investment firm, a foundation), and the stories. */
 export const VIEWS = ["people", "groups", "news"] as const;
 export type View = (typeof VIEWS)[number];
 
@@ -25,10 +25,11 @@ export function isView(value: unknown): value is View {
   return typeof value === "string" && (VIEWS as readonly string[]).includes(value);
 }
 
-/** Which cards a tab shows: a person's or a public official's; a company's or a fund's. */
+/** Which cards a tab shows: a person's or a public official's; a company's, a state fund's, an
+ * investment firm's or a foundation's. */
 export const KINDS: Record<Exclude<View, "news">, readonly string[]> = {
   people: ["person", "official"],
-  groups: ["company", "fund"],
+  groups: ["company", "fund", "manager", "foundation"],
 };
 
 export function watchHref(lang: Lang, view: View): string {

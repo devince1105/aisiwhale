@@ -41,8 +41,9 @@ async def test_every_filing_source_says_whose_it_is_and_stands_alone(db_session)
             )
         )
     ).all()
-    # Buffett, Ackman, Burry, Druckenmiller, Duan, Cathie Wood; NVIDIA, Temasek, Soros (HD-01)
-    assert len(filings) == 9
+    # Buffett, Ackman, Burry, Druckenmiller, Duan, Cathie Wood; NVIDIA, Temasek, Soros (HD-01);
+    # Bridgewater, the Gates Foundation, Hillhouse and Saudi Arabia's PIF (the big holders' tab)
+    assert len(filings) == 13
     # and a public figure's own filings as an owner (D-050)
     filings += (
         await db_session.scalars(
@@ -51,7 +52,7 @@ async def test_every_filing_source_says_whose_it_is_and_stands_alone(db_session)
             )
         )
     ).all()
-    assert len(filings) == 10 and filings[-1].config["section"] == "figures"
+    assert len(filings) == 14 and filings[-1].config["section"] == "figures"
     for source in filings:
         assert source.config["own_story"] is True and source.config["max_age_days"] == 120
         assert source.config["title_prefix"] and source.trust_level >= 0.9
@@ -88,7 +89,7 @@ async def test_a_filer_that_moved_is_the_same_source_with_a_new_address(db_sessi
     assert again.added == [] and "CIK=0002026053" in ackman.url
 
 
-async def test_the_holdings_dashboard_follows_nine_13f_filers(db_session):
+async def test_the_holdings_dashboard_follows_thirteen_13f_filers(db_session):
     """HD-01: NVIDIA (the company's own investments), Temasek and Soros join the six investors;
     the holdings refresh finds each by the CIK in its feed, as it does the others."""
     slug = f"markets-{uuid.uuid4().hex[:8]}"
@@ -105,6 +106,10 @@ async def test_the_holdings_dashboard_follows_nine_13f_filers(db_session):
         "輝達": "1045810",
         "淡馬錫": "1021944",
         "索羅斯": "1029160",
+        "橋水": "1350694",
+        "蓋茲基金會": "1166559",
+        "高瓴": "1762304",
+        "沙烏地公共投資基金": "1767640",
     }
     nvidia = next(s for s in newsroom.sources if s.name == "SEC 13F：輝達")
     assert nvidia.config["title_prefix"] == "輝達（NVIDIA）" and nvidia.config["own_story"] is True

@@ -271,6 +271,12 @@ SOURCES: tuple[MarketSource, ...] = (
     _investor("輝達", "NVIDIA", "0001045810"),
     _investor("淡馬錫", "Temasek", "0001021944"),
     _investor("索羅斯", "Soros Fund Management", "0001029160"),
+    # the big holders' tab, asked for 2026-10-06 (D-217): a macro fund, a charitable trust, a
+    # China-focused manager, and Saudi Arabia's state fund
+    _investor("橋水", "Bridgewater Associates", "0001350694"),
+    _investor("蓋茲基金會", "Gates Foundation Trust", "0001166559"),
+    _investor("高瓴", "HHLR Advisors", "0001762304"),
+    _investor("沙烏地公共投資基金", "Public Investment Fund", "0001767640"),
     # public figures (D-050): the President's SEC filings as an owner (Trump Media, DJT), and —
     # as neither the President's OGE transaction reports nor Congress's STOCK Act reports have a
     # feed — searches for news of new ones, which the newsroom follows to the filing itself

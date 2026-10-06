@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,6 +135,9 @@ async def map_cusips(
     answered = select(CusipSymbol.cusip).where(
         or_(CusipSymbol.symbol.is_not(None), CusipSymbol.checked_at > now - RECHECK)
     )
+    # the largest holdings first: a filer of a thousand (Bridgewater) takes a few runs, and its
+    # card's ring and moves should not wait for its smallest
+    largest = func.max(PortfolioPosition.value_usd)
     todo = list(
         (
             await session.scalars(
@@ -145,8 +148,8 @@ async def map_cusips(
                     PortfolioPosition.kind == "SH",
                     PortfolioPosition.cusip.not_in(answered),
                 )
-                .distinct()
-                .order_by(PortfolioPosition.cusip)
+                .group_by(PortfolioPosition.cusip)
+                .order_by(largest.desc(), PortfolioPosition.cusip)
                 .limit(limit)
             )
         ).all()

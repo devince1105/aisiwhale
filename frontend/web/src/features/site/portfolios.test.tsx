@@ -195,11 +195,14 @@ describe("持股觀察's tabs", () => {
     const tabs = within(screen.getByTestId("watch-tabs")).getAllByRole("link");
     expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("href"), tab.getAttribute("aria-current")])).toEqual([
       ["名人持股", "/news/zh-TW?section=watch", null],
-      ["大戶（集團）持股", "/news/zh-TW?section=watch&view=groups", "page"],
+      ["機構持股", "/news/zh-TW?section=watch&view=groups", "page"],
       ["新聞", "/news/zh-TW?section=watch&view=news", null],
     ]);
     // a person's or an official's card among the big names; a company's or a fund's among the groups
-    expect([KINDS.people, KINDS.groups]).toEqual([["person", "official"], ["company", "fund"]]);
+    expect([KINDS.people, KINDS.groups]).toEqual([
+      ["person", "official"],
+      ["company", "fund", "manager", "foundation"],
+    ]);
   });
 
   it("a photo the site's operator supplied says so (Commons has none of 段永平)", () => {

@@ -1032,7 +1032,7 @@ CARD_TRADES = 3
 """An official's card: the latest three trades."""
 ORDER = (
     "buffett", "trump", "pelosi", "soros", "cathie-wood", "duan-yongping", "druckenmiller",
-    "ackman", "burry", "nvidia", "temasek",
+    "ackman", "burry", "nvidia", "temasek", "pif", "bridgewater", "gates-foundation", "hillhouse",
 )  # fmt: skip
 """The cards' order (HD-07): the brokers' first two, the other official, then the 13F filers."""
 

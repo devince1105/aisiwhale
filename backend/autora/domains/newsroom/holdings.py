@@ -160,7 +160,8 @@ class Profile:
     en: str
     kind: str
     """``person``; ``company`` — a company's own investments, not its chief's (NVIDIA's 13F is
-    not Jensen Huang's, D-217); ``fund`` — a state investor."""
+    not Jensen Huang's, D-217); ``fund`` — a state investor; ``manager`` — an investment firm;
+    ``foundation`` — a charity's endowment; ``official`` — an office-holder (no 13F)."""
     entity_zh: str
     entity_en: str
     """Who files: the manager, the company, the fund."""
@@ -250,6 +251,50 @@ PROFILES: dict[str, Profile] = {
                 "person",
                 "Scion 資產管理",
                 "Scion Asset Management",
+            ),
+        ),
+        (
+            "1767640",
+            Profile(
+                "pif",
+                "沙烏地 PIF",
+                "Saudi PIF",
+                "fund",
+                "沙烏地阿拉伯公共投資基金",
+                "Public Investment Fund (Saudi Arabia)",
+            ),
+        ),
+        (
+            "1350694",
+            Profile(
+                "bridgewater",
+                "橋水",
+                "Bridgewater",
+                "manager",
+                "橋水基金",
+                "Bridgewater Associates",
+            ),
+        ),
+        (
+            "1166559",
+            Profile(
+                "gates-foundation",
+                "蓋茲基金會",
+                "Gates Foundation",
+                "foundation",
+                "蓋茲基金會信託",
+                "Gates Foundation Trust",
+            ),
+        ),
+        (
+            "1762304",
+            Profile(
+                "hillhouse",
+                "高瓴",
+                "Hillhouse",
+                "manager",
+                "高瓴（HHLR Advisors）",
+                "HHLR Advisors (Hillhouse)",
             ),
         ),
     )
