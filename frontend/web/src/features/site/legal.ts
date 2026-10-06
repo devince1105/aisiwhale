@@ -4,7 +4,9 @@
 // - one-time payments that never renew, a month or a year (memberships.purchase);
 // - buying early adds to the end, buying after a lapse starts from the payment (_membership);
 // - card payments on PAYUNi's page, and the card never reaches us (checkout.ts, payuni.py);
-// - sign-in by an emailed link valid 15 minutes, a session cookie for 60 days (accounts);
+// - sign-in by email and password (Argon2id hash) or Google; a confirmation link valid 24 hours,
+//   a reset link valid 30 minutes that signs out every device; a session cookie for 60 days
+//   (accounts, D-230);
 // - the email address lives only in the readers table; the rest of the system knows a reader
 //   by an id (D-018, D-025);
 // - reads are counted with a random id that changes every day (session.ts).
@@ -28,7 +30,7 @@ export interface LegalDoc {
 export const LEGAL_PAGES = ["terms", "privacy", "refund"] as const;
 export type LegalPage = (typeof LEGAL_PAGES)[number];
 
-const UPDATED = "2026-09-24";
+const UPDATED = "2026-10-06";
 
 function who(op: Operator, lang: Lang): string {
   if (lang === "en") return op.owner ? `${op.brand} (${op.owner})` : op.brand;
@@ -58,7 +60,10 @@ function terms(lang: Lang, op: Operator): LegalDoc {
         {
           heading: "3. Signing in",
           body: [
-            "You sign in with your email address: we send a link, valid for 15 minutes, and there is no password. Keep your mailbox secure; anybody who can open your email can sign in as you.",
+            "You sign in with your email address and a password, or with your Google account. A password needs at least 8 characters; we keep only a one-way hash of it and cannot see it.",
+            "When you register with an email address we send a link to confirm it, valid for 24 hours. If you forget your password you can ask for a reset link, valid for 30 minutes; setting a new password signs you out on every device.",
+            "If you sign in with Google using an email address that already has a confirmed account here, both ways lead to the same account.",
+            "Keep your password and your mailbox secure: anybody who can open your email can use a reset link to take over your account.",
           ],
         },
         {
@@ -126,7 +131,10 @@ function terms(lang: Lang, op: Operator): LegalDoc {
       {
         heading: "三、登入",
         body: [
-          "本站以 email 登入：我們寄出一封登入連結，15 分鐘內有效，不需要密碼。請保管好你的信箱，能打開你信箱的人就能以你的身分登入。",
+          "你可以用 email 與密碼，或用 Google 帳號登入本站。密碼至少 8 個字元；我們只保存無法還原的雜湊值，看不到你的密碼。",
+          "用 email 註冊後，我們會寄一封確認信，連結 24 小時內有效。忘記密碼時可以申請重設連結，30 分鐘內有效；設定新密碼後，所有已登入的裝置都會被登出。",
+          "如果你用 Google 登入時使用的 email，已經在本站註冊並完成確認，兩種方式會進入同一個帳號。",
+          "請妥善保管你的密碼與信箱：能打開你信箱的人，可以透過重設連結取得你的帳號。",
         ],
       },
       {
@@ -190,8 +198,10 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
           heading: "2. What we collect, and why",
           body: [
             [
-              "Your email address, when you sign in: to send you sign-in links and to recognise your account.",
-              "A sign-in cookie: to keep you signed in, for up to 60 days.",
+              "Your email address and password, when you register: the email address to send you confirmation and password-reset emails and to recognise your account; the password only as a one-way hash.",
+              "If you sign in with Google: your Google account id, your email address, and whether Google has confirmed that address — to recognise your account. We do not receive your name, photo or anything else from your Google account.",
+              "A sign-in cookie: to keep you signed in, for up to 60 days. While you sign in with Google, a second cookie lasting 10 minutes checks that the sign-in started in your browser.",
+              "Sign-in attempts: to stop password guessing we count attempts to sign in, register and reset a password, by a one-way hash of your IP address and of the email address used — never the address itself. The counts are deleted after about a day.",
               "Your orders and payments (plan, amount, time, the payment provider's reference): to grant your membership and keep accounts.",
               "Reading counts: when you open a story, your browser sends a random id that it replaces every day. It cannot be linked to you or followed from one day to the next, and nothing else about you is sent.",
             ],
@@ -203,7 +213,8 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
           body: [
             [
               "PAYUNi (統一金流), to take your payment. We pass your email address so that PAYUNi can send your receipt; your card details go to PAYUNi directly.",
-              "Resend, which delivers our sign-in emails, receives your email address for that purpose.",
+              "Google, when you choose to sign in with it: Google confirms who you are and knows that you signed in to this site.",
+              "Resend, which delivers our confirmation and password-reset emails, receives your email address for that purpose.",
               "Our hosting provider stores the data on our behalf.",
             ],
             "Inside our own system, your email address is kept only in the account table. The software that runs the newsroom and the business — including its AI agents — knows members only by an anonymous id.",
@@ -213,7 +224,7 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
         {
           heading: "4. How long we keep it",
           body: [
-            "Your account stays until you ask us to delete it. Payment records are kept for as long as accounting and tax law require (at least five years), even after the account is deleted. Expired sign-in links and sessions are deleted.",
+            "Your account stays until you ask us to delete it. Payment records are kept for as long as accounting and tax law require (at least five years), even after the account is deleted. The tokens in confirmation and password-reset links are kept only as one-way hashes; a confirmation link stops working once used or after 24 hours, and a reset link once used or after 30 minutes. Sign-in session tokens are likewise kept only as one-way hashes; a session ends at once when you sign out, and otherwise when the session lifetime set by the system runs out.",
           ],
         },
         {
@@ -243,8 +254,10 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
         heading: "二、我們蒐集的資料與用途",
         body: [
           [
-            "Email：你登入時提供，用來寄送登入連結、辨識你的帳號。",
-            "登入 cookie：讓你保持登入，最長 60 天。",
+            "Email 與密碼：你註冊時提供。Email 用來寄送確認信與重設密碼信、辨識你的帳號；密碼只以無法還原的雜湊值保存。",
+            "Google 登入：如果你選擇用 Google 登入，我們會從 Google 取得你的 Google 帳號編號、email，以及 Google 是否已確認這個 email，用來辨識你的帳號；不會取得你的姓名、照片或其他 Google 資料。",
+            "登入 cookie：讓你保持登入，最長 60 天。用 Google 登入的過程中，另有一個 10 分鐘的 cookie，用來確認登入是從你的瀏覽器開始的。",
+            "登入嘗試紀錄：為了防止有人猜密碼，我們會計算登入、註冊與重設密碼的嘗試次數，以 IP 位址與所用 email 經過無法還原的雜湊後計算，不保存原始內容，約一天後刪除。",
             "訂單與付款紀錄（方案、金額、時間、金流服務商的交易編號）：用來開通會員資格與記帳。",
             "閱讀統計：你打開報導時，瀏覽器會送出一個每天更換的隨機編號。這個編號無法對應到你本人，也無法跨日追蹤，除此之外不會送出任何關於你的資訊。",
           ],
@@ -256,7 +269,8 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
         body: [
           [
             "統一金流（PAYUNi）：處理付款。我們會提供你的 email，讓統一金流寄送付款通知；信用卡資料由你直接在統一金流的頁面輸入。",
-            "Resend：代我們寄送登入信，因此會收到你的 email。",
+            "Google：你選擇用 Google 登入時，由 Google 確認你的身分，Google 會知道你登入了本站。",
+            "Resend：代我們寄送確認信與重設密碼信，因此會收到你的 email。",
             "主機服務商：代我們保存資料。",
           ],
           "在本站系統內部，你的 email 只存放在帳號資料表中。負責新聞室與營運的程式（包括其中的 AI 代理）只以匿名編號辨識會員。",
@@ -266,7 +280,7 @@ function privacy(lang: Lang, op: Operator): LegalDoc {
       {
         heading: "四、保存期間",
         body: [
-          "帳號會保留到你要求刪除為止。付款紀錄依會計與稅務法規保存（至少五年），帳號刪除後仍會保留。過期的登入連結與登入狀態會被刪除。",
+          "帳號會保留到你要求刪除為止。付款紀錄依會計與稅務法規保存（至少五年），帳號刪除後仍會保留。確認信與重設密碼連結的 token 僅以無法還原的雜湊值保存；確認連結使用後或 24 小時後失效，重設密碼連結使用後或 30 分鐘後失效。登入 session 的 token 亦僅以無法還原的雜湊值保存，登出後立即失效，並依系統設定的 session 期限自動失效。",
         ],
       },
       {

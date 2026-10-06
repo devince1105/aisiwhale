@@ -3230,6 +3230,10 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 - vitest 71 個檔案、869 項通過；`make lint`（ruff、格式、`lint-imports` 3 條、eslint、tsc）、`pnpm build`、`gen_openapi.py --check`、`alembic check`、`git diff --check` 都通過。
 - 本機沒有 Playwright 瀏覽器，e2e 沒在本機跑，留給 CI。
 
+### D-230 後續：法律頁改成 Email＋密碼與 Google 的說法
+
+服務條款「三、登入」與隱私權政策（蒐集的資料、第三方、保存期間）中英兩版改寫，最後更新日改為 2026-10-06（`frontend/web/src/features/site/legal.ts`）：Email＋密碼或 Google 登入、密碼只存雜湊、確認信 24 小時與重設連結 30 分鐘、重設後登出所有裝置、Google 只取得帳號編號／email／是否已確認、Google 登入時 10 分鐘的 cookie、登入嘗試以雜湊計數約一天後刪除。舊文字寫「過期的登入連結與登入狀態會被刪除」，但程式從未刪除它們；改成只描述實際行為（token 只存雜湊、何時失效），不承諾實體刪除。是否加清理工作另案處理。驗證：`vitest run src/features/site` 179 項通過，eslint、tsc 沒有錯誤。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
