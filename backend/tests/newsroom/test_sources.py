@@ -189,6 +189,11 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
             (POLL_SCHEDULE, POLL_SCHEDULE, "*/5 * * * *"),
             ("newsroom.refresh_holdings", "newsroom.refresh_holdings", "40 */6 * * *"),  # D-049
             (
+                "newsroom.refresh_portfolio_stats",
+                "newsroom.refresh_portfolio_stats",
+                "40 8,11 * * *",
+            ),  # HD-04
+            (
                 "newsroom.refresh_official_trades",
                 "newsroom.refresh_official_trades",
                 "20 */6 * * *",

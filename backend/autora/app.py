@@ -313,6 +313,16 @@ def build_scheduler(
     )
     scheduler.register(PRICES_SCHEDULE, prices.schedule_handler())
     scheduler.register(FILL_SCHEDULE, prices.fill_handler())
+    # the holdings dashboard's cards (HD-04): Finnhub's quotes and Tiingo's closes, only live
+    from autora.domains.newsroom.economic_calendar import finnhub_json as finnhub_reader
+    from autora.domains.newsroom.portfolios import STATS_SCHEDULE, PortfolioKeeper, finnhub_quote
+
+    quote_key = settings.finnhub_api_key if live and settings else None
+    cards = PortfolioKeeper(
+        finnhub_quote(finnhub_reader(quote_key.get_secret_value())) if quote_key else None,
+        tiingo_rows(tiingo.get_secret_value()) if tiingo else None,
+    )
+    scheduler.register(STATS_SCHEDULE, cards.schedule_handler())
     # every listed stock, to look one up (D-061); offline, nothing is asked of anybody
     finnhub = settings.finnhub_api_key if live and settings else None
     keeper = SecuritiesKeeper(

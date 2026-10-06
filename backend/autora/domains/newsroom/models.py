@@ -287,6 +287,68 @@ class CusipSymbol(Base):
     checked_at: Mapped[datetime]
 
 
+class RawClose(Base):
+    """A US stock's close as it traded, and that day's split factor, from Tiingo (HD-04): what
+    the holdings dashboard checks a 13F price move against — across a split the 13Fs' prices
+    are not comparable, and a stock nobody followed holds any more has none. Unadjusted, unlike
+    ``price_bars`` (the charts' adjusted history): a stretch is computed from the closes at its
+    ends and the splits between. Kept, so a stretch is asked of Tiingo once."""
+
+    __tablename__ = "raw_closes"
+
+    symbol: Mapped[str] = mapped_column(primary_key=True)
+    """As the site writes it: ``BRK.B``."""
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    close: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    split_factor: Mapped[Decimal] = mapped_column(Numeric(12, 6), server_default="1")
+    """Tiingo's: 25 the day Booking's 25-for-1 split took effect, 1 any other day."""
+
+
+class PortfolioStat(Base):
+    """A followed 13F filer's card on the holdings dashboard (HD-04, ``portfolios.py``): its
+    largest holdings, the latest quarter's two biggest moves, and the simulated one-year return —
+    recomputed each run, one row a source."""
+
+    __tablename__ = "portfolio_stats"
+
+    source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id"), primary_key=True)
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id"))
+    period: Mapped[date] = mapped_column(Date)
+    """The latest quarter kept."""
+    filed: Mapped[date] = mapped_column(Date)
+    long_value_usd: Mapped[int] = mapped_column(Numeric(20, 0))
+    """Its long shares' value (no options, no principal): what the weights are shares of."""
+    holdings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    """The largest ten: ``cusip``, ``symbol``, ``issuer``, ``value_usd``, ``weight``."""
+    moves: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    """The two biggest, in US$ at the quarter's end: ``cusip``, ``symbol``, ``issuer``,
+    ``change``, ``shares``, ``previous_shares``, ``value_change_usd``."""
+    return_pct: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    """The simulated return as a fraction (0.1894 is +18.94%); None when not given — less than a
+    year of 13Fs kept, or under ``portfolios.MIN_COVERAGE`` of the value priced."""
+    return_start: Mapped[date | None] = mapped_column(Date)
+    return_through: Mapped[date | None] = mapped_column(Date)
+    """The day of the latest prices used."""
+    coverage: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    """The least share of a stretch's value that was priced."""
+    pending: Mapped[int] = mapped_column(server_default="0")
+    """Holdings still waiting for Tiingo: while any are, no return (the site says 整理中)."""
+    computed_at: Mapped[datetime]
+
+
+class PriceAsk(Base):
+    """A stretch Tiingo was asked for (HD-04): what it could not answer — a stock delisted before
+    the stretch's end, one it does not carry — is neither asked again nor waited for until
+    ``portfolios.RETRY``. The latest stretch's end is the day of the quote it was checked for."""
+
+    __tablename__ = "price_asks"
+
+    symbol: Mapped[str] = mapped_column(primary_key=True)
+    start: Mapped[date] = mapped_column(Date, primary_key=True)
+    end: Mapped[date] = mapped_column(Date, primary_key=True)
+    asked_at: Mapped[datetime]
+
+
 class OfficialReportStatus(StrEnum):
     PENDING = "pending"
     """Transcribed, waiting for a person to check it against the scan."""

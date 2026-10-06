@@ -320,6 +320,7 @@ async def ensure_newsroom_schedules(
     hourly look at whether anything has been published in a day (D-131)."""
     from autora.domains.newsroom.holdings import HOLDINGS_CRON, HOLDINGS_SCHEDULE
     from autora.domains.newsroom.official_trades import OFFICIAL_CRON, OFFICIAL_SCHEDULE
+    from autora.domains.newsroom.portfolios import STATS_CRON, STATS_SCHEDULE
     from autora.domains.newsroom.price_history import (
         FILL_CRON,
         FILL_SCHEDULE,
@@ -336,6 +337,7 @@ async def ensure_newsroom_schedules(
         (POLL_SCHEDULE, POLL_CRON),
         (CLUSTER_SCHEDULE, CLUSTER_CRON),
         (HOLDINGS_SCHEDULE, HOLDINGS_CRON),
+        (STATS_SCHEDULE, STATS_CRON),  # the holdings dashboard's cards (HD-04)
         (OFFICIAL_SCHEDULE, OFFICIAL_CRON),
         (PRICES_SCHEDULE, PRICES_CRON),
         (FILL_SCHEDULE, FILL_CRON),
