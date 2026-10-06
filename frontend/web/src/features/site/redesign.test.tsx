@@ -62,7 +62,7 @@ describe("the front page", () => {
     const headlines = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(headlines).toEqual(["第 1 篇", "第 2 篇", "第 3 篇"]);
     expect(screen.getByRole("heading", { level: 2, name: "第 1 篇" }).closest("article")).toBeTruthy();
-    expect(screen.getAllByText("大戶持股")).toHaveLength(3); // each story's label
+    expect(screen.getAllByText("機構持股")).toHaveLength(3); // each story's label
   });
 
   it("has a tab per section under the masthead, the current one marked", () => {
@@ -79,7 +79,6 @@ describe("the front page", () => {
       ["黃金", "/news/zh-TW?section=gold"],
       ["期貨", "/news/zh-TW?section=commodities"],
       ["外匯", "/news/zh-TW?section=fx"],
-      ["機構觀點", "/news/zh-TW?section=institutions"],
       ["持股觀察", "/news/zh-TW?section=watch"],
       ["觀察清單", "/news/zh-TW/watchlist"],
       ["AI 編輯部", "/news/zh-TW/office"],
@@ -93,6 +92,7 @@ describe("the front page", () => {
     expect(currentSection("en", "/news/en", "nft")).toBe("all");
     // a section inside 持股觀察 lights the tab it is under
     expect(currentSection("zh-TW", "/news/zh-TW", "figures")).toBe("watch");
+    expect(currentSection("zh-TW", "/news/zh-TW", "institutions")).toBe("watch"); // 10/06
     expect(currentSection("zh-TW", "/news/zh-TW", "watch")).toBe("watch");
   });
 
@@ -305,15 +305,16 @@ describe("the site's name on the masthead", () => {
   });
 });
 
-describe("持股觀察: two sections under one tab, told apart by tags (D-050)", () => {
+describe("持股觀察: three sections under one tab, told apart by tags (D-050)", () => {
   it("has a tag for each inside it, the current one marked; other tabs have none", () => {
     render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="figures" />);
     const tags = within(screen.getByRole("navigation", { name: "持股觀察的分類" })).getAllByRole("link");
     expect(tags.map((t) => [t.textContent, t.getAttribute("href"), t.getAttribute("aria-current")])).toEqual([
       // the tab itself opens on its cards now (HD-06): its stories are its news tab
       ["全部", "/news/zh-TW?section=watch&view=news", null],
-      ["大戶持股", "/news/zh-TW?section=holdings", null],
+      ["機構持股", "/news/zh-TW?section=holdings", null],
       ["名人持股", "/news/zh-TW?section=figures", "page"],
+      ["機構觀點", "/news/zh-TW?section=institutions", null],
     ]);
     cleanup();
     render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="ai" />);
@@ -327,10 +328,11 @@ describe("持股觀察: two sections under one tab, told apart by tags (D-050)",
     expect(topicOf("fx")).toBe("fx");
   });
 
-  it("asks for both sections at once, and knows which tab a section is under", () => {
-    expect(sectionsOf("watch")).toEqual(["holdings", "figures"]);
+  it("asks for all its sections at once, and knows which tab a section is under", () => {
+    expect(sectionsOf("watch")).toEqual(["holdings", "figures", "institutions"]);
     expect(sectionsOf("figures")).toEqual(["figures"]);
     expect(topicOf("holdings")).toBe("watch");
+    expect(topicOf("institutions")).toBe("watch"); // 機構觀點, a tab of its own until 10/06
     expect(isFilter("watch") && isFilter("ai") && !isFilter("nft")).toBe(true);
   });
 
@@ -338,7 +340,7 @@ describe("持股觀察: two sections under one tab, told apart by tags (D-050)",
     vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))));
     render(<ArticleView article={ARTICLE} lang="zh-TW" />);
     const crumbs = within(screen.getByRole("navigation", { name: "breadcrumb" })).getAllByRole("link");
-    expect(crumbs.map((a) => a.textContent)).toEqual(["艾矽鯨", "持股觀察", "大戶持股"]);
+    expect(crumbs.map((a) => a.textContent)).toEqual(["艾矽鯨", "持股觀察", "機構持股"]);
   });
 });
 

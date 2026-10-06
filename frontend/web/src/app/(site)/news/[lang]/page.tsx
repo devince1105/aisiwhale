@@ -4,7 +4,7 @@ import { fetchArticlePage, fetchPortfolios } from "@/features/site/api";
 import { isView, KINDS, PortfolioCards, WatchTabs, type View } from "@/features/site/Portfolios";
 import { loadSidebar, taipeiToday } from "@/features/site/sidebarData";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
-import { filterName, isFilter, isLang, sectionsOf, words } from "@/features/site/i18n";
+import { filterName, isFilter, isLang, isSection, sectionsOf, topicOf, words } from "@/features/site/i18n";
 
 export const revalidate = 30;
 
@@ -71,7 +71,11 @@ export default async function Page({ params, searchParams }: { params: Params; s
       events={sidebar.events}
       sentiment={sidebar.sentiment}
       // its tabs above the cards or the stories; its sections' stories are its news tab too
-      top={view || section === "holdings" || section === "figures" ? <WatchTabs lang={lang} view={view ?? "news"} /> : null}
+      top={
+        view || (isSection(section) && topicOf(section) === "watch") ? (
+          <WatchTabs lang={lang} view={view ?? "news"} />
+        ) : null
+      }
       only={
         view === "people" || view === "groups" ? (
           <PortfolioCards

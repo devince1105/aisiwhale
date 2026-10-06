@@ -1,0 +1,20 @@
+Description:           Daily Index of EDGAR Dissemination Feed by Form Type
+Last Data Received:    Aug 14, 2026
+Comments:              webmaster@sec.gov
+Anonymous FTP:         ftp://ftp.sec.gov/edgar/
+
+
+
+
+Form Type   Company Name                                                  CIK
+      Date Filed  File Name
+---------------------------------------------------------------------------------------------------------------------------------------------
+1-A              Deedflow INC                                                  2143384     20260814    edgar/data/2143384/0001683168-26-006495.txt
+13F-HR           &PARTNERS                                                     107136      20260814    edgar/data/107136/0001214659-26-010148.txt
+13F-HR           Alight Capital Management LP                                  1651473     20260814    edgar/data/1651473/0001104659-26-097164.txt
+13F-HR           Third Point LLC                                               1040273     20260814    edgar/data/1040273/0001040273-26-000003.txt
+13F-HR/A         Arini Capital Management Ltd                                  2056819     20260814    edgar/data/2056819/0001172661-26-003819.txt
+13F-HR/A         Artemis Wealth Advisors, LLC                                  1767435     20260814    edgar/data/1767435/0001941040-26-000613.txt
+13F-HR/A         Sunflower Bank, N.A.                                          1818759     20260814    edgar/data/1818759/0001818759-26-000007.txt
+13F-NT           140 Summer Partners Master Fund LP                            1844084     20260814    edgar/data/1844084/0000919574-26-005166.txt
+4                101 HUNTINGTON HOLDINGS LLC                                   1208476     20260814    edgar/data/1208476/0001193125-26-352140.txt

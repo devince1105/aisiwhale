@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xsi:schemaLocation="http://www.sec.gov/edgar/thirteenffiler eis_13F_Filer.xsd" xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:ns1="http://www.sec.gov/edgar/common" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <schemaVersion>X0202</schemaVersion>
+  <headerData>
+    <submissionType>13F-HR</submissionType>
+    <filerInfo>
+      <liveTestFlag>LIVE</liveTestFlag>
+      <flags>
+        <confirmingCopyFlag>false</confirmingCopyFlag>
+        <returnCopyFlag>true</returnCopyFlag>
+        <overrideInternetFlag>false</overrideInternetFlag>
+      </flags>
+      <filer>
+        <credentials>
+          <cik>0002056819</cik>
+          <ccc>XXXXXXXX</ccc>
+        </credentials>
+      </filer>
+      <periodOfReport>06-30-2026</periodOfReport>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPage>
+      <reportCalendarOrQuarter>06-30-2026</reportCalendarOrQuarter>
+      <isAmendment>false</isAmendment>
+      <filingManager>
+        <name>Arini Capital Management Ltd</name>
+        <address>
+          <ns1:street1>2 PARK ST</ns1:street1>
+          <ns1:street2>2ND AND 3RD FLOOR</ns1:street2>
+          <ns1:city>LONDON</ns1:city>
+          <ns1:stateOrCountry>X0</ns1:stateOrCountry>
+          <ns1:zipCode>W1K 2HX</ns1:zipCode>
+        </address>
+      </filingManager>
+      <reportType>13F HOLDINGS REPORT</reportType>
+      <form13FFileNumber>028-26570</form13FFileNumber>
+      <crdNumber>000331241</crdNumber>
+      <secFileNumber>801-130893</secFileNumber>
+      <provideInfoForInstruction5>N</provideInfoForInstruction5>
+    </coverPage>
+    <signatureBlock>
+      <name>Hamza Lemssouguer</name>
+      <title>Founder and Chief Investment Officer</title>
+      <phone>332-253-4524</phone>
+      <signature>/s/ Hamza Lemssouguer</signature>
+      <city>New York</city>
+      <stateOrCountry>NY</stateOrCountry>
+      <signatureDate>08-12-2026</signatureDate>
+    </signatureBlock>
+    <summaryPage>
+      <otherIncludedManagersCount>0</otherIncludedManagersCount>
+      <tableEntryTotal>27</tableEntryTotal>
+      <tableValueTotal>483556989</tableValueTotal>
+    </summaryPage>
+  </formData>
+</edgarSubmission>

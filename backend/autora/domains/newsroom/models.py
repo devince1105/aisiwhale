@@ -373,6 +373,62 @@ class PriceAsk(Base):
     asked_at: Mapped[datetime]
 
 
+class ThirteenFFiling(Base):
+    """A 13F-HR or its amendment, from SEC's daily index (HD-08): every filer's, for 機構排行.
+    Listed first (who, which form, when filed); its cover page read after, a few hundred a run
+    (``thirteenf_index.read_summaries``), for the quarter, the manager's name and the summary
+    page's totals. Market data, not the company's: no ``company_id``."""
+
+    __tablename__ = "thirteenf_filings"
+    __table_args__ = (
+        Index("ix_thirteenf_filings_period", "period"),
+        Index("ix_thirteenf_filings_cik", "cik"),
+        Index(
+            "ix_thirteenf_filings_unread",
+            "filed",
+            postgresql_where=text("read_at IS NULL"),
+        ),
+    )
+
+    accession: Mapped[str] = mapped_column(primary_key=True)
+    cik: Mapped[str]
+    """As SEC numbers the filer, without its leading zeros."""
+    company: Mapped[str]
+    """The filer's name in the index."""
+    form: Mapped[str]
+    """``13F-HR`` or ``13F-HR/A``."""
+    filed: Mapped[date] = mapped_column(Date)
+    period: Mapped[date | None] = mapped_column(Date)
+    """The quarter's last day, from the cover page; None until it is read."""
+    manager: Mapped[str | None]
+    """The filing manager's name on the cover page."""
+    amendment: Mapped[str | None]
+    """``RESTATEMENT`` or ``NEW HOLDINGS``; None for an original."""
+    report_type: Mapped[str | None]
+    """``13F HOLDINGS REPORT``, ``13F COMBINATION REPORT`` or ``13F NOTICE``."""
+    entries: Mapped[int | None]
+    """The summary page's ``tableEntryTotal``: the information table's rows."""
+    value_usd: Mapped[int | None] = mapped_column(Numeric(20, 0))
+    """The summary page's ``tableValueTotal``, in dollars."""
+    read_at: Mapped[datetime | None]
+    error: Mapped[str | None]
+    """Why the cover page could not be read, the last time."""
+    attempts: Mapped[int] = mapped_column(server_default="0")
+    """Failed reads; at ``thirteenf_index.MAX_ATTEMPTS`` it is not tried again."""
+
+
+class ThirteenFIndexDay(Base):
+    """A day of SEC's daily index that has been read (HD-08), and how many 13F filings it
+    listed. A weekday without one (a holiday) is kept too, with why, so it is not asked again."""
+
+    __tablename__ = "thirteenf_index_days"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    listed: Mapped[int]
+    read_at: Mapped[datetime]
+    note: Mapped[str | None]
+
+
 class OfficialReportStatus(StrEnum):
     PENDING = "pending"
     """Transcribed, waiting for a person to check it against the scan."""

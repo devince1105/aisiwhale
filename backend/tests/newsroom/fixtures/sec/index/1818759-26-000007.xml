@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/thirteenffiler" xmlns:com="http://www.sec.gov/edgar/common">
+  <schemaVersion>X0202</schemaVersion>
+  <headerData>
+    <submissionType>13F-HR/A</submissionType>
+    <filerInfo>
+      <liveTestFlag>LIVE</liveTestFlag>
+      <flags>
+        <confirmingCopyFlag>false</confirmingCopyFlag>
+        <returnCopyFlag>true</returnCopyFlag>
+        <overrideInternetFlag>false</overrideInternetFlag>
+      </flags>
+      <filer>
+        <credentials>
+          <cik>0001818759</cik>
+          <ccc>XXXXXXXX</ccc>
+        </credentials>
+      </filer>
+      <periodOfReport>06-30-2026</periodOfReport>
+    </filerInfo>
+  </headerData>
+  <formData>
+    <coverPage>
+      <reportCalendarOrQuarter>06-30-2026</reportCalendarOrQuarter>
+      <isAmendment>true</isAmendment>
+      <amendmentNo>1</amendmentNo>
+      <amendmentInfo>
+        <amendmentType>RESTATEMENT</amendmentType>
+      </amendmentInfo>
+      <filingManager>
+        <name>Sunflower Bank, N.A.</name>
+        <address>
+          <com:street1>8117 PRESTON ROAD #220</com:street1>
+          <com:city>DALLAS</com:city>
+          <com:stateOrCountry>TX</com:stateOrCountry>
+          <com:zipCode>75225</com:zipCode>
+        </address>
+      </filingManager>
+      <reportType>13F COMBINATION REPORT</reportType>
+      <form13FFileNumber>028-20305</form13FFileNumber>
+      <otherManagersInfo>
+        <otherManager>
+          <cik>0001086763</cik>
+          <form13FFileNumber>028-05785</form13FFileNumber>
+          <name>FIRST FOUNDATION ADVISORS</name>
+        </otherManager>
+      </otherManagersInfo>
+      <provideInfoForInstruction5>N</provideInfoForInstruction5>
+    </coverPage>
+    <signatureBlock>
+      <name>Beth Spachek</name>
+      <title>VP Trust Services Manager</title>
+      <phone>913-804-4124</phone>
+      <signature>Beth Spachek</signature>
+      <city>Overland Park</city>
+      <stateOrCountry>KS</stateOrCountry>
+      <signatureDate>08-14-2026</signatureDate>
+    </signatureBlock>
+    <summaryPage>
+      <otherIncludedManagersCount>0</otherIncludedManagersCount>
+      <tableEntryTotal>226</tableEntryTotal>
+      <tableValueTotal>418348911</tableValueTotal>
+      <isConfidentialOmitted>false</isConfidentialOmitted>
+    </summaryPage>
+  </formData>
+</edgarSubmission>

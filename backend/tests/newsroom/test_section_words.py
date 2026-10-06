@@ -16,6 +16,7 @@ def test_the_words_of_a_brief_say_its_section():
     assert section_from_words("黃金與原油同步走高，金價創高") == "gold"  # gold twice, oil once
     assert section_from_words("新台幣午盤貶 5.9 分") == "fx"
     assert section_from_words("巴菲特 13F 持股申報") == "holdings"
+    assert section_from_words("寫一篇機構持股的報導") == "holdings"  # 大戶持股's new name (10/06)
 
 
 def test_latin_words_count_only_whole_and_a_tie_goes_to_the_stock_market():

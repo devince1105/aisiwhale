@@ -323,6 +323,11 @@ def build_scheduler(
         tiingo_rows(tiingo.get_secret_value()) if tiingo else None,
     )
     scheduler.register(STATS_SCHEDULE, cards.schedule_handler())
+    # every 13F filer's quarter from SEC's daily index, for 機構排行 (HD-08), only live
+    from autora.domains.newsroom.thirteenf_index import INDEX_SCHEDULE, IndexKeeper
+
+    sec = HoldingsKeeper(fetcher).fetch if live else None
+    scheduler.register(INDEX_SCHEDULE, IndexKeeper(sec).schedule_handler())
     # every listed stock, to look one up (D-061); offline, nothing is asked of anybody
     finnhub = settings.finnhub_api_key if live and settings else None
     keeper = SecuritiesKeeper(

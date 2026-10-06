@@ -23,7 +23,7 @@ const WORDS = {
     allStories: "所有報導",
     all: "全部",
     sections: {
-      holdings: "大戶持股",
+      holdings: "機構持股",
       figures: "名人持股",
       ai: "AI 科技",
       tw: "台股",
@@ -519,7 +519,7 @@ const WORDS = {
     allStories: "All stories",
     all: "All",
     sections: {
-      holdings: "Holdings",
+      holdings: "Institutional holdings",
       figures: "Public figures",
       ai: "AI & Tech",
       tw: "Taiwan",
@@ -1007,18 +1007,18 @@ export function isSection(value: unknown): value is Section {
 }
 
 /** The site's tabs (D-050). Most are one section — 黃金, 期貨 and 外匯 each a tab of their own
- * (D-067); 持股觀察 (``watch``) is two — the big investors' filings and the public figures' —
- * told apart inside it by tags. */
-export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "institutions", "watch"] as const;
+ * (D-067); 持股觀察 (``watch``) is three — the institutions' filings (機構持股), the public
+ * figures' (名人持股) and the asset managers' published views (機構觀點, a tab of its own until
+ * 10/06) — told apart inside it by tags. */
+export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "watch"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
-  watch: ["holdings", "figures"],
+  watch: ["holdings", "figures", "institutions"],
   ai: ["ai"],
   tw: ["tw"],
   us: ["us"],
   crypto: ["crypto"],
-  institutions: ["institutions"],
   gold: ["gold"],
   commodities: ["commodities"],
   fx: ["fx"],

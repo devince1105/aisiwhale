@@ -208,7 +208,7 @@ SECTION_WORDS: dict[str, tuple[str, ...]] = {
         "JPMORGAN",
         "研究報告",
     ),
-    "holdings": ("13F", "持股申報", "巴菲特", "波克夏", "BERKSHIRE", "大戶持股"),
+    "holdings": ("13F", "持股申報", "巴菲特", "波克夏", "BERKSHIRE", "機構持股", "大戶持股"),
     "figures": ("川普", "裴洛西", "名人持股", "議員交易", "TRUMP", "PELOSI"),
 }
 """The words that say a section (D-212), matched without regard to case. Ordered as ``SECTIONS``
@@ -330,6 +330,7 @@ async def ensure_newsroom_schedules(
     from autora.domains.newsroom.securities import SECURITIES_CRON, SECURITIES_SCHEDULE
     from autora.domains.newsroom.sentiment import SENTIMENT_CRON, SENTIMENT_SCHEDULE
     from autora.domains.newsroom.stories import CLUSTER_CRON, CLUSTER_SCHEDULE
+    from autora.domains.newsroom.thirteenf_index import INDEX_CRON, INDEX_SCHEDULE
     from autora.domains.newsroom.watch import WATCH_CRON, WATCH_SCHEDULE
 
     schedules = []
@@ -338,6 +339,7 @@ async def ensure_newsroom_schedules(
         (CLUSTER_SCHEDULE, CLUSTER_CRON),
         (HOLDINGS_SCHEDULE, HOLDINGS_CRON),
         (STATS_SCHEDULE, STATS_CRON),  # the holdings dashboard's cards (HD-04)
+        (INDEX_SCHEDULE, INDEX_CRON),  # every 13F filer's quarter, for 機構排行 (HD-08)
         (OFFICIAL_SCHEDULE, OFFICIAL_CRON),
         (PRICES_SCHEDULE, PRICES_CRON),
         (FILL_SCHEDULE, FILL_CRON),
