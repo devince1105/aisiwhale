@@ -99,6 +99,36 @@ def test_a_manager_that_moved_filers_has_both_filings_in_its_previous_quarter():
     assert thirteenf.previous_quarter(now, [inc]) == [inc.filings[1]], "without the predecessor"
 
 
+def test_the_recent_quarters_newest_first_each_made_up_as_the_previous_one_is():
+    """HD-02: the history the dashboard keeps — Berkshire's six latest originals (the 2025-03-31
+    amendment is not a quarter), and a moved manager's quarters across both of its filers."""
+    filer = berkshire()
+    six = thirteenf.recent_quarters([filer], 6)
+    assert [str(period) for period, _ in six] == [
+        "2026-06-30", "2026-03-31", "2025-12-31", "2025-09-30", "2025-06-30", "2025-03-31",
+    ]  # fmt: skip
+    assert six[0][1][0].accession == Q2
+    assert all(len(filings) == 1 and filings[0].form == "13F-HR" for _, filings in six)
+    assert six[-1][1][0].accession != AMENDMENT
+
+    inc = thirteenf.Filer("2026053", "PERSHING SQUARE INC.", (
+        _listed("2026053", "0000000001-26-000002", "2026-06-30", "2026-08-14"),
+        _listed("2026053", "0000000001-26-000001", "2026-03-31", "2026-05-15"),
+    ))  # fmt: skip
+    capital = thirteenf.Filer("1336528", "Pershing Square Capital Management, L.P.", (
+        _listed("1336528", "0000000002-26-000002", "2026-06-30", "2026-08-14", form="13F-NT"),
+        _listed("1336528", "0000000002-26-000001", "2026-03-31", "2026-05-15"),
+        _listed("1336528", "0000000002-25-000009", "2025-12-31", "2026-02-17"),
+    ))  # fmt: skip
+    quarters = thirteenf.recent_quarters([inc, capital], 6)
+    assert [(str(period), [f.cik for f in filings]) for period, filings in quarters] == [
+        ("2026-06-30", ["2026053"]),  # Capital Management's notice holds nothing
+        ("2026-03-31", ["1336528", "2026053"]),
+        ("2025-12-31", ["1336528"]),
+    ]
+    assert thirteenf.recent_quarters([inc, capital], 1) == quarters[:1]
+
+
 # --- one filing ---------------------------------------------------------------------------------
 
 

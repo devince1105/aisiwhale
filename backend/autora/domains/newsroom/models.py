@@ -223,6 +223,52 @@ class InvestorPosition(IdMixin, CreatedAtMixin, Base):
     """The whole filing's value, for each position's share of it."""
 
 
+class PortfolioQuarter(IdMixin, CreatedAtMixin, Base):
+    """A tracked 13F filer's holdings at one quarter's end (HD-02, D-217): the history the
+    holdings dashboard's simulated return is computed from.
+
+    ``holdings.refresh_holdings`` keeps each 13F source's latest ``KEEP_QUARTERS``, whether or not
+    anything was written about them. A quarter is what ``thirteenf.recent_quarters`` says makes
+    it up — each filer's latest original 13F-HR for the period — added up when several filers
+    reported it (a manager whose holdings moved, Pershing Square), as the comparison does."""
+
+    __tablename__ = "portfolio_quarters"
+    __table_args__ = (UniqueConstraint("source_id", "period"),)
+
+    company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id"))
+    source_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sources.id"))
+    """The 13F source: who the investor is (its ``title_prefix``)."""
+    period: Mapped[date] = mapped_column(Date)
+    filed: Mapped[date] = mapped_column(Date)
+    """When its last filing was filed: the day the quarter became known."""
+    filings: Mapped[list[dict[str, str]]] = mapped_column(JSONB)
+    """The filings it is made of, ``{"cik", "accession"}`` each, in CIK order: their SEC pages,
+    and what tells a later run it has them already."""
+    total_value_usd: Mapped[int] = mapped_column(Numeric(20, 0))
+    in_thousands: Mapped[bool] = mapped_column(server_default="false")
+    """A filing's values were read as thousands of dollars (``thirteenf.parse_filing``)."""
+
+
+class PortfolioPosition(IdMixin, Base):
+    """One position of a ``PortfolioQuarter``: rows for the same CUSIP, option and kind added up
+    (``thirteenf.Position``). Goes with its quarter."""
+
+    __tablename__ = "portfolio_positions"
+    __table_args__ = (UniqueConstraint("quarter_id", "cusip", "put_call", "kind"),)
+
+    quarter_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("portfolio_quarters.id", ondelete="CASCADE")
+    )
+    cusip: Mapped[str]
+    issuer: Mapped[str]
+    title_of_class: Mapped[str]
+    put_call: Mapped[str] = mapped_column(server_default="")
+    kind: Mapped[str]
+    """``SH`` (shares) or ``PRN`` (principal)."""
+    amount: Mapped[int] = mapped_column(Numeric(20, 0))
+    value_usd: Mapped[int] = mapped_column(Numeric(20, 0))
+
+
 class OfficialReportStatus(StrEnum):
     PENDING = "pending"
     """Transcribed, waiting for a person to check it against the scan."""

@@ -154,25 +154,42 @@ def parse_submissions(body: bytes) -> Filer:
         raise FilingError(f"SEC's list of filings could not be read: {exc}") from exc
 
 
+def _originals(filers: list[Filer]) -> list[tuple[date, Listed]]:
+    """Every original 13F-HR these filers list, with its period (an amendment is not a quarter)."""
+    return [
+        (f.period, f)
+        for filer in filers
+        for f in filer.filings
+        if f.form == "13F-HR" and f.period is not None
+    ]
+
+
+def _quarter(period: date, originals: list[tuple[date, Listed]]) -> list[Listed]:
+    """The filings that make up ``period``: each filer's latest original for it."""
+    chosen: dict[str, Listed] = {}
+    for p, f in originals:
+        if p == period and (f.cik not in chosen or f.filed > chosen[f.cik].filed):
+            chosen[f.cik] = f
+    return sorted(chosen.values(), key=lambda f: f.cik)
+
+
 def previous_quarter(current: Listed, filers: list[Filer]) -> list[Listed]:
     """The filings that make up the quarter before ``current``: the latest earlier period any of
     these filers reported in an original 13F-HR, and each one's latest original for it."""
     if current.period is None:
         return []
-    earlier = [
-        f
-        for filer in filers
-        for f in filer.filings
-        if f.form == "13F-HR" and f.period is not None and f.period < current.period
-    ]
+    earlier = [(p, f) for p, f in _originals(filers) if p < current.period]
     if not earlier:
         return []
-    period = max(f.period for f in earlier if f.period is not None)
-    chosen: dict[str, Listed] = {}
-    for f in earlier:
-        if f.period == period and (f.cik not in chosen or f.filed > chosen[f.cik].filed):
-            chosen[f.cik] = f
-    return sorted(chosen.values(), key=lambda f: f.cik)
+    return _quarter(max(p for p, _ in earlier), earlier)
+
+
+def recent_quarters(filers: list[Filer], count: int) -> list[tuple[date, list[Listed]]]:
+    """The latest ``count`` periods these filers reported in an original 13F-HR, newest first,
+    each with the filings that make it up — by the rule ``previous_quarter`` makes up one."""
+    originals = _originals(filers)
+    periods = sorted({p for p, _ in originals}, reverse=True)[:count]
+    return [(period, _quarter(period, originals)) for period in periods]
 
 
 # --- one filing's holdings ----------------------------------------------------------------------

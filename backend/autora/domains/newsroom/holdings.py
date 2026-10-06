@@ -6,9 +6,13 @@ they do with it — so the same comparison is also kept here as rows, one per po
 13F source the company follows, whether or not an article was written about it.
 
 ``refresh_holdings`` runs on a schedule. For each 13F source it asks SEC for the filer's list of
-filings (one request) and stops there unless the latest original 13F-HR is one it has not stored;
-then it reads that filing and the previous quarter's (its predecessors' too, as ``compare_13f``
-does) and replaces the source's rows. The arithmetic is ``thirteenf``'s, already tested.
+filings (one request, and one for each predecessor filer) and stops there unless the latest
+original 13F-HR is one it has not stored; then it reads that filing and the previous quarter's
+(its predecessors' too, as ``compare_13f`` does) and replaces the source's rows. The arithmetic is
+``thirteenf``'s, already tested.
+
+The same run keeps each source's latest ``KEEP_QUARTERS`` whole (``portfolio_quarters``, HD-02):
+the holdings dashboard's history. The first run reads them all; after that, only a new quarter.
 
 A stock is found in a filing by CUSIP (13F filings name issuers, not tickers): ``STOCKS`` maps
 the site's symbols to theirs. A Taiwan stock's page shows the holders of its US listing — TSMC's
@@ -30,7 +34,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
 from autora.domains.newsroom import thirteenf
-from autora.domains.newsroom.models import InvestorPosition, PositionChange, Source
+from autora.domains.newsroom.models import (
+    InvestorPosition,
+    PortfolioPosition,
+    PortfolioQuarter,
+    PositionChange,
+    Source,
+)
 from autora.domains.newsroom.sources import PRIMARY, SECTION, TITLE_PREFIX
 from autora.domains.newsroom.tools.filings import PREDECESSORS
 from autora.infra.http import FetchError, PageFetcher
@@ -41,6 +51,11 @@ log = logging.getLogger(__name__)
 HOLDINGS_SCHEDULE = "newsroom.refresh_holdings"
 HOLDINGS_CRON = "40 */6 * * *"
 """Four times a day: one request per investor when nothing is new, and 13Fs arrive rarely."""
+
+KEEP_QUARTERS = 6
+"""Of each 13F source's history (HD-02): the simulated one-year return reaches back to the last
+quarter's end a year ago — four quarters, five while the latest filings are coming in — and a
+filer late with its latest needs one more."""
 
 _CIK = re.compile(r"[?&]CIK=0*(\d+)", re.I)
 
@@ -146,10 +161,41 @@ def thirteenf_sources(sources: list[Source]) -> list[tuple[Source, str]]:
 Fetch = Callable[[str], Awaitable[bytes]]
 
 
+def _once(fetch: Fetch) -> Fetch:
+    """``fetch``, asking SEC for each address once: a new quarter is both compared and kept."""
+    seen: dict[str, bytes] = {}
+
+    async def get(url: str) -> bytes:
+        if url not in seen:
+            seen[url] = await fetch(url)
+        return seen[url]
+
+    return get
+
+
 async def refresh_source(session: AsyncSession, source: Source, cik: str, fetch: Fetch) -> bool:
-    """Store the latest 13F-HR's positions for one source if they are not stored yet. True
-    when rows were written."""
+    """One source brought up to date: its latest 13F-HR's positions against the quarter before
+    (``investor_positions``) and its latest ``KEEP_QUARTERS`` (``portfolio_quarters``). True when
+    anything was written."""
+    fetch = _once(fetch)
     filer = thirteenf.parse_submissions(await fetch(thirteenf.submissions_url(cik)))
+    filers = {filer.cik: filer}
+    for other_cik in source.config.get(PREDECESSORS) or []:
+        other = thirteenf.parse_submissions(await fetch(thirteenf.submissions_url(str(other_cik))))
+        filers.setdefault(other.cik, other)
+    compared = await _compare_latest(session, source, filer, list(filers.values()), fetch)
+    kept = await keep_quarters(session, source, list(filers.values()), fetch)
+    return compared or kept
+
+
+async def _compare_latest(
+    session: AsyncSession,
+    source: Source,
+    filer: thirteenf.Filer,
+    filers: list[thirteenf.Filer],
+    fetch: Fetch,
+) -> bool:
+    """The latest 13F-HR's positions against the quarter before, stored unless they are already."""
     originals = [f for f in filer.filings if f.form == "13F-HR" and f.period is not None]
     if not originals:
         return False
@@ -160,11 +206,7 @@ async def refresh_source(session: AsyncSession, source: Source, cik: str, fetch:
     if stored == current.accession:
         return False
 
-    filers = {filer.cik: filer}
-    for other_cik in source.config.get(PREDECESSORS) or []:
-        other = thirteenf.parse_submissions(await fetch(thirteenf.submissions_url(str(other_cik))))
-        filers.setdefault(other.cik, other)
-    before = thirteenf.previous_quarter(current, list(filers.values()))
+    before = thirteenf.previous_quarter(current, filers)
     now = thirteenf.parse_filing(await fetch(current.ref.text_url))
     if not now.positions:
         return False
@@ -206,6 +248,68 @@ async def refresh_source(session: AsyncSession, source: Source, cik: str, fetch:
             )
     await session.flush()
     return True
+
+
+async def keep_quarters(
+    session: AsyncSession, source: Source, filers: list[thirteenf.Filer], fetch: Fetch
+) -> bool:
+    """The source's latest ``KEEP_QUARTERS`` stored, and older ones dropped (HD-02). A quarter
+    already stored from the same filings is not read again; one SEC cannot give now is left for
+    the next run, and the others go on. True when anything was written or dropped."""
+    wanted = thirteenf.recent_quarters(filers, KEEP_QUARTERS)
+    stored = {
+        q.period: q
+        for q in (
+            await session.scalars(
+                select(PortfolioQuarter).where(PortfolioQuarter.source_id == source.id)
+            )
+        ).all()
+    }
+    changed = False
+    for period in set(stored) - {period for period, _ in wanted}:
+        await session.delete(stored.pop(period))  # its positions go with it
+        changed = True
+    for period, filings in wanted:
+        refs = [{"cik": f.cik, "accession": f.accession} for f in filings]
+        held = stored.get(period)
+        if held is not None and held.filings == refs:
+            continue
+        try:
+            parts = [thirteenf.parse_filing(await fetch(f.ref.text_url)) for f in filings]
+        except (thirteenf.FilingError, FetchError) as error:
+            log.warning("holdings: %s %s not kept: %s", source.name, period, error)
+            continue
+        if held is not None:  # a later original for the period replaced one we had
+            await session.delete(held)
+            await session.flush()
+        holdings = thirteenf.combine(parts)
+        quarter = PortfolioQuarter(
+            company_id=source.company_id,
+            source_id=source.id,
+            period=period,
+            filed=max(f.filed for f in filings),
+            filings=refs,
+            total_value_usd=holdings.total_value,
+            in_thousands=holdings.in_thousands,
+        )
+        session.add(quarter)
+        await session.flush()
+        session.add_all(
+            PortfolioPosition(
+                quarter_id=quarter.id,
+                cusip=p.cusip,
+                issuer=p.name,
+                title_of_class=p.title_of_class,
+                put_call=p.put_call,
+                kind=p.kind,
+                amount=p.amount,
+                value_usd=p.value,
+            )
+            for p in holdings.positions.values()
+        )
+        changed = True
+    await session.flush()
+    return changed
 
 
 async def refresh_holdings(session: AsyncSession, company_id: uuid.UUID, fetch: Fetch) -> int:

@@ -201,7 +201,8 @@ OXY    減碼  −12.0%                ╰──────╯
 
 | 表 | 一列是什麼 | 估計大小 |
 |---|---|---|
-| `holding_snapshots` | 名人名單中每位申報人每季的每個部位（CUSIP、股數、市值、類別、選擇權別），保留最近 6 季 | 約 1 萬列 |
+| `portfolio_quarters` | 每位申報人每季一列：組成這一季的申報（CIK、accession）、申報日、總市值、是否以千元申報；保留最近 6 季（HD-02 實作時從原本的 `holding_snapshots` 拆成兩張表，季的資料不必每個部位重複一次） | 約 60 列 |
+| `portfolio_positions` | 每季的每個部位（CUSIP、股數、市值、類別、選擇權別），隨季刪除 | 約 1 萬列 |
 | `cusip_symbols` | CUSIP → 代號、名稱、交易所、來源（OpenFIGI／名稱比對）、查詢時間 | 約 3,000 列 |
 | `portfolio_stats` | 每位名人一列：模擬報酬、起算日、涵蓋率、前 10 大、兩筆動作、計算時間 | 十幾列 |
 | `thirteenf_filers` | CIK → 英文名稱、中文名稱（取自名稱表） | 約 1.2 萬列 |
@@ -216,7 +217,7 @@ OXY    減碼  −12.0%                ╰──────╯
 
 | 排程 | 頻率 | 外部請求 |
 |---|---|---|
-| `refresh_holdings`（已有；改為也寫入 `holding_snapshots`） | 每 6 小時 | 沒有新申報時，每人 1 次 |
+| `refresh_holdings`（已有；改為也保留最近 6 季） | 每 6 小時 | 沒有新申報時，每人 1 次（艾克曼 2 次：多問前一個申報實體的清單） |
 | `refresh_portfolio_stats`（新） | 每天收盤後 | Tiingo：只有出清的持股與最新收盤價 |
 | `refresh_13f_index`（新） | 每小時 | SEC：每日索引 1 次，加上每份新申報 1 次 |
 | `refresh_institution_details`（新） | 每 30 分鐘，每次最多處理 5 家 | SEC：每家 2 份持股表 |
@@ -242,7 +243,7 @@ OXY    減碼  −12.0%                ╰──────╯
 | 編號 | 內容 | 依賴 | 驗收 |
 |---|---|---|---|
 | HD-01 | 新增輝達、淡馬錫、索羅斯三個 13F 來源；在 Neon 上執行 `seed_markets.py` | — | 三家的 `investor_positions` 有資料；跑馬燈個股頁出現新持有人（淡馬錫：NVDA、GOOGL；索羅斯：AMZN、TSM、GOOGL、NVDA）。輝達持有的英特爾、SpaceX 等不是跑馬燈個股，個股頁沒有 CUSIP，看不到——要等個人頁（HD-06） |
-| HD-02 | `holding_snapshots`：`refresh_holdings` 改為保留最近 6 季，第一次執行時往回補 | HD-01 | 9 位都有 5 季以上的資料；遷移可以升級也可以降級 |
+| HD-02 | `portfolio_quarters`、`portfolio_positions`（遷移 0063）：`refresh_holdings` 改為保留最近 6 季，第一次執行時往回補 | HD-01 | 9 位都有 5 季以上的資料；遷移可以升級也可以降級 |
 | HD-03 | `cusip_symbols`：OpenFIGI 用戶端加上名稱比對 | — | 用固定資料測試；名單內前 90% 權重的持股對應率 ≥ 95% |
 | HD-04 | `portfolio_stats`：模擬報酬、兩筆動作、環圈資料 | HD-02、03 | 用手算的固定資料測試（含出清、新建倉、對不到代號的持股）；巴菲特的結果與一個公開追蹤網站比較，差距寫進 devlog |
 | HD-05 | 公開 API：`GET /api/public/holdings`、`/holdings/people/{slug}`；OpenAPI 與 `schema.gen.ts` | HD-04 | API 測試；未登入時只給前 10 大 |
