@@ -310,7 +310,8 @@ describe("持股觀察: two sections under one tab, told apart by tags (D-050)",
     render(<ArticleList articles={[summary(1)]} lang="zh-TW" section="figures" />);
     const tags = within(screen.getByRole("navigation", { name: "持股觀察的分類" })).getAllByRole("link");
     expect(tags.map((t) => [t.textContent, t.getAttribute("href"), t.getAttribute("aria-current")])).toEqual([
-      ["全部", "/news/zh-TW?section=watch", null],
+      // the tab itself opens on its cards now (HD-06): its stories are its news tab
+      ["全部", "/news/zh-TW?section=watch&view=news", null],
       ["大戶持股", "/news/zh-TW?section=holdings", null],
       ["名人持股", "/news/zh-TW?section=figures", "page"],
     ]);

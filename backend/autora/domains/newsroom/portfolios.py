@@ -463,6 +463,23 @@ def moves(
     return sorted(moved, key=lambda m: (-abs(m.value_change), m.cusip))[:count]
 
 
+def table(latest: Quarter, previous: Quarter | None, prices: Prices) -> list[dict[str, Any]]:
+    """The person page's table (HD-05), as kept: ``compare``'s rows, with tickers and weights."""
+    return [
+        {
+            "cusip": m.cusip,
+            "symbol": prices.symbols.get(m.cusip),
+            "issuer": m.issuer,
+            "change": m.change,
+            "shares": m.shares,
+            "previous_shares": m.previous_shares,
+            "value_usd": m.value,
+            "weight": float(round(Decimal(m.value) / latest.value, 6)) if latest.value else 0.0,
+        }
+        for m in compare(latest, previous, prices)
+    ]
+
+
 @dataclass(frozen=True)
 class Top:
     cusip: str
@@ -729,21 +746,7 @@ async def refresh_portfolio_stats(
                 }
                 for m in moves(latest, previous, prices)
             ],
-            "positions": [
-                {
-                    "cusip": m.cusip,
-                    "symbol": symbols.get(m.cusip),
-                    "issuer": m.issuer,
-                    "change": m.change,
-                    "shares": m.shares,
-                    "previous_shares": m.previous_shares,
-                    "value_usd": m.value,
-                    "weight": float(round(Decimal(m.value) / latest.value, 6))
-                    if latest.value
-                    else 0.0,
-                }
-                for m in compare(latest, previous, prices)
-            ],
+            "positions": table(latest, previous, prices),
             "stretches": [
                 {
                     "start": st.start.isoformat(),
@@ -967,6 +970,21 @@ def _card(profile: Profile, stat: PortfolioStat, lang: str) -> dict[str, Any]:
     }
 
 
+async def _table_now(session: AsyncSession, source: Source) -> list[dict[str, Any]]:
+    """The table worked out now, from the source's two latest kept quarters, for a page asked
+    before a run has kept it (HD-06: the runs can wait behind the worker's longer schedules,
+    and a person page should still say what is held). The same comparison, against what is
+    known of prices: a holding that may have split stays 待確認 until a run checks it."""
+    books, implied = await _books(session, source.company_id)
+    ordered = sorted(books.get(source.id, []), key=lambda q: q.period)
+    if not ordered:
+        return []
+    cusip_list = sorted({h.cusip for q in ordered[-2:] for h in q.held})
+    symbols = await cusips.symbols(session, cusip_list)
+    prices = Prices(implied, symbols, await _closes(session, set(symbols.values())))
+    return table(ordered[-1], ordered[-2] if len(ordered) > 1 else None, prices)
+
+
 async def cards(
     session: AsyncSession, company_id: uuid.UUID | None, lang: str
 ) -> list[PublicPortfolioCard]:
@@ -991,7 +1009,8 @@ async def portfolio(
     if found is None:
         return None
     source, _, profile, stat = found
-    rows = stat.positions if signed_in else stat.positions[:FREE_ROWS]
+    every = stat.positions or await _table_now(session, source)
+    rows = every if signed_in else every[:FREE_ROWS]
     quarters = (
         await session.scalars(
             select(PortfolioQuarter)
@@ -1015,8 +1034,8 @@ async def portfolio(
             )
             for r in rows
         ],
-        positions_total=len(stat.positions),
-        locked=len(rows) < len(stat.positions),
+        positions_total=len(every),
+        locked=len(rows) < len(every),
         stretches=[PublicStretch(**st) for st in stat.stretches],
         quarters=[
             PublicFiledQuarter(

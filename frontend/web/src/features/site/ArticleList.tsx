@@ -20,6 +20,7 @@ import {
   type Section,
 } from "./i18n";
 import { Pagination } from "./Pagination";
+import { watchHref } from "./Portfolios";
 import { Sidebar } from "./Sidebar";
 import { StocksNamed } from "./StocksNamed";
 
@@ -95,7 +96,7 @@ function Tags({ lang, filter, day = null }: { lang: Lang; filter: Filter; day?: 
       {chips.map(([id, label]) => (
         <Link
           key={id}
-          href={listHref(lang, id, 1, day)}
+          href={id === "watch" && !day ? watchHref(lang, "news") : listHref(lang, id, 1, day)}
           aria-current={id === filter ? "page" : undefined}
           className={`rounded-full border px-3 py-1 text-xs ${
             id === filter ? "border-ink bg-ink font-semibold text-surface" : "border-line text-muted hover:text-ink"
@@ -139,6 +140,7 @@ export function ArticleList({
   events = [],
   sentiment = [],
   top = null,
+  only = null,
 }: {
   articles: PublicArticleSummary[];
   lang: Lang;
@@ -159,8 +161,10 @@ export function ArticleList({
   events?: PublicEvent[];
   /** 新聞情緒 of the strip's stocks (D-091), for the sidebar. */
   sentiment?: PublicSentiment[];
-  /** What a tab shows above its stories: 持股觀察's cards (HD-06). */
+  /** What a tab shows above its stories: 持股觀察's tabs (HD-06). */
   top?: ReactNode;
+  /** What a tab shows instead of its stories: 持股觀察's cards (HD-06). */
+  only?: ReactNode;
 
 }) {
   const w = words(lang);
@@ -177,6 +181,9 @@ export function ArticleList({
           {day ? `・${w.calendar.on(day)}` : ""}
           {page > 1 ? `・${w.page(page)}` : ""}
         </h1>
+        {top}
+        {only ?? (
+          <>
         {/* the tab's tags; on a narrow screen the calendar's button beside them (D-084) */}
         <div className="flex flex-wrap items-start justify-between gap-x-4">
           <div className="min-w-0 flex-1">{section ? <Tags lang={lang} filter={section} day={day} /> : null}</div>
@@ -186,7 +193,6 @@ export function ArticleList({
             </div>
           ) : null}
         </div>
-        {top}
         {/* 外匯: the bank's own rates are a click away (D-072); a currency's chart is on the watchlist */}
         {section === "fx" && page === 1 ? <BankRates lang={lang} /> : null}
         {articles.length === 0 ? (
@@ -202,6 +208,8 @@ export function ArticleList({
           </>
         )}
         <Pagination lang={lang} page={page} total={pages} to={(n) => listHref(lang, section, n, day)} />
+          </>
+        )}
       </div>
       {calendar ? (
         <Sidebar

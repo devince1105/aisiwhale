@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { PublicPortfolio, PublicPortfolioCard } from "./api";
 import { words } from "./i18n";
-import { CEOS, PortfolioCards, PortfolioView, quarterOf, signedPct } from "./Portfolios";
+import { CEOS, KINDS, PortfolioCards, PortfolioView, quarterOf, signedPct, WatchTabs } from "./Portfolios";
 
 afterEach(cleanup);
 
@@ -66,7 +66,7 @@ describe("the 持股觀察 tab's cards", () => {
     // faces from Wikimedia Commons: Buffett's own; NVIDIA's card its chief's, as the brokers' do
     expect(buffett.querySelector("image")?.getAttribute("href")).toBe("/people/buffett.jpg");
     expect(nvidia.querySelector("image")?.getAttribute("href")).toBe("/ceos/nvda.jpg");
-    expect(screen.getByText(/人物照片來自維基共享資源/)).toBeTruthy();
+    expect(screen.getByText("人物照片的來源列在各人的頁面。")).toBeTruthy();
 
     // NVIDIA's 13F is the company's, not Jensen Huang's; its return is still being checked
     expect(within(nvidia).getByRole("heading").textContent).toBe("輝達（公司）持股");
@@ -149,7 +149,8 @@ describe("the Magnificent Seven's chief executives", () => {
     });
     for (const ceo of Object.values(CEOS)) {
       expect(ceo.photo.page).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
-      expect(ceo.photo.license === null || /^CC BY \d\.\d$/.test(ceo.photo.license)).toBe(true); // no ShareAlike
+      expect(ceo.photo.supplied).toBeUndefined(); // every one from Commons, credited
+      expect(ceo.photo.license === null || /^CC BY \d\.\d$/.test(ceo.photo.license ?? "")).toBe(true); // no ShareAlike
     }
   });
 });
@@ -181,5 +182,25 @@ describe("the numbers", () => {
   it("signs a percentage the way a quote does, and names a quarter", () => {
     expect([signedPct(0.1894), signedPct(-0.0128), signedPct(0)]).toEqual(["+18.94%", "−1.28%", "0.00%"]);
     expect([quarterOf("zh-TW", "2026-06-30"), quarterOf("en", "2025-12-31")]).toEqual(["2026 年第 2 季", "Q4 2025"]);
+  });
+});
+
+describe("持股觀察's tabs", () => {
+  it("separates the big names, the big holders and the stories", () => {
+    render(<WatchTabs lang="zh-TW" view="groups" />);
+    const tabs = within(screen.getByTestId("watch-tabs")).getAllByRole("link");
+    expect(tabs.map((tab) => [tab.textContent, tab.getAttribute("href"), tab.getAttribute("aria-current")])).toEqual([
+      ["名人持股", "/news/zh-TW?section=watch", null],
+      ["大戶（集團）持股", "/news/zh-TW?section=watch&view=groups", "page"],
+      ["新聞", "/news/zh-TW?section=watch&view=news", null],
+    ]);
+    // a person's or an official's card among the big names; a company's or a fund's among the groups
+    expect([KINDS.people, KINDS.groups]).toEqual([["person", "official"], ["company", "fund"]]);
+  });
+
+  it("a photo the site's operator supplied says so (Commons has none of 段永平)", () => {
+    render(<PortfolioView portfolio={{ ...PAGE, slug: "duan-yongping", name: "段永平" }} lang="zh-TW" loginHref="/x" />);
+    expect(screen.getByTestId("photo-credit").textContent).toBe("照片：網站經營者提供");
+    expect(document.querySelector("image")?.getAttribute("href")).toBe("/people/duan-yongping.jpg");
   });
 });

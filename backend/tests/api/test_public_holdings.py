@@ -8,7 +8,13 @@ import httpx
 import pytest
 
 from autora.domains.newsroom.markets import edgar_13f
-from autora.domains.newsroom.models import PortfolioQuarter, PortfolioStat, Source
+from autora.domains.newsroom.models import (
+    CusipSymbol,
+    PortfolioPosition,
+    PortfolioQuarter,
+    PortfolioStat,
+    Source,
+)
 from tests.api.readers import sign_in
 from tests.conftest import unique_company
 
@@ -182,3 +188,54 @@ async def test_no_such_person_or_company(public, dashboard):
     assert missing.status_code == 404
     no_company = await public.get("/api/public/holdings", params={"lang": "zh-TW", "company": "x"})
     assert no_company.status_code == 404
+
+
+async def test_a_person_page_before_a_run_has_kept_its_table(public, committed):
+    """HD-06: the runs can wait behind the worker's longer schedules; the page works the table
+    out from the two latest quarters meanwhile, rather than saying nothing is held."""
+    async with committed() as session:
+        company = await unique_company(session)
+        burry = _source(company.id, "麥可・貝瑞（Scion）", "0001649339")
+        session.add(burry)
+        await session.flush()
+        for period, held in (
+            (Q1, [("60855R100", "MOLINA HEALTHCARE INC", 100, 30_000)]),
+            (Q2, [("60855R100", "MOLINA HEALTHCARE INC", 150, 45_000),
+                  ("550021109", "LULULEMON ATHLETICA INC", 50, 10_000)]),
+        ):  # fmt: skip
+            quarter = PortfolioQuarter(
+                company_id=company.id,
+                source_id=burry.id,
+                period=period,
+                filed=period,
+                filings=[{"cik": "1649339", "accession": f"0001649339-26-0000{period.month:02d}"}],
+                total_value_usd=sum(v for *_, v in held),
+            )
+            session.add(quarter)
+            await session.flush()
+            session.add_all(
+                PortfolioPosition(
+                    quarter_id=quarter.id, cusip=cusip, issuer=issuer, title_of_class="COM",
+                    kind="SH", amount=shares, value_usd=value,
+                )
+                for cusip, issuer, shares, value in held
+            )  # fmt: skip
+        session.add(CusipSymbol(cusip="60855R100", symbol="MOH", checked_at=datetime.now(UTC)))
+        stat = _stat(burry, company.id)
+        stat.positions, stat.stretches = [], []
+        session.add(stat)
+        await session.commit()
+        slug = company.slug
+
+    page = (
+        await public.get(
+            "/api/public/holdings/people/burry", params={"lang": "zh-TW", "company": slug}
+        )
+    ).json()
+    assert [
+        (p["symbol"], p["name"], p["change"], p["shares_change_pct"]) for p in page["positions"]
+    ] == [
+        ("MOH", "MOLINA HEALTHCARE INC", "increased", 50.0),
+        (None, "LULULEMON ATHLETICA INC", "new", None),
+    ]
+    assert page["positions_total"] == 2

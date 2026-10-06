@@ -16,6 +16,45 @@ export function portfolioHref(lang: Lang, slug: string): string {
   return `/news/${lang}/holdings/people/${slug}`;
 }
 
+/** 持股觀察's three tabs (HD-06): the big names' cards, the big holders' (groups: a company's
+ * own investments, a state fund), and the stories. */
+export const VIEWS = ["people", "groups", "news"] as const;
+export type View = (typeof VIEWS)[number];
+
+export function isView(value: unknown): value is View {
+  return typeof value === "string" && (VIEWS as readonly string[]).includes(value);
+}
+
+/** Which cards a tab shows: a person's or a public official's; a company's or a fund's. */
+export const KINDS: Record<Exclude<View, "news">, readonly string[]> = {
+  people: ["person", "official"],
+  groups: ["company", "fund"],
+};
+
+export function watchHref(lang: Lang, view: View): string {
+  return view === "people" ? listHref(lang, "watch") : `${listHref(lang, "watch")}&view=${view}`;
+}
+
+export function WatchTabs({ lang, view }: { lang: Lang; view: View }) {
+  const w = words(lang).portfolio;
+  return (
+    <nav aria-label={w.tabsLabel} className="flex gap-1 border-b border-line pt-4 print:hidden" data-testid="watch-tabs">
+      {VIEWS.map((id) => (
+        <Link
+          key={id}
+          href={watchHref(lang, id)}
+          aria-current={id === view ? "page" : undefined}
+          className={`-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap ${
+            id === view ? "border-accent font-semibold text-ink" : "border-transparent text-muted hover:text-ink"
+          }`}
+        >
+          {w.tabs[id]}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 /** +18.94%, −1.28%: a fraction as a signed percentage. */
 export function signedPct(fraction: number, digits = 2): string {
   const pct = fraction * 100;
@@ -51,12 +90,15 @@ const CHANGE_TONE: Record<string, string> = {
 
 export interface Photo {
   src: string;
-  author: string;
-  /** ``CC BY 4.0``; null: in the public domain. */
-  license: string | null;
-  licenseUrl: string | null;
-  /** The file's page at Wikimedia Commons. */
-  page: string;
+  /** From Wikimedia Commons: who took it, under what licence (null: the public domain), and the
+   * file's page there. A photo the site's operator supplied has none of these (``supplied``). */
+  author?: string;
+  license?: string | null;
+  licenseUrl?: string | null;
+  page?: string;
+  /** Supplied by the site's operator (2026-10-06: 段永平, 杜肯米勒, 麥可・貝瑞 and Temasek's,
+   * for whom Commons has none); where it comes from is the operator's to confirm. */
+  supplied?: boolean;
   /** Who is in it, where that is not the card's own subject: NVIDIA's card shows its chief. */
   pictured?: { zh: string; en: string };
 }
@@ -152,8 +194,8 @@ export const CEOS: Record<string, Ceo> = {
 };
 
 /** Faces at the rings' centres (D-217): photos in the public domain or under CC BY from
- * Wikimedia Commons, cropped square to the face, credited on each person page. A person without
- * one (none found for 段永平, 杜肯米勒, 麥可・貝瑞) keeps a monogram; a fund its name. */
+ * Wikimedia Commons, cropped square to the face, credited on each person page; where Commons has
+ * none, a photo the site's operator supplied. A card without one keeps a monogram. */
 export const PHOTOS: Record<string, Photo> = {
   buffett: {
     src: "/people/buffett.jpg",
@@ -183,6 +225,10 @@ export const PHOTOS: Record<string, Photo> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
     page: "https://commons.wikimedia.org/wiki/File:Bill_Ackman,_2016.jpg",
   },
+  "duan-yongping": { src: "/people/duan-yongping.jpg", supplied: true },
+  druckenmiller: { src: "/people/druckenmiller.jpg", supplied: true },
+  burry: { src: "/people/burry.jpg", supplied: true },
+  temasek: { src: "/people/temasek.jpg", supplied: true },
   // the company's card shows its chief, as the brokers' cards do; the title says whose holdings
   // they are (輝達（公司）持股) and the credit who is pictured
   nvidia: { ...CEOS.NVDA.photo, pictured: { zh: "黃仁勳（輝達執行長）", en: "Jensen Huang, NVIDIA's chief executive" } },
@@ -341,12 +387,12 @@ function Filed({ card, lang }: { card: Card; lang: Lang }) {
 }
 
 /** The 持股觀察 tab's cards, two to a row on a wide screen. */
-export function PortfolioCards({ cards, lang }: { cards: Card[]; lang: Lang }) {
+export function PortfolioCards({ cards, lang, heading }: { cards: Card[]; lang: Lang; heading?: string }) {
   const w = words(lang).portfolio;
   return (
     <section aria-labelledby="portfolios" className="pt-6 pb-2">
       <h2 id="portfolios" className="text-xl font-bold">
-        {w.heading}
+        {heading ?? w.heading}
       </h2>
       {/* two to a row only where a card keeps room for its moves beside its ring (440 px) */}
       <ul className="mt-4 grid gap-4 xl:grid-cols-2" data-testid="portfolio-cards">
@@ -376,9 +422,17 @@ export function PortfolioCards({ cards, lang }: { cards: Card[]; lang: Lang }) {
 }
 
 /** A photo's credit, as its licence asks: who took it, under what, from where, and that it was
- * cropped. */
+ * cropped; or that the site's operator supplied it. */
 function Credit({ photo, lang }: { photo: Photo; lang: Lang }) {
   const w = words(lang).portfolio;
+  if (photo.supplied) {
+    return (
+      <p className="mt-2 text-xs text-muted" data-testid="photo-credit">
+        {w.photo}
+        {w.supplied}
+      </p>
+    );
+  }
   return (
     <p className="mt-2 text-xs text-muted" data-testid="photo-credit">
       {w.photo}
