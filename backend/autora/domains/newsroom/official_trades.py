@@ -38,7 +38,7 @@ import re
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Protocol
 from xml.etree import ElementTree
 
@@ -67,6 +67,10 @@ reports this term — in one request."""
 CONCURRENT_PAGES = 4
 """Pages transcribed at once: a 37-page report in a few minutes rather than ten."""
 PAGES_PER_RUN = 60
+RECENT_DAYS = 180
+"""Reports received in the last half year only (HD-07): the holdings dashboard shows an
+official's latest trades, and the term's first year would be some 700 scanned pages to pay a
+model for."""
 """The most pages transcribed in one run — at about a cent a page, a bound on what a run costs.
 A long backlog takes several runs; a report bigger than this is still read whole, alone."""
 
@@ -75,7 +79,7 @@ FIGURES = {"Trump, Donald": "川普"}
 
 HOUSE_INDEX = "https://disclosures-clerk.house.gov/public_disc/financial-pdfs/{year}FD.zip"
 HOUSE_REPORT = "https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/{year}/{doc}.pdf"
-HOUSE_FIGURES = {("Pelosi", "Nancy"): "佩洛西"}
+HOUSE_FIGURES = {("Pelosi", "Nancy"): "裴洛西"}
 """Whose House reports: (last name, first name) as the Clerk's index gives them → the site's."""
 
 APPROVAL_KIND = "official_report"
@@ -509,7 +513,12 @@ async def refresh_official_trades(
     today: date | None = None,
 ) -> int:
     """Read the new reports, newest first, within the run's page budget. How many were stored."""
-    reports = await list_reports(fetch, today or date.today())
+    today = today or date.today()
+    reports = [
+        r
+        for r in await list_reports(fetch, today)
+        if r.received_on >= today - timedelta(days=RECENT_DAYS)
+    ]
     known = set(
         (
             await session.scalars(
@@ -684,6 +693,8 @@ class PublicTrade(BaseModel):
     """An option on the stock, not the stock."""
     note: str | None = None
     """What the report says of it: "Purchased 100 call options with a strike price of $100…"."""
+    ticker: str | None = None
+    """The stock's: what an official's own page lists (HD-07)."""
 
 
 async def trades_for(
@@ -708,23 +719,65 @@ async def trades_for(
     )
     if company_id is not None:
         query = query.where(OfficialTrade.company_id == company_id)
-    return [
-        PublicTrade(
-            person=report.person,
-            kind=trade.kind,
-            traded_on=trade.traded_on,
-            amount_min=int(trade.amount_min) if trade.amount_min is not None else None,
-            amount_max=int(trade.amount_max) if trade.amount_max is not None else None,
-            amount_text=trade.amount_text,
-            late=trade.late,
-            received_on=report.received_on,
-            report_url=f"{report.url}#page={trade.page}",
-            owner=trade.owner,
-            option=is_option(trade.description),
-            note=trade.note,
+    return [_public(trade, report) for trade, report in (await session.execute(query)).all()]
+
+
+async def trades_of(
+    session: AsyncSession,
+    person: str,
+    *,
+    company_id: uuid.UUID | None = None,
+    limit: int | None = None,
+) -> tuple[list[PublicTrade], int]:
+    """An official's approved trades in listed stocks (a ticker: no bonds), newest first, and how
+    many there are (HD-07)."""
+    query = (
+        select(OfficialTrade, OfficialReport)
+        .join(OfficialReport, OfficialReport.id == OfficialTrade.report_id)
+        .where(
+            OfficialReport.person == person,
+            OfficialReport.status == OfficialReportStatus.APPROVED.value,
+            OfficialTrade.ticker.is_not(None),
         )
-        for trade, report in (await session.execute(query)).all()
-    ]
+        .order_by(OfficialTrade.traded_on.desc().nulls_last(), OfficialTrade.number)
+    )
+    if company_id is not None:
+        query = query.where(OfficialTrade.company_id == company_id)
+    rows = (await session.execute(query)).all()
+    shown = rows if limit is None else rows[:limit]
+    return [_public(trade, report) for trade, report in shown], len(rows)
+
+
+def _public(trade: OfficialTrade, report: OfficialReport) -> PublicTrade:
+    return PublicTrade(
+        person=report.person,
+        kind=trade.kind,
+        traded_on=trade.traded_on,
+        amount_min=int(trade.amount_min) if trade.amount_min is not None else None,
+        amount_max=int(trade.amount_max) if trade.amount_max is not None else None,
+        amount_text=trade.amount_text,
+        late=trade.late,
+        received_on=report.received_on,
+        report_url=f"{report.url}#page={trade.page}",
+        owner=trade.owner,
+        option=is_option(trade.description),
+        note=trade.note,
+        ticker=trade.ticker,
+    )
+
+
+async def reports_of(
+    session: AsyncSession, person: str, *, company_id: uuid.UUID | None = None
+) -> list[OfficialReport]:
+    """An official's reports, newest first: approved, waiting for a person, or rejected."""
+    query = (
+        select(OfficialReport)
+        .where(OfficialReport.person == person)
+        .order_by(OfficialReport.received_on.desc())
+    )
+    if company_id is not None:
+        query = query.where(OfficialReport.company_id == company_id)
+    return list((await session.scalars(query)).all())
 
 
 # --- the schedule ------------------------------------------------------------------------------

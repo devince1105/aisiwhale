@@ -78,6 +78,10 @@ def test_mainland_terms_are_named_with_taiwan_s_own_word():
     assert "zh-TW: 「特朗普」 is mainland usage — write 「川普」" in issues
     assert any("「輝達」" in i for i in issues) and any("「晶片」" in i for i in issues)
     assert any("「聯準會」" in i for i in issues) and any("「升息」" in i for i in issues)
+    # Taiwan's press writes 裴洛西 (HD-07)
+    assert "zh-TW: 「佩洛西」 is mainland usage — write 「裴洛西」" in taiwan_usage_problems(
+        "zh-TW", ["佩洛西申報交易"]
+    )
 
 
 def test_taiwan_s_chinese_passes_including_words_both_scripts_share():

@@ -30,8 +30,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!portfolio) return {};
   const w = words(lang);
   return {
-    title: `${w.portfolio.title(portfolio.name, portfolio.kind)} · ${w.site}`,
-    description: w.portfolio.lag(portfolio.period),
+    title: `${portfolio.kind === "official" ? w.portfolio.officialTitle(portfolio.name) : w.portfolio.title(portfolio.name, portfolio.kind)} · ${w.site}`,
+    description: portfolio.period ? w.portfolio.lag(portfolio.period) : w.portfolio.officialNote,
   };
 }
 

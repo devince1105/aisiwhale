@@ -33,6 +33,8 @@ const BUFFETT: PublicPortfolioCard = {
     { symbol: "GOOGL", name: "Alphabet", change: "increased", shares: 78791167, previous_shares: 54249798, shares_change_pct: 45.24, value_change_usd: 8770000000 },
     { symbol: "OXY", name: "OCCIDENTAL PETE CORP", change: "sold_out", shares: 0, previous_shares: 264941431, shares_change_pct: null, value_change_usd: -1e10 },
   ],
+  trades: [],
+  reports_waiting: 0,
 };
 
 const NVIDIA: PublicPortfolioCard = {
@@ -93,6 +95,8 @@ const PAGE: PublicPortfolio = {
   ],
   positions_total: 31,
   locked: true,
+  trades_total: 0,
+  reports: [],
   stretches: [
     { start: "2025-09-30", end: "2025-12-31", growth: 1.02, coverage: 1 },
     { start: "2025-12-31", end: "2026-10-05", growth: 0.97, coverage: 0.934 },
@@ -158,7 +162,7 @@ describe("the Magnificent Seven's chief executives", () => {
 describe("Taiwan's words, not the screenshot's", () => {
   // the broker's screenshots were mainland Chinese (D-217): none of these on our pages
   // (新建倉 is the site's own, as on the stock pages; 清倉 is not: 出清)
-  const MAINLAND = ["持倉", "持仓", "增倉", "減倉", "清倉", "萬億", "收益", "搜索", "特朗普", "英偉達", "數據", "信息", "默認", "視頻"];
+  const MAINLAND = ["持倉", "持仓", "增倉", "減倉", "清倉", "萬億", "收益", "搜索", "特朗普", "英偉達", "佩洛西", "數據", "信息", "默認", "視頻"];
 
   function texts(value: unknown): string[] {
     if (typeof value === "string") return [value];
@@ -204,3 +208,67 @@ describe("持股觀察's tabs", () => {
     expect(document.querySelector("image")?.getAttribute("href")).toBe("/people/duan-yongping.jpg");
   });
 });
+
+const TRUMP: PublicPortfolioCard = {
+  ...BUFFETT,
+  slug: "trump",
+  name: "川普",
+  kind: "official",
+  entity: "美國總統（OGE 278-T 申報）",
+  period: null,
+  filed: "2026-09-22",
+  return_pct: null,
+  return_start: null,
+  return_through: null,
+  coverage: null,
+  holdings: [],
+  others_weight: 0,
+  moves: [],
+  trades: [
+    { symbol: "AVGO", name: "博通", kind: "purchase", traded_on: "2026-07-31", amount_text: "$250,001 - $500,000", owner: null, option: false, report_url: "https://oge.test/09.pdf#page=3" },
+    { symbol: "META", name: "Meta", kind: "sale", traded_on: "2026-07-27", amount_text: "$50,001 - $100,000", owner: null, option: false, report_url: null },
+  ],
+  reports_waiting: 1,
+};
+
+describe("the officials (HD-07)", () => {
+  it("a card lists the latest checked trades, the amounts as the forms' ranges, and what waits", () => {
+    render(<PortfolioCards cards={[TRUMP, { ...TRUMP, slug: "pelosi", name: "裴洛西", trades: [], filed: null, reports_waiting: 0 }]} lang="zh-TW" />);
+    const [trump, pelosi] = screen.getAllByTestId("portfolio-card");
+    expect(within(trump).getByRole("heading").textContent).toBe("川普的股票交易");
+    expect(within(trump).getByText("AVGO").parentElement?.textContent).toBe("AVGO買進US$250,001–500,000");
+    expect(within(trump).getByText("賣出").className).toContain("text-fall");
+    expect(within(trump).getByText(/申報日 2026年9月22日/).parentElement?.textContent).toContain("1 份申報待人工核對");
+    expect(trump.querySelector("image")?.getAttribute("href")).toBe("/people/trump.jpg");
+    expect(within(pelosi).getByText("還沒有已核對的交易申報。")).toBeTruthy();
+  });
+
+  it("a page has the trades, who owns each, and the reports with their status", () => {
+    const page: PublicPortfolio = {
+      ...PAGE,
+      ...TRUMP,
+      positions: [],
+      positions_total: 0,
+      locked: true,
+      trades_total: 24,
+      reports: [
+        { form: "278 Transaction", received_on: "2026-10-01", status: "pending", url: "https://oge.test/10.pdf" },
+        { form: "278 Transaction", received_on: "2026-09-22", status: "approved", url: "https://oge.test/09.pdf" },
+      ],
+    };
+    render(<PortfolioView portfolio={page} lang="zh-TW" loginHref="/news/zh-TW/login?next=y" />);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("川普的股票交易");
+    const rows = within(screen.getByTestId("official-trades")).getAllByRole("row").slice(1);
+    expect(within(rows[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual([
+      "2026年7月31日", "AVGO博通", "買進", "US$250,001–500,000", "本人",
+    ]);  // prettier-ignore
+    expect(screen.getByText("登入（免費）就能看完整 24 筆交易。")).toBeTruthy();
+    expect(screen.getByText("待人工核對")).toBeTruthy();
+    expect(screen.getByText("已核對")).toBeTruthy();
+    expect(screen.getByTestId("photo-credit").textContent).toBe(
+      "照片：Daniel Torok – The White House，公有領域，維基共享資源（已裁切）",
+    );
+    expect(screen.getByText(/經人工對照原件核對後才顯示/)).toBeTruthy();
+  });
+});
+

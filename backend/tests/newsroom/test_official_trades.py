@@ -388,7 +388,7 @@ def test_the_house_index_gives_the_members_transaction_reports():
     )
     [listed] = ot.parse_house_index(archive, 2026)
     assert (listed.person, listed.url, listed.received_on, listed.kind) == (
-        "佩洛西",
+        "裴洛西",
         PELOSI_URL,
         date(2026, 8, 21),
         "house",
@@ -477,7 +477,7 @@ async def test_a_members_report_is_read_with_its_own_form_and_shows_whose_trade(
     pelosi = [
         t
         for t in await ot.trades_for(db_session, ("NVDA",), company_id=company.id)
-        if t.person == "佩洛西"
+        if t.person == "裴洛西"
     ]
     [trade] = pelosi
     assert (trade.owner, trade.option, trade.kind) == ("SP", True, "purchase")

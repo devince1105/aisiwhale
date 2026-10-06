@@ -150,7 +150,7 @@ describe("a stock's page", () => {
 
   it("a member's spouse's option is shown as the spouse's, and as an option", () => {
     const option = {
-      person: "佩洛西",
+      person: "裴洛西",
       kind: "purchase",
       traded_on: "2026-07-24",
       amount_min: 1000001,
@@ -165,7 +165,7 @@ describe("a stock's page", () => {
     };
     render(<StockView stock={{ ...NVDA, trades: [option] }} lang="zh-TW" />);
     const [trade] = screen.getAllByTestId("trade");
-    expect(trade!.textContent).toContain("佩洛西（配偶）買進選擇權US$1,000,001 – US$5,000,000");
+    expect(trade!.textContent).toContain("裴洛西（配偶）買進選擇權US$1,000,001 – US$5,000,000");
     expect(trade!.textContent).toContain("Purchased 50 call options with a strike price of $100.");
     expect(trade!.textContent).not.toContain("逾 30 天");
   });

@@ -86,10 +86,10 @@ class Settings(BaseSettings):
     """As GEMINI_REASONING_EFFORT, but "none" by default: on Chat Completions the model we run
     refuses function tools with any other reasoning effort (HTTP 400), and every agent uses tools.
     Reasoning with tools needs OpenAI's Responses API, which the adapter does not speak."""
-    official_trades_enabled: bool = False
-    """Transcribe officials' transaction reports ourselves (D-051). Off (D-052): a small company
-    points readers to the trackers that already publish these, rather than paying a model to
-    read hundreds of scanned pages; the code stays for the day it is worth it."""
+    official_trades_enabled: bool = True
+    """Transcribe officials' transaction reports ourselves (D-051), a person checking each before
+    the site shows it. Off from D-052, on again for the holdings dashboard's officials (D-217,
+    HD-07), for the last half year's reports only (``official_trades.RECENT_DAYS``)."""
     model_daily_cap_usd: Decimal = Field(default=Decimal("3"), ge=0)
     """Every company's model calls together, per UTC day: a call that would pass it is refused
     (the cost guard). The bill's own safety net, apart from each company's budgets, which are

@@ -258,6 +258,21 @@ PROFILES: dict[str, Profile] = {
 two the screenshot opened with, then the state investor and the macro trader — then the rest."""
 
 
+OFFICIALS: dict[str, Profile] = {
+    "川普": Profile(
+        "trump", "川普", "Donald Trump", "official",
+        "美國總統（OGE 278-T 申報）", "President of the United States (OGE Form 278-T)",
+    ),
+    "裴洛西": Profile(
+        "pelosi", "裴洛西", "Nancy Pelosi", "official",
+        "美國眾議員（STOCK Act 申報）", "U.S. Representative (STOCK Act reports)",
+    ),
+}  # fmt: skip
+"""The officials whose transaction reports the newsroom reads (D-051), by the name their reports
+are kept under (``official_trades.FIGURES``, ``HOUSE_FIGURES``), for the dashboard's cards
+(HD-07): no 13F, no simulated return — their trades, the amounts as the forms' ranges."""
+
+
 def holder_name(source: Source, cik: str, lang: str) -> str:
     """How a page in ``lang`` names a holder: its profile, or the source's own name."""
     profile = PROFILES.get(cik.lstrip("0"))

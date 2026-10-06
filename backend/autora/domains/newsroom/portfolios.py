@@ -55,8 +55,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Schedule
 from autora.domains.newsroom import cusips, thirteenf
-from autora.domains.newsroom.holdings import PROFILES, STOCKS, Profile, thirteenf_sources
+from autora.domains.newsroom.holdings import (
+    OFFICIALS,
+    PROFILES,
+    STOCKS,
+    Profile,
+    thirteenf_sources,
+)
 from autora.domains.newsroom.models import (
+    OfficialReport,
+    OfficialReportStatus,
     PortfolioPosition,
     PortfolioQuarter,
     PortfolioStat,
@@ -66,6 +74,7 @@ from autora.domains.newsroom.models import (
     Source,
     StockQuote,
 )
+from autora.domains.newsroom.official_trades import PublicTrade, reports_of, trades_of
 from autora.domains.newsroom.price_history import TIINGO_DAILY, GetRows
 from autora.runtime.scheduler import Handler
 
@@ -834,15 +843,34 @@ class PublicMove(BaseModel):
     value_change_usd: int
 
 
+class PublicCardTrade(BaseModel):
+    """An official's trade on a card or a page (HD-07), from a report a person has checked."""
+
+    symbol: str
+    name: str
+    kind: str
+    """``purchase``, ``sale``, ``partial sale``, ``exchange``."""
+    traded_on: date | None
+    amount_text: str
+    """As the report gives it: a range (``$100,001 - $250,000``), never one figure."""
+    owner: str | None = None
+    """``SP`` (spouse), ``JT`` (joint), ``DC`` (child); None: the official."""
+    option: bool = False
+    report_url: str | None = None
+
+
 class PublicPortfolioCard(BaseModel):
     slug: str
     name: str
     kind: str
-    """``person``, ``company`` (its own investments, not its chief's) or ``fund``."""
+    """``person``, ``company`` (its own investments, not its chief's), ``fund``, or ``official``
+    (an office-holder's transaction reports, not a 13F: trades with amounts as ranges)."""
     entity: str
-    """Who files the 13F."""
-    period: date
-    filed: date
+    """Who files: the manager, the company, the fund; for an official, the office and the form."""
+    period: date | None
+    """The 13F's quarter; None for an official."""
+    filed: date | None
+    """When the latest report was filed; None for an official with none checked yet."""
     return_pct: float | None
     """The simulated one-year return, as a fraction; None when not given (see ``pending``)."""
     return_start: date | None
@@ -853,6 +881,10 @@ class PublicPortfolioCard(BaseModel):
     holdings: list[PublicHolding]
     others_weight: float
     moves: list[PublicMove]
+    trades: list[PublicCardTrade] = []
+    """An official's latest trades (HD-07); none for a 13F filer."""
+    reports_waiting: int = 0
+    """An official's reports transcribed and waiting for a person to check them."""
 
 
 class PublicPosition(BaseModel):
@@ -881,6 +913,15 @@ class PublicFiledQuarter(BaseModel):
     """Each filing's page at SEC."""
 
 
+class PublicOfficialReport(BaseModel):
+    form: str
+    received_on: date
+    status: str
+    """``approved`` (its trades are shown), ``pending`` (a person has yet to check it against
+    the scan), ``rejected``."""
+    url: str
+
+
 class PublicPortfolio(PublicPortfolioCard):
     long_value_usd: int
     positions: list[PublicPosition]
@@ -889,6 +930,8 @@ class PublicPortfolio(PublicPortfolioCard):
     """The table stops at ``FREE_ROWS``: signing in (free) shows it all."""
     stretches: list[PublicStretch]
     quarters: list[PublicFiledQuarter]
+    trades_total: int = 0
+    reports: list[PublicOfficialReport] = []
 
 
 def _shown(symbol: str | None, issuer: str, lang: str) -> str:
@@ -985,14 +1028,84 @@ async def _table_now(session: AsyncSession, source: Source) -> list[dict[str, An
     return table(ordered[-1], ordered[-2] if len(ordered) > 1 else None, prices)
 
 
+CARD_TRADES = 3
+"""An official's card: the latest three trades."""
+ORDER = (
+    "buffett", "trump", "pelosi", "soros", "cathie-wood", "duan-yongping", "druckenmiller",
+    "ackman", "burry", "nvidia", "temasek",
+)  # fmt: skip
+"""The cards' order (HD-07): the brokers' first two, the other official, then the 13F filers."""
+
+
+def _trade(trade: PublicTrade, lang: str) -> PublicCardTrade:
+    return PublicCardTrade(
+        symbol=trade.ticker or "",
+        name=_shown(trade.ticker, trade.ticker or "", lang),
+        kind=trade.kind,
+        traded_on=trade.traded_on,
+        amount_text=trade.amount_text,
+        owner=trade.owner,
+        option=trade.option,
+        report_url=trade.report_url,
+    )
+
+
+async def _official(
+    session: AsyncSession,
+    company_id: uuid.UUID | None,
+    person: str,
+    profile: Profile,
+    lang: str,
+    *,
+    limit: int | None,
+) -> tuple[dict[str, Any], int, list[OfficialReport]]:
+    """An official's card, from the reports a person has checked; their trades' count; their
+    reports."""
+    trades, total = await trades_of(session, person, company_id=company_id, limit=limit)
+    reports = await reports_of(session, person, company_id=company_id)
+    approved = [r for r in reports if r.status == OfficialReportStatus.APPROVED.value]
+    card = {
+        "slug": profile.slug,
+        "name": profile.name(lang),
+        "kind": profile.kind,
+        "entity": profile.entity(lang),
+        "period": None,
+        "filed": approved[0].received_on if approved else None,
+        "return_pct": None,
+        "return_start": None,
+        "return_through": None,
+        "coverage": None,
+        "pending": 0,
+        "holdings": [],
+        "others_weight": 0.0,
+        "moves": [],
+        "trades": [_trade(t, lang) for t in trades],
+        "reports_waiting": sum(r.status == OfficialReportStatus.PENDING.value for r in reports),
+    }
+    return card, total, reports
+
+
+def _ordered(cards: list[PublicPortfolioCard]) -> list[PublicPortfolioCard]:
+    return sorted(cards, key=lambda c: ORDER.index(c.slug) if c.slug in ORDER else len(ORDER))
+
+
 async def cards(
     session: AsyncSession, company_id: uuid.UUID | None, lang: str
 ) -> list[PublicPortfolioCard]:
-    """The holdings dashboard's cards, in the profiles' order."""
-    return [
+    """The holdings dashboard's cards: the followed 13F filers, and the officials (HD-07)."""
+    followed = [
         PublicPortfolioCard(**_card(profile, stat, lang))
         for _, _, profile, stat in await _followed(session, company_id)
     ]
+    if not followed:
+        return []
+    officials = [
+        PublicPortfolioCard(
+            **(await _official(session, company_id, person, profile, lang, limit=CARD_TRADES))[0]
+        )
+        for person, profile in OFFICIALS.items()
+    ]
+    return _ordered(followed + officials)
 
 
 async def portfolio(
@@ -1004,7 +1117,30 @@ async def portfolio(
     signed_in: bool,
 ) -> PublicPortfolio | None:
     """A person page: the card, the whole table (the first ``FREE_ROWS`` for a reader not signed
-    in), the return's stretches, and each kept quarter's filings at SEC. None: no such person."""
+    in), the return's stretches, and each kept quarter's filings at SEC; an official's checked
+    trades (the first ``FREE_ROWS`` likewise) and reports. None: no such person."""
+    official = next(((p, o) for p, o in OFFICIALS.items() if o.slug == slug), None)
+    if official is not None:
+        person, profile = official
+        card, total, reports = await _official(
+            session, company_id, person, profile, lang, limit=None if signed_in else FREE_ROWS
+        )
+        return PublicPortfolio(
+            **card,
+            long_value_usd=0,
+            positions=[],
+            positions_total=0,
+            locked=len(card["trades"]) < total,
+            stretches=[],
+            quarters=[],
+            trades_total=total,
+            reports=[
+                PublicOfficialReport(
+                    form=r.form, received_on=r.received_on, status=r.status, url=r.url
+                )
+                for r in reports
+            ],
+        )
     found = next((f for f in await _followed(session, company_id) if f[2].slug == slug), None)
     if found is None:
         return None

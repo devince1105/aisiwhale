@@ -4466,6 +4466,75 @@
     "title": "PublicBlock",
     "type": "object"
    },
+   "PublicCardTrade": {
+    "description": "An official's trade on a card or a page (HD-07), from a report a person has checked.",
+    "properties": {
+     "amount_text": {
+      "title": "Amount Text",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "option": {
+      "default": false,
+      "title": "Option",
+      "type": "boolean"
+     },
+     "owner": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Owner"
+     },
+     "report_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Report Url"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     },
+     "traded_on": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Traded On"
+     }
+    },
+    "required": [
+     "symbol",
+     "name",
+     "kind",
+     "traded_on",
+     "amount_text"
+    ],
+    "title": "PublicCardTrade",
+    "type": "object"
+   },
    "PublicCover": {
     "description": "The article's cover photo (D-142): 1200x630 WebP, and whose it is.",
     "properties": {
@@ -5144,6 +5213,35 @@
     "title": "PublicOfficeTheme",
     "type": "object"
    },
+   "PublicOfficialReport": {
+    "properties": {
+     "form": {
+      "title": "Form",
+      "type": "string"
+     },
+     "received_on": {
+      "format": "date",
+      "title": "Received On",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "form",
+     "received_on",
+     "status",
+     "url"
+    ],
+    "title": "PublicOfficialReport",
+    "type": "object"
+   },
    "PublicPortfolio": {
     "properties": {
      "coverage": {
@@ -5162,9 +5260,16 @@
       "type": "string"
      },
      "filed": {
-      "format": "date",
-      "title": "Filed",
-      "type": "string"
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filed"
      },
      "holdings": {
       "items": {
@@ -5205,9 +5310,16 @@
       "type": "integer"
      },
      "period": {
-      "format": "date",
-      "title": "Period",
-      "type": "string"
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period"
      },
      "positions": {
       "items": {
@@ -5226,6 +5338,19 @@
       },
       "title": "Quarters",
       "type": "array"
+     },
+     "reports": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/PublicOfficialReport"
+      },
+      "title": "Reports",
+      "type": "array"
+     },
+     "reports_waiting": {
+      "default": 0,
+      "title": "Reports Waiting",
+      "type": "integer"
      },
      "return_pct": {
       "anyOf": [
@@ -5272,6 +5397,19 @@
       },
       "title": "Stretches",
       "type": "array"
+     },
+     "trades": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/PublicCardTrade"
+      },
+      "title": "Trades",
+      "type": "array"
+     },
+     "trades_total": {
+      "default": 0,
+      "title": "Trades Total",
+      "type": "integer"
      }
     },
     "required": [
@@ -5317,9 +5455,16 @@
       "type": "string"
      },
      "filed": {
-      "format": "date",
-      "title": "Filed",
-      "type": "string"
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Filed"
      },
      "holdings": {
       "items": {
@@ -5352,9 +5497,21 @@
       "type": "integer"
      },
      "period": {
-      "format": "date",
-      "title": "Period",
-      "type": "string"
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Period"
+     },
+     "reports_waiting": {
+      "default": 0,
+      "title": "Reports Waiting",
+      "type": "integer"
      },
      "return_pct": {
       "anyOf": [
@@ -5394,6 +5551,14 @@
      "slug": {
       "title": "Slug",
       "type": "string"
+     },
+     "trades": {
+      "default": [],
+      "items": {
+       "$ref": "#/components/schemas/PublicCardTrade"
+      },
+      "title": "Trades",
+      "type": "array"
      }
     },
     "required": [
@@ -6001,6 +6166,17 @@
      "report_url": {
       "title": "Report Url",
       "type": "string"
+     },
+     "ticker": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ticker"
      },
      "traded_on": {
       "anyOf": [

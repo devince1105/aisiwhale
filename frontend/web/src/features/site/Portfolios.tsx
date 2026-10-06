@@ -225,6 +225,20 @@ export const PHOTOS: Record<string, Photo> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
     page: "https://commons.wikimedia.org/wiki/File:Bill_Ackman,_2016.jpg",
   },
+  trump: {
+    src: "/people/trump.jpg",
+    author: "Daniel Torok – The White House",
+    license: null,
+    licenseUrl: null,
+    page: "https://commons.wikimedia.org/wiki/File:Donald_Trump_official_portrait,_2025_(cropped_headshot).jpg",
+  },
+  pelosi: {
+    src: "/people/pelosi.jpg",
+    author: "John Harrington – U.S. House of Representatives",
+    license: null,
+    licenseUrl: null,
+    page: "https://commons.wikimedia.org/wiki/File:Official_photo_of_Speaker_Nancy_Pelosi_in_2019.jpg",
+  },
   "duan-yongping": { src: "/people/duan-yongping.jpg", supplied: true },
   druckenmiller: { src: "/people/druckenmiller.jpg", supplied: true },
   burry: { src: "/people/burry.jpg", supplied: true },
@@ -286,6 +300,9 @@ export function Ring({
       aria-label={words(lang).portfolio.ring(card.name)}
       className="shrink-0 text-accent"
     >
+      {arcs.length === 0 ? (
+        <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeOpacity="0.14" strokeWidth="16" />
+      ) : null}
       <g transform="rotate(-90 50 50)">
         {arcs.map(({ holding, weight, start: at }, i) => (
           <circle
@@ -380,9 +397,41 @@ function Filed({ card, lang }: { card: Card; lang: Lang }) {
   const w = words(lang).portfolio;
   return (
     <p className="mt-3 text-xs text-muted">
-      <span className="text-date">{w.filed(formatDate(lang, card.filed))}</span>
-      <span className="whitespace-nowrap">・{quarterOf(lang, card.period)}</span>
+      {card.filed ? <span className="text-date">{w.filed(formatDate(lang, card.filed))}</span> : null}
+      {card.period ? <span className="whitespace-nowrap">・{quarterOf(lang, card.period)}</span> : null}
+      {card.reports_waiting ? (
+        <span className="whitespace-nowrap">
+          {card.filed ? "・" : ""}
+          {w.waiting(card.reports_waiting)}
+        </span>
+      ) : null}
     </p>
+  );
+}
+
+const TRADE_TONE: Record<string, string> = { purchase: "text-rise", sale: "text-fall", "partial sale": "text-fall" };
+
+/** ``$250,001 - $500,000`` as the site writes money: US$250,001–500,000. */
+export function amountRange(text: string): string {
+  return text.replace(/\$/, "US$").replace(/\s*-\s*\$/, "–");
+}
+
+/** An official's card: the latest trades, in place of a return and moves. */
+function Trades({ card, lang }: { card: Card; lang: Lang }) {
+  const w = words(lang);
+  if (!card.trades?.length) return <p className="mt-2 text-sm text-muted">{w.portfolio.noTrades}</p>;
+  return (
+    <ul className="mt-2 space-y-1 text-sm">
+      {card.trades.map((trade, i) => (
+        <li key={`${trade.symbol}-${trade.traded_on}-${i}`} className="flex items-baseline gap-x-2">
+          <span className="w-[4.5rem] shrink-0 truncate font-semibold">{trade.symbol}</span>
+          <span className={`whitespace-nowrap ${TRADE_TONE[trade.kind] ?? "text-muted"}`}>
+            {w.stock.kinds[trade.kind] ?? trade.kind}
+          </span>
+          <span className="truncate text-xs text-muted tabular-nums">{amountRange(trade.amount_text)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -404,11 +453,21 @@ export function PortfolioCards({ cards, lang, heading }: { cards: Card[]; lang: 
               data-testid="portfolio-card"
             >
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold">{w.title(card.name, card.kind)}</h3>
-                <div className="mt-1">
-                  <Return card={card} lang={lang} />
-                </div>
-                <Moves card={card} lang={lang} />
+                {card.kind === "official" ? (
+                  <>
+                    <h3 className="text-lg font-bold">{w.officialTitle(card.name)}</h3>
+                    <p className="mt-1 text-sm text-muted">{w.officialLabel}</p>
+                    <Trades card={card} lang={lang} />
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-bold">{w.title(card.name, card.kind)}</h3>
+                    <div className="mt-1">
+                      <Return card={card} lang={lang} />
+                    </div>
+                    <Moves card={card} lang={lang} />
+                  </>
+                )}
                 <Filed card={card} lang={lang} />
               </div>
               <Ring card={card} lang={lang} />
@@ -455,6 +514,114 @@ function Credit({ photo, lang }: { photo: Photo; lang: Lang }) {
   );
 }
 
+/** An official's page (HD-07): their checked trades in stocks, and their reports. */
+function OfficialView({ portfolio, lang, loginHref }: { portfolio: PublicPortfolio; lang: Lang; loginHref: string }) {
+  const w = words(lang);
+  const p = w.portfolio;
+  return (
+    <article className="mx-auto max-w-[46rem] px-4 pt-4 pb-12">
+      <nav aria-label="breadcrumb" className="text-sm text-muted">
+        <Link href={listHref(lang, "watch")} className="hover:text-accent">
+          {p.back}
+        </Link>{" "}
+        › {portfolio.name}
+      </nav>
+      <header className="mt-4 flex flex-wrap items-center gap-6">
+        <Ring card={portfolio} lang={lang} size={168} />
+        <div className="min-w-0 flex-1">
+          <h1 className="text-3xl font-bold">{p.officialTitle(portfolio.name)}</h1>
+          <p className="mt-1 text-sm text-muted">{portfolio.entity}</p>
+          {portfolio.reports_waiting ? <p className="mt-1 text-sm text-muted">{p.waiting(portfolio.reports_waiting)}</p> : null}
+        </div>
+      </header>
+      {PHOTOS[portfolio.slug] ? <Credit photo={PHOTOS[portfolio.slug]} lang={lang} /> : null}
+      <p className="mt-6 text-sm text-muted">{p.officialNote}</p>
+
+      <section aria-labelledby="trades" className="mt-8">
+        <h2 id="trades" className="text-xl font-bold">
+          {p.officialLabel}
+        </h2>
+        {portfolio.trades?.length ? (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[34rem] text-sm tabular-nums" data-testid="official-trades">
+              <thead className="text-xs text-muted">
+                <tr className="border-b border-line text-left">
+                  <th className="py-2 font-normal">{p.tradeDate}</th>
+                  <th className="py-2 font-normal">{p.stock}</th>
+                  <th className="py-2 font-normal">{p.tradeKind}</th>
+                  <th className="py-2 text-right font-normal">{p.amount}</th>
+                  <th className="py-2 text-right font-normal">{p.ownerCol}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {portfolio.trades.map((trade, i) => (
+                  <tr key={`${trade.symbol}-${trade.traded_on}-${i}`}>
+                    <td className="py-2 text-date">{trade.traded_on ? formatDate(lang, trade.traded_on) : "—"}</td>
+                    <td className="py-2">
+                      <Link href={`/news/${lang}/stocks/${trade.symbol}`} className="font-semibold hover:text-accent">
+                        {trade.symbol}
+                      </Link>
+                      <span className="ml-2 text-xs text-muted">{trade.name !== trade.symbol ? trade.name : ""}</span>
+                    </td>
+                    <td className={`py-2 ${TRADE_TONE[trade.kind] ?? ""}`}>
+                      {w.stock.kinds[trade.kind] ?? trade.kind}
+                      {trade.option ? `・${w.stock.option}` : ""}
+                    </td>
+                    <td className="py-2 text-right">
+                      {trade.report_url ? (
+                        <a href={trade.report_url} rel="noopener nofollow" className="hover:text-accent">
+                          {amountRange(trade.amount_text)}
+                        </a>
+                      ) : (
+                        amountRange(trade.amount_text)
+                      )}
+                    </td>
+                    <td className="py-2 text-right text-muted">{trade.owner ? (w.stock.owners[trade.owner] ?? trade.owner) : p.self}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted">{p.noTrades}</p>
+        )}
+        {portfolio.locked ? (
+          <p className="mt-3 rounded-lg border border-accent/40 px-4 py-3 text-sm">
+            {p.tradesLocked(count(lang, portfolio.trades_total ?? 0))}{" "}
+            <Link href={loginHref} className="font-semibold text-accent hover:underline">
+              {p.signIn}
+            </Link>
+          </p>
+        ) : null}
+      </section>
+
+      {portfolio.reports?.length ? (
+        <section aria-labelledby="reports" className="mt-8">
+          <h2 id="reports" className="text-xl font-bold">
+            {p.filings}
+          </h2>
+          <ul className="mt-3 divide-y divide-line text-sm">
+            {portfolio.reports.map((report) => (
+              <li key={report.url} className="flex flex-wrap items-baseline justify-between gap-x-4 py-2">
+                <span>
+                  <span className="text-date">{formatDate(lang, report.received_on)}</span>
+                  <span className="ml-2 text-xs text-muted">{report.form}</span>
+                  <span className={`ml-2 text-xs ${report.status === "approved" ? "text-ink" : "text-muted"}`}>
+                    {p.reportStatus[report.status] ?? report.status}
+                  </span>
+                </span>
+                <a href={report.url} rel="noopener nofollow" className="text-accent hover:underline">
+                  PDF ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </article>
+  );
+}
+
 /** A person page: the card at large, the method, the quarters, the whole table, the filings. */
 export function PortfolioView({
   portfolio,
@@ -466,6 +633,7 @@ export function PortfolioView({
   /** Where a reader not signed in goes for the rest of the table (D-159). */
   loginHref: string;
 }) {
+  if (portfolio.kind === "official") return <OfficialView portfolio={portfolio} lang={lang} loginHref={loginHref} />;
   const w = words(lang);
   const p = w.portfolio;
   const held = portfolio.positions.filter((row) => row.value_usd > 0).length;
@@ -511,7 +679,7 @@ export function PortfolioView({
         </ol>
       </details>
 
-      <p className="mt-4 text-sm text-muted">{p.lag(formatDate(lang, portfolio.period))}</p>
+      {portfolio.period ? <p className="mt-4 text-sm text-muted">{p.lag(formatDate(lang, portfolio.period))}</p> : null}
 
       <section aria-labelledby="moves" className="mt-8">
         <h2 id="moves" className="text-xl font-bold">

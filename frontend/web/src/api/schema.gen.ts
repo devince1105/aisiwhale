@@ -3483,6 +3483,31 @@ export interface components {
             type: string;
         };
         /**
+         * PublicCardTrade
+         * @description An official's trade on a card or a page (HD-07), from a report a person has checked.
+         */
+        PublicCardTrade: {
+            /** Amount Text */
+            amount_text: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Option
+             * @default false
+             */
+            option: boolean;
+            /** Owner */
+            owner?: string | null;
+            /** Report Url */
+            report_url?: string | null;
+            /** Symbol */
+            symbol: string;
+            /** Traded On */
+            traded_on: string | null;
+        };
+        /**
          * PublicCover
          * @description The article's cover photo (D-142): 1200x630 WebP, and whose it is.
          */
@@ -3744,17 +3769,28 @@ export interface components {
              */
             theme: "muji" | "wabisabi" | "industrial" | "google" | "cyber";
         };
+        /** PublicOfficialReport */
+        PublicOfficialReport: {
+            /** Form */
+            form: string;
+            /**
+             * Received On
+             * Format: date
+             */
+            received_on: string;
+            /** Status */
+            status: string;
+            /** Url */
+            url: string;
+        };
         /** PublicPortfolio */
         PublicPortfolio: {
             /** Coverage */
             coverage: number | null;
             /** Entity */
             entity: string;
-            /**
-             * Filed
-             * Format: date
-             */
-            filed: string;
+            /** Filed */
+            filed: string | null;
             /** Holdings */
             holdings: components["schemas"]["PublicHolding"][];
             /** Kind */
@@ -3771,17 +3807,24 @@ export interface components {
             others_weight: number;
             /** Pending */
             pending: number;
-            /**
-             * Period
-             * Format: date
-             */
-            period: string;
+            /** Period */
+            period: string | null;
             /** Positions */
             positions: components["schemas"]["PublicPosition"][];
             /** Positions Total */
             positions_total: number;
             /** Quarters */
             quarters: components["schemas"]["PublicFiledQuarter"][];
+            /**
+             * Reports
+             * @default []
+             */
+            reports: components["schemas"]["PublicOfficialReport"][];
+            /**
+             * Reports Waiting
+             * @default 0
+             */
+            reports_waiting: number;
             /** Return Pct */
             return_pct: number | null;
             /** Return Start */
@@ -3792,6 +3835,16 @@ export interface components {
             slug: string;
             /** Stretches */
             stretches: components["schemas"]["PublicStretch"][];
+            /**
+             * Trades
+             * @default []
+             */
+            trades: components["schemas"]["PublicCardTrade"][];
+            /**
+             * Trades Total
+             * @default 0
+             */
+            trades_total: number;
         };
         /** PublicPortfolioCard */
         PublicPortfolioCard: {
@@ -3799,11 +3852,8 @@ export interface components {
             coverage: number | null;
             /** Entity */
             entity: string;
-            /**
-             * Filed
-             * Format: date
-             */
-            filed: string;
+            /** Filed */
+            filed: string | null;
             /** Holdings */
             holdings: components["schemas"]["PublicHolding"][];
             /** Kind */
@@ -3816,11 +3866,13 @@ export interface components {
             others_weight: number;
             /** Pending */
             pending: number;
+            /** Period */
+            period: string | null;
             /**
-             * Period
-             * Format: date
+             * Reports Waiting
+             * @default 0
              */
-            period: string;
+            reports_waiting: number;
             /** Return Pct */
             return_pct: number | null;
             /** Return Start */
@@ -3829,6 +3881,11 @@ export interface components {
             return_through: string | null;
             /** Slug */
             slug: string;
+            /**
+             * Trades
+             * @default []
+             */
+            trades: components["schemas"]["PublicCardTrade"][];
         };
         /** PublicPosition */
         PublicPosition: {
@@ -4018,6 +4075,8 @@ export interface components {
             received_on: string;
             /** Report Url */
             report_url: string;
+            /** Ticker */
+            ticker?: string | null;
             /** Traded On */
             traded_on: string | null;
         };

@@ -6,10 +6,14 @@ from datetime import UTC, date, datetime
 
 import httpx
 import pytest
+from sqlalchemy import select
 
+from autora.db.models import Company
 from autora.domains.newsroom.markets import edgar_13f
 from autora.domains.newsroom.models import (
     CusipSymbol,
+    OfficialReport,
+    OfficialTrade,
     PortfolioPosition,
     PortfolioQuarter,
     PortfolioStat,
@@ -133,9 +137,12 @@ async def test_the_cards_in_the_profiles_order_named_in_each_language(public, da
     zh = answer.json()
     assert [(c["slug"], c["name"], c["kind"], c["entity"]) for c in zh] == [
         ("buffett", "巴菲特", "person", "波克夏海瑟威"),
+        # the officials (HD-07): their cards come with the dashboard, a report or none
+        ("trump", "川普", "official", "美國總統（OGE 278-T 申報）"),
+        ("pelosi", "裴洛西", "official", "美國眾議員（STOCK Act 申報）"),
         ("nvidia", "輝達", "company", "輝達"),
     ]
-    buffett, nvidia = zh
+    buffett, nvidia = zh[0], zh[3]
     assert (buffett["return_pct"], buffett["coverage"], buffett["pending"]) == (0.1385, 0.934, 0)
     assert (nvidia["return_pct"], nvidia["pending"]) == (None, 3), "整理中"
     assert [h["name"] for h in buffett["holdings"]][:2] == ["蘋果", "ISSUER 1"], "the site's name"
@@ -155,6 +162,8 @@ async def test_the_cards_in_the_profiles_order_named_in_each_language(public, da
     ).json()
     assert [(c["name"], c["entity"]) for c in en] == [
         ("Warren Buffett", "Berkshire Hathaway"),
+        ("Donald Trump", "President of the United States (OGE Form 278-T)"),
+        ("Nancy Pelosi", "U.S. Representative (STOCK Act reports)"),
         ("NVIDIA", "NVIDIA"),
     ]
     assert en[0]["holdings"][0]["name"] == "Apple"
@@ -239,3 +248,97 @@ async def test_a_person_page_before_a_run_has_kept_its_table(public, committed):
         (None, "LULULEMON ATHLETICA INC", "new", None),
     ]
     assert page["positions_total"] == 2
+
+
+def _report(company_id, status, received_on, url):
+    return OfficialReport(
+        id=uuid.uuid4(),
+        company_id=company_id,
+        person="川普",
+        filer="Trump, Donald J",
+        form="278 Transaction",
+        url=url,
+        received_on=received_on,
+        pages=34,
+        status=status,
+        model="test",
+    )
+
+
+def _trade(company_id, report, number, ticker, kind, traded_on, amount):
+    return OfficialTrade(
+        company_id=company_id,
+        report_id=report.id,
+        page=1,
+        number=number,
+        description=f"{ticker or 'US TREASURY NOTE 4.25% DUE 2030'} - {ticker or ''}",
+        ticker=ticker,
+        kind=kind,
+        traded_on=traded_on,
+        amount_text=amount,
+    )
+
+
+async def test_the_officials_cards_and_pages_from_checked_reports_only(
+    public, dashboard, committed
+):
+    """HD-07: 川普 and 裴洛西 have no 13F — their cards list their latest trades in stocks, from
+    the reports a person has checked against the scan; one waiting for that is counted, not
+    shown."""
+    async with committed() as session:
+        company = await session.scalar(select(Company).where(Company.slug == dashboard))
+        checked = _report(company.id, "approved", date(2026, 9, 22), "https://oge.test/09.pdf")
+        waiting = _report(company.id, "pending", date(2026, 10, 1), "https://oge.test/10.pdf")
+        session.add_all([checked, waiting])
+        await session.flush()
+        for report, number, ticker, kind, day, amount in (
+            (checked, 1, "AVGO", "purchase", 31, "$250,001 - $500,000"),
+            (checked, 2, "META", "sale", 27, "$50,001 - $100,000"),
+            (checked, 3, "AAPL", "purchase", 24, "$1,001 - $15,000"),
+            (checked, 4, "MSFT", "sale", 23, "$15,001 - $50,000"),
+            (checked, 5, None, "purchase", 30, "$1,000,001 - $5,000,000"),  # a bond
+            (waiting, 1, "NVDA", "purchase", 1, "$1,001 - $15,000"),
+        ):
+            session.add(
+                _trade(company.id, report, number, ticker, kind, date(2026, 7, day), amount)
+            )
+        await session.commit()
+
+    zh = (
+        await public.get("/api/public/holdings", params={"lang": "zh-TW", "company": dashboard})
+    ).json()
+    assert [c["slug"] for c in zh] == ["buffett", "trump", "pelosi", "nvidia"], "the brokers' order"
+    trump, pelosi = zh[1], zh[2]
+    assert (trump["name"], trump["kind"], trump["entity"]) == (
+        "川普",
+        "official",
+        "美國總統（OGE 278-T 申報）",
+    )
+    assert [(t["symbol"], t["name"], t["kind"], t["amount_text"]) for t in trump["trades"]] == [
+        ("AVGO", "博通", "purchase", "$250,001 - $500,000"),
+        ("META", "Meta", "sale", "$50,001 - $100,000"),
+        ("AAPL", "蘋果", "purchase", "$1,001 - $15,000"),
+    ], "the latest three in stocks: the bond and the unchecked report's NVDA left out"
+    assert (trump["filed"], trump["reports_waiting"], trump["return_pct"]) == (
+        "2026-09-22",
+        1,
+        None,
+    )
+    assert (pelosi["name"], pelosi["trades"], pelosi["filed"]) == ("裴洛西", [], None)
+
+    page = (
+        await public.get(
+            "/api/public/holdings/people/trump", params={"lang": "en", "company": dashboard}
+        )
+    ).json()
+    assert (page["name"], page["trades_total"], len(page["trades"]), page["locked"]) == (
+        "Donald Trump",
+        4,
+        4,
+        False,
+    )
+    assert [(r["received_on"], r["status"]) for r in page["reports"]] == [
+        ("2026-10-01", "pending"),
+        ("2026-09-22", "approved"),
+    ]
+    assert page["trades"][0]["report_url"] == "https://oge.test/09.pdf#page=1"
