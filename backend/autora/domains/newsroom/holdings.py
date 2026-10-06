@@ -535,6 +535,9 @@ class HoldingsKeeper:
 class PublicHolder(BaseModel):
     investor: str
     """As the site names them: ``巴菲特``."""
+    kind: str
+    """As ``Profile.kind``: ``person`` for the page's 名人持股; ``company``, ``fund``, ``manager``
+    or ``foundation`` for its 機構持股 (10/06); empty for a filer the site has no profile of."""
     filer: str
     period: date
     previous_period: date | None
@@ -574,9 +577,11 @@ async def holders(
     for row, source in (await session.execute(query)).all():
         total = int(row.portfolio_value_usd)
         value = int(row.value_usd)
+        profile = PROFILES.get(row.cik.lstrip("0"))
         out.append(
             PublicHolder(
                 investor=holder_name(source, row.cik, lang),
+                kind=profile.kind if profile is not None else "",
                 filer=row.filer,
                 period=row.period,
                 previous_period=row.previous_period,

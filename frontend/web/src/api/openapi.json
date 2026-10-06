@@ -5099,6 +5099,10 @@
       "title": "Investor",
       "type": "string"
      },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
      "period": {
       "format": "date",
       "title": "Period",
@@ -5150,6 +5154,7 @@
     },
     "required": [
      "investor",
+     "kind",
      "filer",
      "period",
      "previous_period",

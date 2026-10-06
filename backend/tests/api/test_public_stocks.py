@@ -56,7 +56,7 @@ async def test_the_stock_page_api(public, committed):
             "蘋果",
             None,
         )
-        assert [h["investor"] for h in body["holders"]] == ["巴菲特"]
+        assert [(h["investor"], h["kind"]) for h in body["holders"]] == [("巴菲特", "person")]
         english = await public.get(
             "/api/public/stocks/aapl", params={"lang": "en", "company": slug}
         )

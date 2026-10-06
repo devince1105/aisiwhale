@@ -312,8 +312,8 @@ describe("持股觀察: three sections under one tab, told apart by tags (D-050)
     expect(tags.map((t) => [t.textContent, t.getAttribute("href"), t.getAttribute("aria-current")])).toEqual([
       // the tab itself opens on its cards now (HD-06): its stories are its news tab
       ["全部", "/news/zh-TW?section=watch&view=news", null],
-      ["機構持股", "/news/zh-TW?section=holdings", null],
       ["名人持股", "/news/zh-TW?section=figures", "page"],
+      ["機構持股", "/news/zh-TW?section=holdings", null],
       ["機構觀點", "/news/zh-TW?section=institutions", null],
     ]);
     cleanup();
@@ -329,7 +329,7 @@ describe("持股觀察: three sections under one tab, told apart by tags (D-050)
   });
 
   it("asks for all its sections at once, and knows which tab a section is under", () => {
-    expect(sectionsOf("watch")).toEqual(["holdings", "figures", "institutions"]);
+    expect(sectionsOf("watch")).toEqual(["figures", "holdings", "institutions"]);
     expect(sectionsOf("figures")).toEqual(["figures"]);
     expect(topicOf("holdings")).toBe("watch");
     expect(topicOf("institutions")).toBe("watch"); // 機構觀點, a tab of its own until 10/06

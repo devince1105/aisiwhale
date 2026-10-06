@@ -67,9 +67,10 @@ MAX_LIST = 50
 PREVIEW_BLOCKS = 2
 """At most how many blocks of a locked article anybody may read."""
 
-SIGN_IN_SECTIONS = frozenset({"holdings", "figures"})
-"""持股觀察 (D-159): big investors' filings and public figures' holdings are read in full once
-signed in — free, but an account: the reader's email is what the section is for."""
+SIGN_IN_SECTIONS = frozenset({"holdings", "figures", "institutions"})
+"""持股觀察 (D-159): big investors' filings, public figures' holdings and — since 機構觀點 moved
+under it (10/06, the site's operator's decision) — the asset managers' published views are read
+in full once signed in: free, but an account; the reader's email is what the section is for."""
 
 Reader = Literal["anyone", "signed_in", "member"]
 Lock = Literal["members", "sign_in"]

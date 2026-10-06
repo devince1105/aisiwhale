@@ -16,6 +16,7 @@ afterEach(cleanup);
 
 const holder = (over: Partial<PublicHolder>): PublicHolder => ({
   investor: "段永平",
+  kind: "person",
   filer: "H&H International Investment, LLC",
   period: "2026-06-30",
   previous_period: "2026-03-31",
@@ -54,6 +55,7 @@ const NVDA: PublicStock = {
   holders: [
     holder({}),
     holder({ investor: "麥可・貝瑞", filer: "Scion", change: "new", put_call: "PUT", shares: 1000000, previous_shares: 0 }),
+    holder({ investor: "淡馬錫", kind: "fund", filer: "Temasek Holdings (Private) Ltd", change: "unchanged" }),
   ],
   trades: [
     {
@@ -114,6 +116,20 @@ describe("a stock's page", () => {
     expect(burry!.textContent).toContain("新建倉・賣權（看跌）");
     expect(burry!.textContent).toContain("標的股數");
     expect(burry!.querySelector(".text-rise")).toBeNull();
+  });
+
+  it("sorts the holders as 持股觀察 does: the people, then the institutions (10/06)", () => {
+    render(<StockView stock={NVDA} lang="zh-TW" />);
+    expect(screen.getByRole("heading", { level: 2, name: "持股申報（13F）" })).toBeTruthy();
+    const groups = screen.getAllByRole("heading", { level: 3 }).filter((h) => ["名人持股", "機構持股"].includes(h.textContent!));
+    expect(groups.map((h) => h.textContent)).toEqual(["名人持股", "機構持股"]);
+    const [people, institutions] = groups.map((h) => h.parentElement!);
+    expect(within(people!).getAllByTestId("holder").map((h) => h.textContent!.slice(0, 5))).toEqual(["段永平減碼", "麥可・貝瑞"]);
+    expect(within(institutions!).getAllByTestId("holder")[0]!.textContent).toContain("淡馬錫");
+    cleanup();
+    // with nobody of a kind, its heading is not there
+    render(<StockView stock={{ ...NVDA, holders: NVDA.holders.slice(0, 2) }} lang="zh-TW" />);
+    expect(screen.queryByRole("heading", { level: 3, name: "機構持股" })).toBeNull();
   });
 
   it("gives the market value under the price; the day's figures are the chart's", () => {
@@ -199,7 +215,7 @@ describe("a stock's page", () => {
       />,
     );
     // no US listing: 13F and officials' trades can say nothing about it, so they are not shown
-    expect(screen.queryByRole("heading", { name: "大戶持股（13F）" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "持股申報（13F）" })).toBeNull();
     expect(screen.queryByTestId("trackers")).toBeNull();
     expect(document.body.textContent).toContain("還沒有提到這檔股票的報導。");
   });

@@ -188,6 +188,7 @@ def test_what_it_takes_to_read_it():
 
     assert lock_for("free", "ai") is None and lock_for("free", None) is None
     assert lock_for("free", "figures") == "sign_in" and lock_for("members", "ai") == "members"
+    assert lock_for("free", "institutions") == "sign_in"  # 機構觀點, under 持股觀察 since 10/06
     assert may_read(None, "anyone") and may_read("sign_in", "signed_in")
     assert not may_read("sign_in", "anyone") and not may_read("members", "signed_in")
     assert may_read("members", "member") and may_read("sign_in", "member")

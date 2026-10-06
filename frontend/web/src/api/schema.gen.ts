@@ -3796,6 +3796,8 @@ export interface components {
             filing_url: string;
             /** Investor */
             investor: string;
+            /** Kind */
+            kind: string;
             /**
              * Period
              * Format: date

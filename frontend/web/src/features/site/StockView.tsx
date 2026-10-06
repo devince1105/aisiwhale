@@ -32,6 +32,13 @@ const CHANGE_TONE: Record<string, string> = {
   unchanged: "text-muted border-line",
 };
 
+/** Who holds the stock, in 持股觀察's two words: 名人持股 (a person), 機構持股 (anybody else). */
+const PEOPLE = ["person", "official"];
+const HOLDER_GROUPS: ["figures" | "holdings", string[] | null][] = [
+  ["figures", PEOPLE],
+  ["holdings", null],
+];
+
 function Holder({ holder, lang }: { holder: PublicHolder; lang: Lang }) {
   const w = words(lang).stock;
   // an option is a bet, not a holding: its badge is not coloured as buying or selling the stock,
@@ -217,11 +224,20 @@ export function StockView({
                 {stock.market === "tw" ? `${s.holdersUs} ` : ""}
                 {period ? s.holdersNote(formatDate(lang, period), before ? formatDate(lang, before) : null) : null}
               </p>
-              <ul className="mt-2 divide-y divide-line">
-                {stock.holders.map((holder, i) => (
-                  <Holder key={`${holder.investor}-${holder.title_of_class}-${holder.put_call}-${i}`} holder={holder} lang={lang} />
-                ))}
-              </ul>
+              {/* the people first, then the institutions: as 持股觀察's tabs (10/06) */}
+              {HOLDER_GROUPS.map(([group, kinds]) => {
+                const these = stock.holders.filter((h) => (kinds ? kinds.includes(h.kind) : !PEOPLE.includes(h.kind)));
+                return these.length ? (
+                  <div key={group} className="mt-4">
+                    <h3 className="text-sm font-semibold text-muted">{w.sections[group]}</h3>
+                    <ul className="mt-1 divide-y divide-line">
+                      {these.map((holder, i) => (
+                        <Holder key={`${holder.investor}-${holder.title_of_class}-${holder.put_call}-${i}`} holder={holder} lang={lang} />
+                      ))}
+                    </ul>
+                  </div>
+                ) : null;
+              })}
             </>
           ) : (
             <p className="mt-3 text-muted">{stock.market === "tw" ? s.twNo13f : s.holdersNone}</p>

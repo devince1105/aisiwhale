@@ -196,7 +196,7 @@ const WORDS = {
     stock: {
       day: { open: "開盤", high: "最高", low: "最低", previous_close: "前收" } as Record<string, string>,
       marketCap: "總市值",
-      holders: "大戶持股（13F）",
+      holders: "持股申報（13F）",
       holdersNote: (period: string, before: string | null) =>
         `${period} 季底的 13F 申報${before ? `，對比 ${before}` : ""}。13F 只揭露美股多頭部位，申報期限是季底後 45 天。`,
       holdersNone: "我們追蹤的投資人最近一季的 13F 沒有這檔股票。",
@@ -673,7 +673,7 @@ const WORDS = {
     stock: {
       day: { open: "Open", high: "High", low: "Low", previous_close: "Prev. close" } as Record<string, string>,
       marketCap: "Market value",
-      holders: "Big investors' holdings (13F)",
+      holders: "Holdings filed (13F)",
       holdersNote: (period: string, before: string | null) =>
         `13F filings for the quarter ended ${period}${before ? `, against ${before}` : ""}. A 13F shows only long positions in US-listed securities, filed up to 45 days after the quarter ends.`,
       holdersNone: "None of the investors we follow held it in their latest 13F.",
@@ -1007,14 +1007,15 @@ export function isSection(value: unknown): value is Section {
 }
 
 /** The site's tabs (D-050). Most are one section — 黃金, 期貨 and 外匯 each a tab of their own
- * (D-067); 持股觀察 (``watch``) is three — the institutions' filings (機構持股), the public
- * figures' (名人持股) and the asset managers' published views (機構觀點, a tab of its own until
- * 10/06) — told apart inside it by tags. */
+ * (D-067); 持股觀察 (``watch``) is three — the public figures' filings (名人持股), the
+ * institutions' (機構持股) and the asset managers' published views (機構觀點, a tab of its own
+ * until 10/06) — told apart inside it by tags. */
 export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "watch"] as const;
 export type Topic = (typeof TOPICS)[number];
 
 const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
-  watch: ["holdings", "figures", "institutions"],
+  // as its tabs above: the people first (the site's operator, 10/06)
+  watch: ["figures", "holdings", "institutions"],
   ai: ["ai"],
   tw: ["tw"],
   us: ["us"],
