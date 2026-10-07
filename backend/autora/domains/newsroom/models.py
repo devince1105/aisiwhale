@@ -1010,12 +1010,13 @@ class PriceBar(IdMixin, CreatedAtMixin, Base):
 class PriceFetch(IdMixin, Base):
     """When one series of ``price_bars`` was last asked for, and when it may be asked again
     (D-082): what ``forex.TiingoFx`` kept in memory only, so every restart asked Tiingo for every
-    pair at once and ran through its 50 requests an hour."""
+    pair at once and ran through its 50 requests an hour. Since D-244 a stock's too (``tw``,
+    ``us``), for the scheduled refresh's few a run."""
 
     __tablename__ = "price_fetches"
     __table_args__ = (
         UniqueConstraint("market", "symbol"),
-        CheckConstraint("market in ('fx', 'crypto')", name="market"),
+        CheckConstraint("market in ('fx', 'crypto', 'tw', 'us')", name="market"),
     )
 
     market: Mapped[str]

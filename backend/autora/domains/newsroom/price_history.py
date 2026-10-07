@@ -10,9 +10,13 @@ client that asks too quickly, so requests are spaced (``pause``): a first fill o
 about 175 requests, some minutes of the worker's time, once.
 
 The United States comes from Tiingo (the user's choice; its key in a header, never in a URL).
-One request gives a stock's whole five years, split- and dividend-adjusted, so every refresh asks
-for all of it again: a split rewrites the past, and thirteen requests twice a day is well inside
-the free plan's 1,000 a day. Without the key a US page has no chart.
+One request gives a stock's days since its last, split- and dividend-adjusted; a split asks for
+all five years again, since it rewrites the past. Without the key a US page has no chart.
+
+The scheduled refresh runs every five minutes of a weekday's shift and asks only a few stocks a
+run (D-244): each one once a day, the longest unread first, remembered in ``price_fetches`` so a
+restart does not ask again. One run used to ask every stock, Tiingo's 75 seconds apart: some 120
+of them, two and a half hours in which no other schedule ran, begun again after every deploy.
 """
 
 from __future__ import annotations
@@ -21,7 +25,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel
@@ -32,14 +36,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from autora.db.models import Schedule
 from autora.domains.newsroom import securities
 from autora.domains.newsroom.market_strip import TW_STOCKS, US_STOCKS, PublicQuote
-from autora.domains.newsroom.models import PriceBar
+from autora.domains.newsroom.models import PriceBar, PriceFetch
 from autora.runtime.scheduler import Handler
 
 log = logging.getLogger(__name__)
 
 PRICES_SCHEDULE = "newsroom.refresh_prices"
-PRICES_CRON = "20 7,10 * * 1-5"
-"""15:20 and 18:20 in Taipei, weekdays: after TWSE publishes the day, and once more in case."""
+PRICES_CRON = "*/5 7-12 * * 1-5"
+"""Every five minutes of a weekday's shift, 15:00 to 20:55 in Taipei (D-205), a few stocks a run
+(D-244); each was asked twice a day before, all in one run."""
+TW_PER_RUN = 20
+"""Requests of Taiwan's exchanges a run, ``PAUSE_SECONDS`` apart: under a minute. A day's
+stocks, the index and 台指期 are one run; a new stock's five years a few more."""
+US_PER_RUN = 2
+"""Tiingo requests a run: 24 an hour beside the cards' six (HD-04) and the pages' own, inside its
+50; some 120 stocks in five hours of a six-hour shift."""
+US_PAUSE = 2.0
+FRESH_AT = time(6, 0)
+"""UTC, 14:00 in Taipei: a stock read is asked again from then on the next day, when TWSE has
+published the day and Tiingo has the US session before."""
+RETRY = timedelta(minutes=30)
+"""A stock not read is asked again after this."""
 
 TWSE_DAY = "https://www.twse.com.tw/exchangeReport/STOCK_DAY"
 TPEX_DAY = "https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock"
@@ -68,6 +85,29 @@ class Bar:
 
 class PriceError(Exception):
     pass
+
+
+class Spent(Exception):
+    """A run's requests are spent: the rest is the next run's."""
+
+
+class Pacer:
+    """One run's requests of one service: ``pause`` seconds apart, at most ``limit`` of them
+    (None: as many as it takes), and how many went unanswered."""
+
+    def __init__(self, pause: float, limit: int | None = None) -> None:
+        self.pause = pause
+        self.limit = limit
+        self.asked = 0
+        self.failures = 0
+
+    async def next(self) -> None:
+        """Before a request: the pause after the one before; ``Spent`` past the limit."""
+        if self.limit is not None and self.asked >= self.limit:
+            raise Spent
+        if self.asked:
+            await asyncio.sleep(self.pause)
+        self.asked += 1
 
 
 def _number(text: str) -> Decimal:
@@ -202,20 +242,20 @@ async def refresh_tw(
     exchanges: dict[str, str] | None = None,
     pause: float = PAUSE_SECONDS,
     extend: bool = True,
+    pacer: Pacer | None = None,
 ) -> int:
     """Bring every Taiwan stock's bars up to ``today``. How many bars were written.
 
     ``exchanges``: where each symbol is listed (TWSE unless it says TPEx). A stock with no bars
-    yet gets its last ``FIRST_FILL_MONTHS``; ``extend`` then walks it back to five years."""
-    written, requests = 0, 0
+    yet gets its last ``FIRST_FILL_MONTHS``; ``extend`` then walks it back to five years.
+    ``pacer``: the run's requests (``Spent`` when they are; what was read is stored)."""
+    written = 0
     exchanges = exchanges or {}
+    pacer = pacer or Pacer(pause)
 
     async def month_of(symbol: str, month: date) -> list[Bar] | None:
         """One month's bars; None when it could not be read (next time's)."""
-        nonlocal requests
-        if requests:
-            await asyncio.sleep(pause)
-        requests += 1
+        await pacer.next()
         try:
             if symbol == INDEX:
                 payload = await get(
@@ -233,6 +273,7 @@ async def refresh_tw(
             )
             return parse_twse_month(payload)
         except Exception as error:  # noqa: BLE001 — one month missing is next time's
+            pacer.failures += 1
             log.warning("prices: %s %s not read: %s", symbol, f"{month:%Y-%m}", error)
             return None
 
@@ -297,38 +338,48 @@ async def refresh_us(
     today: date,
     symbols: tuple[str, ...] = US_STOCKS,
     pause: float = 1.0,
+    pacer: Pacer | None = None,
 ) -> int:
     """Every US stock's bars up to ``today``. Bars written.
 
     A stock with bars asks for the days since its last one (a week back, for corrections); one
     without, or one whose new days carry a split, for all five years again — Tiingo's prices are
-    adjusted, so a split rewrites the past."""
+    adjusted, so a split rewrites the past. ``pacer``: the run's requests, as ``refresh_tw``'s."""
     horizon = _months_back(today, HISTORY_MONTHS)
     written = 0
-    for number, symbol in enumerate(symbols):
-        if number:
-            await asyncio.sleep(pause)
-        last = await session.scalar(
-            select(func.max(PriceBar.day)).where(PriceBar.market == "us", PriceBar.symbol == symbol)
-        )
-        start = last - timedelta(days=7) if last else horizon
+    pacer = pacer or Pacer(pause)
+
+    async def ask(symbol: str, start: date) -> list[dict] | None:
+        await pacer.next()
         try:
-            rows = await get(
+            return await get(
                 TIINGO_DAILY.format(symbol=symbol),
                 {"startDate": start.isoformat(), "endDate": today.isoformat()},
             )
-            if last and any(float(r.get("splitFactor") or 1) != 1 for r in rows):
-                await asyncio.sleep(pause)
-                rows = await get(
-                    TIINGO_DAILY.format(symbol=symbol),
-                    {"startDate": horizon.isoformat(), "endDate": today.isoformat()},
-                )
         except Exception as error:  # noqa: BLE001 — one stock missing is next time's
+            pacer.failures += 1
             log.warning("prices: %s not read: %s", symbol, _describe(error))
+            return None
+
+    for symbol in symbols:
+        last = await session.scalar(
+            select(func.max(PriceBar.day)).where(PriceBar.market == "us", PriceBar.symbol == symbol)
+        )
+        rows = await ask(symbol, last - timedelta(days=7) if last else horizon)
+        if rows and last and _splits(rows):
+            rows = await ask(symbol, horizon)
+        if rows is None:
             continue
         written += await _store(session, "us", symbol, parse_tiingo(rows), source="Tiingo")
         await session.commit()
     return written
+
+
+def _splits(rows: list[dict]) -> bool:
+    try:
+        return any(float(r.get("splitFactor") or 1) != 1 for r in rows)
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 def _describe(error: Exception) -> str:
@@ -371,11 +422,9 @@ async def _store(
 
 FILL_SCHEDULE = "newsroom.fill_prices"
 FILL_CRON = "*/5 * * * *"
-"""Every five minutes: a stock somebody just asked about gets its chart within minutes."""
+"""Every five minutes: a Taiwan stock somebody just asked about gets its chart within minutes. A
+US one is the refresh's first (it has never been read), or the page's own (one request)."""
 FILL_TW_PER_RUN = 3
-FILL_US_PER_RUN = 2
-TIINGO_PAUSE_SECONDS = 75.0
-"""Between two scheduled Tiingo requests: its free plan allows 50 an hour."""
 
 
 class PricesKeeper:
@@ -386,16 +435,16 @@ class PricesKeeper:
         *,
         futures: Callable[[date, date], Awaitable[str]] | None = None,
         pause: float = PAUSE_SECONDS,
-        us_pause: float = TIINGO_PAUSE_SECONDS,
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self.get = get
         self.pause = pause
         """Between two TWSE requests; 0 when nothing is asked of TWSE (offline)."""
         self.us = us
         """Tiingo's reader; None without its key, and the US pages have no chart."""
-        self.us_pause = us_pause
         self.futures = futures
         """The futures exchange's download, for 台指期's chart (D-180); None offline."""
+        self.clock = clock or (lambda: datetime.now(UTC))
 
     async def _tw(self, session: AsyncSession) -> tuple[tuple[str, ...], dict[str, str]]:
         # the index first (D-073): the watchlist's chart of it, then the stocks
@@ -405,30 +454,59 @@ class PricesKeeper:
         return symbols, await securities.exchange_of(session, list(symbols))
 
     def schedule_handler(self) -> Handler:
-        """The ``newsroom.refresh_prices`` handler: the strip's stocks and every tracked one."""
+        """The ``newsroom.refresh_prices`` handler: the strip's stocks and every tracked one, a
+        few a run (D-244)."""
 
         async def handler(
             session: AsyncSession, schedule: Schedule, scheduled_for: datetime
         ) -> None:
-            today = datetime.now(UTC).date()
-            symbols, exchanges = await self._tw(session)
-            await refresh_tw(
-                session, self.get, today=today, symbols=symbols, exchanges=exchanges,
-                pause=self.pause,
-            )  # fmt: skip
-            if self.futures is not None:
-                from autora.domains.newsroom.futures import refresh_txf1  # it builds on this module
-
-                await refresh_txf1(session, self.futures, today=today, pause=self.pause)
-            if self.us is not None:
-                us = tuple(dict.fromkeys((*US_STOCKS, *await securities.tracked(session, "us"))))
-                await refresh_us(session, self.us, today=today, symbols=us, pause=self.us_pause)
+            await self.refresh(session)
 
         return handler
 
+    async def refresh(self, session: AsyncSession) -> None:
+        """Taiwan's due symbols, ``TW_PER_RUN`` requests at most (one not read ends them: the
+        exchange's bad hour is the next run's), then ``US_PER_RUN`` of Tiingo's. Each symbol read
+        is asked again from tomorrow's ``FRESH_AT``; one not read after ``RETRY``; one the run had
+        no requests left for, next run."""
+        from autora.domains.newsroom.futures import TXF1, refresh_txf1  # it builds on this module
+
+        now = self.clock()
+        today = now.date()
+        symbols, exchanges = await self._tw(session)
+        pacer = Pacer(self.pause, TW_PER_RUN)
+        for symbol in await due(session, "tw", (*symbols, *((TXF1,) if self.futures else ())), now):
+            failures = pacer.failures
+            try:
+                if symbol == TXF1:
+                    await refresh_txf1(session, self.futures, today=today, pacer=pacer)
+                else:
+                    await refresh_tw(
+                        session, self.get, today=today, symbols=(symbol,), exchanges=exchanges,
+                        pacer=pacer,
+                    )  # fmt: skip
+            except Spent:
+                break
+            await asked(session, "tw", symbol, now, read=pacer.failures == failures)
+            if pacer.failures > failures:
+                break
+        await session.commit()
+        if self.us is None:
+            return
+        us = tuple(dict.fromkeys((*US_STOCKS, *await securities.tracked(session, "us"))))
+        pacer = Pacer(US_PAUSE, US_PER_RUN)
+        for symbol in await due(session, "us", us, now):
+            failures = pacer.failures
+            try:
+                await refresh_us(session, self.us, today=today, symbols=(symbol,), pacer=pacer)
+            except Spent:
+                break
+            await asked(session, "us", symbol, now, read=pacer.failures == failures)
+        await session.commit()
+
     def fill_handler(self) -> Handler:
-        """The ``newsroom.fill_prices`` handler: a few tracked stocks with no bars yet, their last
-        year only (the next refresh adds the years before)."""
+        """The ``newsroom.fill_prices`` handler: a few tracked Taiwan stocks with no bars yet,
+        their last year only (the next refresh adds the years before)."""
 
         async def handler(
             session: AsyncSession, schedule: Schedule, scheduled_for: datetime
@@ -442,14 +520,40 @@ class PricesKeeper:
                     exchanges=await securities.exchange_of(session, list(picked)),
                     pause=self.pause, extend=False,
                 )  # fmt: skip
-            us = await without_bars(session, "us", await securities.tracked(session, "us"))
-            if us and self.us is not None:
-                await refresh_us(
-                    session, self.us, today=today, symbols=tuple(us[:FILL_US_PER_RUN]),
-                    pause=self.us_pause,
-                )  # fmt: skip
 
         return handler
+
+
+async def due(
+    session: AsyncSession, market: str, symbols: tuple[str, ...], now: datetime
+) -> list[str]:
+    """Which of ``symbols`` may be asked for now (``price_fetches``): those never asked first, in
+    their order, then the longest waiting."""
+    waits = dict(
+        (
+            await session.execute(
+                select(PriceFetch.symbol, PriceFetch.next_at).where(
+                    PriceFetch.market == market, PriceFetch.symbol.in_(symbols)
+                )
+            )
+        ).all()
+    )
+    ready = [s for s in symbols if s not in waits or waits[s] <= now]
+    return sorted(ready, key=lambda s: (s in waits, waits.get(s, now)))
+
+
+async def asked(session: AsyncSession, market: str, symbol: str, now: datetime, *, read: bool):
+    """When ``symbol`` was read, and when it may be asked again."""
+    fresh = datetime.combine(now.date(), FRESH_AT, UTC)
+    values = (
+        {"fetched_at": now, "next_at": fresh if fresh > now else fresh + timedelta(days=1)}
+        if read
+        else {"next_at": now + RETRY}
+    )
+    statement = insert(PriceFetch).values(market=market, symbol=symbol, **values)
+    await session.execute(
+        statement.on_conflict_do_update(index_elements=["market", "symbol"], set_=values)
+    )
 
 
 async def without_bars(session: AsyncSession, market: str, symbols: list[str]) -> list[str]:
