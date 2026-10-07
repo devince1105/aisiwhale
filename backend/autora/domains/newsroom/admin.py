@@ -10,13 +10,14 @@ so a reader of the admin page can see that the quote is really there (AC-7).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel
-from sqlalchemy import func, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import AgentRun, StateTransition, Task, WorkflowRun, WorkflowRunState
@@ -42,7 +43,6 @@ from autora.domains.newsroom.sources import SECTION
 
 CONTEXT = 80
 """Characters of evidence text shown before and after a quote."""
-MAX_LIST = 100
 
 
 class ArticleRef(BaseModel):
@@ -313,21 +313,19 @@ def _story_summary(
     }  # fmt: skip
 
 
-async def list_stories(
-    session: AsyncSession, company_id: uuid.UUID, *, state: str | None = None, limit: int = 50
-) -> list[StorySummary]:
+def stories_query(company_id: uuid.UUID, *, state: str | None = None) -> Select[Any]:
+    """The company's stories, each with its article if it has one: rows of (Story, Article |
+    None), filtered, not ordered — the API pages them (AD-04)."""
     query = (
         select(Story, Article)
         .outerjoin(Article, Article.story_id == Story.id)
         .where(Story.company_id == company_id)
     )
-    if state:
-        query = query.where(Story.state == state)
-    rows = (
-        await session.execute(
-            query.order_by(Story.last_item_at.desc(), Story.id.desc()).limit(min(limit, MAX_LIST))
-        )
-    ).all()
+    return query.where(Story.state == state) if state else query
+
+
+async def story_summaries(session: AsyncSession, rows: Sequence[Any]) -> list[StorySummary]:
+    """``stories_query``'s rows as the list shows them, with their claim and evidence counts."""
     claims, evidence = await _story_counts(session, [s.id for s, _ in rows])
     return [
         StorySummary(**_story_summary(s, a, claims.get(s.id, 0), evidence.get(s.id, 0)))
@@ -454,17 +452,15 @@ async def story_detail(session: AsyncSession, story_id: uuid.UUID) -> StoryDetai
 # --- articles ---------------------------------------------------------------------------------
 
 
-async def list_articles(
-    session: AsyncSession, company_id: uuid.UUID, *, limit: int = 50
+def articles_query(company_id: uuid.UUID) -> Select[Any]:
+    """The company's articles, filtered, not ordered — the API pages them (AD-04)."""
+    return select(Article).where(Article.company_id == company_id)
+
+
+async def article_summaries(
+    session: AsyncSession, articles: Sequence[Article]
 ) -> list[ArticleSummary]:
-    articles = (
-        await session.scalars(
-            select(Article)
-            .where(Article.company_id == company_id)
-            .order_by(Article.updated_at.desc(), Article.id.desc())
-            .limit(min(limit, MAX_LIST))
-        )
-    ).all()
+    """Articles as the list shows them: the current version, its languages, the views."""
     ids = [a.id for a in articles]
     current = {
         row.draft_group_id: row
@@ -667,17 +663,15 @@ async def article_detail(
 # --- sources ----------------------------------------------------------------------------------
 
 
-async def list_sources(session: AsyncSession, company_id: uuid.UUID) -> list[SourceView]:
-    rows = (
-        await session.execute(
-            select(Source, func.count(SourceItem.id))
-            .outerjoin(SourceItem, SourceItem.source_id == Source.id)
-            .where(Source.company_id == company_id)
-            .group_by(Source.id)
-            .order_by(Source.created_at, Source.id)
-        )
-    ).all()
-    return [source_view(s, items) for s, items in rows]
+def sources_query(company_id: uuid.UUID) -> Select[Any]:
+    """The company's sources with how many items each brought: rows of (Source, count),
+    filtered, not ordered — the API pages them (AD-04)."""
+    return (
+        select(Source, func.count(SourceItem.id))
+        .outerjoin(SourceItem, SourceItem.source_id == Source.id)
+        .where(Source.company_id == company_id)
+        .group_by(Source.id)
+    )
 
 
 def source_view(source: Source, items: int = 0) -> SourceView:

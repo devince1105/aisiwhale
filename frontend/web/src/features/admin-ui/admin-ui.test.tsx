@@ -46,7 +46,7 @@ afterEach(() => {
 function withQueries(children: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
   client.setQueryData(queryKeys.companies(), COMPANIES);
-  client.setQueryData(queryKeys.approvals("c1", "PENDING"), [{ id: "a1" }, { id: "a2" }, { id: "a3" }]);
+  client.setQueryData([...queryKeys.approvals("c1", "PENDING"), "count"], 3);
   return render(<QueryClientProvider client={client}>{children}</QueryClientProvider>);
 }
 

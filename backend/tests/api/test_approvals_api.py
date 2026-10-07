@@ -42,7 +42,7 @@ async def waiting(db_session, runtime):
 async def test_inbox_lists_pending_approvals(api, waiting):
     response = await api.get("/api/approvals", params={"company_id": str(waiting["company"].id)})
     assert response.status_code == 200
-    [item] = response.json()
+    [item] = response.json()["items"]
     assert item["id"] == str(waiting["approval"].id)
     assert (item["state"], item["kind"], item["action"]) == (
         "PENDING",
@@ -54,7 +54,7 @@ async def test_inbox_lists_pending_approvals(api, waiting):
     decided = await api.get(
         "/api/approvals", params={"company_id": str(waiting["company"].id), "state": "APPROVED"}
     )
-    assert decided.json() == []
+    assert decided.json() == {"items": [], "next_cursor": None, "total": 0}
 
 
 async def test_approve_releases_the_task(api, db_session, waiting):

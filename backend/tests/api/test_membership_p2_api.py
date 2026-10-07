@@ -215,10 +215,10 @@ async def test_ending_a_comp_takes_vip_away_and_keeps_the_record(api, browser, d
         f"{COMPS}/{grant_id}/revoke", json={"reason": "again"}, params={"company": company.slug}
     )
     assert again.status_code == 409
-    listed = (await api.get(COMPS, params={"company": company.slug})).json()
+    listed = (await api.get(COMPS, params={"company": company.slug})).json()["items"]
     assert [comp["id"] for comp in listed] == [grant_id], "the history stays"
     running = (await api.get(COMPS, params={"company": company.slug, "running": True})).json()
-    assert running == []
+    assert running["items"] == [] and running["total"] == 0
     one = await api.get(f"{COMPS}/{grant_id}", params={"company": company.slug})
     assert one.json()["revoke_reason"] == "test finished"
 

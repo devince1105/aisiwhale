@@ -168,8 +168,8 @@ describe("the group beside the office (D-109)", () => {
         if (url.includes("/team/feed")) return Response.json({ items, has_more: false });
         if (url.includes("/team/messages")) return Response.json({ seq: 99, story_id: null, workflow_run_id: null }, { status: 201 });
         if (url.includes("/decide")) return Response.json({ id: "ap1" });
-        if (url.includes("/articles")) return Response.json([]);
-        if (url.includes("/api/approvals")) return Response.json(approvals);
+        if (url.includes("/articles")) return Response.json({ items: [], next_cursor: null, total: 0 });
+        if (url.includes("/api/approvals")) return Response.json({ items: approvals, next_cursor: null, total: approvals.length });
         return Response.json({});
       }),
     );

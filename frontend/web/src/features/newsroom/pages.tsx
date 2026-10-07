@@ -26,6 +26,7 @@ import {
 } from "@/api/queries";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { ErrorState } from "@/features/admin-ui/states";
+import { usePaged } from "@/features/admin-ui/usePaged";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
@@ -68,12 +69,13 @@ export function StoriesPage() {
 function CompanyStories({ company }: { company: Company }) {
   useCompanyStream(company.id);
   const [filter, setFilter] = useState<StoryFilter>("ALL");
-  const stories = useQuery(storiesQuery(company.id, filter === "ALL" ? null : (filter as StoryState)));
+  const stories = usePaged(storiesQuery(company.id, filter === "ALL" ? null : (filter as StoryState)));
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的題材`} />
       {stories.error ? <ErrorState>{stories.error.message}</ErrorState> : null}
-      <StoriesView stories={stories.data} filter={filter} onFilter={setFilter} />
+      <StoriesView stories={stories.items} filter={filter} onFilter={setFilter} />
+      {stories.footer}
     </AdminPage>
   );
 }
@@ -84,12 +86,13 @@ export function ArticlesPage() {
 
 function CompanyArticles({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const articles = useQuery(articlesQuery(company.id));
+  const articles = usePaged(articlesQuery(company.id));
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的文章`} />
       {articles.error ? <ErrorState>{articles.error.message}</ErrorState> : null}
-      <ArticlesView articles={articles.data} />
+      <ArticlesView articles={articles.items} />
+      {articles.footer}
     </AdminPage>
   );
 }
@@ -100,13 +103,14 @@ export function SourcesPage() {
 
 function CompanySources({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const sources = useQuery(sourcesQuery(company.id));
+  const sources = usePaged(sourcesQuery(company.id));
   const queryClient = useQueryClient();
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的來源`} />
       {sources.error ? <ErrorState>{sources.error.message}</ErrorState> : null}
-      <SourcesView sources={sources.data} />
+      <SourcesView sources={sources.items} />
+      {sources.footer}
       <h2 className="mt-8 mb-3 text-lg font-semibold">新增來源</h2>
       <AddSourceForm
         onAdd={async (body) => {

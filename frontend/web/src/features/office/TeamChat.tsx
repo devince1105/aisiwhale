@@ -5,11 +5,11 @@
 // back: a note, or 交辦題材, a story for the newsroom to write, started at once. Approvals are
 // given here as in the inbox. Every message is an event the company recorded (chatModel.ts).
 import { parseEvent, type EventEnvelope } from "@autora/event-schema";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { approvalsQuery, articlesQuery, decideApproval, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
+import { approvalsQuery, articlesQuery, decideApproval, itemsOf, fetchTeamFeed, postTeamMessage, queryKeys, teamFeedQuery } from "@/api/queries";
 import { Face } from "@/features/agent-panel/Face";
 import { commandChoice, type Approval } from "@/features/approvals/model";
 import { isSection, SECTIONS, words as siteWords, type Section } from "@/features/site/i18n";
@@ -42,8 +42,9 @@ function useTeamFeed(companyId: string) {
     [older, firstEvents, live],
   );
   // the articles' titles, to say which story a draft or a verdict is about
-  const articles = useQuery(articlesQuery(companyId));
-  const titles = useMemo(() => new Map((Array.isArray(articles.data) ? articles.data : []).map((a) => [a.id, a.title])), [articles.data]);
+  // the latest page's (AD-04): a chat is about what is being written now
+  const articles = useInfiniteQuery(articlesQuery(companyId));
+  const titles = useMemo(() => new Map((itemsOf(articles.data) ?? []).map((a) => [a.id, a.title])), [articles.data]);
   const items = useMemo(() => chatItems(events, agents ?? {}, titles), [events, agents, titles]);
   const more = older ? older.more : (first.data?.has_more ?? false);
   const loadOlder = async () => {
@@ -62,8 +63,8 @@ function useTeamFeed(companyId: string) {
 
 export function TeamChat({ companyId, onClose }: { companyId: string; onClose: () => void }) {
   const { items, agents, loading, failed, more, loadOlder, loadingOlder } = useTeamFeed(companyId);
-  const pending = useQuery(approvalsQuery(companyId));
-  const pendingByRef = useMemo(() => new Map((pending.data ?? []).map((a) => [a.ref_id, a])), [pending.data]);
+  const pending = useInfiniteQuery(approvalsQuery(companyId));
+  const pendingByRef = useMemo(() => new Map((itemsOf(pending.data) ?? []).map((a) => [a.ref_id, a])), [pending.data]);
   const members = Object.values(agents).filter((a) => ROLE_NAME[a.role]);
   const now = useNow();
   const list = useRef<HTMLDivElement>(null);

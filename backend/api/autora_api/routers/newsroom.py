@@ -1,6 +1,7 @@
 """The newsroom's admin API (T-517): stories, articles and sources for the operator's pages.
 
 - GET  /api/companies/{id}/stories[?state=]      stories, newest activity first
+  (the three lists: ?cursor=&limit=&q=&sort= → {items, next_cursor, total}, AD-04)
 - GET  /api/stories/{id}                          a story: leads, evidence, claims (with quotes)
 - POST /api/stories/{id}/start                    select it (if new) and start its workflow
 - GET  /api/companies/{id}/articles               articles, last changed first
@@ -22,7 +23,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 from functools import lru_cache
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -35,6 +36,7 @@ from autora.domains.newsroom import admin, covers
 from autora.domains.newsroom.models import (
     Article,
     ArticleAccess,
+    Source,
     SourceKind,
     Story,
     StoryCover,
@@ -55,6 +57,7 @@ from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
 from autora.runtime.fsm import IllegalTransition
 from autora_api.deps import Operator, RuntimeDep, Session
+from autora_api.pagination import Listing, Page, page_rows, search, sort_by
 from autora_api.routers.public import Section
 
 router = APIRouter(tags=["newsroom"])
@@ -67,17 +70,48 @@ async def _company(session: Session, company_id: uuid.UUID) -> Company:
     return company
 
 
+class StoryPage(Page[admin.StorySummary]):
+    pass
+
+
+class ArticlePage(Page[admin.ArticleSummary]):
+    pass
+
+
+class SourcePage(Page[admin.SourceView]):
+    pass
+
+
+StorySort = Literal["-last_item_at", "last_item_at", "-score", "-first_seen_at", "title"]
+ArticleSort = Literal["-updated_at", "updated_at", "-created_at", "title"]
+SourceSort = Literal["created_at", "-created_at", "name"]
+
+
 @router.get("/api/companies/{company_id}/stories")
 async def list_stories(
     company_id: uuid.UUID,
     session: Session,
     _: Operator,
+    listing: Listing,
     state: Annotated[StoryState | None, Query()] = None,
-    limit: Annotated[int, Query(ge=1, le=admin.MAX_LIST)] = 50,
-) -> list[admin.StorySummary]:
+    sort: StorySort = "-last_item_at",
+) -> StoryPage:
+    """Stories a page at a time (AD-04), newest activity first; ``q`` searches the title."""
     await _company(session, company_id)
-    return await admin.list_stories(
-        session, company_id, state=state.value if state else None, limit=limit
+    stmt = admin.stories_query(company_id, state=state.value if state else None)
+    if (words := search(listing.words, Story.title)) is not None:
+        stmt = stmt.where(words)
+    columns = {
+        "last_item_at": Story.last_item_at,
+        "score": Story.score,
+        "first_seen_at": Story.first_seen_at,
+        "title": Story.title,
+    }
+    rows, next_cursor, total = await page_rows(
+        session, stmt, sort=sort_by(sort, columns), id_column=Story.id, listing=listing
+    )
+    return StoryPage(
+        items=await admin.story_summaries(session, rows), next_cursor=next_cursor, total=total
     )
 
 
@@ -158,10 +192,28 @@ async def list_articles(
     company_id: uuid.UUID,
     session: Session,
     _: Operator,
-    limit: Annotated[int, Query(ge=1, le=admin.MAX_LIST)] = 50,
-) -> list[admin.ArticleSummary]:
+    listing: Listing,
+    sort: ArticleSort = "-updated_at",
+) -> ArticlePage:
+    """Articles a page at a time (AD-04), last changed first; ``q`` searches the title and
+    the slug."""
     await _company(session, company_id)
-    return await admin.list_articles(session, company_id, limit=limit)
+    stmt = admin.articles_query(company_id)
+    if (words := search(listing.words, Article.title, Article.slug)) is not None:
+        stmt = stmt.where(words)
+    columns = {
+        "updated_at": Article.updated_at,
+        "created_at": Article.created_at,
+        "title": Article.title,
+    }
+    rows, next_cursor, total = await page_rows(
+        session, stmt, sort=sort_by(sort, columns), id_column=Article.id, listing=listing
+    )
+    return ArticlePage(
+        items=await admin.article_summaries(session, [a for (a,) in rows]),
+        next_cursor=next_cursor,
+        total=total,
+    )
 
 
 @router.get("/api/articles/{article_id}")
@@ -382,10 +434,26 @@ async def post_revise(
 
 @router.get("/api/companies/{company_id}/sources")
 async def list_sources(
-    company_id: uuid.UUID, session: Session, _: Operator
-) -> list[admin.SourceView]:
+    company_id: uuid.UUID,
+    session: Session,
+    _: Operator,
+    listing: Listing,
+    sort: SourceSort = "created_at",
+) -> SourcePage:
+    """Sources a page at a time (AD-04), oldest first; ``q`` searches the name and the URL."""
     await _company(session, company_id)
-    return await admin.list_sources(session, company_id)
+    stmt = admin.sources_query(company_id)
+    if (words := search(listing.words, Source.name, Source.url)) is not None:
+        stmt = stmt.where(words)
+    columns = {"created_at": Source.created_at, "name": Source.name}
+    rows, next_cursor, total = await page_rows(
+        session, stmt, sort=sort_by(sort, columns), id_column=Source.id, listing=listing
+    )
+    return SourcePage(
+        items=[admin.source_view(s, items) for s, items in rows],
+        next_cursor=next_cursor,
+        total=total,
+    )
 
 
 class NewSource(BaseModel):

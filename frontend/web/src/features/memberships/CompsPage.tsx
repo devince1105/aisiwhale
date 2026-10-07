@@ -3,7 +3,7 @@
 // VIP given by an admin, for internal testing (D-228, P2-B): who has it, until when, why, and
 // ending one. A comp is not a sale — no order, payment or revenue — and ending one only takes
 // away what the comp gave; the server works out what is left. Nothing here decides access.
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { compsQuery, grantComp, revokeComp, type Comp } from "@/api/queries";
@@ -13,6 +13,7 @@ import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
+import { usePaged } from "@/features/admin-ui/usePaged";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -46,7 +47,7 @@ export function CompsPage() {
 
 function CompanyComps({ company }: { company: Company }) {
   const [running, setRunning] = useState(false);
-  const comps = useQuery(compsQuery(company.slug, running));
+  const comps = usePaged(compsQuery(company.slug, running));
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["memberships", "comps", company.slug] });
 
@@ -67,7 +68,8 @@ function CompanyComps({ company }: { company: Company }) {
         </label>
       </div>
       {comps.error ? <ErrorState>無法載入：{comps.error.message}</ErrorState> : null}
-      <CompsTable comps={comps.data} onRevoked={refresh} />
+      <CompsTable comps={comps.items} onRevoked={refresh} />
+      {comps.footer}
     </AdminPage>
   );
 }

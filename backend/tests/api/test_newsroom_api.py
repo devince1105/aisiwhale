@@ -15,10 +15,12 @@ async def test_stories_list_and_detail(api, newsroom_room):
     room = newsroom_room
     listed = await api.get(f"/api/companies/{room.company.id}/stories")
     assert listed.status_code == 200, listed.text
-    [story] = listed.json()
+    [story] = listed.json()["items"]
     assert story["id"] == str(room.story.id) and story["claims"] == 2 and story["evidence"] == 2
     assert story["article"] is None
-    assert (await api.get(f"/api/companies/{room.company.id}/stories?state=DROPPED")).json() == []
+    assert (await api.get(f"/api/companies/{room.company.id}/stories?state=DROPPED")).json()[
+        "items"
+    ] == []
 
     detail = (await api.get(f"/api/stories/{room.story.id}")).json()
     assert detail["title"] == "Lumen City microgrid"
@@ -37,7 +39,7 @@ async def test_stories_list_and_detail(api, newsroom_room):
 async def test_article_detail_with_versions_checks_and_distribution(api, newsroom_room):
     room = newsroom_room
     article_id = await room.publish()
-    [summary] = (await api.get(f"/api/companies/{room.company.id}/articles")).json()
+    [summary] = (await api.get(f"/api/companies/{room.company.id}/articles")).json()["items"]
     assert summary["id"] == article_id and summary["state"] == "PUBLISHED"
     assert summary["version"] == 1 and sorted(summary["langs"]) == ["en", "zh-TW"]
     assert summary["views"] == 0
@@ -78,7 +80,7 @@ async def test_sources_list_and_add(api, newsroom_room, db_session):
     )
     assert added.status_code == 201, added.text
     assert added.json()["status"] == "active" and added.json()["items"] == 0
-    [listed] = (await api.get(f"/api/companies/{room.company.id}/sources")).json()
+    [listed] = (await api.get(f"/api/companies/{room.company.id}/sources")).json()["items"]
     assert listed["name"] == "Lumen City News" and listed["trust_level"] == "0.70"
     schedules = (
         await db_session.scalars(

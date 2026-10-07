@@ -9,7 +9,8 @@
 | 1 | AD-01 共用元件 | — | ✅ 2026-10-07 |
 | 2 | AD-02 外殼：側欄、頂欄、麵包屑、公司切換器 | AD-01 | ✅ 2026-10-07 |
 | 3 | AD-03 ⌘K 指令面板與快捷鍵 | AD-02（`nav.ts`） | ✅ 2026-10-07 |
-| 4 | AD-04 後端列表規格、AD-05 DataTable | — | ⏳ |
+| 4 | AD-04 後端列表規格 | — | ✅ 2026-10-07 |
+| 4b | AD-05 DataTable | AD-04 | ⏳ |
 | 5 | AD-06 管理操作稽核、AD-07 詳情頁 | AD-04 | ⏳ |
 | 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ⏳ |
 | 7 | AD-08、AD-10、AD-11、AD-12、AD-13 | — | ⏳ |
@@ -119,3 +120,65 @@
 
   這就是計畫的驗收條件，已通過。
 - 完整的 Playwright e2e：17 項通過、1 項略過（`office-soak` 預設就不跑），沒有失敗。
+
+---
+
+## 2026-10-07：AD-04 後端列表規格
+
+### 做了什麼
+
+新模組 `backend/api/autora_api/pagination.py`，讓所有後台列表用同一種問法：`?cursor=&limit=&q=&sort=`，回傳 `{items, next_cursor, total}`。
+
+- **limit**：1～100，預設 50。
+- **sort**：每個端點自己的 `Literal` 值，前面加 `-` 是遞減，FastAPI 會先檢查（不認得的值回 422）。以列的 id 作為第二排序鍵、方向相同，所以順序完整而且穩定。
+- **cursor**：keyset 分頁，內容是上一頁最後一列的排序值和 id，用 base64url 編碼。前面新增資料，後面的頁不會跟著位移；翻到很深的頁也一樣快。cursor 裡記著它的排序方式，換了排序再拿來用會回 400；cursor 壞掉也回 400，都是 problem+json。
+- **q**：每個詞都要出現在該端點的搜尋欄位之一，`ILIKE` 不分大小寫；`%`、`_`、`\` 會先跳脫，所以照字面比對、不是萬用字元。
+- **total**：套用篩選後的總筆數，和 cursor 無關，每一頁都有。
+- 錯誤維持 RFC 7807。
+
+改過的端點：
+
+| 端點 | 排序 | `q` 搜尋 |
+|---|---|---|
+| `GET /api/approvals` | `created_at`（預設，最久的在上）、`-created_at` | 摘要、kind、action |
+| `GET /api/companies/{id}/stories` | `-last_item_at`（預設）、`last_item_at`、`-score`、`-first_seen_at`、`title` | 標題 |
+| `GET /api/companies/{id}/articles` | `-updated_at`（預設）、`updated_at`、`-created_at`、`title` | 標題、slug |
+| `GET /api/companies/{id}/sources` | `created_at`（預設）、`-created_at`、`name` | 名稱、網址 |
+| `GET /api/admin/memberships/comps` | `-created_at`（預設）、`created_at`、`-expires_at`、`expires_at` | 讀者 email、理由、撤銷理由 |
+
+- `newsroom/admin.py` 的 `list_stories`、`list_articles`、`list_sources` 拆成兩部分：查詢（`stories_query`、`articles_query`、`sources_query`）和組成畫面資料（`story_summaries`、`article_summaries`），分頁交給 API 層，domain 模組不需要 import API。原本的 `MAX_LIST` 拿掉。
+- VIP 授予的資料來自 `memberships.comp_grants`，那是會員與鯨幣工作階段負責的模組，我不改它，所以用 `page_list` 在記憶體裡分頁，規則和 SQL 版相同。授予只有內部測試用的幾筆，記憶體分頁足夠。
+
+前端：
+
+- `queries.ts` 的五個列表改成 `infiniteQueryOptions`。新增 `Page<T>`、`itemsOf`、`totalOf`，以及 `pendingCountQuery`：只要一列，回傳 `total`，給側欄、Dashboard、辦公室的待審件數用，不必再把整份收件匣抓下來數。
+- `admin-ui/usePaged.tsx` 搭配 `LoadMore`（顯示「顯示 X / 共 Y 筆」和「載入更多」），用在審批、題材、文章、來源、VIP 授予五頁。
+- 指令面板接上真實資料：輸入停頓 250 毫秒後，用 `q` 搜尋目前公司的文章與題材（各取 5 筆），結果列在「搜尋結果」組，選了就打開那篇。這就是 AD-03 說的「AD-04 完成後改打 API」。`no-fake-data.test.ts` 的計時器白名單加上 `AdminShell.tsx`，理由和股票搜尋的等字（D-061）相同：計時器只延後送出請求，顯示的仍然是 API 的結果。
+- 團隊群組只拿第一頁（50 筆）的待審批與文章標題來對應訊息。原本待審批一次全拿；超過 50 筆待審的情況目前不會發生。
+- `openapi.json`、`schema.gen.ts` 是等持股工作階段先提交 HD-11（1297574）、pull 之後才重新產生的，避免把對方未提交的部分一起提交。
+
+### 有意延後的部分
+
+- 計畫最後列的 `events`（事件時間軸）沒有改。即時串流會用 `limit` 補資料，改它的回傳格式會牽動 realtime，等 AD-05 處理時間軸表格時再一起做。
+- 計畫說 `total` 只在資料量可接受的表上提供；這五張後台表都很小，所以都提供。
+
+### 出過的錯
+
+- **我在共用的 `autora_test` 上跑了好幾次 pytest。** conftest 每次都會 `DROP SCHEMA public CASCADE`，因此打斷了持股工作階段的完整測試（對方來問才發現）。之後改成設 `DATABASE_URL=…/autora_ad`，用自己的 `autora_ad_test`。
+- `test_pagination.py` 的搜尋測試，原本四列的 action 都是 `publish_article`，而 action 也在搜尋範圍內，所以「PUBLISH」四列都命中。是測試資料寫錯，改成另一個 action。
+
+### 驗證
+
+- 新增 `backend/tests/api/test_pagination.py` 共 10 項：
+  - 7 列資料用每頁 3 列翻完：順序正確、沒有缺漏、共 3 頁；剛好一頁的量不會多出一個空頁的 cursor；
+  - 10 列 `created_at` 完全相同，正序和倒序翻頁都不會漏列或重複；
+  - `q`：不分大小寫、多個詞、中文、`%` 和 `_` 照字面比對、action 也會被搜到；
+  - 壞掉的 cursor、換了排序的 cursor 都回 400 problem+json；`limit` 0 或 101、未知的排序值回 422；
+  - 三個新聞室列表接受相同的參數；
+  - 1,000 筆待審時，第一頁和翻到深處的頁平均每頁不到 200 毫秒（計畫的驗收條件；量三次取最快的一次。第一版只量一次，在 32 分鐘的完整測試裡、機器同時跑其他工作階段的負載時超時一次，單獨跑三次都通過）；
+  - cursor 編碼後能解回原值；`page_list` 規則與 SQL 版一致。
+- 既有的 approvals、newsroom、membership_p2 API 測試改讀 `items`，24 項通過。
+- 前端：typecheck、lint、build 通過；vitest 77 個檔案、932 項全過。新增 `admin-ui/paged.test.tsx`，測「載入更多」和面板的搜尋結果。
+- `gen_openapi.py --check`、`gen-api:check`：產生的檔案是最新的。
+- 完整後端 pytest（在自己的 `autora_ad_test` 上）：2,403 項中只有 1 項失敗，就是上面那個計時測試，已改成量三次取最快；`test_workflow.py` 有一項在先前另一次完整測試裡失敗過，單獨重跑通過，那次是機器負載高（load average 172）。
+- Playwright e2e：17 項通過、1 項略過。`newsroom.spec.ts` 輪詢待審數的地方改讀 `total`。

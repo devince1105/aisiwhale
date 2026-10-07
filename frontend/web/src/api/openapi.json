@@ -514,6 +514,38 @@
     "title": "ApprovalOut",
     "type": "object"
    },
+   "ApprovalPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ApprovalOut"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "ApprovalPage",
+    "type": "object"
+   },
    "ApprovalState": {
     "enum": [
      "PENDING",
@@ -793,6 +825,38 @@
      "workflow_run_ids"
     ],
     "title": "ArticleDetail",
+    "type": "object"
+   },
+   "ArticlePage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ArticleSummary"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "ArticlePage",
     "type": "object"
    },
    "ArticleRef": {
@@ -1674,6 +1738,38 @@
      "running"
     ],
     "title": "Comp",
+    "type": "object"
+   },
+   "CompPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/Comp"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "CompPage",
     "type": "object"
    },
    "CompanyCreate": {
@@ -7573,6 +7669,38 @@
     "title": "SourceKind",
     "type": "string"
    },
+   "SourcePage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/SourceView"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "SourcePage",
+    "type": "object"
+   },
    "SourceView": {
     "properties": {
      "config": {
@@ -7903,6 +8031,38 @@
      "workflow_run_ids"
     ],
     "title": "StoryDetail",
+    "type": "object"
+   },
+   "StoryPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/StorySummary"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "StoryPage",
     "type": "object"
    },
    "StoryState": {
@@ -9097,6 +9257,7 @@
   },
   "/api/admin/memberships/comps": {
    "get": {
+    "description": "``q`` searches the reader's address and the reasons. Comps are few (internal testing),\nso the page is cut from the whole list here rather than in SQL.",
     "operationId": "list_comps_api_admin_memberships_comps_get",
     "parameters": [
      {
@@ -9127,6 +9288,68 @@
       }
      },
      {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "-created_at",
+       "enum": [
+        "-created_at",
+        "created_at",
+        "-expires_at",
+        "expires_at"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
       "in": "cookie",
       "name": "autora_admin",
       "required": false,
@@ -9148,11 +9371,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/Comp"
-         },
-         "title": "Response List Comps Api Admin Memberships Comps Get",
-         "type": "array"
+         "$ref": "#/components/schemas/CompPage"
         }
        }
       },
@@ -9453,7 +9672,7 @@
   },
   "/api/approvals": {
    "get": {
-    "description": "The approval inbox. Oldest first, so the longest-waiting request is on top.",
+    "description": "The approval inbox, a page at a time (AD-04). Oldest first by default, so the\nlongest-waiting request is on top; ``q`` searches the summary, kind and action.",
     "operationId": "list_approvals_api_approvals_get",
     "parameters": [
      {
@@ -9484,6 +9703,66 @@
       }
      },
      {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "created_at",
+       "enum": [
+        "created_at",
+        "-created_at"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
       "in": "cookie",
       "name": "autora_admin",
       "required": false,
@@ -9505,11 +9784,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/ApprovalOut"
-         },
-         "title": "Response List Approvals Api Approvals Get",
-         "type": "array"
+         "$ref": "#/components/schemas/ApprovalPage"
         }
        }
       },
@@ -11572,6 +11847,7 @@
   },
   "/api/companies/{company_id}/articles": {
    "get": {
+    "description": "Articles a page at a time (AD-04), last changed first; ``q`` searches the title and\nthe slug.",
     "operationId": "list_articles_api_companies__company_id__articles_get",
     "parameters": [
      {
@@ -11586,6 +11862,39 @@
      },
      {
       "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "-updated_at",
+       "enum": [
+        "-updated_at",
+        "updated_at",
+        "-created_at",
+        "title"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
       "name": "limit",
       "required": false,
       "schema": {
@@ -11594,6 +11903,23 @@
        "minimum": 1,
        "title": "Limit",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {
@@ -11618,11 +11944,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/ArticleSummary"
-         },
-         "title": "Response List Articles Api Companies  Company Id  Articles Get",
-         "type": "array"
+         "$ref": "#/components/schemas/ArticlePage"
         }
        }
       },
@@ -12577,6 +12899,7 @@
   },
   "/api/companies/{company_id}/sources": {
    "get": {
+    "description": "Sources a page at a time (AD-04), oldest first; ``q`` searches the name and the URL.",
     "operationId": "list_sources_api_companies__company_id__sources_get",
     "parameters": [
      {
@@ -12587,6 +12910,67 @@
        "format": "uuid",
        "title": "Company Id",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "created_at",
+       "enum": [
+        "created_at",
+        "-created_at",
+        "name"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {
@@ -12611,11 +12995,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/SourceView"
-         },
-         "title": "Response List Sources Api Companies  Company Id  Sources Get",
-         "type": "array"
+         "$ref": "#/components/schemas/SourcePage"
         }
        }
       },
@@ -12717,6 +13097,7 @@
   },
   "/api/companies/{company_id}/stories": {
    "get": {
+    "description": "Stories a page at a time (AD-04), newest activity first; ``q`` searches the title.",
     "operationId": "list_stories_api_companies__company_id__stories_get",
     "parameters": [
      {
@@ -12747,6 +13128,40 @@
      },
      {
       "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "-last_item_at",
+       "enum": [
+        "-last_item_at",
+        "last_item_at",
+        "-score",
+        "-first_seen_at",
+        "title"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
       "name": "limit",
       "required": false,
       "schema": {
@@ -12755,6 +13170,23 @@
        "minimum": 1,
        "title": "Limit",
        "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
       }
      },
      {
@@ -12779,11 +13211,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "items": {
-          "$ref": "#/components/schemas/StorySummary"
-         },
-         "title": "Response List Stories Api Companies  Company Id  Stories Get",
-         "type": "array"
+         "$ref": "#/components/schemas/StoryPage"
         }
        }
       },

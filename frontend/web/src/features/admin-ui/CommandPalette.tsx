@@ -10,10 +10,23 @@ import { Modal } from "./Dialog";
 import { Icon } from "./icons";
 import { SHORTCUTS } from "./hotkeys";
 
-export function CommandPalette({ commands, onClose }: { commands: readonly Command[]; onClose: () => void }) {
+export function CommandPalette({
+  commands,
+  onClose,
+  onQuery,
+  remote = [],
+  searching = false,
+}: {
+  commands: readonly Command[];
+  onClose: () => void;
+  /** What is typed, for a search on the server; its results come back as ``remote``. */
+  onQuery?: (query: string) => void;
+  remote?: readonly Command[];
+  searching?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const found = useMemo(() => pick(commands, query), [commands, query]);
+  const found = useMemo(() => [...pick(commands, query), ...(query.trim() ? remote : [])], [commands, query, remote]);
   const groups = useMemo(() => {
     const order: Command["group"][] = [];
     for (const c of found) if (!order.includes(c.group)) order.push(c.group);
@@ -70,6 +83,7 @@ export function CommandPalette({ commands, onClose }: { commands: readonly Comma
           onChange={(event) => {
             setQuery(event.target.value);
             setActive(0);
+            onQuery?.(event.target.value);
           }}
           onKeyDown={onKey}
           className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted"
@@ -79,7 +93,7 @@ export function CommandPalette({ commands, onClose }: { commands: readonly Comma
       <ul id={listId} role="listbox" aria-label="結果" className="max-h-[50vh] overflow-y-auto p-2">
         {shown.length === 0 ? (
           <li role="presentation" className="px-3 py-6 text-center text-sm text-muted">
-            找不到「{query}」
+            {searching ? "搜尋中…" : `找不到「${query}」`}
           </li>
         ) : (
           groups.map(({ group, items }) => (
