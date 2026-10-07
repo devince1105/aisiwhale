@@ -278,3 +278,10 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
   - 列表的排序、`failed`、`q`、`target_id` 篩選，以及未登入回 401；
   - 遮蔽、截斷、非 JSON 與過大 body 的處理。
 - 前端 `features/audit/audit.test.tsx`：列表的顯示；`ACTION_LABEL` 的每個路由都存在於 openapi.json。
+- 和 D-237（33071df，同樣改了 `deps.py` 與 `app.py`）合併：兩處衝突都是在同一個位置各自新增一行，兩邊都保留。`require_operator` 裡的順序是 `OFFICE_CALL.mark()` → `await OFFICE_CALL.keep(...)` → `audit.mark(...)`。合併後 `alembic heads` 只有 0076。
+- 在乾淨的 worktree 驗證合併後的提交（共用目錄裡有會員工作階段未提交的修改）：
+  - `gen_openapi --check`、`gen-api:check`、typecheck、lint 通過；
+  - vitest 80 個檔案、950 項全過（用 `--maxWorkers=3`；機器負載約 47 時，預設的 worker 數會讓不同的測試輪流超時）；
+  - build 通過；Playwright e2e 17 項通過、1 項略過；
+  - 完整後端 pytest 2,425 項全過（在自己的 `autora_ad_test` 上）。
+- 畫面：以 e2e 測試資料拍了操作紀錄頁，一筆完成、一筆被拒 422，送出的內容可以展開。看了截圖後發現「範圍」篩選沒選時顯示「全部」，實際上只有這間公司，所以 `FilterDef` 加了 `anyLabel`，這裡改成「這間公司」。
