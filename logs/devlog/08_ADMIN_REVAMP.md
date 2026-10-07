@@ -487,3 +487,4 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - 遷移 0080：upgrade、`alembic check`、downgrade 再 upgrade 都通過。
 - 前端 `admin-ui/bell.test.tsx` 共 3 項：件數、列表與快到期標示、收件匣連結、Esc 與點外面關閉、自己的開關（權杖沒有開關）。vitest 87 個檔案、1,021 項全過。
 - **計畫的驗收條件**（真實瀏覽器，暫時的 Playwright spec，沒有提交）：打開 Dashboard 等即時連線，用 API 開始製作一則題材，等 API 回報有 1 件待審，然後量鈴鐺：**8 毫秒後**顯示「1」（要求是 5 秒內）；打開鈴鐺並截圖。
+- 推送前合併 origin/main（D-245 的紀錄）後，在 worktree 跑完整驗證：ruff、lint-imports、openapi 檢查、typecheck、lint、build 通過；Playwright e2e 17 項、後端 pytest 2,520 項全過。
