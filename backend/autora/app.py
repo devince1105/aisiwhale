@@ -607,8 +607,9 @@ def build_worker(
     from autora.infra.blobstore import build_blob_store
     from autora.runtime.agent_runner import AgentRunner
     from autora.runtime.cost.guard import DbCostGuard
+    from autora.runtime.live_settings import LiveOvertime, LiveShifts, worker_reloader
     from autora.runtime.models.factory import gateway_from_settings
-    from autora.runtime.oncall import Overtime, api_caller
+    from autora.runtime.oncall import api_caller
     from autora.runtime.progress import ProgressPublisher
     from autora.runtime.services import ServiceDispatcher
     from autora.runtime.shifts import Shifts
@@ -645,6 +646,17 @@ def build_worker(
         behaviors=build_behaviors(runtime.snapshots),
         progress=ProgressPublisher(session_factory),
     )
+    live_shifts = LiveShifts(
+        Shifts.parse(settings.worker_shifts, settings.worker_days, settings.worker_timezone)
+    )
+    live_overtime = LiveOvertime(
+        session_factory,
+        day_limit=timedelta(hours=settings.worker_overtime_day_hours),
+        month_limit=timedelta(hours=settings.worker_overtime_month_hours),
+        zone=ZoneInfo(settings.worker_timezone),
+    )
+    reload, reload_in_pass = worker_reloader(settings, session_factory, live_shifts, live_overtime)
+    live_overtime.reload = reload
     return Worker(
         worker_id=settings.worker_id,
         session_factory=session_factory,
@@ -670,23 +682,20 @@ def build_worker(
         concurrency=settings.worker_concurrency,
         poll_interval=settings.worker_poll_seconds,
         idle_poll_interval=max(settings.worker_idle_poll_seconds, settings.worker_poll_seconds),
-        shifts=Shifts.parse(settings.worker_shifts, settings.worker_days, settings.worker_timezone),
+        # the shifts and the overtime limits a person may change in the back office (AD-11)
+        shifts=live_shifts,
         # on call (D-205): off its shifts, the worker comes in when a person has just acted
         on_call=api_caller(settings.worker_call_url, call_token)
         if settings.worker_call_url and call_token
         else None,
-        overtime=Overtime(
-            session_factory,
-            day_limit=timedelta(hours=settings.worker_overtime_day_hours),
-            month_limit=timedelta(hours=settings.worker_overtime_month_hours),
-            zone=ZoneInfo(settings.worker_timezone),
-        ),
+        overtime=live_overtime,
         call_poll_interval=settings.worker_call_poll_seconds,
         call_idle=settings.worker_call_idle_seconds,
         call_limit=settings.worker_call_max_minutes * 60,
         maintenance_interval=settings.worker_maintenance_seconds,
         company_ids=companies,
         maintenance_jobs=[
+            ("live_settings", reload_in_pass),
             ("advance_cycles", cycle_maintenance_job(runtime.cycles, companies)),
             ("forget_stale_memories", runner.memory.maintenance_job()),
             ("expire_unpaid_orders", orders.maintenance_job()),

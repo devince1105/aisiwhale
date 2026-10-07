@@ -58,7 +58,8 @@ export const ADMIN_NAV: readonly NavGroup[] = [
   {
     label: "系統",
     items: [{ key: "audit", go: "l", label: "操作紀錄", href: "/admin/audit", icon: "audit", need: "audit:view" },
-      { key: "access", go: "r", label: "角色與權限", href: "/admin/settings/access", icon: "access", need: "access:manage" }],
+      { key: "access", go: "r", label: "角色與權限", href: "/admin/settings/access", icon: "access", need: "access:manage" },
+      { key: "settings", go: "e", label: "系統設定", href: "/admin/settings", icon: "settings", need: "system:settings" }],
   },
 ];
 

@@ -795,6 +795,21 @@ export async function savePrefs(prefs: AdminPrefs, api: ApiClient = defaultApi) 
   return unwrap(await api.PUT("/api/admin/me/prefs", { body: prefs }));
 }
 
+export type SettingView = Schemas["SettingView"];
+
+/** What the back office tunes while everything runs (AD-11): an owner's. */
+export function settingsQuery(api: ApiClient = defaultApi) {
+  return queryOptions({ queryKey: ["system-settings"] as const, queryFn: async () => unwrap(await api.GET("/api/admin/settings")) });
+}
+
+export async function saveSetting(key: string, value: unknown, api: ApiClient = defaultApi) {
+  return unwrap(await api.PUT("/api/admin/settings/{key}", { params: { path: { key } }, body: { value } }));
+}
+
+export async function resetSetting(key: string, api: ApiClient = defaultApi) {
+  return unwrap(await api.DELETE("/api/admin/settings/{key}", { params: { path: { key } } }));
+}
+
 /** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
 export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
   return unwrap(await api.POST("/api/admin/memberships/comps", { body }));

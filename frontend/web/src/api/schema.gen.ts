@@ -284,6 +284,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Settings */
+        get: operations["list_settings_api_admin_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Setting */
+        put: operations["set_setting_api_admin_settings__key__put"];
+        post?: never;
+        /** Reset Setting */
+        delete: operations["reset_setting_api_admin_settings__key__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/analytics/beacon": {
         parameters: {
             query?: never;
@@ -1414,7 +1449,8 @@ export interface paths {
         };
         /**
          * Office Hours
-         * @description The worker's shifts, read from the settings the worker shares: no database query.
+         * @description The worker's shifts — the environment's, or the back office's (AD-11), held in memory: no
+         *     database query.
          */
         get: operations["office_hours_api_office_hours_get"];
         put?: never;
@@ -2821,6 +2857,24 @@ export interface components {
             /** Recorded */
             recorded: boolean;
         };
+        /** Change */
+        Change: {
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Actor Label */
+            actor_label: string;
+            /** After */
+            after: unknown | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Before */
+            before: unknown | null;
+        };
         /** ChangeRole */
         ChangeRole: {
             role: components["schemas"]["AdminRoleName"];
@@ -3883,6 +3937,11 @@ export interface components {
             trust_level: number | string;
             /** Url */
             url?: string | null;
+        };
+        /** NewValue */
+        NewValue: {
+            /** Value */
+            value: unknown;
         };
         /**
          * Offer
@@ -5350,6 +5409,35 @@ export interface components {
             /** Tokens Out */
             tokens_out: number;
         };
+        /** SettingView */
+        SettingView: {
+            /** Changes */
+            changes: components["schemas"]["Change"][];
+            /** Default */
+            default: unknown;
+            /** Help */
+            help: string;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Maximum */
+            maximum: number | null;
+            /** Minimum */
+            minimum: number | null;
+            /** Overridden */
+            overridden: boolean;
+            /** Updated At */
+            updated_at: string | null;
+            /** Updated By */
+            updated_by: {
+                [key: string]: unknown;
+            } | null;
+            /** Value */
+            value: unknown;
+        };
         /**
          * SourceKind
          * @enum {string}
@@ -6567,6 +6655,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Comp"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_settings_api_admin_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_setting_api_admin_settings__key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewValue"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_setting_api_admin_settings__key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingView"][];
                 };
             };
             /** @description Validation Error */

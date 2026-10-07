@@ -5,6 +5,7 @@
 // nothing for a library to add. Each is rendered only while open, so a closed one is not in the
 // page at all (and a test environment without showModal still sees what is open).
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "./Button";
 import { Icon } from "./icons";
@@ -43,7 +44,10 @@ export function Modal({
       if (dialog.open && typeof dialog.close === "function") dialog.close();
     };
   }, []);
-  return (
+  // on the page's body, not where it is called from: a dialog called from inside a <form> must
+  // not put its own form inside that one (a nested form submits the outer one natively — found
+  // on /admin/coins, D-246)
+  const dialog = (
     <dialog
       ref={ref}
       aria-label={label}
@@ -57,6 +61,7 @@ export function Modal({
       {children}
     </dialog>
   );
+  return typeof document === "undefined" ? dialog : createPortal(dialog, document.body);
 }
 
 export interface ConfirmDialogProps {
@@ -96,6 +101,9 @@ export function ConfirmDialog({
         className="grid gap-3 p-5"
         onSubmit={(event) => {
           event.preventDefault();
+          // React bubbles a portal's events to where it was called from: an outer form's own
+          // onSubmit must not run for this one
+          event.stopPropagation();
           if (ready) onConfirm(said.trim());
         }}
       >

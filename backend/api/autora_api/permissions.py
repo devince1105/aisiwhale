@@ -27,6 +27,7 @@ COINS_ADJUST = "coins:adjust"
 COINS_VIEW = "coins:view"
 AUDIT = "audit:view"
 ACCESS = "access:manage"
+SETTINGS = "system:settings"
 SELF = "self:prefs"
 """One's own preferences (AD-10): every role has it."""
 
@@ -44,6 +45,7 @@ ALL = frozenset(
         COINS_VIEW,
         AUDIT,
         ACCESS,
+        SETTINGS,
         SELF,
     }
 )
@@ -96,6 +98,9 @@ ROUTES: dict[tuple[str, str], str] = {
     ("PUT", "/api/admin/access/{reader_id}"): ACCESS,
     ("DELETE", "/api/admin/access/{reader_id}"): ACCESS,
     ("PUT", "/api/admin/me/prefs"): SELF,
+    ("GET", "/api/admin/settings"): SETTINGS,
+    ("PUT", "/api/admin/settings/{key}"): SETTINGS,
+    ("DELETE", "/api/admin/settings/{key}"): SETTINGS,
 }
 
 

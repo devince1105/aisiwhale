@@ -16,7 +16,8 @@
 | 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ✅ 2026-10-07 |
 | 7 | AD-08 看板 | AD-05、AD-07 | ✅ 2026-10-07 |
 | 8 | AD-10 通知 | AD-09 | ✅ 2026-10-07 |
-| 9 | AD-11、AD-12、AD-13 | — | ⏳ |
+| 9 | AD-11 系統設定 | AD-09 | ✅ 2026-10-07 |
+| 10 | AD-12、AD-13 | — | ⏳ |
 
 ---
 
@@ -488,3 +489,63 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - 前端 `admin-ui/bell.test.tsx` 共 3 項：件數、列表與快到期標示、收件匣連結、Esc 與點外面關閉、自己的開關（權杖沒有開關）。vitest 87 個檔案、1,021 項全過。
 - **計畫的驗收條件**（真實瀏覽器，暫時的 Playwright spec，沒有提交）：打開 Dashboard 等即時連線，用 API 開始製作一則題材，等 API 回報有 1 件待審，然後量鈴鐺：**8 毫秒後**顯示「1」（要求是 5 秒內）；打開鈴鐺並截圖。
 - 推送前合併 origin/main（D-245 的紀錄）後，在 worktree 跑完整驗證：ruff、lint-imports、openapi 檢查、typecheck、lint、build 通過；Playwright e2e 17 項、後端 pytest 2,520 項全過。
+
+---
+
+## 2026-10-07：AD-11 系統設定
+
+在 `.claude/worktrees/ad11`（分支 `admin/ad11`）做。
+
+### 做了什麼
+
+- **可以在執行中修改的設定**（`autora/runtime/live_settings.py` 的 `DEFINITIONS`）：每一項都有型別、上下限和中文說明，預設值是環境變數的值，後台設定過就用後台的。第一批四項：
+  - AI 員工的上班時段（`WORKER_SHIFTS`，D-205）：存檔前會先解析，不合法就拒絕；
+  - 每日加班上限：0～4 小時；
+  - 每月加班上限：0～46 小時（勞基法 §32）；
+  - 「聯絡我們」每日上限：0～1000 則，必須是整數。
+  - 密鑰與連線設定仍留在環境變數。
+- **遷移 0081**：
+  - `system_settings`：後台設定的值（沒有資料列就是環境預設）；
+  - `system_setting_changes`：每次修改的修改前、修改後、誰改的。只能新增（沿用 0002 的 trigger），這就是計畫裡「稽核頁看得到修改前後的值」的地方。操作紀錄也會照 AD-06 記下這個動作。
+- **`/api/admin/settings`**（GET、PUT `{key}`、DELETE `{key}`；權限鍵 `system:settings`，只有 owner 有）。
+- **不必重新部署就生效**，而且**不會讓資料庫一直醒著**（D-205：下班時 worker 不做任何查詢）：
+  - **API**：值放在記憶體（`autora_api/live.py`）。啟動時讀一次（部署的遷移剛叫醒資料庫，和 D-237 的 `OFFICE_CALL.recall` 同一個時機），每次存檔順便更新。`/api/office-hours`、聯絡表單的上限都讀記憶體，所以 `/api/office-hours` 和 worker 每分鐘問的 `/office-hours/call` 仍然完全不碰資料庫。
+  - **worker**：`LiveShifts`、`LiveOvertime` 取代原本的 `Shifts`、`Overtime`，介面相同，`runtime/worker.py` 和 `oncall.py` 都沒有改，只在 `app.py` 換掉組裝方式。
+    - 上班時：每一輪 maintenance（約 15 秒）重讀一次，那時資料庫本來就醒著；
+    - 下班時：只在臨時上班要開始時重讀（`LiveOvertime.left` 先 reload）。在後台存設定本身就是一個寫入，會叫 worker 來臨時上班，所以「加班時數用完了、管理員把上限調高」這種情況，新上限就是讓這次臨時上班成立的那個值；
+    - 有設 `WORKER_CALL_URL`（正式環境）時，下班中的 worker 每 60 秒會重算一次下一班，所以班表改了一分鐘內生效。
+- **前端「系統設定」頁**（`/admin/settings`，系統群組，快捷鍵 `g e`，只有 owner 看得到）：
+  - 每一項顯示目前是「環境預設」還是「後台設定」、說明、上下限；
+  - 改了才能儲存；可以改回環境預設（先確認）；
+  - 環境預設值、最近 10 次修改（誰：管理員顯示 email、權杖顯示「操作者權杖」，以及修改前 → 修改後）。
+- **ConfirmDialog 的修正**：會員工作階段在 /admin/coins 發現（D-246），對話框放在另一個 `<form>` 裡面時會變成巢狀表單，真瀏覽器會把外層表單原生送出並重新載入頁面。
+  - 現在 `Modal` 一律用 `createPortal` 渲染到 `document.body`，在 DOM 裡就不會巢狀；
+  - 但 React 仍會沿著元件樹把 portal 內的事件往上傳，所以對話框的 submit 另外加了 `stopPropagation()`，避免外層表單自己的 `onSubmit` 被觸發。
+  - 新增測試：對話框放在表單裡，按確認只呼叫對話框自己的動作，外層表單的 onSubmit 不會被呼叫。這個測試第一次跑是失敗的，失敗的原因正是 React 的事件傳遞。
+
+### 協調
+
+- 這個做法和「臨時上班」工作階段（D-205、D-237 的作者）先確認過。它指出三點，我原本的設計有兩點會出問題，三點都照它的建議改了：
+  1. 原本打算在背景每 30 秒讀一次設定，這會讓資料庫一直醒著，所以改成只在 maintenance 時和臨時上班開始前讀；
+  2. 加班用完時，worker 會用舊上限判斷而永遠不來，所以 `left()` 要先 reload；
+  3. `/api/office-hours` 必須維持只讀記憶體。
+- 遷移 0081 先問過其他三個工作階段。
+
+### 和計畫不同的地方
+
+- **計畫說存檔時要發出 `settings.changed` 事件讓 worker 重讀，我沒有做事件。** worker 改成在資料庫本來就醒著的兩個時機去讀，效果相同；做事件需要擴充事件目錄與前端的 event-schema。
+- **API 若有多個行程，各自的記憶體只會在自己存檔或重新啟動時更新。** 目前正式環境只有一個 API 行程，所以不是問題，之後若擴充成多個行程要再處理。
+
+### 驗證
+
+- 後端 `tests/api/test_admin_settings.py` 共 6 項：
+  - 存檔前的檢查（班表能解析、數字上下限、整數、布林值會被拒絕、不認得的 key）；
+  - 設定、再設定、改回預設的完整流程，以及修改前後的紀錄與「操作者權杖」標示；設定後 `/api/office-hours` 立刻回傳新班表；
+  - 不合法的值回 422、不認得的 key 回 404、未登入回 401；
+  - 修改紀錄不能刪除（trigger）；
+  - API 啟動時讀回已存的值；
+  - worker 端：上班的 maintenance 讀到環境預設；臨時上班開始前的 `left()` 讀到新上限和新班表。
+- `test_office_hours.py`、`test_admin_permissions.py`（`system:settings` 的三條路由已加進權限表，只有 owner 能用）通過。
+- 遷移 0081：upgrade、`alembic check`、downgrade 再 upgrade 都通過。
+- 前端：`features/settings/settings.test.tsx` 3 項，`admin-ui.test.tsx` 新增 1 項（巢狀表單）；改成 portal 之後，原本 1,021 項全部通過。
+- 真實瀏覽器：用 e2e 的管理員把聯絡上限改成 50 並截圖，狀態變成「後台設定」，修改紀錄是「（環境預設） → 50」。看截圖時發現紀錄裡的操作者是原始 id，所以補上 `actor_label`。

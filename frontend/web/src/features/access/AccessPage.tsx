@@ -33,6 +33,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "coins:view": "查看讀者的鯨幣明細",
   "audit:view": "查看操作紀錄",
   "access:manage": "管理角色與權限（本頁）",
+  "system:settings": "系統設定：上班時段、加班上限、聯絡表單上限",
   "self:prefs": "自己的通知設定",
 };
 

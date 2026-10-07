@@ -40,6 +40,7 @@ from autora.accounts import AccountError, normalise
 from autora.infra.email import EmailError, Message
 from autora.infra.settings import Settings
 from autora_api.deps import EmailSender, settings_dep
+from autora_api.live import LIVE
 
 log = logging.getLogger(__name__)
 
@@ -203,8 +204,9 @@ async def send_message(
     # 4, 5: one address, then everyone
     if not recent.allow(address, time.monotonic()):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many messages; try later")
-    if not daily.allow(datetime.now(UTC).date(), settings.contact_daily_cap):
-        log.warning("聯絡我們: today's cap of %d messages reached", settings.contact_daily_cap)
+    cap = LIVE.value(settings, "contact.daily_cap")  # the back office may change it (AD-11)
+    if not daily.allow(datetime.now(UTC).date(), cap):
+        log.warning("聯絡我們: today's cap of %d messages reached", cap)
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many messages today")
     name = " ".join(body.name.split())[:40]
     message = Message(

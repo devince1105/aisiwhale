@@ -77,6 +77,7 @@ from autora.db.models.runtime import (
     StateTransition,
     WorkerOvertime,
 )
+from autora.db.models.settings import SystemSetting, SystemSettingChange
 from autora.db.models.tasks import (
     AGENT_RUN_TERMINAL,
     AgentRun,
@@ -90,6 +91,8 @@ from autora.db.models.tasks import (
 )
 
 __all__ = [
+    "SystemSetting",
+    "SystemSettingChange",
     "DIGEST_ROLES",
     "AdminAction",
     "AdminPref",

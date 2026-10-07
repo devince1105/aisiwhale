@@ -14,6 +14,7 @@ from autora.realtime.gateway import EventHub
 from autora_api import problems
 from autora_api.audit import AuditMiddleware
 from autora_api.deps import OFFICE_CALL
+from autora_api.live import LIVE
 from autora_api.routers import (
     admin_access,
     admin_activity,
@@ -22,6 +23,7 @@ from autora_api.routers import (
     admin_coins,
     admin_me,
     admin_memberships,
+    admin_settings,
     approvals,
     auth,
     coins,
@@ -52,6 +54,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # the last call, written down before this start (D-237): the deploy's migrations just woke
     # the database, so reading it costs no extra wake
     await OFFICE_CALL.recall(get_sessionmaker())
+    # the settings the back office changed (AD-11), read the same once
+    await LIVE.recall(get_sessionmaker())
     hub = EventHub(engine=get_engine(), session_factory=get_sessionmaker())
     app.state.hub = hub
     await hub.start()
@@ -105,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_activity.router)
     app.include_router(admin_access.router)
     app.include_router(admin_me.router)
+    app.include_router(admin_settings.router)
     app.include_router(contact.router)
     app.include_router(payments.router)
     app.include_router(watchlist.router)

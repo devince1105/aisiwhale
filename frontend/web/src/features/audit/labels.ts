@@ -20,6 +20,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "/api/admin/access": "加入管理員",
   "/api/admin/access/{reader_id}": "改角色或移除管理員",
   "/api/admin/me/prefs": "自己的通知設定",
+  "/api/admin/settings/{key}": "系統設定",
   "/api/admin/memberships/comps/{grant_id}/revoke": "撤銷 VIP",
   "/api/admin/coins/adjustments": "調整鯨幣",
   "/api/stories/{story_id}/start": "開始製作",

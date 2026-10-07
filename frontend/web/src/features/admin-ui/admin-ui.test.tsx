@@ -109,6 +109,22 @@ describe("the confirm dialog", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("called from inside a form, it is not a form inside that form (D-246)", () => {
+    const outer = vi.fn((event: Event) => event.preventDefault());
+    const onConfirm = vi.fn();
+    render(
+      <form onSubmit={(e) => outer(e.nativeEvent)}>
+        <ConfirmDialog title="確認調整？" confirmLabel="確認" onConfirm={onConfirm} onCancel={vi.fn()} />
+      </form>,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.parentElement).toBe(document.body);
+    expect(dialog.closest("form form")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "確認" }));
+    expect(onConfirm).toHaveBeenCalled();
+    expect(outer).not.toHaveBeenCalled();
+  });
+
   it("Esc, a click outside and 取消 all call it off", () => {
     const onCancel = vi.fn();
     render(<ConfirmDialog title="下架？" confirmLabel="確定" onConfirm={vi.fn()} onCancel={onCancel} />);

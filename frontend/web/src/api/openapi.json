@@ -2058,6 +2058,51 @@
     "title": "CapitalOut",
     "type": "object"
    },
+   "Change": {
+    "properties": {
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "actor_label": {
+      "title": "Actor Label",
+      "type": "string"
+     },
+     "after": {
+      "anyOf": [
+       {},
+       {
+        "type": "null"
+       }
+      ],
+      "title": "After"
+     },
+     "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+     },
+     "before": {
+      "anyOf": [
+       {},
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Before"
+     }
+    },
+    "required": [
+     "before",
+     "after",
+     "actor",
+     "actor_label",
+     "at"
+    ],
+    "title": "Change",
+    "type": "object"
+   },
    "ChangeRole": {
     "properties": {
      "role": {
@@ -4688,6 +4733,18 @@
      "kind"
     ],
     "title": "NewSource",
+    "type": "object"
+   },
+   "NewValue": {
+    "properties": {
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "value"
+    ],
+    "title": "NewValue",
     "type": "object"
    },
    "Offer": {
@@ -8849,6 +8906,105 @@
     "title": "RunOut",
     "type": "object"
    },
+   "SettingView": {
+    "properties": {
+     "changes": {
+      "items": {
+       "$ref": "#/components/schemas/Change"
+      },
+      "title": "Changes",
+      "type": "array"
+     },
+     "default": {
+      "title": "Default"
+     },
+     "help": {
+      "title": "Help",
+      "type": "string"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "maximum": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maximum"
+     },
+     "minimum": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minimum"
+     },
+     "overridden": {
+      "title": "Overridden",
+      "type": "boolean"
+     },
+     "updated_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated At"
+     },
+     "updated_by": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Updated By"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "key",
+     "kind",
+     "label",
+     "help",
+     "minimum",
+     "maximum",
+     "value",
+     "default",
+     "overridden",
+     "updated_by",
+     "updated_at",
+     "changes"
+    ],
+    "title": "SettingView",
+    "type": "object"
+   },
    "SourceKind": {
     "enum": [
      "rss",
@@ -11774,6 +11930,206 @@
     "summary": "Revoke Comp",
     "tags": [
      "admin-memberships"
+    ]
+   }
+  },
+  "/api/admin/settings": {
+   "get": {
+    "operationId": "list_settings_api_admin_settings_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SettingView"
+         },
+         "title": "Response List Settings Api Admin Settings Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List Settings",
+    "tags": [
+     "admin-settings"
+    ]
+   }
+  },
+  "/api/admin/settings/{key}": {
+   "delete": {
+    "operationId": "reset_setting_api_admin_settings__key__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SettingView"
+         },
+         "title": "Response Reset Setting Api Admin Settings  Key  Delete",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reset Setting",
+    "tags": [
+     "admin-settings"
+    ]
+   },
+   "put": {
+    "operationId": "set_setting_api_admin_settings__key__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NewValue"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SettingView"
+         },
+         "title": "Response Set Setting Api Admin Settings  Key  Put",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Set Setting",
+    "tags": [
+     "admin-settings"
     ]
    }
   },
@@ -16449,7 +16805,7 @@
   },
   "/api/office-hours": {
    "get": {
-    "description": "The worker's shifts, read from the settings the worker shares: no database query.",
+    "description": "The worker's shifts — the environment's, or the back office's (AD-11), held in memory: no\ndatabase query.",
     "operationId": "office_hours_api_office_hours_get",
     "parameters": [
      {

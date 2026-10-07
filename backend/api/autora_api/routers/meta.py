@@ -22,6 +22,7 @@ from autora.app import build_behaviors
 from autora.infra.settings import Settings
 from autora.runtime.shifts import Shifts
 from autora_api.deps import OFFICE_CALL, Operator, settings_dep
+from autora_api.live import LIVE
 
 SettingsDep = Annotated[Settings, Depends(settings_dep)]
 _worker_bearer = HTTPBearer(auto_error=False)
@@ -54,12 +55,14 @@ class OfficeHours(BaseModel):
 
 @router.get("/office-hours")
 async def office_hours(_: Operator, settings: SettingsDep) -> OfficeHours:
-    """The worker's shifts, read from the settings the worker shares: no database query."""
-    shifts = Shifts.parse(settings.worker_shifts, settings.worker_days, settings.worker_timezone)
+    """The worker's shifts — the environment's, or the back office's (AD-11), held in memory: no
+    database query."""
+    spec = LIVE.value(settings, "worker.shifts")
+    shifts = Shifts.parse(spec, settings.worker_days, settings.worker_timezone)
     now = datetime.now(UTC)
     on_duty = shifts is None or shifts.on_duty(now)
     return OfficeHours(
-        shifts=[g.strip() for g in settings.worker_shifts.split(";") if g.strip()],
+        shifts=[g.strip() for g in spec.split(";") if g.strip()],
         days=settings.worker_days,
         timezone=settings.worker_timezone,
         on_duty=on_duty,
