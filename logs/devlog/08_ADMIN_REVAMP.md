@@ -384,3 +384,8 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
   3. 放下後跳出「待核准 → 已核准」的確認，按核准，API 的待審數從 1 變成 0，並出現「已核准：…」的 toast。
 
   截圖時發現「待核准」欄顯示「0 / 1」（總數還算著正在移動的那張卡），已改成總數也跟著調整，重拍確認變成 0。
+- 推送前合併了 origin/main（D-240 的會議室、會員工作階段 P3-C 的 d050849），沒有衝突。合併後重新產生 openapi.json、schema.gen.ts，結果完全相同。合併後的驗證：
+  - ruff、lint-imports 通過；
+  - vitest 85 個檔案 1,011 項中只有 1 項失敗，是 `office3d/agents/avatar.test.tsx` 在負載 20 時超時，單獨重跑 12 項全過；
+  - build 通過；Playwright e2e 17 項通過；
+  - 完整後端 pytest 2,498 項中只有 1 項失敗，是 `tests/e2e/test_recovery.py::test_killed_worker_is_recovered_without_duplicates`（會殺掉 worker 行程的測試），單獨重跑兩次都通過，那個檔案我也沒有動。
