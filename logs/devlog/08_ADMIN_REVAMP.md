@@ -655,3 +655,11 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - 前端 `conventions.test.ts` 3 項；先故意刪掉一個稽核名稱、把導覽的鍵打錯、加一個不在導覽上的 `/admin/zzprobe` 頁，三項都如預期失敗並指出是哪一個，改回後通過。
 - 後端 `test_admin_permissions.py` 12 項通過（含新的 openapi 一致性檢查）；`gen-api:check` 確認型別沒變。
 - 真實瀏覽器：Dashboard 頁只有一個 `<main>`，三個區塊的標題都在裡面，手機寬度 390px 沒有橫向捲動；打開不存在的執行軌跡，錯誤顯示在外殼裡。截圖時發現錯誤頁沒有麵包屑，補上 `PageHeader`。
+- 完整套件：vitest 1,034 項、build、Playwright e2e 17 項（1 項略過）通過；後端 2,531 項通過、1 項失敗：`test_recovery.py::test_killed_worker_loses_no_draft`（殺掉 worker 再計時重啟）。那時我不小心在同一台機器上同時跑了另一整套後端測試；單獨重跑 `tests/e2e` 8 項全部通過。
+
+### D-248：交易頁只給 owner 和 finance
+
+使用者決定：**看交易紀錄與核准交易都只給 owner 和 finance**。權限表新增 `trading:view`、`trading:approve`，加進 `ALL` 與 finance；editor、viewer 都沒有，由 `test_admin_permissions.py` 鎖住。角色與權限頁補上兩個鍵的說明。
+
+- 交易頁還沒做，所以目前沒有路由用到這兩個鍵。TR-10 要做的事寫進檢查清單和交易提案：讀取路由預設所有後台角色都能看，所以交易頁的**每一條讀取路由**都要在權限表加 GET 的鍵；核准路由對應 `trading:approve`；導覽項目加 `need: "trading:view"`。
+- 合併 origin/main 後，前端 1,034 項、後端 `tests/api` 338 項與 `tests/e2e` 8 項通過。
