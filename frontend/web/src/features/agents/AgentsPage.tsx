@@ -1,11 +1,13 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 
 import { agentsQuery, decideAgent, hireAgent, rolesQuery, type AgentAction } from "@/api/queries";
-import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
+
+import { ErrorState } from "@/features/admin-ui/states";
 
 import { AgentsView, HireForm } from "./AgentsView";
 
@@ -21,22 +23,9 @@ function CompanyAgents({ company }: { company: Company }) {
   const queryClient = useQueryClient();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 pt-8 pb-12">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs tracking-widest text-muted uppercase">Agents</p>
-          <h1 className="mt-1 text-2xl font-semibold">{company.name} 的代理</h1>
-        </div>
-        <div className="flex gap-4 text-sm">
-          <Link href={withCompany("/admin/dashboard", company.id)} className="text-accent underline">
-            Dashboard
-          </Link>
-          <Link href={withCompany("/admin/office", company.id)} className="text-accent underline">
-            辦公室
-          </Link>
-        </div>
-      </header>
-      {agents.error ? <p className="mb-3 text-danger">{agents.error.message}</p> : null}
+    <AdminPage width="read">
+      <PageHeader title={`${company.name} 的代理`} />
+      {agents.error ? <ErrorState>{agents.error.message}</ErrorState> : null}
       <AgentsView
         agents={agents.data}
         onDecide={async (agentId: string, action: AgentAction) => {
@@ -53,6 +42,6 @@ function CompanyAgents({ company }: { company: Company }) {
           await queryClient.invalidateQueries({ queryKey: ["agents", company.id] });
         }}
       />
-    </main>
+    </AdminPage>
   );
 }

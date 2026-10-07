@@ -12,7 +12,7 @@ import { useAskAgain } from "@/features/auth/TokenGate";
 export type Company = Schemas["CompanyOut"];
 
 const message = (text: string, alert = false) => (
-  <p className="mx-auto max-w-6xl px-4 pt-8 text-muted" role={alert ? "alert" : undefined}>
+  <p className="mx-auto max-w-7xl px-4 pt-8 text-muted md:px-6" role={alert ? "alert" : undefined}>
     {text}
   </p>
 );
@@ -26,15 +26,7 @@ const message = (text: string, alert = false) => (
  * to the token form.
  */
 export function CompanyScope({ children }: { children: (company: Company) => ReactNode }) {
-  const requested = useSearchParams().get("company");
-  const companies = useQuery(companiesQuery());
-  const last = requested ? null : remembered();
-  const company = requested
-    ? companies.data?.find((c) => c.id === requested)
-    : (companies.data?.find((c) => c.id === last) ??
-      companies.data?.find((c) => c.slug === SITE_COMPANY) ??
-      companies.data?.find((c) => c.agents > 0) ??
-      companies.data?.[0]);
+  const { requested, companies, company } = useCompanyChoice();
   useEffect(() => {
     if (company) remember(company.id);
   }, [company]);
@@ -54,6 +46,21 @@ export function CompanyScope({ children }: { children: (company: Company) => Rea
     );
   }
   return <>{children(company)}</>;
+}
+
+/** The company the address asks for, or the one CompanyScope would pick without it — what the
+ * page shows, and what the back office's company switcher says (AD-02). */
+export function useCompanyChoice() {
+  const requested = useSearchParams()?.get("company") ?? null;
+  const companies = useQuery(companiesQuery());
+  const last = requested ? null : remembered();
+  const company = requested
+    ? companies.data?.find((c) => c.id === requested)
+    : (companies.data?.find((c) => c.id === last) ??
+      companies.data?.find((c) => c.slug === SITE_COMPANY) ??
+      companies.data?.find((c) => c.agents > 0) ??
+      companies.data?.[0]);
+  return { requested, companies, company };
 }
 
 /** Links between admin pages keep the selected company — also a link that already has a query

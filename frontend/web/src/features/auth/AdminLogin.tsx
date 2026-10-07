@@ -8,6 +8,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { ThemeToggle } from "@/features/site/ThemeToggle";
+
 import { adminGoogleUrl, afterLogin, loginAdmin, type AdminLoginResult } from "./adminAuth";
 
 type State = "idle" | "sending" | Exclude<AdminLoginResult, "ok">;
@@ -51,7 +53,10 @@ export function AdminLogin() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <main className="relative grid min-h-screen place-items-center p-4">
+      <div className="absolute top-4 right-4 rounded-lg border border-line bg-surface">
+        <ThemeToggle lang="zh-TW" />
+      </div>
       <div className="grid w-full max-w-md gap-4 rounded-2xl border border-line bg-surface p-8">
         <h1 className="text-2xl font-semibold">登入後台</h1>
         <p className="text-sm leading-relaxed text-muted">

@@ -8,6 +8,8 @@ import { applyEvent, hydrate } from "@/realtime/reducer";
 import { RealtimeSnapshot } from "@/realtime/snapshot";
 import { parseEvent } from "@autora/event-schema";
 
+import { ConnectionBadge } from "@/features/admin-ui/ConnectionBadge";
+
 import { DashboardView } from "./DashboardView";
 import { dashboardModel, formatMoney, type KpisData } from "./model";
 
@@ -123,7 +125,6 @@ describe("dashboard view", () => {
     expect(within(screen.getByTestId("tasks")).getByText(String(model.tasks.active))).toBeTruthy();
     expect(within(screen.getByTestId("published")).getByText("3")).toBeTruthy();
     expect(within(screen.getByTestId("goal")).getByText("發布 3 篇雙語文章")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("即時");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -131,7 +132,9 @@ describe("dashboard view", () => {
     const now = new Date();
     const offline = { status: "offline" as const, serverOffsetMs: 0, lastEventAt: now.getTime() - 30_000 };
     render(<DashboardView companyId="c1" companyName="Echo Demo" model={dashboardModel(company(), kpis, offline, now)} />);
-    expect(screen.getByRole("status").textContent).toContain("資料可能已過期 30 秒");
+    expect(render(<ConnectionBadge connection={dashboardModel(company(), kpis, offline, now).connection} />).getByRole("status").textContent).toContain(
+      "資料可能已過期 30 秒",
+    );
     expect(screen.getByRole("alert").textContent).toContain("畫面保留最後的狀態");
     expect(within(screen.getByTestId("cash")).getByText("US$103.00")).toBeTruthy();
   });

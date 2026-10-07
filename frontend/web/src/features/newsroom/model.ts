@@ -43,16 +43,6 @@ export const CLAIM_TYPE: Record<string, string> = {
 
 export const SUPPORT: Record<string, string> = { supports: "支持", contradicts: "反駁", context: "背景" };
 
-export const TONE_BADGE: Record<Tone, string> = {
-  neutral: "bg-canvas text-muted",
-  think: "bg-canvas text-ink",
-  work: "bg-canvas text-accent",
-  review: "bg-canvas text-warn",
-  ok: "bg-canvas text-ok",
-  warn: "bg-canvas text-warn",
-  danger: "bg-danger-soft text-danger",
-};
-
 export function label(table: Record<string, [string, Tone]>, value: string): [string, Tone] {
   return table[value] ?? [value, "neutral"];
 }

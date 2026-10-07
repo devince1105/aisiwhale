@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import {
@@ -12,10 +11,9 @@ import {
   queryKeys,
   restartWorkflow,
 } from "@/api/queries";
-import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
-import { ConnectionBadge } from "@/features/dashboard/DashboardView";
-import { connectionModel } from "@/features/dashboard/model";
 import { useNow } from "@/hooks/useNow";
 import type { AgentState } from "@/realtime/reducer";
 import { useRealtime } from "@/stores/realtime";
@@ -50,19 +48,8 @@ function CompanyApprovals({ company }: { company: Company }) {
   const agents = current?.agents ?? NO_AGENTS;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs tracking-widest text-muted uppercase">Approvals</p>
-          <h1 className="mt-1 text-2xl font-semibold">{company.name} 的審批收件匣</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link href={withCompany("/admin/dashboard", company.id)} className="text-sm text-accent underline">
-            Dashboard
-          </Link>
-          <ConnectionBadge connection={connectionModel(connection, current !== null, now)} />
-        </div>
-      </header>
+    <AdminPage width="read">
+      <PageHeader title={`${company.name} 的審批收件匣`} />
       <ApprovalInbox
         state={state}
         onState={setState}
@@ -88,7 +75,7 @@ function CompanyApprovals({ company }: { company: Company }) {
           return result;
         }}
       />
-    </main>
+    </AdminPage>
   );
 }
 

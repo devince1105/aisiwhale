@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { Schemas } from "@/api/client";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { TONE_DOT } from "@/events/describe";
 
 import type { Row, Trace, TraceSummary } from "./model";
@@ -100,10 +101,9 @@ export function TraceView({
   loadBlob: (seq: number) => Promise<unknown>;
 }) {
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
-      <p className="text-xs tracking-widest text-muted uppercase">Trace</p>
-      <h1 className="mt-1 text-2xl font-semibold break-words">{taskName ?? trace.task_id}</h1>
-      <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+    <AdminPage width="read">
+      <PageHeader title={taskName ?? trace.task_id} crumbs={[{ label: "執行軌跡" }]} />
+      <p className="-mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
         <span>第 {trace.attempt} 次嘗試</span>
         <span>狀態 {trace.state}</span>
         <span className="tabular-nums">US${Number(trace.cost_usd).toFixed(4)}</span>
@@ -128,7 +128,7 @@ export function TraceView({
       ) : (
         <p className="mt-6 text-muted">這次執行還沒有任何事件。</p>
       )}
-    </main>
+    </AdminPage>
   );
 }
 
@@ -136,10 +136,9 @@ type TaskOut = Schemas["TaskDetailOut"];
 
 export function TaskView({ task }: { task: TaskOut }) {
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
-      <p className="text-xs tracking-widest text-muted uppercase">Task</p>
-      <h1 className="mt-1 text-2xl font-semibold break-words">{task.display_name}</h1>
-      <p className="mt-2 flex flex-wrap gap-x-4 text-sm text-muted">
+    <AdminPage width="read">
+      <PageHeader title={task.display_name} crumbs={[{ label: "任務" }]} />
+      <p className="-mt-4 flex flex-wrap gap-x-4 text-sm text-muted">
         <span>{task.name}</span>
         <span>角色 {task.required_role}</span>
         <span>狀態 {task.state}</span>
@@ -175,6 +174,6 @@ export function TaskView({ task }: { task: TaskOut }) {
           <Raw value={task.output} />
         </>
       ) : null}
-    </main>
+    </AdminPage>
   );
 }

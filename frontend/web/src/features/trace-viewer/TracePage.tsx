@@ -18,7 +18,7 @@ async function loadBlob(runId: string, seq: number): Promise<unknown> {
   );
 }
 
-const message = (text: string) => <p className="mx-auto max-w-4xl px-4 pt-8">{text}</p>;
+const message = (text: string) => <p className="mx-auto max-w-5xl px-4 pt-8 md:px-6">{text}</p>;
 
 /** /trace/[runId]: the run's real events and steps. Stays live through the company stream. */
 export function TracePage({ runId }: { runId: string }) {

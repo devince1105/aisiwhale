@@ -3,6 +3,7 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 
 import { cyclesQuery } from "@/api/queries";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 
 import { CyclesView } from "./CyclesView";
@@ -19,9 +20,9 @@ export function CyclesPage() {
 function CompanyCycles({ company }: { company: Company }) {
   const { data } = useSuspenseQuery(cyclesQuery(company.id));
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold">營運週期</h1>
+    <AdminPage width="read">
+      <PageHeader title={`${company.name} 的營運週期`} />
       <CyclesView cycles={data} />
-    </main>
+    </AdminPage>
   );
 }

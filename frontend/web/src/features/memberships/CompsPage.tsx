@@ -4,11 +4,15 @@
 // ending one. A comp is not a sale — no order, payment or revenue — and ending one only takes
 // away what the comp gave; the server works out what is left. Nothing here decides access.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useState } from "react";
 
 import { compsQuery, grantComp, revokeComp, type Comp } from "@/api/queries";
-import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
+import { Button } from "@/features/admin-ui/Button";
+import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
+import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 
 const DAY = 24 * 60 * 60 * 1000;
 const REASON_MAX = 500;
@@ -46,17 +50,11 @@ function CompanyComps({ company }: { company: Company }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["memberships", "comps", company.slug] });
 
   return (
-    <main className="mx-auto max-w-5xl px-4 pt-8 pb-12">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs tracking-widest text-muted uppercase">Memberships</p>
-          <h1 className="mt-1 text-2xl font-semibold">{company.name} 的 VIP 授予</h1>
-          <p className="mt-1 text-sm text-muted">內部測試用（D-228）：不建立訂單、付款或營收，結帳仍關閉。</p>
-        </div>
-        <Link href={withCompany("/admin/dashboard", company.id)} className="text-sm text-accent underline">
-          Dashboard
-        </Link>
-      </header>
+    <AdminPage>
+      <PageHeader
+        title={`${company.name} 的 VIP 授予`}
+        description="內部測試用（D-228）：不建立訂單、付款或營收，結帳仍關閉。"
+      />
 
       <GrantForm companySlug={company.slug} onDone={refresh} />
 
@@ -67,13 +65,9 @@ function CompanyComps({ company }: { company: Company }) {
           只看有效中
         </label>
       </div>
-      {comps.error ? (
-        <p role="alert" className="mb-3 text-danger">
-          無法載入：{comps.error.message}
-        </p>
-      ) : null}
+      {comps.error ? <ErrorState>無法載入：{comps.error.message}</ErrorState> : null}
       <CompsTable comps={comps.data} onRevoked={refresh} />
-    </main>
+    </AdminPage>
   );
 }
 
@@ -132,13 +126,9 @@ function GrantForm({ companySlug, onDone }: { companySlug: string; onDone: () =>
           className="rounded border border-line bg-canvas px-2 py-1"
         />
       </label>
-      <button
-        type="submit"
-        disabled={grant.isPending || !email.trim() || !reason.trim()}
-        className="rounded bg-accent px-3 py-1.5 font-medium text-canvas disabled:opacity-50"
-      >
+      <Button type="submit" variant="primary" disabled={grant.isPending || !email.trim() || !reason.trim()}>
         授予 VIP
-      </button>
+      </Button>
       {grant.isError ? (
         <p role="alert" className="w-full text-sm text-danger">
           沒有授予：{grant.error.message}
@@ -154,8 +144,8 @@ function GrantForm({ companySlug, onDone }: { companySlug: string; onDone: () =>
 }
 
 export function CompsTable({ comps, onRevoked }: { comps: Comp[] | undefined; onRevoked: () => unknown }) {
-  if (comps === undefined) return <p className="text-muted">載入中…</p>;
-  if (comps.length === 0) return <p className="text-muted">沒有授予紀錄。</p>;
+  if (comps === undefined) return <LoadingState />;
+  if (comps.length === 0) return <EmptyState>沒有授予紀錄。</EmptyState>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-sm">
@@ -179,11 +169,12 @@ export function CompsTable({ comps, onRevoked }: { comps: Comp[] | undefined; on
   );
 }
 
+const STATUS_TONE = { 有效中: "ok", 已撤銷: "danger", 已到期: "neutral" } as const;
+
 function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) {
   const [asking, setAsking] = useState(false);
-  const [reason, setReason] = useState("");
   const revoke = useMutation({
-    mutationFn: () => revokeComp(comp.id, reason.trim()),
+    mutationFn: (reason: string) => revokeComp(comp.id, reason),
     onSuccess: async () => {
       setAsking(false);
       await onRevoked();
@@ -194,7 +185,7 @@ function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) 
     <tr className="border-t border-line align-top" data-testid={`comp-${comp.id}`}>
       <td className="py-2 pr-3 break-all">{comp.email ?? "（讀者已不存在）"}</td>
       <td className="py-2 pr-3 whitespace-nowrap">
-        <span className={status === "有效中" ? "text-accent" : "text-muted"}>{status}</span>
+        <StatusLozenge tone={STATUS_TONE[status]}>{status}</StatusLozenge>
       </td>
       <td className="py-2 pr-3 whitespace-nowrap">
         {when(comp.started_at)} – {when(comp.expires_at)}
@@ -209,47 +200,23 @@ function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) 
         {comp.revoked_by ? <div>撤銷：{actorOf(comp.revoked_by)}</div> : null}
       </td>
       <td className="py-2 text-right">
-        {comp.running && !asking ? (
-          <button type="button" onClick={() => setAsking(true)} className="rounded border border-line px-2 py-1">
+        {comp.running ? (
+          <Button size="sm" onClick={() => setAsking(true)}>
             撤銷
-          </button>
+          </Button>
         ) : null}
         {asking ? (
-          <form
-            aria-label="撤銷 VIP"
-            className="grid gap-1"
-            onSubmit={(e) => {
-              e.preventDefault();
-              revoke.mutate();
-            }}
+          <ConfirmDialog
+            title={`撤銷 ${comp.email ?? "這位讀者"} 的 VIP？`}
+            confirmLabel="確認撤銷"
+            reason={{ placeholder: "撤銷理由（必填）", maxLength: REASON_MAX }}
+            busy={revoke.isPending}
+            error={revoke.isError ? `沒有撤銷：${revoke.error.message}` : null}
+            onConfirm={(reason) => revoke.mutate(reason)}
+            onCancel={() => setAsking(false)}
           >
-            <input
-              required
-              autoFocus
-              maxLength={REASON_MAX}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="撤銷理由（必填）"
-              className="rounded border border-line bg-canvas px-2 py-1"
-            />
-            <span className="flex justify-end gap-2">
-              <button type="button" onClick={() => setAsking(false)} className="text-muted underline">
-                取消
-              </button>
-              <button
-                type="submit"
-                disabled={revoke.isPending || !reason.trim()}
-                className="rounded bg-danger px-2 py-1 text-canvas disabled:opacity-50"
-              >
-                確認撤銷
-              </button>
-            </span>
-            {revoke.isError ? (
-              <span role="alert" className="text-xs text-danger">
-                沒有撤銷：{revoke.error.message}
-              </span>
-            ) : null}
-          </form>
+            只結束這筆授予給的 VIP；讀者自己付費的部分不受影響。
+          </ConfirmDialog>
         ) : null}
       </td>
     </tr>

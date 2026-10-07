@@ -5,8 +5,10 @@ import { useState, type FormEvent } from "react";
 
 import type { NewSource } from "@/api/queries";
 
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+
 import { formatTime, type SourceView } from "./model";
-import { Badge, Empty } from "./parts";
+import { Empty } from "./parts";
 
 const KINDS: Record<string, string> = {
   rss: "RSS / Atom",
@@ -23,7 +25,7 @@ export function SourcesView({ sources }: { sources: readonly SourceView[] | unde
     <ul className="divide-y divide-line rounded border border-line bg-surface text-sm">
       {sources.map((source) => (
         <li key={source.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-          <Badge text={source.status === "active" ? "啟用" : "暫停"} tone={source.status === "active" ? "ok" : "warn"} />
+          <StatusLozenge tone={source.status === "active" ? "ok" : "warn"}>{source.status === "active" ? "啟用" : "暫停"}</StatusLozenge>
           <span className="font-medium">{source.name}</span>
           <span className="text-muted">{KINDS[source.kind] ?? source.kind}</span>
           <span className="truncate text-muted">{source.url ?? String(source.config.query ?? "")}</span>

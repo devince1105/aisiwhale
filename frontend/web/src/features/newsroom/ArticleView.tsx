@@ -8,8 +8,13 @@ import { Fragment, useState, type ReactNode } from "react";
 
 import { isSection, SECTIONS, words, type Section as SiteSection } from "@/features/site/i18n";
 
+import { Button } from "@/features/admin-ui/Button";
+import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+
 import { ARTICLE_STATE, claimNumbers, formatTime, label, orderedClaims, problems, type ArticleDetail } from "./model";
-import { Badge, ClaimList, Empty, EventList, NewsroomHeader, Section } from "./parts";
+import { ClaimList, Empty, EventList, Section } from "./parts";
 
 const CHANNEL: Record<string, string> = { site: "網站", social_draft: "社群貼文（草稿，未發出）" };
 
@@ -30,6 +35,7 @@ const REVISING = new Set(["DRAFT", "IN_REVIEW", "APPROVED"]);
 
 function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
   const [note, setNote] = useState("");
+  const [askingDown, setAskingDown] = useState(false);
   const { state } = article;
   const published = Boolean(article.published_at);
   if (published && REVISING.has(state)) {
@@ -59,34 +65,32 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
         />
       </label>
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={onSite.busy || !said}
-          onClick={() => onSite.revise(said)}
-          className="rounded-lg bg-accent px-4 py-1.5 text-canvas disabled:opacity-50"
-        >
+        <Button variant="primary" disabled={onSite.busy || !said} onClick={() => onSite.revise(said)}>
           修改文章
-        </button>
+        </Button>
         {state === "PUBLISHED" ? (
-          <button
-            type="button"
-            disabled={onSite.busy || !said}
-            onClick={() => onSite.unpublish(said)}
-            className="rounded-lg border border-danger-line px-4 py-1.5 text-danger disabled:opacity-50"
-          >
+          <Button variant="danger" disabled={onSite.busy || !said} onClick={() => setAskingDown(true)}>
             下架
-          </button>
+          </Button>
         ) : (
-          <button
-            type="button"
-            disabled={onSite.busy}
-            onClick={() => onSite.republish()}
-            className="rounded-lg border border-line px-4 py-1.5 disabled:opacity-50"
-          >
+          <Button disabled={onSite.busy} onClick={() => onSite.republish()}>
             重新上架
-          </button>
+          </Button>
         )}
       </div>
+      {askingDown ? (
+        <ConfirmDialog
+          title="下架這篇文章？"
+          confirmLabel="確定下架"
+          onConfirm={() => {
+            setAskingDown(false);
+            onSite.unpublish(said);
+          }}
+          onCancel={() => setAskingDown(false)}
+        >
+          網站上將看不到這篇，之後可以重新上架。說明：{said}
+        </ConfirmDialog>
+      ) : null}
       {onSite.error ? (
         <p role="alert" className="mt-2 text-danger">
           {onSite.error}
@@ -190,10 +194,10 @@ export function ArticleView({
   const href = `/admin/newsroom/articles/${article.id}`;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
-      <NewsroomHeader companyId={article.company_id} current="articles" eyebrow="Article" title={article.title}>
+    <AdminPage width="read">
+      <PageHeader title={article.title}>
         <p className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-          <Badge text={state} tone={tone} />
+          <StatusLozenge tone={tone}>{state}</StatusLozenge>
           <Link href={`/admin/newsroom/stories/${article.story_id}`} className="text-accent underline">
             題材：{article.story_title}
           </Link>
@@ -205,7 +209,7 @@ export function ArticleView({
           ))}
           {article.published_at ? <span className="text-muted">發布於 {formatTime(article.published_at)}</span> : null}
         </p>
-      </NewsroomHeader>
+      </PageHeader>
 
       {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
       {onSite?.setSection ? <SectionControl article={article} onSite={onSite} /> : null}
@@ -294,7 +298,7 @@ export function ArticleView({
             {article.fact_checks.map((report) => (
               <li key={report.id} className="rounded border border-line bg-surface p-3 text-sm">
                 <p className="flex flex-wrap items-center gap-2">
-                  <Badge text={report.passed ? "通過" : "未通過"} tone={report.passed ? "ok" : "danger"} />
+                  <StatusLozenge tone={report.passed ? "ok" : "danger"}>{report.passed ? "通過" : "未通過"}</StatusLozenge>
                   <span>v{report.version ?? "?"}</span>
                   <span className="text-muted">
                     {report.checked - report.failed}/{report.checked} 則主張通過・{formatTime(report.created_at)}
@@ -379,6 +383,6 @@ export function ArticleView({
       <Section id="timeline" title="時間軸">
         <EventList events={events} />
       </Section>
-    </main>
+    </AdminPage>
   );
 }

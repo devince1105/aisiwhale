@@ -6,6 +6,9 @@ import { useState, type FormEvent } from "react";
 
 import type { Schemas } from "@/api/client";
 import type { AgentAction, NewAgent } from "@/api/queries";
+import { Button } from "@/features/admin-ui/Button";
+import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
 import { Face } from "@/features/agent-panel/Face";
 import { ROLE_LABEL, STATE_LABEL } from "@/features/agent-panel/model";
 import type { ActivityState } from "@/realtime/snapshot";
@@ -39,12 +42,13 @@ export function AgentsView({
     }
   }
 
-  if (!agents) return <p className="text-sm text-muted">載入中…</p>;
-  if (agents.length === 0) return <p className="text-sm text-muted">這間公司還沒有代理。</p>;
+  if (!agents) return <LoadingState />;
+  if (agents.length === 0) return <EmptyState>這間公司還沒有代理。</EmptyState>;
+  const leaving = agents.find((agent) => agent.id === confirming);
   return (
     <>
-      {error ? <p className="mb-2 text-sm text-danger">{error}</p> : null}
-      <ul className="divide-y divide-line rounded border border-line bg-surface text-sm">
+      {error ? <ErrorState>{error}</ErrorState> : null}
+      <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
         {agents.map((agent) => (
           <li key={agent.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <Face name={agent.display_name} role={agent.role} avatarKey={agent.avatar_key} size={28} />
@@ -55,43 +59,31 @@ export function AgentsView({
               {STATUS_LABEL[agent.status] ?? agent.status}
               {agent.activity ? `・${STATE_LABEL[agent.activity.state as ActivityState] ?? agent.activity.state}` : ""}
             </span>
-            {confirming === agent.id ? (
-              <>
-                <span className="text-xs">確定讓 {personName(agent.display_name)} 離職？不能復職。</span>
-                <button
-                  type="button"
-                  disabled={busy === agent.id}
-                  onClick={() => decide(agent.id, "retire")}
-                  className="rounded border border-danger-line bg-danger-soft px-2 py-0.5 text-xs text-danger disabled:opacity-50"
-                >
-                  確定解雇
-                </button>
-                <button type="button" onClick={() => setConfirming(null)} className="text-xs text-muted underline">
-                  取消
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={busy === agent.id}
-                  onClick={() => decide(agent.id, agent.status === "paused" ? "resume" : "pause")}
-                  className="rounded border border-line px-2 py-0.5 text-xs disabled:opacity-50"
-                >
-                  {agent.status === "paused" ? "恢復工作" : "暫停"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(agent.id)}
-                  className="rounded border border-line px-2 py-0.5 text-xs text-muted"
-                >
-                  解雇
-                </button>
-              </>
-            )}
+            <Button
+              size="sm"
+              disabled={busy === agent.id}
+              onClick={() => decide(agent.id, agent.status === "paused" ? "resume" : "pause")}
+            >
+              {agent.status === "paused" ? "恢復工作" : "暫停"}
+            </Button>
+            <Button size="sm" variant="subtle" onClick={() => setConfirming(agent.id)}>
+              解雇
+            </Button>
           </li>
         ))}
       </ul>
+      {leaving ? (
+        <ConfirmDialog
+          title={`確定讓 ${personName(leaving.display_name)} 離職？`}
+          confirmLabel="確定解雇"
+          busy={busy === leaving.id}
+          error={error}
+          onConfirm={() => decide(leaving.id, "retire")}
+          onCancel={() => setConfirming(null)}
+        >
+          不能復職。
+        </ConfirmDialog>
+      ) : null}
     </>
   );
 }

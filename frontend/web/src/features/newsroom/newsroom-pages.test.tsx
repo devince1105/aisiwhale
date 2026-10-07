@@ -16,7 +16,7 @@ import { AddSourceForm, SourcesView, sourceConfig } from "./SourcesView";
 import { StoriesView } from "./StoriesView";
 import { StoryView } from "./StoryView";
 
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/admin/newsroom/articles/a1", useSearchParams: () => new URLSearchParams() }));
 afterEach(cleanup);
 
 const C = "0192c000-0000-7000-8000-000000000001";
@@ -173,14 +173,22 @@ describe("taking an article off the site (D-044)", () => {
     expect(box().getByRole("option", { name: "自動（AI 科技）" })).toBeTruthy();
   });
 
-  it("a published article comes down only with a reason", () => {
+  it("a published article comes down only with a reason, and after asking (AD-01)", () => {
     const controls = onSite();
     render(<ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED" }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />);
     const down = within(screen.getByTestId("site-controls")).getByRole("button", { name: "下架" }) as HTMLButtonElement;
     expect(down.disabled).toBe(true);
     fireEvent.change(within(screen.getByTestId("site-controls")).getByRole("textbox"), { target: { value: "用字要改" } });
     fireEvent.click(down);
+    expect(controls.unpublish).not.toHaveBeenCalled();
+    const ask = screen.getByRole("dialog", { name: "下架這篇文章？" });
+    expect(ask.textContent).toContain("說明：用字要改");
+    fireEvent.click(within(ask).getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(down);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "確定下架" }));
     expect(controls.unpublish).toHaveBeenCalledWith("用字要改");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("one that was taken down says so and can go back up", () => {
@@ -316,7 +324,8 @@ describe("a story", () => {
     expect(screen.getByText("還沒有開始製作。")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "開始製作" }));
     expect(onStart).toHaveBeenCalledOnce();
-    expect(screen.getByRole("link", { name: "文章" }).getAttribute("href")).toBe(`/admin/newsroom/articles?company=${C}`);
+    // the sections are in the shell's sidebar now (AD-02); the way back keeps the company
+    expect(screen.getByRole("link", { name: "← 所有題材" }).getAttribute("href")).toBe(`/admin/newsroom/stories?company=${C}`);
   });
 
   it("cannot be started twice, and says why a start failed", () => {

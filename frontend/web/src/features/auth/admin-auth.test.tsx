@@ -22,6 +22,9 @@ import { TokenGate } from "./TokenGate";
 const calls: { url: string; init: RequestInit }[] = [];
 function answer(status: number, body: unknown = null) {
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+    // the shell's own requests (its company list, its approvals count): nothing there
+    const target: unknown = url;
+    if (!(target instanceof Request ? target.url : String(target)).includes("/api/admin/")) return new Response("[]", { status: 200 });
     calls.push({ url, init });
     return new Response(body === null ? null : JSON.stringify(body), { status });
   });

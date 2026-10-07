@@ -1,7 +1,9 @@
 // The newsroom's stories (T-517): what the sources brought, clustered; what is being made of them.
 import Link from "next/link";
 
-import { Badge, Empty } from "./parts";
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+
+import { Empty } from "./parts";
 import { formatTime, label, STORY_STATE, type StorySummary } from "./model";
 
 export const STORY_FILTERS = ["ALL", "DISCOVERED", "SELECTED", "IN_PRODUCTION", "PUBLISHED", "DROPPED"] as const;
@@ -41,7 +43,7 @@ export function StoriesView({
             const [state, tone] = label(STORY_STATE, story.state);
             return (
               <li key={story.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <Badge text={state} tone={tone} />
+                <StatusLozenge tone={tone}>{state}</StatusLozenge>
                 <Link href={`/admin/newsroom/stories/${story.id}`} className="font-medium hover:text-accent">
                   {story.title}
                 </Link>

@@ -46,7 +46,7 @@ function CompanyDashboard({ company }: { company: Company }) {
       />
       <ProjectsPanel companyId={company.id} />
       <FinancePanel companyId={company.id} />
-      <section className="mx-auto max-w-6xl px-4 pb-12" aria-labelledby="agents-heading">
+      <section className="mx-auto max-w-7xl px-4 md:px-6 pb-12" aria-labelledby="agents-heading">
         <h2 id="agents-heading" className="mb-3 text-lg font-semibold">
           代理
         </h2>

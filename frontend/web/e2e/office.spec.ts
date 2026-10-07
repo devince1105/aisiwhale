@@ -218,8 +218,9 @@ test("the 2D office turns the whole page into a terminal; 3D gives it back", asy
 
   await views.getByRole("button", { name: "2D", exact: true }).click();
   await expect(shell).toHaveAttribute("data-terminal", "true");
-  // the page's own chrome wears the console's colours, not only the board
-  const header = page.locator("header").first();
+  // the office's own chrome wears the console's colours, not only the board; the back office's
+  // sidebar and top bar around it (AD-02) keep the site's theme
+  const header = shell.locator("header").first();
   await expect(header).toHaveCSS("border-bottom-color", "rgb(29, 63, 53)");
 
   await views.getByRole("button", { name: "3D", exact: true }).click();

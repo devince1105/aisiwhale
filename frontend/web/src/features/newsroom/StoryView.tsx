@@ -5,8 +5,12 @@ import Link from "next/link";
 
 import { withCompany } from "@/features/company/CompanyScope";
 
+import { Button } from "@/features/admin-ui/Button";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+
 import { ARTICLE_STATE, formatTime, label, STORY_STATE, type StoryDetail } from "./model";
-import { Badge, ClaimList, Empty, EventList, NewsroomHeader, Section } from "./parts";
+import { ClaimList, Empty, EventList, Section } from "./parts";
 
 const STARTABLE = new Set(["DISCOVERED", "SELECTED"]);
 
@@ -25,10 +29,19 @@ export function StoryView({
 }) {
   const [state, tone] = label(STORY_STATE, story.state);
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-12">
-      <NewsroomHeader companyId={story.company_id} current="stories" eyebrow="Story" title={story.title}>
+    <AdminPage width="read">
+      <PageHeader
+        title={story.title}
+        actions={
+          STARTABLE.has(story.state) ? (
+            <Button variant="primary" onClick={onStart} disabled={starting}>
+              {starting ? "啟動中…" : "開始製作"}
+            </Button>
+          ) : null
+        }
+      >
         <p className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-          <Badge text={state} tone={tone} />
+          <StatusLozenge tone={tone}>{state}</StatusLozenge>
           <span className="text-muted">
             分數 {Math.round(Number(story.score) * 100)}・{story.sources} 個來源・首次出現 {formatTime(story.first_seen_at)}
           </span>
@@ -37,19 +50,10 @@ export function StoryView({
               文章（{label(ARTICLE_STATE, story.article.state)[0]}）
             </Link>
           ) : null}
-          {STARTABLE.has(story.state) ? (
-            <button
-              onClick={onStart}
-              disabled={starting}
-              className="rounded bg-accent px-3 py-1 text-accent-ink disabled:opacity-50"
-            >
-              {starting ? "啟動中…" : "開始製作"}
-            </button>
-          ) : null}
         </p>
         {startError ? <p className="mt-2 text-sm text-danger">{startError}</p> : null}
         {story.summary ? <p className="mt-3 text-muted">{story.summary}</p> : null}
-      </NewsroomHeader>
+      </PageHeader>
 
       <Section id="sources" title={`線索（${story.leads.length}）`}>
         {story.leads.length === 0 ? (
@@ -106,6 +110,6 @@ export function StoryView({
           ← 所有題材
         </Link>
       </p>
-    </main>
+    </AdminPage>
   );
 }

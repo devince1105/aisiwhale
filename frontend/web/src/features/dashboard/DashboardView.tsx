@@ -1,45 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { buttonClass } from "@/features/admin-ui/Button";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { withCompany } from "@/features/company/CompanyScope";
 import { STAGE_LABEL } from "@/features/cycles/model";
 
 import { formatMoney, type DashboardModel, type RevenueModel } from "./model";
-
-const CONNECTION_LABEL: Record<DashboardModel["connection"]["status"], string> = {
-  idle: "未連線",
-  connecting: "連線中",
-  live: "即時",
-  reconnecting: "重新連線中",
-  offline: "離線",
-  unauthorized: "權杖無效",
-  not_found: "找不到公司",
-};
-
-const DOT: Record<DashboardModel["connection"]["status"], string> = {
-  idle: "bg-neutral",
-  connecting: "bg-warn",
-  live: "bg-ok",
-  reconnecting: "bg-warn",
-  offline: "bg-danger",
-  unauthorized: "bg-danger",
-  not_found: "bg-danger",
-};
-
-export function ConnectionBadge({ connection }: { connection: DashboardModel["connection"] }) {
-  const stale = connection.staleSeconds;
-  return (
-    <span
-      role="status"
-      data-status={connection.status}
-      className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-sm text-muted"
-    >
-      <span aria-hidden className={`size-2 rounded-full ${DOT[connection.status]}`} />
-      {CONNECTION_LABEL[connection.status]}
-      {stale !== null && connection.status !== "live" ? `・資料可能已過期 ${stale} 秒` : null}
-    </span>
-  );
-}
 
 /** The progress line under 今日目標: the plan's numbers, and which stage the day is in. */
 function goalDetail(goal: NonNullable<DashboardModel["goal"]>, stage: string | null): string {
@@ -206,46 +173,22 @@ export function DashboardView({
 }) {
   const { money, agents, tasks, goal } = model;
   return (
-    <main className="mx-auto max-w-6xl px-4 pt-8 pb-12">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs tracking-widest text-muted uppercase">Dashboard</p>
-          <h1 className="mt-1 text-2xl font-semibold">{companyName}</h1>
-        </div>
-        <div className="flex items-center gap-4">
+    <AdminPage>
+      <PageHeader
+        title={companyName}
+        actions={
           <Link
             href={withCompany("/admin/approvals", companyId)}
-            className="text-sm text-accent underline"
+            className={buttonClass()}
             data-testid="pending-approvals"
           >
             審批收件匣
             {pendingApprovals ? (
-              <span className="ml-1 rounded-full bg-warn px-1.5 text-xs font-medium text-canvas no-underline">
-                {pendingApprovals}
-              </span>
+              <span className="rounded-full bg-warn px-1.5 text-xs font-medium text-canvas">{pendingApprovals}</span>
             ) : null}
           </Link>
-          <Link href={withCompany("/admin/office", companyId)} className="text-sm text-accent underline">
-            辦公室
-          </Link>
-          <Link href={withCompany("/admin/newsroom/articles", companyId)} className="text-sm text-accent underline">
-            新聞室
-          </Link>
-          <Link href={withCompany("/admin/agents", companyId)} className="text-sm text-accent underline">
-            代理
-          </Link>
-          <Link href={withCompany("/admin/cycles", companyId)} className="text-sm text-accent underline">
-            每日週期
-          </Link>
-          <Link href={withCompany("/admin/timeline", companyId)} className="text-sm text-accent underline">
-            事件時間軸
-          </Link>
-          <Link href={withCompany("/admin/memberships", companyId)} className="text-sm text-accent underline">
-            VIP 授予
-          </Link>
-          <ConnectionBadge connection={model.connection} />
-        </div>
-      </header>
+        }
+      />
 
       {model.connection.status === "offline" ? (
         <p
@@ -320,6 +263,6 @@ export function DashboardView({
       </div>
 
       <RevenueSection revenue={model.revenue} />
-    </main>
+    </AdminPage>
   );
 }

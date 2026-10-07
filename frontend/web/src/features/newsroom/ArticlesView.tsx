@@ -1,8 +1,10 @@
 // The newsroom's articles (T-517): drafts, in review, published.
 import Link from "next/link";
 
+import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+
 import { ARTICLE_STATE, formatTime, label, type ArticleSummary } from "./model";
-import { Badge, Empty } from "./parts";
+import { Empty } from "./parts";
 
 export function ArticlesView({ articles }: { articles: readonly ArticleSummary[] | undefined }) {
   if (!articles) return <Empty>載入中…</Empty>;
@@ -25,7 +27,7 @@ export function ArticlesView({ articles }: { articles: readonly ArticleSummary[]
           return (
             <tr key={article.id}>
               <td className="px-3 py-2">
-                <Badge text={state} tone={tone} />
+                <StatusLozenge tone={tone}>{state}</StatusLozenge>
               </td>
               <td className="px-3 py-2">
                 <Link href={`/admin/newsroom/articles/${article.id}`} className="font-medium hover:text-accent">

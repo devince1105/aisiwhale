@@ -2,15 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { approvalsQuery, kpisQuery, officeHoursQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
 import { AgentPanel } from "@/features/agent-panel/AgentPanel";
-import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
+import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
-import { ConnectionBadge } from "@/features/dashboard/DashboardView";
-import { connectionModel, dashboardModel } from "@/features/dashboard/model";
+import { dashboardModel } from "@/features/dashboard/model";
 import { useNow } from "@/hooks/useNow";
 import { OfficeCanvas, terminalVars, parseView, type OfficeView, type ThemeId } from "@/office3d/OfficeCanvas";
 import { useRealtime, type RealtimeState } from "@/stores/realtime";
@@ -155,7 +153,7 @@ function CompanyOffice({ company }: { company: Company }) {
 
   return (
     <main
-      className="flex h-dvh flex-col bg-canvas text-ink"
+      className="flex h-[calc(100dvh-var(--admin-bar,0px))] flex-col bg-canvas text-ink"
       data-terminal={mode === "2d"}
       // the 2D office is a terminal; while it is on screen the page around it wears the same
       // colours, by overriding the app's own tokens here and nowhere else (D-007)
@@ -197,10 +195,6 @@ function CompanyOffice({ company }: { company: Company }) {
               </span>
             ) : null}
           </button>
-          <Link href={withCompany("/admin/dashboard", company.id)} className="text-sm text-accent underline">
-            Dashboard
-          </Link>
-          <ConnectionBadge connection={connectionModel(connection, realtime !== null, now)} />
         </div>
       </header>
       <MiniDashboardView model={model} pendingApprovals={pending.data?.length ?? null} />
