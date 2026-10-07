@@ -4,6 +4,7 @@
 // through the company's event stream (src/api/invalidation.ts); the views render.
 import { parseEvent, type EventEnvelope } from "@autora/event-schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -28,20 +29,24 @@ import {
   type StoryState,
 } from "@/api/queries";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { buttonClass } from "@/features/admin-ui/Button";
 import { ListToolbar, Pager, sortControl, type FilterDef } from "@/features/admin-ui/DataTable";
+import { Drawer } from "@/features/admin-ui/Dialog";
 import { ErrorState } from "@/features/admin-ui/states";
 import { useListState } from "@/features/admin-ui/useListState";
+import { usePeek } from "@/features/admin-ui/usePeek";
+import { ActivityTimeline } from "@/features/audit/ActivityTimeline";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
 import { ArticlesView } from "./ArticlesView";
-import { ArticleView } from "./ArticleView";
+import { ArticleProperties, ArticleView } from "./ArticleView";
 import type { ArticleDetail, StoryDetail } from "./model";
 import { Empty } from "./parts";
 import { AddSourceForm, SourcesView } from "./SourcesView";
 import { label, STORY_STATE } from "./model";
 import { STORY_STATES, StoriesView } from "./StoriesView";
-import { StoryView } from "./StoryView";
+import { StoryProperties, StoryView } from "./StoryView";
 import { CoverPanel, coverWatch } from "./CoverPanel";
 
 function Loading({ error }: { error: Error | null }) {
@@ -83,11 +88,18 @@ function CompanyStories({ company }: { company: Company }) {
   const list = useListState(["state"], STORY_SORTS);
   const state = (STORY_STATES as readonly string[]).includes(list.filters.state ?? "") ? (list.filters.state as StoryState) : null;
   const page = useQuery(storiesQuery(company.id, state, { q: list.q, sort: list.sort, cursor: list.cursor }));
+  const peek = usePeek();
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的題材`} />
       <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" />
-      <StoriesView stories={page.data?.items} sort={sortControl(list, STORY_SORTS, "-last_item_at")} error={page.error?.message} />
+      {peek.peek ? <StoryPeek storyId={peek.peek} onClose={peek.close} /> : null}
+      <StoriesView
+        stories={page.data?.items}
+        sort={sortControl(list, STORY_SORTS, "-last_item_at")}
+        error={page.error?.message}
+        onPeek={peek.open}
+      />
       <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
     </AdminPage>
   );
@@ -103,11 +115,18 @@ function CompanyArticles({ company }: { company: Company }) {
   useCompanyStream(company.id);
   const list = useListState([], ARTICLE_SORTS);
   const page = useQuery(articlesPageQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }));
+  const peek = usePeek();
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的文章`} />
       <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" />
-      <ArticlesView articles={page.data?.items} sort={sortControl(list, ARTICLE_SORTS, "-updated_at")} error={page.error?.message} />
+      <ArticlesView
+        articles={page.data?.items}
+        sort={sortControl(list, ARTICLE_SORTS, "-updated_at")}
+        error={page.error?.message}
+        onPeek={peek.open}
+      />
+      {peek.peek ? <ArticlePeek articleId={peek.peek} onClose={peek.close} /> : null}
       <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
     </AdminPage>
   );
@@ -143,6 +162,55 @@ function CompanySources({ company }: { company: Company }) {
   );
 }
 
+// --- peeks (AD-07): a row beside its list -----------------------------------------------------
+
+function ArticlePeek({ articleId, onClose }: { articleId: string; onClose: () => void }) {
+  const article = useQuery(articleQuery(articleId, null));
+  const text = article.data ? article.data.languages[article.data.primary_lang] : undefined;
+  return (
+    <Drawer title={article.data?.title ?? "文章"} wide onClose={onClose}>
+      <div className="grid gap-4 p-4">
+        {article.error ? <ErrorState>{article.error.message}</ErrorState> : null}
+        {article.data ? (
+          <>
+            <Link href={`/admin/newsroom/articles/${articleId}`} className={`${buttonClass("primary")} justify-self-start`}>
+              開啟完整頁面
+            </Link>
+            {text?.summary ? <p className="text-sm text-muted">{text.summary}</p> : null}
+            <ArticleProperties article={article.data} />
+            <ActivityTimeline targetType="article" targetId={articleId} />
+          </>
+        ) : (
+          <Empty>載入中…</Empty>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+
+function StoryPeek({ storyId, onClose }: { storyId: string; onClose: () => void }) {
+  const story = useQuery(storyQuery(storyId));
+  return (
+    <Drawer title={story.data?.title ?? "題材"} wide onClose={onClose}>
+      <div className="grid gap-4 p-4">
+        {story.error ? <ErrorState>{story.error.message}</ErrorState> : null}
+        {story.data ? (
+          <>
+            <Link href={`/admin/newsroom/stories/${storyId}`} className={`${buttonClass("primary")} justify-self-start`}>
+              開啟完整頁面
+            </Link>
+            {story.data.summary ? <p className="text-sm text-muted">{story.data.summary}</p> : null}
+            <StoryProperties story={story.data} />
+            <ActivityTimeline targetType="story" targetId={storyId} />
+          </>
+        ) : (
+          <Empty>載入中…</Empty>
+        )}
+      </div>
+    </Drawer>
+  );
+}
+
 // --- details ----------------------------------------------------------------------------------
 
 export function StoryPage({ storyId }: { storyId: string }) {
@@ -162,6 +230,7 @@ function LoadedStory({ story }: { story: StoryDetail }) {
   return (
     <StoryView
       story={story}
+      activity={<ActivityTimeline targetType="story" targetId={story.id} />}
       events={events}
       onStart={() => start.mutate()}
       starting={start.isPending}
@@ -203,6 +272,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending || section.isPending,
         error: (unpublish.error ?? republish.error ?? revise.error ?? access.error ?? section.error)?.message ?? null,
       }}
+      activity={<ActivityTimeline targetType="article" targetId={article.id} />}
       cover={<CoverPanel articleId={article.id} cover={article.cover} asked={article.cover_asked} />}
     />
   );

@@ -741,6 +741,18 @@ export function auditQuery(
   });
 }
 
+export type ActivityEntry = Schemas["ActivityEntry"];
+
+/** One article's, story's or approval's history (AD-07). Under "newsroom" for the newsroom's,
+ * so the events that change them refresh it too. */
+export function activityQuery(targetType: "article" | "story" | "approval", targetId: string, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: [targetType === "approval" ? "approvals" : "newsroom", "activity", targetType, targetId] as const,
+    queryFn: async () =>
+      unwrap(await api.GET("/api/admin/activity", { params: { query: { target_type: targetType, target_id: targetId } } })),
+  });
+}
+
 /** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
 export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
   return unwrap(await api.POST("/api/admin/memberships/comps", { body }));

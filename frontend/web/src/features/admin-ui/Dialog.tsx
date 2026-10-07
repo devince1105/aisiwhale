@@ -135,11 +135,14 @@ export function ConfirmDialog({
 export function Drawer({
   title,
   side = "right",
+  wide = false,
   onClose,
   children,
 }: {
   title: string;
   side?: "left" | "right";
+  /** A preview (AD-07) rather than a menu. */
+  wide?: boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -148,7 +151,7 @@ export function Drawer({
     <Modal
       onClose={onClose}
       label={title}
-      className={`${edge} my-0 h-dvh max-h-dvh w-[min(22rem,calc(100vw-3rem))] border-line p-0 shadow-xl`}
+      className={`${edge} my-0 h-dvh max-h-dvh ${wide ? "w-[min(40rem,calc(100vw-2rem))]" : "w-[min(22rem,calc(100vw-3rem))]"} border-line p-0 shadow-xl`}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">

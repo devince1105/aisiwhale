@@ -1,6 +1,117 @@
 {
  "components": {
   "schemas": {
+   "ActivityEntry": {
+    "properties": {
+     "action": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action"
+     },
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "actor_label": {
+      "title": "Actor Label",
+      "type": "string"
+     },
+     "at": {
+      "format": "date-time",
+      "title": "At",
+      "type": "string"
+     },
+     "from_state": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "From State"
+     },
+     "kind": {
+      "enum": [
+       "state",
+       "action",
+       "asked"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "route": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Route"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "subject": {
+      "title": "Subject",
+      "type": "string"
+     },
+     "subject_id": {
+      "title": "Subject Id",
+      "type": "string"
+     },
+     "to_state": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "To State"
+     }
+    },
+    "required": [
+     "at",
+     "kind",
+     "subject",
+     "subject_id",
+     "actor",
+     "actor_label"
+    ],
+    "title": "ActivityEntry",
+    "type": "object"
+   },
    "ActivityOut": {
     "properties": {
      "detail": {
@@ -9533,6 +9644,100 @@
  },
  "openapi": "3.1.0",
  "paths": {
+  "/api/admin/activity": {
+   "get": {
+    "operationId": "activity_api_admin_activity_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "target_type",
+      "required": true,
+      "schema": {
+       "enum": [
+        "article",
+        "story",
+        "approval"
+       ],
+       "title": "Target Type",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "target_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Target Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 100,
+       "maximum": 200,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ActivityEntry"
+         },
+         "title": "Response Activity Api Admin Activity Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Activity",
+    "tags": [
+     "admin-activity"
+    ]
+   }
+  },
   "/api/admin/audit": {
    "get": {
     "description": "``q`` searches the route, the action, the target's id and who (by stored id). ``failed``:\nonly refused (4xx/5xx) or only done (2xx/3xx).",

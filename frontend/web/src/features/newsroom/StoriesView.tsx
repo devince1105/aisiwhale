@@ -4,13 +4,16 @@ import Link from "next/link";
 
 import { DataTable, type Column, type SortControl } from "@/features/admin-ui/DataTable";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+import { peekClick } from "@/features/admin-ui/usePeek";
 
 import { formatTime, label, STORY_STATE, type StorySummary } from "./model";
 
 /** The states a person filters by. */
 export const STORY_STATES = ["DISCOVERED", "SELECTED", "IN_PRODUCTION", "PUBLISHED", "DROPPED"] as const;
 
-const COLUMNS: readonly Column<StorySummary>[] = [
+function columns(onPeek?: (id: string) => void): Column<StorySummary>[] {
+  return [
+
   {
     key: "state",
     header: "狀態",
@@ -25,7 +28,7 @@ const COLUMNS: readonly Column<StorySummary>[] = [
     header: "題材",
     sort: "title",
     cell: (story) => (
-      <Link href={`/admin/newsroom/stories/${story.id}`} className="font-medium hover:text-accent">
+      <Link href={`/admin/newsroom/stories/${story.id}`} onClick={peekClick(onPeek, story.id)} className="font-medium hover:text-accent">
         {story.title}
       </Link>
     ),
@@ -60,14 +63,18 @@ const COLUMNS: readonly Column<StorySummary>[] = [
     className: "whitespace-nowrap text-muted",
     cell: (story) => formatTime(story.first_seen_at),
   },
-];
+  ];
+}
 
 export function StoriesView({
   stories,
   sort,
   error = null,
+  onPeek,
 }: {
   stories: readonly StorySummary[] | undefined;
+  /** A plain click on a title opens it beside the list (AD-07). */
+  onPeek?: (id: string) => void;
   sort?: SortControl;
   error?: string | null;
 }) {
@@ -75,7 +82,7 @@ export function StoriesView({
     <DataTable
       label="題材"
       rows={stories}
-      columns={COLUMNS}
+      columns={columns(onPeek)}
       rowKey={(story) => story.id}
       sort={sort}
       error={error}

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/admin/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity */
+        get: operations["activity_api_admin_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/audit": {
         parameters: {
             query?: never;
@@ -1942,6 +1959,41 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivityEntry */
+        ActivityEntry: {
+            /** Action */
+            action?: string | null;
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Actor Label */
+            actor_label: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** From State */
+            from_state?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "state" | "action" | "asked";
+            /** Reason */
+            reason?: string | null;
+            /** Route */
+            route?: string | null;
+            /** Status */
+            status?: number | null;
+            /** Subject */
+            subject: string;
+            /** Subject Id */
+            subject_id: string;
+            /** To State */
+            to_state?: string | null;
+        };
         /** ActivityOut */
         ActivityOut: {
             /** Detail */
@@ -5515,6 +5567,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    activity_api_admin_activity_get: {
+        parameters: {
+            query: {
+                target_type: "article" | "story" | "approval";
+                target_id: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_admin_actions_api_admin_audit_get: {
         parameters: {
             query?: {

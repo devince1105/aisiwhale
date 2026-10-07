@@ -57,6 +57,7 @@ function Card({
   busy,
   onDecide,
   preview,
+  activity,
 }: {
   card: ApprovalCard;
   sent: Decision | undefined;
@@ -64,6 +65,7 @@ function Card({
   busy: boolean;
   onDecide: (decision: Decision, reason: string | null) => void;
   preview?: (card: ApprovalCard) => ReactNode;
+  activity?: (card: ApprovalCard) => ReactNode;
 }) {
   const [reason, setReason] = useState("");
   const [asking, setAsking] = useState(false);
@@ -153,6 +155,8 @@ function Card({
           </Link>
         ) : null}
       </p>
+
+      {activity ? <ActivityFold card={card} activity={activity} /> : null}
 
       {card.decision ? (
         <div className="mt-3 text-sm text-muted">
@@ -249,6 +253,8 @@ export interface ApprovalInboxProps {
   refresh: () => void;
   /** What to show for a card about an article, in place of its payload (D-046). */
   preview?: (card: ApprovalCard) => ReactNode;
+  /** The card's history, shown when its 活動 is opened (AD-07). */
+  activity?: (card: ApprovalCard) => ReactNode;
 }
 
 /**
@@ -256,7 +262,7 @@ export interface ApprovalInboxProps {
  * when the APPROVAL_* event arrives and invalidates it (refetched right away when the stream is
  * down, since no event would come).
  */
-export function ApprovalInbox({ state, onState, cards, loadError, decide, live, refresh, preview }: ApprovalInboxProps) {
+export function ApprovalInbox({ state, onState, cards, loadError, decide, live, refresh, preview, activity }: ApprovalInboxProps) {
   const [sent, setSent] = useState<Record<string, Decision>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -319,6 +325,7 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
               busy={busy === card.id}
               onDecide={(decision, reason) => onDecide(card.id, decision, reason)}
               preview={preview}
+              activity={activity}
             />
           ))}
         </ul>
@@ -326,5 +333,16 @@ export function ApprovalInbox({ state, onState, cards, loadError, decide, live, 
         <p className="text-muted">{state === "PENDING" ? "目前沒有等待審批的項目。" : "沒有資料。"}</p>
       )}
     </>
+  );
+}
+
+/** 活動, folded: asked for only when someone opens it. */
+function ActivityFold({ card, activity }: { card: ApprovalCard; activity: (card: ApprovalCard) => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details className="mt-2" onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-xs text-accent">活動</summary>
+      {open ? <div className="mt-2">{activity(card)}</div> : null}
+    </details>
   );
 }

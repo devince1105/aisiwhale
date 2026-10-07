@@ -3,10 +3,13 @@ import Link from "next/link";
 
 import { DataTable, type Column, type SortControl } from "@/features/admin-ui/DataTable";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+import { peekClick } from "@/features/admin-ui/usePeek";
 
 import { ARTICLE_STATE, formatTime, label, type ArticleSummary } from "./model";
 
-const COLUMNS: readonly Column<ArticleSummary>[] = [
+function columns(onPeek?: (id: string) => void): Column<ArticleSummary>[] {
+  return [
+
   {
     key: "state",
     header: "狀態",
@@ -21,7 +24,7 @@ const COLUMNS: readonly Column<ArticleSummary>[] = [
     header: "標題",
     sort: "title",
     cell: (article) => (
-      <Link href={`/admin/newsroom/articles/${article.id}`} className="font-medium hover:text-accent">
+      <Link href={`/admin/newsroom/articles/${article.id}`} onClick={peekClick(onPeek, article.id)} className="font-medium hover:text-accent">
         {article.title}
       </Link>
     ),
@@ -46,14 +49,18 @@ const COLUMNS: readonly Column<ArticleSummary>[] = [
     className: "whitespace-nowrap text-muted",
     cell: (article) => formatTime(article.updated_at),
   },
-];
+  ];
+}
 
 export function ArticlesView({
   articles,
   sort,
   error = null,
+  onPeek,
 }: {
   articles: readonly ArticleSummary[] | undefined;
+  /** A plain click on a title opens it beside the list (AD-07). */
+  onPeek?: (id: string) => void;
   sort?: SortControl;
   error?: string | null;
 }) {
@@ -61,7 +68,7 @@ export function ArticlesView({
     <DataTable
       label="文章"
       rows={articles}
-      columns={COLUMNS}
+      columns={columns(onPeek)}
       rowKey={(article) => article.id}
       sort={sort}
       error={error}

@@ -15,6 +15,7 @@ import {
 import { ListToolbar } from "@/features/admin-ui/DataTable";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { useListState } from "@/features/admin-ui/useListState";
+import { ActivityTimeline } from "@/features/audit/ActivityTimeline";
 import { usePaged } from "@/features/admin-ui/usePaged";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
@@ -80,6 +81,7 @@ function CompanyApprovals({ company }: { company: Company }) {
         decide={(id, decision, reason) => decideApproval(id, decision, reason)}
         live={connection.status === "live"}
         refresh={() => queryClient.invalidateQueries({ queryKey: ["approvals", company.id] })}
+        activity={(card) => <ActivityTimeline targetType="approval" targetId={card.id} />}
         preview={(card) =>
           card.article ? <ArticlePreview
               articleId={card.article.id}

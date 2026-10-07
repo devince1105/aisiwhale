@@ -2,10 +2,12 @@
 // the timeline of its workflow. The researcher's and the analyst's activity links land here.
 import type { EventEnvelope } from "@autora/event-schema";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { withCompany } from "@/features/company/CompanyScope";
 
 import { Button } from "@/features/admin-ui/Button";
+import { DetailLayout, Properties } from "@/features/admin-ui/DetailLayout";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
@@ -14,22 +16,49 @@ import { ClaimList, Empty, EventList, Section } from "./parts";
 
 const STARTABLE = new Set(["DISCOVERED", "SELECTED"]);
 
+/** What a story is, in a few lines: the right column's box, and the peek's (AD-07). */
+export function StoryProperties({ story }: { story: Pick<StoryDetail, "state" | "score" | "sources" | "first_seen_at" | "article"> }) {
+  const [state, tone] = label(STORY_STATE, story.state);
+  return (
+    <Properties
+      rows={[
+        ["狀態", <StatusLozenge key="s" tone={tone}>{state}</StatusLozenge>],
+        ["分數", Math.round(Number(story.score) * 100)],
+        ["來源", `${story.sources} 個`],
+        ["首次出現", formatTime(story.first_seen_at)],
+        [
+          "文章",
+          story.article ? (
+            <Link key="a" href={`/admin/newsroom/articles/${story.article.id}`} className="text-accent underline">
+              {label(ARTICLE_STATE, story.article.state)[0]}：{story.article.title}
+            </Link>
+          ) : (
+            "還沒有"
+          ),
+        ],
+      ]}
+    />
+  );
+}
+
 export function StoryView({
   story,
   events,
   onStart,
   starting,
   startError,
+  activity,
 }: {
   story: StoryDetail;
+  /** Its history (AD-07: ``ActivityTimeline``). */
+  activity?: ReactNode;
   events: readonly EventEnvelope[];
   onStart: () => void;
   starting: boolean;
   startError: string | null;
 }) {
-  const [state, tone] = label(STORY_STATE, story.state);
   return (
-    <AdminPage width="read">
+    <AdminPage>
       <PageHeader
         title={story.title}
         actions={
@@ -40,21 +69,18 @@ export function StoryView({
           ) : null
         }
       >
-        <p className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-          <StatusLozenge tone={tone}>{state}</StatusLozenge>
-          <span className="text-muted">
-            分數 {Math.round(Number(story.score) * 100)}・{story.sources} 個來源・首次出現 {formatTime(story.first_seen_at)}
-          </span>
-          {story.article ? (
-            <Link href={`/admin/newsroom/articles/${story.article.id}`} className="text-accent underline">
-              文章（{label(ARTICLE_STATE, story.article.state)[0]}）
-            </Link>
-          ) : null}
-        </p>
         {startError ? <p className="mt-2 text-sm text-danger">{startError}</p> : null}
         {story.summary ? <p className="mt-3 text-muted">{story.summary}</p> : null}
       </PageHeader>
-
+      <DetailLayout
+        side={
+          <>
+            <StoryProperties story={story} />
+            {activity}
+          </>
+        }
+        main={
+          <>
       <Section id="sources" title={`線索（${story.leads.length}）`}>
         {story.leads.length === 0 ? (
           <Empty>沒有來源項目（手動建立的題材）。</Empty>
@@ -101,7 +127,7 @@ export function StoryView({
         <ClaimList claims={story.claim_list} />
       </Section>
 
-      <Section id="timeline" title="時間軸">
+      <Section id="timeline" title="工作流程事件">
         <EventList events={events} />
         {story.workflow_run_ids.length ? null : <Empty>還沒有開始製作。</Empty>}
       </Section>
@@ -110,6 +136,9 @@ export function StoryView({
           ← 所有題材
         </Link>
       </p>
+          </>
+        }
+      />
     </AdminPage>
   );
 }

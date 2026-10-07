@@ -10,6 +10,7 @@ import { isSection, SECTIONS, words, type Section as SiteSection } from "@/featu
 
 import { Button } from "@/features/admin-ui/Button";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { DetailLayout, Properties } from "@/features/admin-ui/DetailLayout";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
@@ -40,7 +41,7 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
   const published = Boolean(article.published_at);
   if (published && REVISING.has(state)) {
     return (
-      <section aria-label="網站上架" data-testid="site-controls" className="mb-6 rounded-lg border border-line p-4 text-sm">
+      <section aria-label="網站上架" data-testid="site-controls" className="rounded-lg border border-line p-4 text-sm">
         <span className="text-muted">
           {article.listed
             ? "修改中：網站仍顯示目前發布的版本，新版本核准後才會換上。"
@@ -52,7 +53,7 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
   if (state !== "PUBLISHED" && state !== "ARCHIVED") return null;
   const said = note.trim();
   return (
-    <section aria-label="網站上架" data-testid="site-controls" className="mb-6 grid gap-2 rounded-lg border border-line p-4 text-sm">
+    <section aria-label="網站上架" data-testid="site-controls" className="grid gap-2 rounded-lg border border-line p-4 text-sm">
       {state === "ARCHIVED" ? <span className="text-muted">已下架：網站上看不到這篇。</span> : null}
       <label className="grid gap-1">
         <span className="text-muted">說明（修改：要改什麼，寫手照這段改；下架：為什麼下架）</span>
@@ -104,7 +105,7 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
 function AccessControl({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
   const vip = article.access === "members";
   return (
-    <section aria-label="閱讀權限" data-testid="access-control" className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
+    <section aria-label="閱讀權限" data-testid="access-control" className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
       <span className="text-muted">閱讀權限：</span>
       <div role="group" aria-label="閱讀權限" className="flex rounded-lg border border-line p-0.5">
         {(
@@ -137,7 +138,7 @@ const SECTION_NAMES = words("zh-TW").sections;
 function SectionControl({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
   const now = article.section && isSection(article.section) ? SECTION_NAMES[article.section] : null;
   return (
-    <section aria-label="分類" data-testid="section-control" className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
+    <section aria-label="分類" data-testid="section-control" className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
       <label className="flex items-center gap-2">
         <span className="text-muted">分類：</span>
         <select
@@ -166,6 +167,46 @@ function SectionControl({ article, onSite }: { article: ArticleDetail; onSite: O
   );
 }
 
+/** What an article is, in a few lines: the right column's box, and the peek's (AD-07). */
+export function ArticleProperties({ article }: { article: ArticleSummaryLike }) {
+  const [state, tone] = label(ARTICLE_STATE, article.state);
+  return (
+    <Properties
+      rows={[
+        ["狀態", <StatusLozenge key="s" tone={tone}>{state}</StatusLozenge>],
+        [
+          "題材",
+          <Link key="t" href={`/admin/newsroom/stories/${article.story_id}`} className="text-accent underline">
+            {article.story_title}
+          </Link>,
+        ],
+        ["閱讀權限", article.access === "members" ? "VIP" : "免費"],
+        ["修訂", article.revision_count ? `${article.revision_count} 次` : "—"],
+        ["發布", article.published_at ? formatTime(article.published_at) : "尚未發布"],
+        [
+          "公開頁",
+          Object.keys(article.public_urls).length ? (
+            <span key="u" className="flex flex-wrap gap-2">
+              {Object.entries(article.public_urls).map(([l, url]) => (
+                <a key={l} href={url} target="_blank" rel="noopener" className="text-accent underline">
+                  {l}
+                </a>
+              ))}
+            </span>
+          ) : (
+            "—"
+          ),
+        ],
+      ]}
+    />
+  );
+}
+
+type ArticleSummaryLike = Pick<
+  ArticleDetail,
+  "state" | "story_id" | "story_title" | "access" | "revision_count" | "published_at" | "public_urls"
+>;
+
 export function ArticleView({
   article,
   lang,
@@ -173,6 +214,7 @@ export function ArticleView({
   events,
   onSite,
   cover,
+  activity,
 }: {
   article: ArticleDetail;
   lang: string;
@@ -181,8 +223,9 @@ export function ArticleView({
   onSite?: OnSite;
   /** The cover and what a person can do with it (D-142: ``CoverPanel``). */
   cover?: ReactNode;
+  /** Its history (AD-07: ``ActivityTimeline``). */
+  activity?: ReactNode;
 }) {
-  const [state, tone] = label(ARTICLE_STATE, article.state);
   const primary = article.primary_lang;
   const langs = Object.keys(article.languages).sort(
     (a, b) => Number(b === primary) - Number(a === primary) || a.localeCompare(b),
@@ -193,33 +236,28 @@ export function ArticleView({
   const claims = orderedClaims(article.claims, numbers);
   const href = `/admin/newsroom/articles/${article.id}`;
 
-  return (
-    <AdminPage width="read">
-      <PageHeader title={article.title}>
-        <p className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-          <StatusLozenge tone={tone}>{state}</StatusLozenge>
-          <Link href={`/admin/newsroom/stories/${article.story_id}`} className="text-accent underline">
-            題材：{article.story_title}
-          </Link>
-          {article.revision_count ? <span className="text-muted">修訂 {article.revision_count} 次</span> : null}
-          {Object.entries(article.public_urls).map(([l, url]) => (
-            <a key={l} href={url} target="_blank" rel="noopener" className="text-accent underline">
-              公開頁（{l}）
-            </a>
-          ))}
-          {article.published_at ? <span className="text-muted">發布於 {formatTime(article.published_at)}</span> : null}
-        </p>
-      </PageHeader>
-
+  const side = (
+    <>
+      <ArticleProperties article={article} />
       {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
       {onSite?.setSection ? <SectionControl article={article} onSite={onSite} /> : null}
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
       {cover ? (
-        <section aria-label="首圖" className="mb-6 rounded-lg border border-line p-4">
+        <section aria-label="首圖" className="rounded-lg border border-line p-4">
           {cover}
         </section>
       ) : null}
+      {activity}
+    </>
+  );
 
+  return (
+    <AdminPage>
+      <PageHeader title={article.title} />
+      <DetailLayout
+        side={side}
+        main={
+          <>
       <nav aria-label="版本" className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">版本</span>
         {article.versions.map((v) => (
@@ -380,9 +418,12 @@ export function ArticleView({
         )}
       </Section>
 
-      <Section id="timeline" title="時間軸">
+      <Section id="timeline" title="工作流程事件">
         <EventList events={events} />
       </Section>
+          </>
+        }
+      />
     </AdminPage>
   );
 }

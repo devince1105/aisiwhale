@@ -274,9 +274,10 @@ describe("an article", () => {
     expect(distribution.getByText("社群貼文（草稿，未發出）")).toBeTruthy();
     expect(distribution.getByText("New: the microgrid.")).toBeTruthy();
     expect(screen.getByText("讀者（共 7 次瀏覽）")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "公開頁（en）" }).getAttribute("href")).toBe("/news/en/articles/microgrid-a1b2c3");
+    // the public pages are in the properties box beside the article (AD-07)
+    expect(within(screen.getByRole("region", { name: "屬性" })).getByRole("link", { name: "en" }).getAttribute("href")).toBe("/news/en/articles/microgrid-a1b2c3");
     expect(within(document.getElementById("timeline")!).getByText("文章發布")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "題材：Lumen City microgrid" }).getAttribute("href")).toBe(`/admin/newsroom/stories/${STORY}`);
+    expect(within(screen.getByRole("region", { name: "屬性" })).getByRole("link", { name: "Lumen City microgrid" }).getAttribute("href")).toBe(`/admin/newsroom/stories/${STORY}`);
   });
 });
 
