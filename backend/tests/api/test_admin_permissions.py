@@ -59,6 +59,14 @@ def test_the_four_roles():
     assert "coins:adjust" not in permissions.permissions_of("editor")
     assert "approvals:decide" in permissions.permissions_of("editor")
     assert "access:manage" not in permissions.permissions_of("finance")
+    # D-248: trades are seen and approved by an owner or finance, nobody else
+    for key in ("trading:view", "trading:approve"):
+        having = {
+            r
+            for r in ("owner", "editor", "finance", "viewer")
+            if key in permissions.permissions_of(r)
+        }
+        assert having == {"owner", "finance"}, key
     assert permissions.permissions_of("nobody") == frozenset()
 
 
@@ -213,3 +221,15 @@ async def test_a_refused_attempt_is_in_the_record(api, db_session, newsroom_room
         )
     ).all()
     assert (row.status, row.actor["id"]) == (403, f"admin:{viewer}")
+
+
+def test_openapi_names_each_routes_key():
+    """AD-14: the web app's tests read the keys from openapi.json (conventions.test.ts)."""
+    schema = create_app().openapi()
+    named = {
+        (method.upper(), path): operation["x-permission"]
+        for path, operations in schema["paths"].items()
+        for method, operation in operations.items()
+        if "x-permission" in operation
+    }
+    assert named == permissions.ROUTES

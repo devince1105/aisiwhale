@@ -15,7 +15,7 @@ const SCOPES: Record<string, string> = { company: "公司", project: "專案", b
 export function FinancePanel({ companyId }: { companyId: string }) {
   const finance = useQuery(financeQuery(companyId));
   return (
-    <section className="mx-auto max-w-7xl px-4 md:px-6 pb-8" aria-labelledby="finance-heading">
+    <section className="mt-8" aria-labelledby="finance-heading">
       <h2 id="finance-heading" className="mb-3 text-lg font-semibold">
         預算與資金
       </h2>

@@ -20,7 +20,7 @@ const PAUSED_BY: Record<string, string> = { ceo: "CEO", human: "操作者", kill
 export function ProjectsPanel({ companyId }: { companyId: string }) {
   const projects = useQuery(projectsQuery(companyId));
   return (
-    <section className="mx-auto max-w-7xl px-4 md:px-6 pb-8" aria-labelledby="projects-heading">
+    <section className="mt-8" aria-labelledby="projects-heading">
       <h2 id="projects-heading" className="mb-3 text-lg font-semibold">
         專案
       </h2>

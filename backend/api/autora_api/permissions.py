@@ -13,6 +13,8 @@ the machines' (CI, scripts, the worker), recorded as ``operator`` in the audit t
 
 from __future__ import annotations
 
+from typing import Any
+
 from autora.db.models import AdminRoleName
 
 NEWSROOM = "newsroom:edit"
@@ -28,6 +30,13 @@ COINS_VIEW = "coins:view"
 AUDIT = "audit:view"
 ACCESS = "access:manage"
 SETTINGS = "system:settings"
+TRADING_VIEW = "trading:view"
+"""See the trading records — decisions, orders, profit and loss (D-248): owner and finance."""
+TRADING_APPROVE = "trading:approve"
+"""Approve a trade the trading agent proposes (D-248): owner and finance.
+
+TR-10 puts both on its routes (its reads too: a GET is keyed here only when listed); until then
+no route has them."""
 SELF = "self:prefs"
 """One's own preferences (AD-10): every role has it."""
 
@@ -46,6 +55,8 @@ ALL = frozenset(
         AUDIT,
         ACCESS,
         SETTINGS,
+        TRADING_VIEW,
+        TRADING_APPROVE,
         SELF,
     }
 )
@@ -53,7 +64,9 @@ ALL = frozenset(
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     AdminRoleName.OWNER: ALL,
     AdminRoleName.EDITOR: frozenset({NEWSROOM, APPROVALS, PROJECTS, WORKFLOWS, SELF}),
-    AdminRoleName.FINANCE: frozenset({FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW, SELF}),
+    AdminRoleName.FINANCE: frozenset(
+        {FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW, TRADING_VIEW, TRADING_APPROVE, SELF}
+    ),
     AdminRoleName.VIEWER: frozenset({SELF}),
 }
 
@@ -112,3 +125,14 @@ def needed(method: str, route: str) -> str | None:
 
 def permissions_of(role: str) -> frozenset[str]:
     return ROLE_PERMISSIONS.get(role, frozenset())
+
+
+def label_openapi(schema: dict[str, Any]) -> dict[str, Any]:
+    """Each operation that needs a key says which, as ``x-permission`` (AD-14): the web app's
+    tests read it from openapi.json — a write without a name in the audit trail, or a page that
+    asks for a key no route has, fails there rather than in someone's memory."""
+    for path, operations in schema.get("paths", {}).items():
+        for method, operation in operations.items():
+            if isinstance(operation, dict) and (key := needed(method.upper(), path)) is not None:
+                operation["x-permission"] = key
+    return schema

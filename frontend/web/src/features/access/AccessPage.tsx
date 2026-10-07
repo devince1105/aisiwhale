@@ -34,6 +34,8 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "audit:view": "查看操作紀錄",
   "access:manage": "管理角色與權限（本頁）",
   "system:settings": "系統設定：上班時段、加班上限、聯絡表單上限",
+  "trading:view": "查看交易紀錄：決定、訂單、損益（D-248，交易頁上線後生效）",
+  "trading:approve": "核准交易代理提出的交易（D-248，交易頁上線後生效）",
   "self:prefs": "自己的通知設定",
 };
 

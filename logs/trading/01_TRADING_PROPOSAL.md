@@ -339,7 +339,7 @@ Phase 0–1 **只記錄、只提醒**：對帳排程發現價格穿過代理寫�
 | TR-07 | 交易代理：行為、脈絡、結構化輸出、驗證器、fake model 模擬 | TR-03 | `MODEL_PROVIDER=fake` 下跑完 BUY、SELL、HOLD 三種路徑 |
 | TR-08 | workflow `trading.decide_v1`、三個排程、總開關、governance 暫停 | TR-04~07 | 整條流程在 fake model + fake OKX 下跑通；總開關關閉時什麼都不送 |
 | TR-09 | `performance.py`：每日結算、基準線、每週檢討 | TR-06, TR-07 | 固定資料的結算對照手算 |
-| TR-10 | 後台頁（需登入）：決定、訂單、損益、風險拒絕列表；事件接上 3D 辦公室 | TR-08 | e2e 看得到一筆完整紀錄 |
+| TR-10 | 後台頁（需登入）：決定、訂單、損益、風險拒絕列表；事件接上 3D 辦公室。照 `logs/admin/02_NEW_ADMIN_PAGE.md` 做（AD-14）；看交易紀錄用 `trading:view`、核准用 `trading:approve`，都只有 owner 和 finance（D-248） | TR-08 | e2e 看得到一筆完整紀錄 |
 | TR-11 | **Phase 0 驗收**：接上 OKX demo 實跑 14 天 | 全部 | 見 §9 |
 
 ## 9. Phase 0 驗收（進入 Phase 1 的條件）
