@@ -35,6 +35,8 @@ import { Drawer } from "@/features/admin-ui/Dialog";
 import { ErrorState } from "@/features/admin-ui/states";
 import { useListState } from "@/features/admin-ui/useListState";
 import { usePeek } from "@/features/admin-ui/usePeek";
+import { ViewSwitch } from "@/features/admin-ui/ViewSwitch";
+import { ArticleBoard, StoryBoard } from "@/features/board/Boards";
 import { ActivityTimeline } from "@/features/audit/ActivityTimeline";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
@@ -85,22 +87,29 @@ const STORY_FILTER: FilterDef<"state"> = {
 
 function CompanyStories({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const list = useListState(["state"], STORY_SORTS);
+  const list = useListState(["state", "view"], STORY_SORTS);
+  const board = list.filters.view === "board";
   const state = (STORY_STATES as readonly string[]).includes(list.filters.state ?? "") ? (list.filters.state as StoryState) : null;
-  const page = useQuery(storiesQuery(company.id, state, { q: list.q, sort: list.sort, cursor: list.cursor }));
+  const page = useQuery({ ...storiesQuery(company.id, state, { q: list.q, sort: list.sort, cursor: list.cursor }), enabled: !board });
   const peek = usePeek();
   return (
     <AdminPage>
-      <PageHeader title={`${company.name} 的題材`} />
-      <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" />
+      <PageHeader title={`${company.name} 的題材`} actions={<ViewSwitch board={board} onBoard={(on) => list.set({ filters: { view: on ? "board" : null } })} />} />
+      {board ? null : <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" />}
       {peek.peek ? <StoryPeek storyId={peek.peek} onClose={peek.close} /> : null}
-      <StoriesView
-        stories={page.data?.items}
-        sort={sortControl(list, STORY_SORTS, "-last_item_at")}
-        error={page.error?.message}
-        onPeek={peek.open}
-      />
-      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
+      {board ? (
+        <StoryBoard companyId={company.id} onOpen={peek.open} />
+      ) : (
+        <>
+          <StoriesView
+            stories={page.data?.items}
+            sort={sortControl(list, STORY_SORTS, "-last_item_at")}
+            error={page.error?.message}
+            onPeek={peek.open}
+          />
+          <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
+        </>
+      )}
     </AdminPage>
   );
 }
@@ -113,21 +122,26 @@ const ARTICLE_SORTS: readonly ArticleSort[] = ["-updated_at", "updated_at", "-cr
 
 function CompanyArticles({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const list = useListState([], ARTICLE_SORTS);
-  const page = useQuery(articlesPageQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }));
+  const list = useListState(["view"], ARTICLE_SORTS);
+  const board = list.filters.view === "board";
+  const page = useQuery({ ...articlesPageQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }), enabled: !board });
   const peek = usePeek();
   return (
     <AdminPage>
-      <PageHeader title={`${company.name} 的文章`} />
-      <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" />
-      <ArticlesView
-        articles={page.data?.items}
-        sort={sortControl(list, ARTICLE_SORTS, "-updated_at")}
-        error={page.error?.message}
-        onPeek={peek.open}
-      />
+      <PageHeader title={`${company.name} 的文章`} actions={<ViewSwitch board={board} onBoard={(on) => list.set({ filters: { view: on ? "board" : null } })} />} />
+      {board ? null : <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" />}
+      {board ? (
+        <ArticleBoard companyId={company.id} onOpen={peek.open} />
+      ) : (
+        <ArticlesView
+          articles={page.data?.items}
+          sort={sortControl(list, ARTICLE_SORTS, "-updated_at")}
+          error={page.error?.message}
+          onPeek={peek.open}
+        />
+      )}
       {peek.peek ? <ArticlePeek articleId={peek.peek} onClose={peek.close} /> : null}
-      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
+      {board ? null : <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />}
     </AdminPage>
   );
 }

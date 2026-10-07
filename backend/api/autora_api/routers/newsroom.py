@@ -37,6 +37,7 @@ from autora.domains.newsroom import admin, covers
 from autora.domains.newsroom.models import (
     Article,
     ArticleAccess,
+    ArticleState,
     Source,
     SourceKind,
     Story,
@@ -56,7 +57,7 @@ from autora.domains.newsroom.tools import covers as covers_tool
 from autora.domains.newsroom.workflow import ask_for_cover, start_article_revision, start_story
 from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
-from autora.runtime.fsm import IllegalTransition
+from autora.runtime.fsm import FSMError, IllegalTransition
 from autora_api.deps import Operator, RuntimeDep, Session
 from autora_api.pagination import Listing, Page, page_rows, search, sort_by
 from autora_api.routers.public import Section
@@ -194,12 +195,15 @@ async def list_articles(
     session: Session,
     _: Operator,
     listing: Listing,
+    state: Annotated[ArticleState | None, Query()] = None,
     sort: ArticleSort = "-updated_at",
 ) -> ArticlePage:
     """Articles a page at a time (AD-04), last changed first; ``q`` searches the title and
-    the slug."""
+    the slug; ``state``: one column of the production board (AD-08)."""
     await _company(session, company_id)
     stmt = admin.articles_query(company_id)
+    if state is not None:
+        stmt = stmt.where(Article.state == state.value)
     if (words := search(listing.words, Article.title, Article.slug)) is not None:
         stmt = stmt.where(words)
     columns = {
@@ -407,7 +411,9 @@ async def post_unpublish(
             session, company_id=article.company_id, article_id=article.id,
             actor=operator, reason=body.reason,
         )  # fmt: skip
-    except (IllegalTransition, PublishError, NotAllowed) as exc:
+    # FSMError: an illegal step, or a guard's no (a draft never published cannot be taken down
+    # or put back: AD-08's board found the 500 this was)
+    except (FSMError, PublishError, NotAllowed) as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     await session.commit()
     return {"article_id": str(article.id), "state": article.state}
@@ -423,7 +429,9 @@ async def post_republish(
         await republish_article(
             session, company_id=article.company_id, article_id=article.id, actor=operator
         )
-    except (IllegalTransition, PublishError, NotAllowed) as exc:
+    # FSMError: an illegal step, or a guard's no (a draft never published cannot be taken down
+    # or put back: AD-08's board found the 500 this was)
+    except (FSMError, PublishError, NotAllowed) as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     await session.commit()
     return {"article_id": str(article.id), "state": article.state}

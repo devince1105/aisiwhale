@@ -1174,6 +1174,19 @@
     "title": "ArticleSectionBody",
     "type": "object"
    },
+   "ArticleState": {
+    "description": "platform/02 §6: DRAFT -> IN_REVIEW -> APPROVED -> PUBLISHED -> ARCHIVED;\nIN_REVIEW -> DRAFT (revise, at most twice) | REJECTED.",
+    "enum": [
+     "DRAFT",
+     "IN_REVIEW",
+     "APPROVED",
+     "PUBLISHED",
+     "ARCHIVED",
+     "REJECTED"
+    ],
+    "title": "ArticleState",
+    "type": "string"
+   },
    "ArticleSummary": {
     "properties": {
      "access": {
@@ -12842,7 +12855,7 @@
   },
   "/api/companies/{company_id}/articles": {
    "get": {
-    "description": "Articles a page at a time (AD-04), last changed first; ``q`` searches the title and\nthe slug.",
+    "description": "Articles a page at a time (AD-04), last changed first; ``q`` searches the title and\nthe slug; ``state``: one column of the production board (AD-08).",
     "operationId": "list_articles_api_companies__company_id__articles_get",
     "parameters": [
      {
@@ -12853,6 +12866,22 @@
        "format": "uuid",
        "title": "Company Id",
        "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "state",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/ArticleState"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
       }
      },
      {

@@ -20,6 +20,7 @@ import { LiveStatus } from "./ConnectionBadge";
 import { Drawer } from "./Dialog";
 import { moveRow, openRow, useHotkeys } from "./hotkeys";
 import { Icon } from "./icons";
+import { ToastProvider } from "./Toast";
 import { activeNav, ADMIN_NAV, type NavItem } from "./nav";
 import { recentVisits } from "./recent";
 
@@ -175,7 +176,9 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
             登出
           </Button>
         </header>
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 flex-1">
+          <ToastProvider>{children}</ToastProvider>
+        </div>
       </div>
     </div>
   );

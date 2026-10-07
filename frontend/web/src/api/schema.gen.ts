@@ -806,7 +806,7 @@ export interface paths {
         /**
          * List Articles
          * @description Articles a page at a time (AD-04), last changed first; ``q`` searches the title and
-         *     the slug.
+         *     the slug; ``state``: one column of the production board (AD-08).
          */
         get: operations["list_articles_api_companies__company_id__articles_get"];
         put?: never;
@@ -2369,6 +2369,13 @@ export interface components {
             /** Section */
             section: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx") | null;
         };
+        /**
+         * ArticleState
+         * @description platform/02 §6: DRAFT -> IN_REVIEW -> APPROVED -> PUBLISHED -> ARCHIVED;
+         *     IN_REVIEW -> DRAFT (revise, at most twice) | REJECTED.
+         * @enum {string}
+         */
+        ArticleState: "DRAFT" | "IN_REVIEW" | "APPROVED" | "PUBLISHED" | "ARCHIVED" | "REJECTED";
         /** ArticleSummary */
         ArticleSummary: {
             /**
@@ -7074,6 +7081,7 @@ export interface operations {
     list_articles_api_companies__company_id__articles_get: {
         parameters: {
             query?: {
+                state?: components["schemas"]["ArticleState"] | null;
                 sort?: "-updated_at" | "updated_at" | "-created_at" | "title";
                 cursor?: string | null;
                 limit?: number;

@@ -1,0 +1,15 @@
+{
+  "article": [
+    ["IN_REVIEW", "APPROVED", "approve"],
+    ["IN_REVIEW", "DRAFT", "send_back"],
+    ["IN_REVIEW", "REJECTED", "reject"],
+    ["PUBLISHED", "ARCHIVED", "unpublish"],
+    ["ARCHIVED", "PUBLISHED", "republish"],
+    ["PUBLISHED", "DRAFT", "revise"],
+    ["ARCHIVED", "DRAFT", "revise"]
+  ],
+  "story": [
+    ["DISCOVERED", "IN_PRODUCTION", "start"],
+    ["SELECTED", "IN_PRODUCTION", "start"]
+  ]
+}

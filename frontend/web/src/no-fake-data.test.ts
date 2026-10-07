@@ -71,6 +71,8 @@ describe("the screen invents nothing (AC-S6)", () => {
       "features/site/drift.ts:",
       "features/site/Watchlist.tsx:",
       "features/admin-ui/AdminShell.tsx:",
+      // a toast goes away by itself (AD-08): the timer removes a message, it never makes one
+      "features/admin-ui/Toast.tsx:",
       "features/demo-office/player.ts:",
     ];
     expect(hits(timers, "features").filter((hit) => !named.some((file) => hit.startsWith(file)))).toEqual([]);

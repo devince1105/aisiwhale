@@ -261,13 +261,19 @@ export function storyQuery(storyId: string, api: ApiClient = defaultApi) {
 }
 
 /** One page of articles (AD-05), as the table's address asks. */
-export function articlesPageQuery(companyId: string, args: ListArgs<ArticleSort> = {}, api: ApiClient = defaultApi) {
+export type ArticleState = NonNullable<QueryOf<"list_articles_api_companies__company_id__articles_get">["state"]>;
+
+export function articlesPageQuery(
+  companyId: string,
+  args: ListArgs<ArticleSort> & { state?: ArticleState | null } = {},
+  api: ApiClient = defaultApi,
+) {
   return queryOptions({
     queryKey: [...queryKeys.articles(companyId), "page", args] as const,
     queryFn: async () =>
       unwrap(
         await api.GET("/api/companies/{company_id}/articles", {
-          params: { path: { company_id: companyId }, query: listQuery(args) },
+          params: { path: { company_id: companyId }, query: { ...listQuery(args), ...(args.state ? { state: args.state } : {}) } },
         }),
       ),
   });
