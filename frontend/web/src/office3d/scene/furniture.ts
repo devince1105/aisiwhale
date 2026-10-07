@@ -315,10 +315,15 @@ function lounge(): Part[] {
   ];
 }
 
-/** The meeting table (D-120), built along its own x with its open end at +x: turned a quarter in
- * the room, that end faces the projection screen on the back wall. Three chairs a side facing
- * each other, one at the far end facing the screen, none in front of it. */
-export const MEETING_TABLE = { length: 2.8, width: 1.2 } as const;
+/** The meeting table (D-120, D-239), built along its own x with its open end at +x: in the room
+ * that end faces the projection screen. Four chairs a side facing each other and one at the far
+ * end facing the screen — nine — none in front of it. */
+export const MEETING_TABLE = { length: 3.6, width: 1.2 } as const;
+/** The projection screen on the meeting room's west wall (D-239): about centred on the table, and
+ * short of the back corner where the whiteboard stands at an angle. */
+export const MEETING_SCREEN = { z: -5.45, width: 2.3 } as const;
+/** Where the side chairs sit along the table: four a side, 0.9 apart. */
+const MEETING_SIDE_CHAIRS = [-1.35, -0.45, 0.45, 1.35] as const;
 
 function meetingSet(): Part[] {
   const { length, width } = MEETING_TABLE;
@@ -326,10 +331,10 @@ function meetingSet(): Part[] {
     block(length, 0.06, width, [0, TOP - 0.06, 0], P.tableWood),
     block(0.12, TOP - 0.06, width - 0.4, [-length / 2 + 0.4, 0, 0], P.metal),
     block(0.12, TOP - 0.06, width - 0.4, [length / 2 - 0.4, 0, 0], P.metal),
-    block(0.5, 0.02, 0.35, [-0.6, TOP, 0.15], P.keyboard),
-    block(0.5, 0.02, 0.35, [0.7, TOP, -0.15], P.keyboard),
+    block(0.5, 0.02, 0.35, [-0.9, TOP, 0.15], P.keyboard),
+    block(0.5, 0.02, 0.35, [0.9, TOP, -0.15], P.keyboard),
   ];
-  for (const x of [-0.85, 0, 0.85]) {
+  for (const x of MEETING_SIDE_CHAIRS) {
     parts.push(...place(officeChair(P.cushion), x, width / 2 + 0.35));
     parts.push(...place(officeChair(P.cushion), x, -width / 2 - 0.35, Math.PI));
   }
@@ -613,9 +618,8 @@ function outerWall(side: OuterWall): Part[] {
       box(width + WALL + 0.04, CAP, WALL + 0.04, [-WALL / 2, ROOM.wallHeight + CAP / 2, ROOM.minZ - WALL / 2], P.wallCap),
       block(width, 0.12, 0.02, [0, 0, ROOM.minZ + 0.01], P.frame),
       ...BACK_WINDOWS.flatMap(([x, w]) => place(windowFrame(w, WINDOW.height, WINDOW.sill), x, ROOM.minZ)),
-      // the meeting room's projection screen
-      box(3.2, 1.7, 0.03, [-0.8, 1.75, ROOM.minZ + 0.03], P.whiteboard),
-      box(3.4, 0.12, 0.14, [-0.8, 2.65, ROOM.minZ + 0.08], P.metal),
+      // (the meeting room's projection screen hung here until it moved to the room's west wall,
+      // at the open end of its longer table, D-239)
     ];
   return [
     block(WALL, ROOM.wallHeight, depth, [ROOM.minX - WALL / 2, 0, 0], P.wall),
@@ -668,8 +672,16 @@ function shellCore(): Part[] {
     parts.push(block(WALL, 0.02, span, [x, 0, mid], P.metal));
   }
 
+  // the meeting room's projection screen, on its west wall at the table's open end (D-239); the
+  // picture that hung there gave way to it
+  {
+    const x = CEO_OFFICE.maxX + WALL_HALF;
+    // a dark border round the white face, or it is the wall's colour and only its roller shows
+    parts.push(box(0.02, 1.52, MEETING_SCREEN.width + 0.12, [x + 0.01, 1.7, MEETING_SCREEN.z], P.metal));
+    parts.push(box(0.03, 1.4, MEETING_SCREEN.width, [x + 0.025, 1.7, MEETING_SCREEN.z], P.whiteboard));
+    parts.push(box(0.14, 0.12, MEETING_SCREEN.width + 0.2, [x + 0.07, 2.5, MEETING_SCREEN.z], P.metal));
+  }
   // pictures on the inner walls (the outer walls' own are with them)
-  parts.push(...place(picture(0.7, 0.9, P.picture[1]), CEO_OFFICE.maxX + WALL_HALF, -6.4, Math.PI / 2, 1.6));
   parts.push(...place(picture(0.6, 0.6, P.picture[2]), MEETING_ROOM.maxX - WALL_HALF, -6.2, -Math.PI / 2, 1.7));
   parts.push(...place(picture(0.6, 0.8, P.picture[3]), PANTRY.minX + WALL_HALF, -6.9, Math.PI / 2, 1.8));
   return parts;

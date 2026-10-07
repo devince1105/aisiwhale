@@ -413,10 +413,12 @@ export const DECOR: Decor[] = [
   d("ceo_shelf", [-8.0, -7.6], [2.2, 0.5]),
   d("ceo_sofa", [-5.7, -5.8], [0.9, 2.0], -QUARTER),
   d("plant", [-11.4, -3.8], [0.6, 0.6]),
-  // meeting room
-  // the table points at the projection screen on the back wall (D-120)
-  d("meeting_set", [-0.8, -5.4], [2.5, 3.7], QUARTER),
-  d("whiteboard", [-4.3, -4.4], [0.6, 1.6], QUARTER),
+  // meeting room: four a side and one at the head (D-239), along the room's long side; the open
+  // end points west, at the projection screen on that wall, and the head chair faces it
+  d("meeting_set", [-0.9, -5.5], [4.5, 2.5], Math.PI),
+  // the whiteboard at 45° in the back corner beside the screen: it faces the table, and the
+  // camera too (in the front corner it was edge-on to the camera, a line)
+  d("whiteboard", [-4.1, -7.2], [1.5, 1.5], Math.PI / 4),
   d("plant", [3.5, -7.5], [0.6, 0.6]),
   // pantry
   d("pantry_counter", [6.4, -7.65], [4.2, 0.7]),
