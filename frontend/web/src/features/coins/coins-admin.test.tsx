@@ -174,6 +174,21 @@ describe("an adjustment", () => {
     expect(body.request_id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
+  it("asks in a form of its own, never one inside the adjustment form", async () => {
+    // a form within a form: a real browser submits the inner one natively — a reload, no
+    // adjustment — which is how the first version failed in production (jsdom does not submit)
+    show();
+    await lookUp();
+    fill("1");
+    fireEvent.click(screen.getByRole("button", { name: "調整" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(document.querySelectorAll("form form")).toHaveLength(0);
+    const confirm = within(dialog).getByRole("button", { name: "確認調整" }) as HTMLButtonElement;
+    expect(confirm.form).not.toBeNull();
+    expect(dialog.contains(confirm.form)).toBe(true);
+    expect(confirm.form?.closest("form[aria-label='調整鯨幣']")).toBeNull();
+  });
+
   it("past the cap: says so, and asks again in red only when overridden", async () => {
     show();
     await lookUp();

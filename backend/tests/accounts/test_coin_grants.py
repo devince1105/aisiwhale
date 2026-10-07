@@ -75,8 +75,11 @@ def test_who_is_eligible(tier, verified, gets):
 
 
 def test_the_numbers_are_d218_s():
-    assert policy.MONTHLY[Tier.FREE] == policy.MonthlyGrant(amount=50, cap=100)
-    assert policy.MONTHLY[Tier.VIP] == policy.MonthlyGrant(amount=500, cap=1000)
+    """D-218's monthly amounts; caps of six months' worth (raised from two before any coin was
+    given)."""
+    assert policy.MONTHLY[Tier.FREE] == policy.MonthlyGrant(amount=50, cap=300)
+    assert policy.MONTHLY[Tier.VIP] == policy.MonthlyGrant(amount=500, cap=3000)
+    assert policy.POLICY_VERSION == "p3b-2"
 
 
 def test_grants_are_off_until_p3c():
@@ -120,14 +123,14 @@ async def test_the_first_time_this_month_gives_the_tier_s_coins_and_says_why(db_
     )
     assert posted is not None and posted.created
     txn = posted.txn
-    assert (txn.kind, txn.amount, txn.requested, txn.cap) == ("MONTHLY_GRANT", 50, 50, 100)
+    assert (txn.kind, txn.amount, txn.requested, txn.cap) == ("MONTHLY_GRANT", 50, 50, 300)
     assert txn.idempotency_key == f"grant:free:{reader}:2026-10"
     assert txn.meta == {
         "tier": "free",
         "month": "2026-10",
-        "policy": "p3b-1",
+        "policy": "p3b-2",
         "monthly": 50,
-        "cap": 100,
+        "cap": 300,
         "trigger": "auth_me",
     }
     assert txn.actor == {"kind": "system", "id": "monthly-grant"}
@@ -197,19 +200,19 @@ async def test_a_downgraded_reader_s_month_is_zero_and_written(db_session):
 async def test_after_a_refund_past_the_cap_the_month_is_zero(db_session):
     reader = await _reader(db_session)
     await grant(
-        db_session, reader, requested=1000, cap=1000, kind=TxnKind.PROMOTION_GRANT,
+        db_session, reader, requested=3000, cap=3000, kind=TxnKind.PROMOTION_GRANT,
         idempotency_key=f"promo:setup:{reader}", actor=SYSTEM,
     )  # fmt: skip
     spent = await spend(
         db_session, reader, amount=5, idempotency_key=f"spend:x:{reader}", actor=SYSTEM
     )
     await grant(
-        db_session, reader, requested=5, cap=1000, kind=TxnKind.PROMOTION_GRANT,
+        db_session, reader, requested=5, cap=3000, kind=TxnKind.PROMOTION_GRANT,
         idempotency_key=f"promo:refill:{reader}", actor=SYSTEM,
     )  # fmt: skip
     await refund(db_session, spent.txn.id, actor=SYSTEM)
     vip = await grant_monthly(db_session, reader, tier=Tier.VIP, email_verified=True, now=OCTOBER)
-    assert (vip.txn.amount, vip.txn.balance_after) == (0, 1005)
+    assert (vip.txn.amount, vip.txn.balance_after) == (0, 3005)
     await proven(db_session)
 
 
