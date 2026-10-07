@@ -11,6 +11,7 @@ Autora 是一個 AI Autonomous Company 平台。第一個 Business Domain 是 **
 | `3d-office/` | 3D Office / Realtime / Agent State / Event Model / Newsroom Integration 與對應的 Roadmap、Task Breakdown、Acceptance、Risks — 12 份 | ✅ |
 | `trading/` | AI 交易代理（第二個真實業務 `domains/trading`）：架構提案、OKX 整合、Risk Engine、Phase 0 模擬盤與 Phase 1 計畫（D-037）— 1 份 | 📝 提案 |
 | `holdings/` | 名人持股與機構排行（「持股觀察」改版）：13F 模擬報酬、全體 13F 機構排行、台灣用語對照、資料模型與 HD-01 ~ HD-12 開發步驟 — 1 份 | 🚧 實作中（D-217） |
+| `admin/` | 後台改版：參考 Jira 的 UI/UX（側欄外殼、列表／看板／詳情雙欄、活動紀錄、⌘K），盤點 ERP 專案可借用的部分，AD-01 ~ AD-14 任務分解 — 1 份 | 📝 提案 |
 
 ## 開發紀錄
 
