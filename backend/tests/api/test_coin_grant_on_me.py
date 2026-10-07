@@ -1,7 +1,7 @@
 """P3-B over HTTP: ``/api/auth/me`` gives the month's coins, and nothing about coins changes what
 it answers or can break it.
 
-The switch is turned on for these tests (it ships off until P3-C); one test checks that off, a
+The switch is set on for these tests (it is on since D-247); one test checks that off, a
 signed-in reader's ``/me`` writes no coins.
 """
 

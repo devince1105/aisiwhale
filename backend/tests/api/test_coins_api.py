@@ -93,7 +93,7 @@ async def test_a_new_reader_holds_nothing_and_the_month_is_not_given(api, db_ses
             "cap": 300,
             "month": month,
             "granted": False,
-            "grants_on": False,  # D-238: shipped off
+            "grants_on": True,  # D-247: on (D-238 shipped it off)
         },
         "history": {"items": [], "next_cursor": None, "total": 0},
     }
