@@ -6,7 +6,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { compsQuery, grantComp, revokeComp, type Comp, type CompSort } from "@/api/queries";
+import { compsQuery, exportComps, grantComp, revokeComp, type Comp, type CompSort } from "@/api/queries";
 import { Button } from "@/features/admin-ui/Button";
 import { DataTable, ListToolbar, Pager, sortControl, type Column, type FilterDef, type SortControl } from "@/features/admin-ui/DataTable";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
@@ -65,7 +65,13 @@ function CompanyComps({ company }: { company: Company }) {
       {can("memberships:grant") ? <GrantForm companySlug={company.slug} onDone={refresh} /> : null}
 
       <h2 className="mt-8 mb-3 text-lg font-semibold">授予紀錄</h2>
-      <ListToolbar list={list} filters={[RUNNING]} placeholder="搜尋 email 或理由…" views="comps" />
+      <ListToolbar
+        list={list}
+        filters={[RUNNING]}
+        placeholder="搜尋 email 或理由…"
+        views="comps"
+        onExport={() => exportComps(company.slug, list.filters.running === "1", { q: list.q, sort: list.sort })}
+      />
       <CompsTable
         comps={page.data?.items}
         onRevoked={refresh}

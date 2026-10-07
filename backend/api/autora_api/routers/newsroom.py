@@ -26,7 +26,8 @@ from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -58,6 +59,7 @@ from autora.domains.newsroom.workflow import ask_for_cover, start_article_revisi
 from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
 from autora.runtime.fsm import FSMError, IllegalTransition
+from autora_api import export
 from autora_api.deps import Operator, RuntimeDep, Session
 from autora_api.pagination import Listing, Page, page_rows, search, sort_by
 from autora_api.routers.public import Section
@@ -114,6 +116,43 @@ async def list_stories(
     )
     return StoryPage(
         items=await admin.story_summaries(session, rows), next_cursor=next_cursor, total=total
+    )
+
+
+STORY_COLUMNS: list[export.Column] = [
+    ("狀態", lambda s: s.state),
+    ("題材", lambda s: s.title),
+    ("分數", lambda s: round(s.score * 100)),  # as the table shows it
+    ("項目", lambda s: s.items),
+    ("來源", lambda s: s.sources),
+    ("證據", lambda s: s.evidence),
+    ("主張", lambda s: s.claims),
+    ("文章", lambda s: s.article.title if s.article else None),
+    ("首次出現", lambda s: s.first_seen_at),
+    ("id", lambda s: s.id),
+]
+
+
+@router.get("/api/companies/{company_id}/stories/export", **export.ROUTE)
+async def export_stories(
+    company_id: uuid.UUID,
+    request: Request,
+    session: Session,
+    actor: Operator,
+    listing: Listing,
+    state: Annotated[StoryState | None, Query()] = None,
+    sort: StorySort = "-last_item_at",
+) -> StreamingResponse:
+    """The stories list as CSV (AD-13): the same filters, every page."""
+    return await export.csv_export(
+        session,
+        request,
+        actor,
+        name="stories",
+        columns=STORY_COLUMNS,
+        fetch=lambda page: list_stories(company_id, session, actor, page, state, sort),
+        listing=listing,
+        company_id=company_id,
     )
 
 
@@ -218,6 +257,45 @@ async def list_articles(
         items=await admin.article_summaries(session, [a for (a,) in rows]),
         next_cursor=next_cursor,
         total=total,
+    )
+
+
+ARTICLE_COLUMNS: list[export.Column] = [
+    ("狀態", lambda a: a.state),
+    ("標題", lambda a: a.title),
+    ("網址代稱", lambda a: a.slug),
+    ("版本", lambda a: a.version),
+    ("修訂次數", lambda a: a.revision_count),
+    ("語言", lambda a: " / ".join(a.langs)),
+    ("瀏覽", lambda a: a.views),
+    ("權限", lambda a: a.access),
+    ("列在網站上", lambda a: a.listed),
+    ("發布", lambda a: a.published_at),
+    ("更新", lambda a: a.updated_at),
+    ("id", lambda a: a.id),
+]
+
+
+@router.get("/api/companies/{company_id}/articles/export", **export.ROUTE)
+async def export_articles(
+    company_id: uuid.UUID,
+    request: Request,
+    session: Session,
+    actor: Operator,
+    listing: Listing,
+    state: Annotated[ArticleState | None, Query()] = None,
+    sort: ArticleSort = "-updated_at",
+) -> StreamingResponse:
+    """The articles list as CSV (AD-13): the same filters, every page."""
+    return await export.csv_export(
+        session,
+        request,
+        actor,
+        name="articles",
+        columns=ARTICLE_COLUMNS,
+        fetch=lambda page: list_articles(company_id, session, actor, page, state, sort),
+        listing=listing,
+        company_id=company_id,
     )
 
 
@@ -496,6 +574,42 @@ async def list_sources(
         items=[admin.source_view(s, items) for s, items in rows],
         next_cursor=next_cursor,
         total=total,
+    )
+
+
+SOURCE_COLUMNS: list[export.Column] = [
+    ("狀態", lambda s: s.status),
+    ("名稱", lambda s: s.name),
+    ("種類", lambda s: s.kind),
+    ("網址或查詢", lambda s: s.url or s.config.get("query")),
+    ("信任度", lambda s: s.trust_level),
+    ("語言", lambda s: s.language),
+    ("項目", lambda s: s.items),
+    ("輪詢間隔（秒）", lambda s: s.poll_interval_seconds),
+    ("上次輪詢", lambda s: s.last_polled_at),
+    ("id", lambda s: s.id),
+]
+
+
+@router.get("/api/companies/{company_id}/sources/export", **export.ROUTE)
+async def export_sources(
+    company_id: uuid.UUID,
+    request: Request,
+    session: Session,
+    actor: Operator,
+    listing: Listing,
+    sort: SourceSort = "created_at",
+) -> StreamingResponse:
+    """The sources list as CSV (AD-13): the same search, every page."""
+    return await export.csv_export(
+        session,
+        request,
+        actor,
+        name="sources",
+        columns=SOURCE_COLUMNS,
+        fetch=lambda page: list_sources(company_id, session, actor, page, sort),
+        listing=listing,
+        company_id=company_id,
     )
 
 

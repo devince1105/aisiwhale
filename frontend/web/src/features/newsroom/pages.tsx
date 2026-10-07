@@ -20,6 +20,9 @@ import {
   sourcesQuery,
   startStory,
   storiesQuery,
+  exportArticles,
+  exportSources,
+  exportStories,
   storyQuery,
   unpublishArticle,
   workflowEventsQuery,
@@ -96,7 +99,7 @@ function CompanyStories({ company }: { company: Company }) {
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的題材`} actions={<ViewSwitch board={board} onBoard={(on) => list.set({ filters: { view: on ? "board" : null } })} />} />
-      {board ? null : <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" />}
+      {board ? null : <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" onExport={() => exportStories(company.id, state, { q: list.q, sort: list.sort })} />}
       {peek.peek ? <StoryPeek storyId={peek.peek} onClose={peek.close} /> : null}
       {board ? (
         <StoryBoard companyId={company.id} onOpen={peek.open} />
@@ -130,7 +133,7 @@ function CompanyArticles({ company }: { company: Company }) {
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的文章`} actions={<ViewSwitch board={board} onBoard={(on) => list.set({ filters: { view: on ? "board" : null } })} />} />
-      {board ? null : <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" />}
+      {board ? null : <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" onExport={() => exportArticles(company.id, { q: list.q, sort: list.sort })} />}
       {board ? (
         <ArticleBoard companyId={company.id} onOpen={peek.open} />
       ) : (
@@ -162,7 +165,7 @@ function CompanySources({ company }: { company: Company }) {
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的來源`} />
-      <ListToolbar list={list} placeholder="搜尋名稱或網址…" />
+      <ListToolbar list={list} placeholder="搜尋名稱或網址…" onExport={() => exportSources(company.id, { q: list.q, sort: list.sort })} />
       <SourcesView sources={page.data?.items} sort={sortControl(list, SOURCE_SORTS, "created_at")} error={page.error?.message} />
       <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
       <h2 id="add-source" className="mt-8 mb-3 text-lg font-semibold">

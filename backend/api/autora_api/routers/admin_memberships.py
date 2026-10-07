@@ -22,7 +22,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -30,6 +31,7 @@ from autora.accounts import AccountError, Reader, by_email, customer_ref
 from autora.company import memberships
 from autora.company.memberships import REASON_MAX, MembershipError
 from autora.db.models import Company, MembershipGrant
+from autora_api import export
 from autora_api.deps import Operator, Session
 from autora_api.pagination import Listing, Page, matches, page_list, sort_by
 
@@ -175,6 +177,46 @@ async def list_comps(
         listing=listing,
     )
     return CompPage(items=[view for _, view in page], next_cursor=next_cursor, total=total)
+
+
+COMP_COLUMNS: list[export.Column] = [
+    ("讀者", lambda c: c.email or "（讀者已不存在）"),
+    ("有效中", lambda c: c.running),
+    ("開始", lambda c: c.started_at),
+    ("到期", lambda c: c.expires_at),
+    ("理由", lambda c: c.reason),
+    ("授予者", lambda c: c.actor.get("id")),
+    ("撤銷時間", lambda c: c.revoked_at),
+    ("撤銷理由", lambda c: c.revoke_reason),
+    ("來源", lambda c: c.source),
+    ("id", lambda c: c.id),
+]
+
+
+# before /comps/{grant_id}, which would take "export" for an id
+@router.get("/comps/export", **export.ROUTE)
+async def export_comps(
+    request: Request,
+    session: Session,
+    actor: Operator,
+    listing: Listing,
+    company: CompanySlug = None,
+    running: bool = False,
+    sort: CompSort = "-created_at",
+) -> StreamingResponse:
+    """The comps list as CSV (AD-13): readers' addresses leave the back office, so it is in the
+    audit trail with who took it."""
+    found = await _company(session, company)
+    return await export.csv_export(
+        session,
+        request,
+        actor,
+        name="vip-comps",
+        columns=COMP_COLUMNS,
+        fetch=lambda page: list_comps(session, actor, page, company, running, sort),
+        listing=listing,
+        company_id=found.id,
+    )
 
 
 @router.get("/comps/{grant_id}")

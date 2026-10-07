@@ -11,17 +11,20 @@ reading (``actor_label``), and stored by reader id (D-024).
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from autora.accounts.models import Reader
 from autora.db.models import AdminAction
+from autora_api import export
 from autora_api.deps import Operator, Session
-from autora_api.pagination import Listing, Page, page_rows, search, sort_by
+from autora_api.pagination import Listing, ListParams, Page, page_rows, search, sort_by
 
 router = APIRouter(prefix="/api/admin/audit", tags=["admin-audit"])
 
@@ -143,4 +146,66 @@ async def list_admin_actions(
         ],
         next_cursor=next_cursor,
         total=total,
+    )
+
+
+AUDIT_COLUMNS: list[export.Column] = [
+    ("時間", lambda a: a.created_at),
+    ("誰", lambda a: a.actor_label),
+    ("方法", lambda a: a.method),
+    ("路由", lambda a: a.route),
+    ("動作", lambda a: a.action),
+    ("對象種類", lambda a: a.target_type),
+    ("對象 id", lambda a: a.target_id),
+    ("公司 id", lambda a: a.company_id),
+    ("結果", lambda a: a.status),
+    ("送出的內容", lambda a: a.input),
+    ("來源 IP", lambda a: a.ip),
+    ("id", lambda a: a.id),
+]
+
+
+@router.get("/export", **export.ROUTE)
+async def export_admin_actions(
+    request: Request,
+    session: Session,
+    operator: Operator,
+    listing: Listing,
+    company_id: uuid.UUID | None = None,
+    actor: Annotated[str | None, Query(max_length=200)] = None,
+    target_type: Annotated[str | None, Query(max_length=50)] = None,
+    target_id: Annotated[str | None, Query(max_length=100)] = None,
+    action: Annotated[str | None, Query(max_length=100)] = None,
+    failed: bool | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    sort: AuditSort = "-created_at",
+) -> StreamingResponse:
+    """The audit trail as CSV (AD-13): the same filters, every page; ``audit:view`` as the list."""
+
+    def fetch(page: ListParams) -> Awaitable[AdminActionPage]:
+        return list_admin_actions(
+            session,
+            operator,
+            page,
+            company_id,
+            actor,
+            target_type,
+            target_id,
+            action,
+            failed,
+            since,
+            until,
+            sort,
+        )
+
+    return await export.csv_export(
+        session,
+        request,
+        operator,
+        name="audit",
+        columns=AUDIT_COLUMNS,
+        fetch=fetch,
+        listing=listing,
+        company_id=company_id,
     )

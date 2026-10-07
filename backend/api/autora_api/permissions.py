@@ -93,6 +93,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/api/admin/coins/wallet"): COINS_VIEW,  # a reader's details and history
     # the back office itself
     ("GET", "/api/admin/audit"): AUDIT,
+    ("GET", "/api/admin/audit/export"): AUDIT,
     ("GET", "/api/admin/access"): ACCESS,
     ("POST", "/api/admin/access"): ACCESS,
     ("PUT", "/api/admin/access/{reader_id}"): ACCESS,

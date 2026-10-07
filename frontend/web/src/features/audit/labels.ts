@@ -17,6 +17,12 @@ export const ACTION_LABEL: Record<string, string> = {
   "/api/companies/{company_id}/projects/{project_id}/pause": "暫停專案",
   "/api/companies/{company_id}/projects/{project_id}/resume": "恢復專案",
   "/api/admin/memberships/comps": "授予 VIP",
+  // exports are reads, recorded on purpose (AD-13)
+  "/api/companies/{company_id}/stories/export": "匯出題材 CSV",
+  "/api/companies/{company_id}/articles/export": "匯出文章 CSV",
+  "/api/companies/{company_id}/sources/export": "匯出來源 CSV",
+  "/api/admin/memberships/comps/export": "匯出 VIP 授予 CSV",
+  "/api/admin/audit/export": "匯出操作紀錄 CSV",
   "/api/admin/access": "加入管理員",
   "/api/admin/access/{reader_id}": "改角色或移除管理員",
   "/api/admin/me/prefs": "自己的通知設定",

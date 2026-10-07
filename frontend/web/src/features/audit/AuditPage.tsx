@@ -6,7 +6,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
-import { auditQuery, type AdminAction, type AuditSort } from "@/api/queries";
+import { auditQuery, exportAudit, type AdminAction, type AuditSort } from "@/api/queries";
 import { DataTable, ListToolbar, Pager, sortControl, type Column, type FilterDef } from "@/features/admin-ui/DataTable";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
@@ -125,20 +125,22 @@ export function AuditPage() {
 function CompanyAudit({ company }: { company: Company }) {
   const list = useListState<AuditSort, Filter>(["scope", "result", "target"], SORTS);
   const result = list.filters.result;
-  const page = useQuery(
-    auditQuery(
-      list.filters.scope === "all" ? null : company.id,
-      { failed: result === "refused" ? true : result === "done" ? false : null, target_type: list.filters.target },
-      { q: list.q, sort: list.sort, cursor: list.cursor },
-    ),
-  );
+  const scope = list.filters.scope === "all" ? null : company.id;
+  const filters = { failed: result === "refused" ? true : result === "done" ? false : null, target_type: list.filters.target };
+  const page = useQuery(auditQuery(scope, filters, { q: list.q, sort: list.sort, cursor: list.cursor }));
   return (
     <AdminPage>
       <PageHeader
         title={`${company.name} 的操作紀錄`}
-        description="後台每一次修改都會記在這裡（包括被拒絕的），紀錄不能修改或刪除。只看不改的動作不記錄。"
+        description="後台每一次修改都會記在這裡（包括被拒絕的），紀錄不能修改或刪除。只看不改的動作不記錄，但匯出 CSV 會記錄。"
       />
-      <ListToolbar list={list} filters={FILTERS} placeholder="搜尋動作、對象 id 或操作者…" views="audit" />
+      <ListToolbar
+        list={list}
+        filters={FILTERS}
+        placeholder="搜尋動作、對象 id 或操作者…"
+        views="audit"
+        onExport={() => exportAudit(scope, filters, { q: list.q, sort: list.sort })}
+      />
       <DataTable
         label="操作紀錄"
         rows={page.data?.items}

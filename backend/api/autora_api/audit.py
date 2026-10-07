@@ -136,7 +136,7 @@ def _target(path: dict[str, Any]) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _ip(scope: Scope) -> str | None:
+def client_ip(scope: Scope) -> str | None:
     for key, value in scope.get("headers", []):
         if key == b"cf-connecting-ip" and value.strip():
             return value.decode("latin-1").strip()
@@ -171,7 +171,7 @@ async def _record(scope: Scope, status: int, body: bytes, overflow: bool) -> Non
                 company_id=await _company(session, path, given, target),
                 status=status,
                 input=given,
-                ip=_ip(scope),
+                ip=client_ip(scope),
             )
         )
         await session.commit()

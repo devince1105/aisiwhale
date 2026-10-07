@@ -12,10 +12,13 @@ import {
   type ReactNode,
 } from "react";
 
+import type { Exported } from "@/api/queries";
+
 import { Button } from "./Button";
 import { ROW, ROW_FOCUS } from "./hotkeys";
 import { Icon } from "./icons";
 import { EmptyState, ErrorState, LoadingState } from "./states";
+import { useToast } from "./Toast";
 import type { ListState } from "./useListState";
 
 // --- density ----------------------------------------------------------------------------------
@@ -272,6 +275,7 @@ export function ListToolbar<S extends string, F extends string>({
   placeholder = "搜尋…",
   views,
   density: withDensity = true,
+  onExport,
 }: {
   list: ListState<S, F>;
   filters?: readonly FilterDef<F>[];
@@ -280,6 +284,8 @@ export function ListToolbar<S extends string, F extends string>({
   views?: string;
   /** The row-height switch; off where the list is not a table (the approval cards). */
   density?: boolean;
+  /** Save what the list shows, every page under its filters, as CSV (AD-13). */
+  onExport?: () => Promise<Exported>;
 }) {
   const density = useDensity();
   // what is typed, until Enter: the address changes once per search, not per letter
@@ -350,10 +356,33 @@ export function ListToolbar<S extends string, F extends string>({
         ))}
         <span className="grow" />
         {withDensity ? <DensitySwitch density={density} /> : null}
+        {onExport ? <ExportButton run={onExport} /> : null}
       </div>
       <ActiveFilters list={list} filters={filters} />
       {views ? <SavedViews list={list} storageKey={views} /> : null}
     </div>
+  );
+}
+
+/** 匯出 CSV: one file of every row the filters leave; says how many, and when it was cut. */
+function ExportButton({ run }: { run: () => Promise<Exported> }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const click = async () => {
+    setBusy(true);
+    try {
+      const { rows, total } = await run();
+      toast(rows < total ? `已匯出前 ${rows.toLocaleString()} 筆（共 ${total.toLocaleString()} 筆，請加上篩選條件分批匯出）` : `已匯出 ${rows.toLocaleString()} 筆`);
+    } catch (error) {
+      toast(`匯出失敗：${error instanceof Error ? error.message : String(error)}`, "danger");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Button size="sm" onClick={click} disabled={busy} title="下載目前篩選條件下的所有資料（CSV，Excel 可開）">
+      {busy ? "匯出中…" : "匯出 CSV"}
+    </Button>
   );
 }
 

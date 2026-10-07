@@ -81,6 +81,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Admin Actions
+         * @description The audit trail as CSV (AD-13): the same filters, every page; ``audit:view`` as the list.
+         */
+        get: operations["export_admin_actions_api_admin_audit_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/auth/google/start": {
         parameters: {
             query?: never;
@@ -241,6 +261,27 @@ export interface paths {
          * @description Give a reader VIP until ``until``. No order, no payment, no revenue.
          */
         post: operations["grant_comp_api_admin_memberships_comps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/memberships/comps/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Comps
+         * @description The comps list as CSV (AD-13): readers' addresses leave the back office, so it is in the
+         *     audit trail with who took it.
+         */
+        get: operations["export_comps_api_admin_memberships_comps_export_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -978,6 +1019,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/articles/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Articles
+         * @description The articles list as CSV (AD-13): the same filters, every page.
+         */
+        get: operations["export_articles_api_companies__company_id__articles_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/cycles": {
         parameters: {
             query?: never;
@@ -1238,6 +1299,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/sources/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Sources
+         * @description The sources list as CSV (AD-13): the same search, every page.
+         */
+        get: operations["export_sources_api_companies__company_id__sources_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/stories": {
         parameters: {
             query?: never;
@@ -1250,6 +1331,26 @@ export interface paths {
          * @description Stories a page at a time (AD-04), newest activity first; ``q`` searches the title.
          */
         get: operations["list_stories_api_companies__company_id__stories_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/stories/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Stories
+         * @description The stories list as CSV (AD-13): the same filters, every page.
+         */
+        get: operations["export_stories_api_companies__company_id__stories_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6337,6 +6438,50 @@ export interface operations {
             };
         };
     };
+    export_admin_actions_api_admin_audit_export_get: {
+        parameters: {
+            query?: {
+                company_id?: string | null;
+                actor?: string | null;
+                target_type?: string | null;
+                target_id?: string | null;
+                action?: string | null;
+                failed?: boolean | null;
+                since?: string | null;
+                until?: string | null;
+                sort?: "-created_at" | "created_at";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list as CSV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     google_start_api_admin_auth_google_start_get: {
         parameters: {
             query?: {
@@ -6690,6 +6835,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Comp"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_comps_api_admin_memberships_comps_export_get: {
+        parameters: {
+            query?: {
+                company?: string | null;
+                running?: boolean;
+                sort?: "-created_at" | "created_at" | "-expires_at" | "expires_at";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list as CSV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Validation Error */
@@ -8106,6 +8289,45 @@ export interface operations {
             };
         };
     };
+    export_articles_api_companies__company_id__articles_export_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["ArticleState"] | null;
+                sort?: "-updated_at" | "updated_at" | "-created_at" | "title";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list as CSV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cycles_api_companies__company_id__cycles_get: {
         parameters: {
             query?: {
@@ -8634,6 +8856,44 @@ export interface operations {
             };
         };
     };
+    export_sources_api_companies__company_id__sources_export_get: {
+        parameters: {
+            query?: {
+                sort?: "created_at" | "-created_at" | "name";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list as CSV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_stories_api_companies__company_id__stories_get: {
         parameters: {
             query?: {
@@ -8660,6 +8920,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_stories_api_companies__company_id__stories_export_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["StoryState"] | null;
+                sort?: "-last_item_at" | "last_item_at" | "-score" | "-first_seen_at" | "title";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list as CSV. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
                 };
             };
             /** @description Validation Error */

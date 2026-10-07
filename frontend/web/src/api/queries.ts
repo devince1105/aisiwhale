@@ -869,3 +869,100 @@ export function coinReconcileQuery(api: ApiClient = defaultApi) {
     queryFn: async () => unwrap(await api.GET("/api/admin/coins/reconcile")),
   });
 }
+
+// --- CSV exports (AD-13) ---------------------------------------------------------------------
+
+/** What an export sent: its rows, and how many the filters leave (more: it was cut). */
+export interface Exported {
+  rows: number;
+  total: number;
+}
+
+type ExportArgs<S extends string> = Pick<ListArgs<S>, "q" | "sort">;
+
+/** An export's search and order: the list's, without its page. */
+function exportQuery<S extends string>(args: ExportArgs<S>) {
+  return { ...(args.q ? { q: args.q } : {}), ...(args.sort ? { sort: args.sort } : {}) };
+}
+
+/** Save the file the API sent under the name it gave. */
+async function saveCsv(request: Promise<{ data?: unknown; error?: unknown; response: Response }>): Promise<Exported> {
+  const result = await request;
+  const blob = unwrap(result) as Blob;
+  const headers = result.response.headers;
+  const named = /filename\*=UTF-8''([^;]+)/.exec(headers.get("content-disposition") ?? "");
+  saveFile(blob, named ? decodeURIComponent(named[1]) : "export.csv");
+  return { rows: Number(headers.get("x-export-rows") ?? 0), total: Number(headers.get("x-export-total") ?? 0) };
+}
+
+function saveFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function exportStories(companyId: string, state: StoryState | null, args: ExportArgs<StorySort>, api: ApiClient = defaultApi) {
+  return saveCsv(
+    api.GET("/api/companies/{company_id}/stories/export", {
+      params: { path: { company_id: companyId }, query: { ...(state ? { state } : {}), ...exportQuery(args) } },
+      parseAs: "blob",
+    }),
+  );
+}
+
+export function exportArticles(
+  companyId: string,
+  args: ExportArgs<ArticleSort> & { state?: ArticleState | null },
+  api: ApiClient = defaultApi,
+) {
+  return saveCsv(
+    api.GET("/api/companies/{company_id}/articles/export", {
+      params: { path: { company_id: companyId }, query: { ...exportQuery(args), ...(args.state ? { state: args.state } : {}) } },
+      parseAs: "blob",
+    }),
+  );
+}
+
+export function exportSources(companyId: string, args: ExportArgs<SourceSort>, api: ApiClient = defaultApi) {
+  return saveCsv(
+    api.GET("/api/companies/{company_id}/sources/export", {
+      params: { path: { company_id: companyId }, query: exportQuery(args) },
+      parseAs: "blob",
+    }),
+  );
+}
+
+export function exportComps(companySlug: string, running: boolean, args: ExportArgs<CompSort>, api: ApiClient = defaultApi) {
+  return saveCsv(
+    api.GET("/api/admin/memberships/comps/export", {
+      params: { query: { company: companySlug, running, ...exportQuery(args) } },
+      parseAs: "blob",
+    }),
+  );
+}
+
+export function exportAudit(
+  companyId: string | null,
+  filters: { failed?: boolean | null; target_type?: string | null },
+  args: ExportArgs<AuditSort>,
+  api: ApiClient = defaultApi,
+) {
+  return saveCsv(
+    api.GET("/api/admin/audit/export", {
+      params: {
+        query: {
+          ...(companyId ? { company_id: companyId } : {}),
+          ...(filters.failed != null ? { failed: filters.failed } : {}),
+          ...(filters.target_type ? { target_type: filters.target_type } : {}),
+          ...exportQuery(args),
+        },
+      },
+      parseAs: "blob",
+    }),
+  );
+}
