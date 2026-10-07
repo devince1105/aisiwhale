@@ -8800,7 +8800,7 @@ export const PLACED: readonly { bake: string; at: readonly [number, number]; sea
   { bake: "decor:17:fridge", at: [9, -7.55] },
   { bake: "decor:18:vending", at: [4.55, -4.4] },
   { bake: "decor:19:water_cooler", at: [4.45, -5.6] },
-  { bake: "decor:20:cafe_table", at: [8.6, -5.4] },
+  { bake: "decor:20:cafe_table", at: [8.6, -5.2] },
   { bake: "decor:21:plant", at: [11.5, -3.7] },
   { bake: "counterDesk", at: [5.7, 5.3] },
   { bake: "wall:0", at: [-5, -5.65] },

@@ -427,7 +427,8 @@ export const DECOR: Decor[] = [
   d("fridge", [9.0, -7.55], [0.9, 0.8]),
   d("vending", [4.55, -4.4], [0.9, 1.0], QUARTER),
   d("water_cooler", [4.45, -5.6], [0.45, 0.45], QUARTER),
-  d("cafe_table", [8.6, -5.4], [2.4, 2.4]),
+  // a step forward of where it was, so the one at the counter's east end has room behind (D-243)
+  d("cafe_table", [8.6, -5.2], [2.4, 2.4]),
   d("plant", [11.5, -3.7], [0.6, 0.6]),
 ];
 
@@ -571,10 +572,15 @@ function doorway(approach: Vec2): Vec2[] {
 
 // --- the office's own places, for its people's idle moments (D-136) --------------------------
 
+/** How far apart people stand at the pantry counter (D-243): a figure's width, not a person's —
+ * at AVATAR_SCALE its head alone is about 0.83 m across. At 0.55, two or three at the counter
+ * stood in one another. */
+export const PANTRY_SPACING = 1.2;
+
 /** At the pantry counter, where the coffee is: up the back walkway to its door, in, and to the
  * counter; ``slot`` spreads two or three people along it. Faces the counter. */
 export function pantrySpot(slot = 0): { target: WalkTarget; lookAt: Vec2 } {
-  const x = PANTRY.doorX + ((slot % 3) - 1) * 0.55;
+  const x = PANTRY.doorX + ((slot % 3) - 1) * PANTRY_SPACING;
   const counterZ = -6.8;
   return {
     target: { spot: [x, counterZ], lane: "back", via: [[PANTRY.doorX, BACK_ROOMS_Z - 0.5], [PANTRY.doorX, counterZ]] },

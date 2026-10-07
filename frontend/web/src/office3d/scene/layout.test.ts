@@ -168,6 +168,13 @@ describe("courier paths", () => {
     expect(checked).toBe(seats.length * seats.length);
   });
 
+  it("people at the pantry counter stand a figure's width apart, all of them at the counter (D-243)", () => {
+    const xs = [0, 1, 2].map((slot) => pantrySpot(slot).target.spot[0]).sort((a, b) => a - b);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(1.1); // a head is ~0.83 m
+    const counter = DECOR.find((d) => d.kind === "pantry_counter")!;
+    for (const x of xs) expect(Math.abs(x - counter.at[0])).toBeLessThan(counter.size[0] / 2 - 0.4);
+  });
+
   it("to the pantry's counter and the server room's aisle (D-136): through their doors, around everything", () => {
     const problems: string[] = [];
     const places = [0, 1, 2].map((slot) => ({ name: `pantry ${slot}`, ...pantrySpot(slot) }));
