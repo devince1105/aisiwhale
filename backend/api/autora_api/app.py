@@ -13,6 +13,7 @@ from autora.infra.settings import get_settings
 from autora.realtime.gateway import EventHub
 from autora_api import problems
 from autora_api.audit import AuditMiddleware
+from autora_api.deps import OFFICE_CALL
 from autora_api.routers import (
     admin_audit,
     admin_auth,
@@ -43,6 +44,9 @@ from autora_api.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     get_settings()  # fail fast on missing/inconsistent configuration
+    # the last call, written down before this start (D-237): the deploy's migrations just woke
+    # the database, so reading it costs no extra wake
+    await OFFICE_CALL.recall(get_sessionmaker())
     hub = EventHub(engine=get_engine(), session_factory=get_sessionmaker())
     app.state.hub = hub
     await hub.start()

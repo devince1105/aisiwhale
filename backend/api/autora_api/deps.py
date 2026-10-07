@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -8,18 +9,22 @@ from typing import Annotated
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
 from autora.accounts import Reader, reader_for
 from autora.accounts.entitlement import admin_authorized
 from autora.accounts.google import GoogleOAuth
 from autora.app import Runtime, build_runtime
+from autora.db.models import OfficeCallRecord
 from autora.db.session import get_sessionmaker
 from autora.infra.email import Sender, build_sender
 from autora.infra.settings import Settings, get_settings
 from autora.runtime.actor import Actor
 from autora_api import audit
 
+log = logging.getLogger(__name__)
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -108,14 +113,45 @@ def admin_actor(reader: Reader) -> Actor:
 class OfficeCall:
     """When a person last changed something in the back office (D-205).
 
-    Off its shifts the worker asks for this once a minute and comes in when it is new. It lives
-    in this process's memory, not the database: answering must not wake the database the shifts
-    let sleep. A restart forgets it, and the next shift does the work instead."""
+    Off its shifts the worker asks for this once a minute and comes in when it is new. It is
+    answered from this process's memory, not the database: answering must not wake the database
+    the shifts let sleep. It is also written down (D-237) — when a person acts, the database is
+    awake anyway — and read back when the API starts, right after the deploy's migrations woke
+    it, so a deploy does not forget a call."""
 
     at: datetime | None = None
 
     def mark(self) -> None:
         self.at = datetime.now(UTC)
+
+    async def keep(self, bind: AsyncEngine | AsyncConnection) -> None:
+        """Write the call down in a transaction of its own, so no request holds the one row while
+        it works. A failure is logged: the memory still has the call."""
+        if self.at is None:
+            return
+        statement = insert(OfficeCallRecord).values(id=1, called_at=self.at)
+        later = func.greatest(OfficeCallRecord.called_at, statement.excluded.called_at)
+        try:
+            async with AsyncSession(bind=bind, join_transaction_mode="create_savepoint") as session:
+                await session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[OfficeCallRecord.id], set_={"called_at": later}
+                    )
+                )
+                await session.commit()
+        except Exception:  # noqa: BLE001 - the call stands without its record
+            log.warning("cannot write the call down; only this process remembers it", exc_info=True)
+
+    async def recall(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """At the API's start: the call written down before it, if later than what it has."""
+        try:
+            async with session_factory() as session:
+                called = await session.scalar(select(OfficeCallRecord.called_at))
+        except Exception:  # noqa: BLE001 - a start without it is a start as before D-237
+            log.warning("cannot read the last call back", exc_info=True)
+            return
+        if called is not None and (self.at is None or called > self.at):
+            self.at = called
 
 
 OFFICE_CALL = OfficeCall()
@@ -146,6 +182,7 @@ async def require_operator(
     if actor is not None:
         if request.method not in READ_ONLY:
             OFFICE_CALL.mark()
+            await OFFICE_CALL.keep(session.bind)
         audit.mark(request, actor)
         return actor
     raise HTTPException(
