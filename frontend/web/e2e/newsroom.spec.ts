@@ -62,16 +62,19 @@ test("a story from the feeds to the public site, and from the office to its draf
 
   // 1. the story page: the demo feeds were read and clustered; start the microgrid story
   await page.goto(`/admin/newsroom/stories?company=${company}`);
+  // a click opens the story beside the list (AD-07); its full page is one more click
   await page
     .getByRole("link", { name: /microgrid/i })
     .first()
     .click();
+  await expect(page).toHaveURL(/peek=/);
+  await page.getByRole("dialog").getByRole("link", { name: "開啟完整頁面" }).click();
   await expect(page).toHaveURL(/\/newsroom\/stories\/[0-9a-f-]+$/);
   const storyTitle = (await page
     .getByRole("heading", { level: 1 })
     .textContent())!;
   await page.getByRole("button", { name: "開始製作" }).click();
-  await expect(page.getByText("製作中")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("region", { name: "屬性" }).getByText("製作中")).toBeVisible({ timeout: 15_000 });
 
   // 2. the worker runs research, analysis, draft and review; the line stops at the approval
   await expect

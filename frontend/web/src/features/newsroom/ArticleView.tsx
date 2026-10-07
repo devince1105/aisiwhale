@@ -242,11 +242,6 @@ export function ArticleView({
       {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
       {onSite?.setSection ? <SectionControl article={article} onSite={onSite} /> : null}
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
-      {cover ? (
-        <section aria-label="首圖" className="rounded-lg border border-line p-4">
-          {cover}
-        </section>
-      ) : null}
       {activity}
     </>
   );
@@ -258,6 +253,12 @@ export function ArticleView({
         side={side}
         main={
           <>
+      {/* the cover across the content's width: its search and buttons do not fit the column */}
+      {cover ? (
+        <section aria-label="首圖" className="mb-6 rounded-lg border border-line p-4">
+          {cover}
+        </section>
+      ) : null}
       <nav aria-label="版本" className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">版本</span>
         {article.versions.map((v) => (

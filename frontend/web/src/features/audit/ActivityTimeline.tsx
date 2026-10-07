@@ -10,6 +10,7 @@ import { activityQuery, type ActivityEntry } from "@/api/queries";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 import { STATES as APPROVAL_STATES } from "@/features/approvals/model";
 import { ARTICLE_STATE, formatTime, STORY_STATE } from "@/features/newsroom/model";
+import { personName } from "@/people";
 
 import { ACTION_LABEL } from "./labels";
 
@@ -94,7 +95,7 @@ export function ActivityList({
           {shown.map((entry, index) => (
             <li key={`${entry.at}-${index}`} className="px-3 py-2 text-sm">
               <p className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium">{entry.actor_label}</span>
+                <span className="font-medium">{entry.actor.kind === "agent" ? personName(entry.actor_label) : entry.actor_label}</span>
                 <span>{describe(entry, own)}</span>
                 {entry.kind === "action" && entry.status && entry.status >= 400 ? <StatusLozenge tone="warn">被拒</StatusLozenge> : null}
               </p>
