@@ -27,6 +27,8 @@ COINS_ADJUST = "coins:adjust"
 COINS_VIEW = "coins:view"
 AUDIT = "audit:view"
 ACCESS = "access:manage"
+SELF = "self:prefs"
+"""One's own preferences (AD-10): every role has it."""
 
 ALL = frozenset(
     {
@@ -42,14 +44,15 @@ ALL = frozenset(
         COINS_VIEW,
         AUDIT,
         ACCESS,
+        SELF,
     }
 )
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     AdminRoleName.OWNER: ALL,
-    AdminRoleName.EDITOR: frozenset({NEWSROOM, APPROVALS, PROJECTS, WORKFLOWS}),
-    AdminRoleName.FINANCE: frozenset({FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW}),
-    AdminRoleName.VIEWER: frozenset(),
+    AdminRoleName.EDITOR: frozenset({NEWSROOM, APPROVALS, PROJECTS, WORKFLOWS, SELF}),
+    AdminRoleName.FINANCE: frozenset({FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW, SELF}),
+    AdminRoleName.VIEWER: frozenset({SELF}),
 }
 
 ROUTES: dict[tuple[str, str], str] = {
@@ -92,6 +95,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/api/admin/access"): ACCESS,
     ("PUT", "/api/admin/access/{reader_id}"): ACCESS,
     ("DELETE", "/api/admin/access/{reader_id}"): ACCESS,
+    ("PUT", "/api/admin/me/prefs"): SELF,
 }
 
 

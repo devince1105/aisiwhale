@@ -288,6 +288,19 @@ def build_scheduler(
     from autora.accounts.coins.reconcile import schedule_handler as coin_reconcile
 
     scheduler.register(RECONCILE_SCHEDULE, coin_reconcile())
+    # what waits for a person to decide, emailed to those who decide, daily (AD-10)
+    from autora.accounts.admin_digest import DIGEST_SCHEDULE
+    from autora.accounts.admin_digest import schedule_handler as approvals_digest
+    from autora.infra.email import build_sender
+    from autora.infra.settings import get_settings as current_settings
+
+    scheduler.register(
+        DIGEST_SCHEDULE,
+        approvals_digest(
+            lambda: settings or current_settings(),
+            lambda: build_sender(settings or current_settings()),
+        ),
+    )
     fetcher = build_page_fetcher(settings)
     poller = SourcePoller(fetcher=fetcher, search=build_search_provider(settings))
     scheduler.register(POLL_SCHEDULE, poller.schedule_handler())

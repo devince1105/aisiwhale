@@ -53,7 +53,8 @@ def test_every_back_office_write_has_a_key_and_every_key_a_route():
 
 def test_the_four_roles():
     assert permissions.permissions_of("owner") == permissions.ALL
-    assert permissions.permissions_of("viewer") == frozenset()
+    # a viewer changes nothing but its own settings (AD-10)
+    assert permissions.permissions_of("viewer") == frozenset({"self:prefs"})
     assert "coins:adjust" in permissions.permissions_of("finance")
     assert "coins:adjust" not in permissions.permissions_of("editor")
     assert "approvals:decide" in permissions.permissions_of("editor")
@@ -160,7 +161,8 @@ async def test_owners_let_people_in_and_out(api, db_session, mailbox):
     listed = (await api.get("/api/admin/access")).json()
     assert ADMIN in listed["owners"]
     assert [m["email"] for m in listed["members"]] == ["new@perm.test"]
-    assert set(listed["roles"]["owner"]) == permissions.ALL and listed["roles"]["viewer"] == []
+    assert set(listed["roles"]["owner"]) == permissions.ALL
+    assert listed["roles"]["viewer"] == ["self:prefs"]
 
     # now they open it — and may not manage access
     signed = await api.post("/api/admin/auth/login", json=login, headers=ANON)

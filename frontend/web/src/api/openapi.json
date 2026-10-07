@@ -5100,6 +5100,17 @@
     "title": "Period",
     "type": "object"
    },
+   "Prefs": {
+    "properties": {
+     "approvals_digest": {
+      "default": true,
+      "title": "Approvals Digest",
+      "type": "boolean"
+     }
+    },
+    "title": "Prefs",
+    "type": "object"
+   },
    "ProductLine": {
     "properties": {
      "id": {
@@ -11267,6 +11278,122 @@
     "summary": "Get Wallet",
     "tags": [
      "admin-coins"
+    ]
+   }
+  },
+  "/api/admin/me/prefs": {
+   "get": {
+    "operationId": "get_prefs_api_admin_me_prefs_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Prefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Prefs",
+    "tags": [
+     "admin-me"
+    ]
+   },
+   "put": {
+    "operationId": "put_prefs_api_admin_me_prefs_put",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Prefs"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Prefs"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Put Prefs",
+    "tags": [
+     "admin-me"
     ]
    }
   },

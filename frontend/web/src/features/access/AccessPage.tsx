@@ -33,6 +33,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "coins:view": "查看讀者的鯨幣明細",
   "audit:view": "查看操作紀錄",
   "access:manage": "管理角色與權限（本頁）",
+  "self:prefs": "自己的通知設定",
 };
 
 function when(iso: string): string {

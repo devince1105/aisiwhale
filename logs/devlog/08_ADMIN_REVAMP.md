@@ -15,7 +15,8 @@
 | 5b | AD-07 詳情頁與 Drawer 預覽 | AD-06 | ✅ 2026-10-07 |
 | 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ✅ 2026-10-07 |
 | 7 | AD-08 看板 | AD-05、AD-07 | ✅ 2026-10-07 |
-| 8 | AD-10、AD-11、AD-12、AD-13 | — | ⏳ |
+| 8 | AD-10 通知 | AD-09 | ✅ 2026-10-07 |
+| 9 | AD-11、AD-12、AD-13 | — | ⏳ |
 
 ---
 
@@ -444,3 +445,45 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - 前端 `features/access/access.test.tsx` 共 6 項：側欄與指令面板依權限過濾；`useCan` 的預設與限制；看板移動對應的權限鍵；viewer 看到審批卡片但沒有決定按鈕；權限頁的顯示（不能改自己）、改角色、移除前確認、加入。vitest 86 個檔案、1,018 項全過；typecheck、lint 通過。
 - 真實瀏覽器：用 e2e 的管理員打開權限頁並截圖，頂欄顯示「擁有者」，權限表正確。
 - 推送前的完整驗證（在 0078 改號之前）：後端 pytest 2,509 項、Playwright e2e 17 項全過。之後合併了 origin/main：持股工作階段的 0078_prices_paced（D-244），以及 D-245（後台 2D 辦公室配色，同時把側欄的收合鈕移到標題列）。`AdminShell.tsx` 的衝突只在 `SidebarContent` 的開頭，保留了 D-245 的 `onToggle` 和我的 `useCan()`。合併並改號後，重建自己的資料庫跑 0001→0079、`alembic check`、typecheck、lint、vitest 1,018 項、API 與價格測試 325 項、e2e 17 項，全部通過。
+
+---
+
+## 2026-10-07：AD-10 通知
+
+在 `.claude/worktrees/ad10`（分支 `admin/ad10`）做。
+
+### 做了什麼
+
+- **頂欄的鈴鐺**（`admin-ui/NotificationBell.tsx`）：
+  - 顯示這間公司等待審批的件數。資料來源是 `pendingCountQuery`，會隨收件匣原本的 `APPROVAL_*` 即時事件一起更新，不另外輪詢。
+  - 點開後列出最久的 8 件，各自顯示已等多久；2 小時內到期或已到期的標「快到期」或「已到期」。下方有「前往審批收件匣」，以及自己的「每日 email 摘要」開關（用操作者權杖時沒有這個開關）。
+  - 按 Esc 或點外面就會關閉。
+- **每日 email 摘要**（`autora/accounts/admin_digest.py`）：
+  - 由 `admin.approvals_digest` 排程執行，台北時間 15:05，也就是 worker 平日上班的時間；週末則在上班時補跑。
+  - 收件人：會決定審批的角色（owner：ADMIN_EMAILS 與被設為 owner 的人；editor），email 必須已驗證，而且沒有關掉摘要。
+  - 內容：每間公司的待審件數、最久的在前（最多列 10 件，其餘只計數）、已等多久、幾小時後到期（快到期的會標註）、收件匣連結，最後一行說明怎麼關掉。
+  - 沒有待審時不寄；某一封寄失敗不會擋住其他人；等待時間以實際寄出的時間計算，不用排定的時間。
+  - 放在 accounts 層，因為要讀管理員的 email（D-025），import-linter 的三條規則都維持通過。
+- **遷移 0080**：新增 `admin_prefs` 表（目前只有 `approvals_digest`，沒有資料列就是預設開啟），並寫入一筆 schedules。
+- **`DIGEST_ROLES`**（owner、editor）放在 `db/models/access.py`，有測試確認它等於 `permissions.py` 裡擁有 `approvals:decide` 的角色，兩邊不會各改各的。
+- **`GET`／`PUT /api/admin/me/prefs`**：自己的設定，新增權限鍵 `self:prefs`，四種角色都有（viewer 也能關自己的信）。用權杖呼叫回 409。
+- 操作紀錄的中文名稱補上 AD-09 的三個權限頁路由，以及這次的通知設定。
+
+### 和計畫不同的地方
+
+- **站內通知只有審批**：計畫寫的也只有審批，其他事件（例如鯨幣對帳異常）要等有需要時再接。
+- **摘要的寄送時間和收件人規則是我定的**，計畫沒有寫到這麼細。寄送時間是 15:05（worker 上班時），收件人是會決定審批的人（owner、editor），finance 和 viewer 不會收到。
+
+### 驗證
+
+- 後端 `tests/api/test_admin_notifications.py` 共 6 項：
+  - `DIGEST_ROLES` 和權限表一致；
+  - 收件人規則（未驗證的、viewer、finance、關掉的都不寄）；
+  - 信件內容（主旨的件數與快到期件數、最久的在前、已等與到期時間的寫法、收件匣連結、關閉方式）；
+  - 某一封寄失敗不影響其他人；
+  - 自己的開關可以改，用權杖呼叫回 409；
+  - worker 的排程器有註冊這個 handler。
+- `test_admin_permissions.py`：viewer 現在有 `self:prefs`，相關的兩個斷言跟著改。
+- 遷移 0080：upgrade、`alembic check`、downgrade 再 upgrade 都通過。
+- 前端 `admin-ui/bell.test.tsx` 共 3 項：件數、列表與快到期標示、收件匣連結、Esc 與點外面關閉、自己的開關（權杖沒有開關）。vitest 87 個檔案、1,021 項全過。
+- **計畫的驗收條件**（真實瀏覽器，暫時的 Playwright spec，沒有提交）：打開 Dashboard 等即時連線，用 API 開始製作一則題材，等 API 回報有 1 件待審，然後量鈴鐺：**8 毫秒後**顯示「1」（要求是 5 秒內）；打開鈴鐺並截圖。

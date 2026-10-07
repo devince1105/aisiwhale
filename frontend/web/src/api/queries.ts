@@ -784,6 +784,17 @@ export async function takeOut(readerId: string, api: ApiClient = defaultApi) {
   if (!result.response.ok) unwrap(result);
 }
 
+export type AdminPrefs = Schemas["Prefs"];
+
+/** The signed-in admin's own settings (AD-10): the daily email of approvals waiting. */
+export function prefsQuery(api: ApiClient = defaultApi) {
+  return queryOptions({ queryKey: ["admin-prefs"] as const, queryFn: async () => unwrap(await api.GET("/api/admin/me/prefs")) });
+}
+
+export async function savePrefs(prefs: AdminPrefs, api: ApiClient = defaultApi) {
+  return unwrap(await api.PUT("/api/admin/me/prefs", { body: prefs }));
+}
+
 /** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
 export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
   return unwrap(await api.POST("/api/admin/memberships/comps", { body }));

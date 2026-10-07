@@ -17,6 +17,7 @@ import { Button } from "./Button";
 import { buildCommands, searchCommands } from "./commands";
 import { CommandPalette, ShortcutHelp } from "./CommandPalette";
 import { LiveStatus } from "./ConnectionBadge";
+import { NotificationBell } from "./NotificationBell";
 import { Drawer } from "./Dialog";
 import { moveRow, openRow, useHotkeys } from "./hotkeys";
 import { Icon } from "./icons";
@@ -171,6 +172,7 @@ export function AdminShell({
             <kbd className="hidden rounded border border-line px-1.5 text-[11px] sm:inline">⌘K</kbd>
           </button>
           <span className="grow" />
+          <NotificationBell companyId={companyId} personal={email !== null} />
           <LiveStatus />
           <ThemeToggle lang="zh-TW" />
           <span data-testid="admin-who" className="hidden max-w-48 truncate text-xs text-muted sm:inline">

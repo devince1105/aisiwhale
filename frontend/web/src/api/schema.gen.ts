@@ -204,6 +204,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/me/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Prefs */
+        get: operations["get_prefs_api_admin_me_prefs_get"];
+        /** Put Prefs */
+        put: operations["put_prefs_api_admin_me_prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/memberships/comps": {
         parameters: {
             query?: never;
@@ -4041,6 +4059,14 @@ export interface components {
             /** Stage */
             stage?: string | null;
         };
+        /** Prefs */
+        Prefs: {
+            /**
+             * Approvals Digest
+             * @default true
+             */
+            approvals_digest: boolean;
+        };
         /** ProductLine */
         ProductLine: {
             /**
@@ -6328,6 +6354,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminWallet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_prefs_api_admin_me_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Prefs"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_prefs_api_admin_me_prefs_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Prefs"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Prefs"];
                 };
             };
             /** @description Validation Error */
