@@ -21,6 +21,11 @@
   --color-alert: #ffebe9;
   --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
+  /* the footer's Buy me a coffee (D-250): the service's orange-yellow button, dark words, white coffee */
+  --color-coffee: #ffc107;
+  --color-coffee-hover: #ffb300;
+  --color-coffee-ink: #0d0c22;
+  --color-coffee-bean: #ffffff;
   /* prices, the Taiwanese way: red is up, green is down (D-048) */
   --color-rise: #d64545;
   --color-fall: #1f9d55;
@@ -46,6 +51,11 @@
     --color-alert: #4b2224;
     --color-alert-ink: #ef8a85;
     --color-neutral: #5f6875;
+    /* dark: the brown button the operator made on the service, white words, yellow coffee */
+    --color-coffee: #594436;
+    --color-coffee-hover: #6b5343;
+    --color-coffee-ink: #ffffff;
+    --color-coffee-bean: #ffdd00;
   }
 }
 
@@ -80,6 +90,11 @@ html[data-site-theme="light"] [data-admin]:not([data-theme]) {
   --color-alert: #ffebe9;
   --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
+  /* the footer's Buy me a coffee (D-250): the service's orange-yellow button, dark words, white coffee */
+  --color-coffee: #ffc107;
+  --color-coffee-hover: #ffb300;
+  --color-coffee-ink: #0d0c22;
+  --color-coffee-bean: #ffffff;
 }
 
 [data-theme="dark"],
@@ -101,6 +116,11 @@ html[data-site-theme="dark"] [data-admin]:not([data-theme]) {
   --color-alert: #4b2224;
   --color-alert-ink: #ef8a85;
   --color-neutral: #5f6875;
+  /* dark: the brown button the operator made on the service, white words, yellow coffee */
+  --color-coffee: #594436;
+  --color-coffee-hover: #6b5343;
+  --color-coffee-ink: #ffffff;
+  --color-coffee-bean: #ffdd00;
 }
 
 /* Its type: one sans for headlines and reading (font-display is the headlines', in case they
@@ -112,6 +132,7 @@ html[data-site-theme="dark"] [data-admin]:not([data-theme]) {
   --font-brand: var(--font-site-serif), "Noto Serif TC", "Songti TC", serif;
   --font-reading: var(--font-site-sans), system-ui, -apple-system, "PingFang TC", "Noto Sans TC",
     "Microsoft JhengHei", sans-serif;
+  --font-coffee: var(--font-site-coffee), "Lato", system-ui, sans-serif;
 }
 
 /* Printed, an article is black on white whatever the screen showed. */

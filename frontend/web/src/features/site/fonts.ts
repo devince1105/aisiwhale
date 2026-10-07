@@ -3,7 +3,7 @@
 // characters are in). Loaded by
 // next/font, which serves the files from this site (no request goes to Google from a reader's
 // browser) and only the slices of the Chinese character set a page uses.
-import { Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
+import { Lato, Noto_Sans_TC, Noto_Serif_TC } from "next/font/google";
 
 export const sans = Noto_Sans_TC({
   subsets: ["latin"],
@@ -17,4 +17,13 @@ export const serif = Noto_Serif_TC({
   display: "swap",
   preload: false,
   variable: "--font-site-serif",
+});
+
+/** The footer's "Buy me a coffee" (D-250), in the font its button was made with: its words only. */
+export const coffee = Lato({
+  subsets: ["latin"],
+  weight: "700",
+  display: "swap",
+  preload: false,
+  variable: "--font-site-coffee",
 });

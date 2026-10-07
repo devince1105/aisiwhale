@@ -316,7 +316,7 @@ const WORDS = {
     },
     contactLink: "聯絡我們",
     coffee: {
-      lead: ["覺得內容有幫助嗎？", "歡迎請我喝杯咖啡，支持艾矽鯨持續更新。"] as [string, string],
+      lead: "覺得有幫助，請我喝咖啡",
       button: "Buy me a coffee",
       newTab: "（另開新分頁）",
     },
@@ -926,7 +926,7 @@ const WORDS = {
     },
     contactLink: "Contact us",
     coffee: {
-      lead: ["Find this useful?", "A coffee helps keep AiSiWhale going."] as [string, string],
+      lead: "Like what you read? Support the site.",
       button: "Buy me a coffee",
       newTab: " (opens in a new tab)",
     },

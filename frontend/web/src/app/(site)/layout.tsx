@@ -3,12 +3,12 @@
 // follows it (globals.css), and the toggle writes the pick on it once it is made.
 import type { ReactNode } from "react";
 
-import { sans, serif } from "@/features/site/fonts";
+import { coffee, sans, serif } from "@/features/site/fonts";
 
 export default function SiteRoot({ children }: { children: ReactNode }) {
   return (
     // data-theme is written by the toggle once the page runs: not a mismatch to report
-    <div data-site suppressHydrationWarning className={`${sans.variable} ${serif.variable} bg-surface font-reading text-ink`}>
+    <div data-site suppressHydrationWarning className={`${sans.variable} ${serif.variable} ${coffee.variable} bg-surface font-reading text-ink`}>
       {children}
     </div>
   );
