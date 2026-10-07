@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from autora.db.models import EventRecord, Task
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.advice import NO_ADVICE_BRIEF, no_advice
+from autora.domains.newsroom.agents.editor import PERSON_SENT_BACK, person_sent_back
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.models import (
     Article,
@@ -122,6 +123,9 @@ async def final_review_context(session: AsyncSession, ctx: RunContext) -> str | 
     ]
     if article.revision_count >= MAX_REVISIONS:
         lines.append("No revisions left: sending it back drops the story.")
+    asked = await person_sent_back(session, ctx)
+    if asked:
+        lines.append(PERSON_SENT_BACK.format(reason=asked))
     if article.published_group_id is not None:
         lines.append("This is a revision of a published article: a veto keeps the published one.")
     # the editor's review, from the task this one follows

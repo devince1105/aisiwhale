@@ -148,6 +148,18 @@ describe("inbox", () => {
     expect(props.decide).toHaveBeenCalledWith(pending.id, "revise", "標題不要用「狂加」");
   });
 
+  it("an article sent back twice cannot be sent back a third time (D-233)", () => {
+    const article = { ...pending, kind: "article", run_id: null, task_id: "t-approve" };
+    const last = approvalCard({ ...article, payload: { article_id: "a1", returns_left: 0 } }, agents, NOW);
+    expect(last.returnsLeft).toBe(0);
+    const { card } = setup({ cards: [last] });
+    expect(within(card()).queryByRole("button", { name: "退回修改" })).toBeNull();
+    expect(within(card()).getByRole("button", { name: "駁回（放棄這則）" })).toBeTruthy();
+    expect(within(card()).getByText(/已經退回 2 次，不能再退回修改/)).toBeTruthy();
+    // one asked before D-233 does not say: it can be sent back, as it could
+    expect(approvalCard(article, agents, NOW).returnsLeft).toBeNull();
+  });
+
   it("a paused agent run is approved or rejected, never sent back", () => {
     const { card } = setup();
     expect(within(card()).queryByRole("button", { name: "退回修改" })).toBeNull();

@@ -5,7 +5,10 @@ import uuid
 from sqlalchemy import select
 
 from autora.db.models import Project, Schedule
+from autora.domains.newsroom import covers
 from autora.domains.newsroom.models import Story
+from autora.infra.blobstore import LocalFSBlobStore
+from autora_api.routers import newsroom as newsroom_router
 
 
 async def test_stories_list_and_detail(api, newsroom_room):
@@ -133,3 +136,42 @@ async def test_the_pages_need_the_operator(api, newsroom_room):
         f"/api/companies/{room.company.id}/stories", headers={"Authorization": ""}
     )
     assert anonymous.status_code == 401
+
+
+async def test_a_person_looks_for_the_cover_in_their_own_words(
+    api, newsroom_room, tmp_path, monkeypatch
+):
+    """D-233: 換一張 only goes through marketing's search; a person may search again with their
+    own words, and 換一張 then goes through that search."""
+    room = newsroom_room
+    article_id = await room.publish()
+    library, store = covers.FixtureLibrary(), covers.BlobCoverStore(LocalFSBlobStore(tmp_path))
+    monkeypatch.setattr(newsroom_router, "cover_tools", lambda: (library, store))
+    found = await library.search("晶圓廠")
+
+    got = await api.post(f"/api/articles/{article_id}/cover/search", json={"query": " 晶圓廠 "})
+    assert got.status_code == 200, got.text
+    cover = got.json()
+    assert (cover["state"], cover["query"], cover["others"]) == ("active", "晶圓廠", 2)
+    assert cover["alt"]["zh-TW"] == f"示意圖：{found[0].tags}"
+    swapped = (await api.post(f"/api/articles/{article_id}/cover/swap")).json()
+    assert swapped["query"] == "晶圓廠" and swapped["url"] != cover["url"]
+    assert (await api.get(f"/api/articles/{article_id}")).json()["cover"] == swapped
+
+    # a cover a person took off is put back by their search
+    await api.delete(f"/api/articles/{article_id}/cover")
+    back = await api.post(f"/api/articles/{article_id}/cover/search", json={"query": "wafer"})
+    assert back.json()["state"] == "active" and back.json()["query"] == "wafer"
+
+    blank = await api.post(f"/api/articles/{article_id}/cover/search", json={"query": ""})
+    assert blank.status_code == 422
+
+    class Empty(covers.FixtureLibrary):
+        async def search(self, query, *, limit=10):
+            return []
+
+    monkeypatch.setattr(newsroom_router, "cover_tools", lambda: (Empty(), store))
+    refused = await api.post(f"/api/articles/{article_id}/cover/search", json={"query": "無"})
+    assert refused.status_code == 409 and "try other words" in refused.json()["detail"]
+    missing = await api.post(f"/api/articles/{uuid.uuid4()}/cover/search", json={"query": "x"})
+    assert missing.status_code == 404

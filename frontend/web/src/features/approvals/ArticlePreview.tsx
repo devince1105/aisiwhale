@@ -42,20 +42,35 @@ export function copyText(article: ArticleDetail, lang: string): string {
   return [text.title, ...(text.summary ? [text.summary] : []), ...blocks].join("\n\n");
 }
 
+/** Why it was turned down, in words (D-233): the editor's limit is the engine's sentence. */
+function rejectedBecause(reason: string): string {
+  const limit = /^still not ready after (\d+) revisions$/.exec(reason);
+  if (limit) return `編輯與總編要求修改超過 ${limit[1]} 次，題材已放棄`;
+  return reason.length > 80 ? `${reason.slice(0, 80)}…` : reason;
+}
+
 /**
  * What became of the article after this decision (D-141): the card's title is what was asked
  * (申請發布), its tab what was decided, and this line where the article stands now — a version
- * sent back is often published later as its revision, or dropped.
+ * sent back is often published later as its revision, or dropped, and then it says why (D-233).
  */
 export function outcomeText(decision: ApprovalState, latest: ArticleDetail, draftGroupId: string | null): string {
   const decided = STATES.find((s) => s.id === decision)?.label ?? decision;
   const versions = latest.versions ?? [];
   const mine = versions.find((v) => v.draft_group_id === draftGroupId)?.version ?? null;
   const newest = versions.reduce((n, v) => Math.max(n, v.version), 0);
-  // a draft after a decision is the writer at work on the revision
-  const label = latest.state === "DRAFT" ? "寫手修改中" : (ARTICLE_STATE[latest.state]?.[0] ?? latest.state);
+  // a draft after a decision is the writer at work on the revision — unless nothing is at work
+  // on it any more (D-233)
+  const label =
+    latest.state === "DRAFT"
+      ? latest.in_production === false
+        ? "停在草稿（流程已結束，沒有人在改）"
+        : "寫手修改中"
+      : (ARTICLE_STATE[latest.state]?.[0] ?? latest.state);
   let now = label;
-  if (latest.state === "PUBLISHED") {
+  if (latest.state === "REJECTED" && latest.state_reason) {
+    now = `${label}（${rejectedBecause(latest.state_reason)}）`;
+  } else if (latest.state === "PUBLISHED") {
     const onSite = versions.find((v) => v.published)?.version ?? null;
     if (onSite !== null && mine !== null) {
       now =

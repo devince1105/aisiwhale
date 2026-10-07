@@ -386,3 +386,65 @@ def test_a_halt_on_an_unknown_node_is_refused():
             nodes=(NodeSpec("a", "A", "writer"),),
             halts=(Halt("b", when=lambda o: True),),
         )
+
+
+# --- D-233: a person's round gives the editor its rounds back ------------------------------------
+
+SENT_BACK = WorkflowTemplate(
+    name="test.sent_back",
+    nodes=(
+        NodeSpec("draft", "Draft", "writer"),
+        NodeSpec("review", "Review", "editor", depends_on=("draft",)),
+        NodeSpec("approve", "Approve", "analyst", depends_on=("review",)),
+        NodeSpec("file", "File", "researcher", depends_on=("approve",)),
+    ),
+    loops=(
+        Loop(check="review", back_to="draft", again=lambda o: o.get("verdict") == "revise"),
+        Loop(
+            check="approve",
+            back_to="draft",
+            again=lambda o: o.get("decision") == "revise",
+            restarts=("review",),
+        ),
+    ),
+)
+
+
+async def test_a_round_sent_back_from_approval_starts_the_editors_count_again(db_session, world):
+    world["engine"].templates.register(SENT_BACK)
+    run, tasks = await _start(world, db_session, "test.sent_back")
+    # the editor uses both of its rounds before approval
+    for verdict in ("revise", "revise", "accept"):
+        await _run_task(world, db_session, "writer")
+        await _review(world, db_session, {"verdict": verdict})
+    claim = await world["tm"].claim_next(db_session, world["agents"]["analyst"], "w1")
+    unlocked = await world["tm"].succeed(db_session, claim, {"decision": "revise"})
+    assert [u.required_role for u in unlocked] == ["writer"]
+
+    # in the person's round the editor has two rounds again: before D-233 its first objection
+    # here cancelled the approval (four reviews, two rounds allowed)
+    for _ in range(2):
+        await _run_task(world, db_session, "writer")
+        unlocked = await _review(world, db_session, {"verdict": "revise"})
+        assert [u.required_role for u in unlocked] == ["writer"]
+    await _run_task(world, db_session, "writer")
+    assert await _review(world, db_session, {"verdict": "revise"}) == []  # a third: no more
+    names = await _names(db_session, run.id)
+    assert [n for n, _ in names].count("review") == 6
+    assert names[-1] == ("review", "SUCCEEDED")
+    assert [s for n, s in names if n == "approve"] == ["SUCCEEDED", "CANCELLED"]
+    assert await _state(db_session, tasks["file"]) == "CANCELLED"
+    run = await db_session.get(WorkflowRun, run.id, populate_existing=True)
+    assert run.state == "CANCELLED"
+
+
+def test_a_loop_restarts_only_loops_inside_it():
+    with pytest.raises(InvalidTemplate, match="restarts no loop inside it"):
+        WorkflowTemplate(
+            name="test.bad_restart",
+            nodes=SENT_BACK.nodes,
+            loops=(
+                Loop(check="review", back_to="draft", again=lambda o: True, restarts=("approve",)),
+                Loop(check="approve", back_to="draft", again=lambda o: True),
+            ),
+        )

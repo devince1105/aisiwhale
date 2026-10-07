@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.db.models import EventRecord, Task, TaskState
+from autora.db.models import Approval, ApprovalState, EventRecord, Task, TaskState
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.models import Article, ArticleVersion, FactCheckReport, Story
@@ -140,6 +140,9 @@ async def review_context(session: AsyncSession, ctx: RunContext) -> str | None:
     ]
     if article.revision_count >= MAX_REVISIONS:
         lines.append("No revisions left: asking for another one drops the story.")
+    asked = await person_sent_back(session, ctx)
+    if asked:
+        lines.append(PERSON_SENT_BACK.format(reason=asked))
     change = next((v.change_summary for v in versions if v.change_summary), None)
     if change:
         lines.append(f"The writer's changes in this version: {change}")
@@ -161,6 +164,30 @@ async def review_context(session: AsyncSession, ctx: RunContext) -> str | None:
                 for i in asked
             ]
     return "\n".join(lines)
+
+
+PERSON_SENT_BACK = (
+    "A person sent this article back at approval, and the revisions since answer them "
+    "(the count above started again then): «{reason}». Check first that it does what they asked."
+)
+
+
+async def person_sent_back(session: AsyncSession, ctx: RunContext) -> str | None:
+    """What a person asked for when they last sent this run's article back at approval (D-044):
+    the drafts since were written for it, so the reviews check it first (D-233)."""
+    if ctx.task.workflow_run_id is None:
+        return None
+    reason = await session.scalar(
+        select(Approval.reason)
+        .join(Task, Task.id == Approval.task_id)
+        .where(
+            Task.workflow_run_id == ctx.task.workflow_run_id,
+            Approval.state == ApprovalState.RETURNED,
+        )
+        .order_by(Approval.decided_at.desc())
+        .limit(1)
+    )
+    return reason[:2000] if reason else None
 
 
 async def last_round_issues(

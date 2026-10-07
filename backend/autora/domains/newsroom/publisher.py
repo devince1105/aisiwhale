@@ -300,12 +300,14 @@ async def return_article(
     actor: Actor,
     reason: str,
 ) -> Article:
-    """A person sends the article back for changes: it is a DRAFT again (D-044)."""
+    """A person sends the article back for changes: it is a DRAFT again (D-044), and the editor
+    and the editor-in-chief have their two revisions again for the round it starts (D-233)."""
     _by_a_person("return_article", actor)
     if not reason.strip():
         raise PublishError("say what to change: the writer works from the reason")
     article = await _article(session, company_id, article_id)
     await ARTICLE_FSM.transition(session, article, ArticleState.DRAFT, actor=actor, reason=reason)
+    article.revision_count = 0  # as for a published article's revision (D-045)
     version_id = await session.scalar(
         select(ArticleVersion.id)
         .where(

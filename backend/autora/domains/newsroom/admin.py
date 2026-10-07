@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.db.models import AgentRun, Task, WorkflowRun
+from autora.db.models import AgentRun, StateTransition, Task, WorkflowRun, WorkflowRunState
 from autora.domains.newsroom.covers import cover_of
 from autora.domains.newsroom.models import (
     AnalyticsDaily,
@@ -223,6 +223,11 @@ class ArticleDetail(ArticleSummary):
     """Where it is on the site (D-047): one of the sections, or None for the front page only."""
     section_given: bool = False
     """A person chose it (D-208), rather than the story's sources deciding it."""
+    state_reason: str | None = None
+    """Why it is in its state, as given when it got there (D-233): a rejected article says who
+    turned it down and why — the editor's last objection, a veto, a person's or the CEO's."""
+    in_production: bool = False
+    """A workflow is still at work on it (D-233): a draft without one is not being written."""
 
 
 def cover_view(row: StoryCover | None) -> CoverView | None:
@@ -515,6 +520,7 @@ async def article_detail(
     if article is None:
         return None
     story = await session.get(Story, article.story_id)
+    runs = await _workflow_runs(session, article.story_id)
     rows = (
         await session.scalars(
             select(ArticleVersion)
@@ -636,7 +642,25 @@ async def article_detail(
             )
             for d in daily
         ],
-        workflow_run_ids=await _workflow_runs(session, article.story_id),
+        workflow_run_ids=runs,
+        state_reason=await session.scalar(
+            select(StateTransition.reason)
+            .where(
+                StateTransition.entity_type == "article",
+                StateTransition.entity_id == article.id,
+                StateTransition.to_state == article.state,
+            )
+            .order_by(StateTransition.at.desc(), StateTransition.id.desc())
+            .limit(1)
+        ),
+        in_production=bool(
+            runs
+            and await session.scalar(
+                select(func.count()).where(
+                    WorkflowRun.id.in_(runs), WorkflowRun.state == WorkflowRunState.RUNNING
+                )
+            )
+        ),
     )
 
 

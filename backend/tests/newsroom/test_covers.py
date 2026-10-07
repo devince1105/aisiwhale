@@ -560,3 +560,17 @@ async def test_a_swap_after_the_library_links_expired_looks_the_photo_up_again(
     assert row.provider_id == found[1].id  # the same photo, with a fresh link
     assert library.searches == 3
     assert all(c["image_url"].endswith("?s=3") for c in row.candidates)
+
+
+async def test_pixabay_is_asked_in_chinese_when_a_person_writes_chinese():
+    # D-233: marketing searches in English; a person may write 晶圓廠
+    asked = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        asked.append((request.url.params["q"], request.url.params["lang"]))
+        return httpx.Response(200, json={"hits": []})
+
+    library = covers.Pixabay("KEY", client=httpx.AsyncClient(transport=httpx.MockTransport(answer)))
+    await library.search("晶圓廠")
+    await library.search("semiconductor wafer")
+    assert asked == [("晶圓廠", "zh"), ("semiconductor wafer", "en")]

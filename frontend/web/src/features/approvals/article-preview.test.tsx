@@ -203,7 +203,19 @@ describe("copying the article (D-141)", () => {
 });
 
 it("a version sent back that the writer is revising (D-141)", () => {
-  expect(outcomeText("RETURNED", article({ state: "DRAFT" }), "g2")).toBe(
+  expect(outcomeText("RETURNED", article({ state: "DRAFT", in_production: true }), "g2")).toBe(
     "結果：已退回修改・這篇目前：寫手修改中",
+  );
+});
+
+it("a dropped one says why, and a draft nothing works on says so (D-233)", () => {
+  const dropped = article({ state: "REJECTED", state_reason: "still not ready after 2 revisions" });
+  expect(outcomeText("RETURNED", dropped, "g1")).toBe(
+    "結果：已退回修改・這篇目前：已駁回（編輯與總編要求修改超過 2 次，題材已放棄）",
+  );
+  const turnedDown = article({ state: "REJECTED", state_reason: "標題誇大，不發" });
+  expect(outcomeText("RETURNED", turnedDown, "g1")).toBe("結果：已退回修改・這篇目前：已駁回（標題誇大，不發）");
+  expect(outcomeText("RETURNED", article({ state: "DRAFT", in_production: false }), "g2")).toBe(
+    "結果：已退回修改・這篇目前：停在草稿（流程已結束，沒有人在改）",
   );
 });

@@ -55,6 +55,9 @@ export interface ApprovalCard {
   runId: string | null;
   /** A decision task (an article to approve) can be sent back; a paused agent run cannot. */
   canSendBack: boolean;
+  /** How many more times it may be sent back (D-233): a run has two such rounds, and a third
+   * would leave the article a draft nobody writes. Null when the approval does not say. */
+  returnsLeft: number | null;
   /** The article to read before deciding (D-046): its id and the draft that was submitted. */
   article: { id: string; draftGroupId: string | null } | null;
   /** A transcribed official's transaction report to check against its scan (D-051). */
@@ -223,6 +226,7 @@ export function approvalCard(
     taskId: approval.task_id,
     runId: approval.run_id,
     canSendBack: Boolean(approval.task_id) && !approval.run_id,
+    returnsLeft: typeof payload.returns_left === "number" ? payload.returns_left : null,
     article:
       typeof payload.article_id === "string"
         ? {

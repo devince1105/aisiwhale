@@ -250,6 +250,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/articles/{article_id}/cover/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Cover
+         * @description Look for the cover with a person's own words (D-233): the library's first photo becomes
+         *     the cover and 換一張 goes through the rest (no model call). On a published article the site
+         *     changes with it.
+         */
+        post: operations["search_cover_api_articles__article_id__cover_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/articles/{article_id}/cover/swap": {
         parameters: {
             query?: never;
@@ -2015,6 +2037,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * In Production
+             * @default false
+             */
+            in_production: boolean;
             /** Langs */
             langs: string[];
             /** Languages */
@@ -2053,6 +2080,8 @@ export interface components {
             slug: string;
             /** State */
             state: string;
+            /** State Reason */
+            state_reason?: string | null;
             /**
              * Story Id
              * Format: uuid
@@ -2556,6 +2585,11 @@ export interface components {
             strong_sell: number;
             /** Total */
             readonly total: number;
+        };
+        /** CoverSearchBody */
+        CoverSearchBody: {
+            /** Query */
+            query: string;
         };
         /**
          * CoverView
@@ -5455,6 +5489,43 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_cover_api_articles__article_id__cover_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoverSearchBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

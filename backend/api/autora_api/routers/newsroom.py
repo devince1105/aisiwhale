@@ -11,6 +11,7 @@
 - POST /api/articles/{id}/republish               put it back
 - POST /api/articles/{id}/revise                  change a published article (D-045)
 - POST /api/articles/{id}/cover/swap              the next photo from the same search (D-142)
+- POST /api/articles/{id}/cover/search            look again with a person's words (D-233)
 - DELETE /api/articles/{id}/cover                 take the cover off
 - GET  /api/companies/{id}/sources                sources with how many items each brought
 - POST /api/companies/{id}/sources                add a source (starts the newsroom schedules)
@@ -201,6 +202,39 @@ async def swap_cover(article_id: uuid.UUID, session: Session, _: Operator) -> ad
         raise HTTPException(status.HTTP_409_CONFLICT, covers_tool.NO_LIBRARY)
     try:
         await covers.swap_cover(session, row, library=library, store=store)
+    except covers.CoverError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await session.commit()
+    view = admin.cover_view(row)
+    assert view is not None
+    return view
+
+
+class CoverSearchBody(BaseModel):
+    query: str = Field(min_length=1, max_length=100)
+    """What the picture should show, in a person's words (Chinese or English)."""
+
+
+@router.post("/api/articles/{article_id}/cover/search")
+async def search_cover(
+    article_id: uuid.UUID, body: CoverSearchBody, session: Session, _: Operator
+) -> admin.CoverView:
+    """Look for the cover with a person's own words (D-233): the library's first photo becomes
+    the cover and 換一張 goes through the rest (no model call). On a published article the site
+    changes with it."""
+    article = await _article_of(session, article_id)
+    library, store = cover_tools()
+    if library is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, covers_tool.NO_LIBRARY)
+    try:
+        row = await covers.search_cover(
+            session,
+            company_id=article.company_id,
+            story_id=article.story_id,
+            query=body.query,
+            library=library,
+            store=store,
+        )
     except covers.CoverError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     await session.commit()

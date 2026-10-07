@@ -19,7 +19,9 @@ Two additions (T-514):
   waited for ``check`` waits for the new round instead. At most ``max_rounds`` extra rounds; one
   more request cancels what was waiting (the work did not get done). Several loops may check the
   same node: the first whose ``again`` asks for a round is the one that runs (the problem is in the
-  draft, or further back, in the analysis — D-110).
+  draft, or further back, in the analysis — D-110). A loop may **restart** others: when it starts a
+  round, theirs are counted again from there (D-233: a person's send-back gives the editor its
+  rounds back).
 - a template may declare **halts** (``Halt``): when the node ``check`` succeeds and its output says
   the work must stop there (a veto), whatever waited for it is cancelled and the run closes.
 
@@ -93,6 +95,10 @@ class Loop:
     max_rounds: int = 2
     round_label: str = "{name} (round {round})"
     """Display name of a repeated task: ``name`` is the node's display name, ``round`` from 2."""
+    restarts: tuple[str, ...] = ()
+    """The checks of other loops inside this one's body that get their rounds back when it starts
+    a round: they count again from that round (D-233: a person's send-back gives the editor its
+    revisions)."""
 
 
 @dataclass(frozen=True)
@@ -134,6 +140,13 @@ class WorkflowTemplate:
                 raise InvalidTemplate(f"{self.name}: loop over unknown nodes {loop}")
             if loop.back_to not in self.upstream(loop.check) and loop.back_to != loop.check:
                 raise InvalidTemplate(f"{self.name}: {loop.back_to} does not lead to {loop.check}")
+        for loop in self.loops:
+            inside = {n.name for n in self.loop_body(loop)} - {loop.check}
+            unknown = set(loop.restarts) - ({lp.check for lp in self.loops} & inside)
+            if unknown:
+                raise InvalidTemplate(
+                    f"{self.name}: the loop on {loop.check} restarts no loop inside it on {unknown}"
+                )
         for halt in self.halts:
             if halt.check not in names:
                 raise InvalidTemplate(f"{self.name}: halt on unknown node {halt.check!r}")
@@ -344,7 +357,7 @@ class WorkflowEngine:
         if loop is None:
             return None
         waiting = [t for t in siblings if task.id in t.depends_on]
-        rounds = sum(1 for t in siblings if t.name == loop.check) - 1
+        rounds = _rounds(template, loop, siblings)
         if rounds >= loop.max_rounds:
             await self._cancel_waiting(
                 session,
@@ -504,6 +517,26 @@ class WorkflowEngine:
                 correlation_id=run.id,
             ),
         )
+
+
+def _rounds(template: WorkflowTemplate, loop: Loop, siblings: list[Task]) -> int:
+    """The extra rounds ``loop`` has had: its ``check`` tasks but the first — counted from the
+    latest round of a loop that restarts it, if there was one (``Loop.restarts``).
+
+    ``siblings`` are in creation order, and a round's tasks are added together in topological
+    order, its own ``check`` last: the restarting round's copy of ``loop.check`` is the nearest
+    one before it, and the count starts there."""
+    start = 0
+    for outer in template.loops:
+        if loop.check not in outer.restarts:
+            continue
+        repeated = [i for i, t in enumerate(siblings) if t.name == outer.check][1:]
+        if repeated:  # the first is the run's own, not a round
+            own = next(
+                (i for i in range(repeated[-1], -1, -1) if siblings[i].name == loop.check), 0
+            )
+            start = max(start, own)
+    return max(0, sum(1 for t in siblings[start:] if t.name == loop.check) - 1)
 
 
 def _input(node: NodeSpec, params: dict[str, Any]) -> dict[str, Any]:

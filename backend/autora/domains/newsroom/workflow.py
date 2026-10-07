@@ -31,7 +31,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.company.agents import hire_agent
@@ -53,6 +53,7 @@ from autora.domains.newsroom.publisher import (
 )
 from autora.domains.newsroom.stories import STORY_FSM
 from autora.runtime.actor import Actor
+from autora.runtime.approvals import ApprovalError
 from autora.runtime.dag import (
     Halt,
     Loop,
@@ -164,8 +165,9 @@ TEMPLATE = WorkflowTemplate(
         ),
         CHIEF_LOOP,
         # D-044: a person sends it back from approval; the writer drafts again with their reason,
-        # the editor reviews again, and it comes back to approval. The editor's loop above counts
-        # reviews, so a round sent back by a person uses one of those too.
+        # the editor reviews again, and it comes back to approval. The editor and the chief have
+        # their rounds again from there (D-233): counted from the start, a draft that had used
+        # them was dropped at the editor's first objection, and never came back to the person.
         Loop(
             check="approve",
             back_to="draft",
@@ -173,6 +175,7 @@ TEMPLATE = WorkflowTemplate(
             carry=_their_reason,
             max_rounds=MAX_REVISIONS,
             round_label="{name}（退回後第 {round} 輪）",
+            restarts=("review", "chief_review"),
         ),
     ),
     halts=(CHIEF_HALT,),
@@ -373,6 +376,20 @@ async def _story_article(ctx: ServiceContext) -> Article | None:
     )
 
 
+async def returns_left(session: AsyncSession, approve: Task) -> int:
+    """How many more times a person may send the article back from this approval: the run's
+    loop on ``approve`` has ``MAX_REVISIONS`` rounds (D-044). The card offers 退回修改 only
+    while there is one (D-233)."""
+    if approve.workflow_run_id is None:
+        return 0
+    approvals = await session.scalar(
+        select(func.count()).where(
+            Task.workflow_run_id == approve.workflow_run_id, Task.name == approve.name
+        )
+    )
+    return max(0, MAX_REVISIONS - ((approvals or 1) - 1))
+
+
 # --- service steps ----------------------------------------------------------------------------
 
 
@@ -408,6 +425,7 @@ async def approve_step(ctx: ServiceContext) -> None:
                 "article_id": str(article.id),
                 "story_id": str(article.story_id),
                 "draft_group_id": str(article.current_draft_group_id),
+                "returns_left": await returns_left(ctx.session, ctx.task),
             },
         )
         return
@@ -467,6 +485,12 @@ def on_article_decided(policy: PolicyEngine):
                 delegated=actor.kind == "agent",
             )
         elif outcome == "revise":
+            waiting = await session.get(Task, approval.task_id) if approval.task_id else None
+            if waiting is None or await returns_left(session, waiting) < 1:
+                # a third would cancel the run and leave the article a draft nobody writes
+                raise ApprovalError(
+                    f"sent back {MAX_REVISIONS} times already: approve it or reject it"
+                )
             await return_article(
                 session,
                 company_id=approval.company_id,

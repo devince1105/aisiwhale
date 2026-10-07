@@ -287,7 +287,8 @@ function ApprovalActions({ approval, companyId }: { approval?: Pick<Approval, "i
           <button type="button" disabled={busy} onClick={() => void decide("approve")} className={`${button} border-ok bg-ok text-white`}>
             {choice?.approve ?? "核准"}
           </button>
-          {choice ? null : (
+          {/* a third send-back would leave the article a draft nobody writes (D-233) */}
+          {choice || approval.payload?.returns_left === 0 ? null : (
             <button type="button" disabled={busy} onClick={() => setAsking("revise")} className={`${button} border-line text-ink`}>
               退回修改
             </button>

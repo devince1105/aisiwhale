@@ -257,6 +257,17 @@ export async function swapCover(articleId: string, api: ApiClient = defaultApi) 
   return unwrap(await api.POST("/api/articles/{article_id}/cover/swap", { params: { path: { article_id: articleId } } }));
 }
 
+/** Look for the cover in a person's own words (D-233): the first photo found is the cover, and
+ * swapping goes through the rest of that search. */
+export async function searchCover(articleId: string, query: string, api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.POST("/api/articles/{article_id}/cover/search", {
+      params: { path: { article_id: articleId } },
+      body: { query },
+    }),
+  );
+}
+
 /** Take the article's cover off (D-142); swapping puts one back. */
 export async function removeCover(articleId: string, api: ApiClient = defaultApi) {
   return unwrap(await api.DELETE("/api/articles/{article_id}/cover", { params: { path: { article_id: articleId } } }));

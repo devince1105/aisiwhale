@@ -601,6 +601,11 @@
       "title": "Id",
       "type": "string"
      },
+     "in_production": {
+      "default": false,
+      "title": "In Production",
+      "type": "boolean"
+     },
      "langs": {
       "items": {
        "type": "string"
@@ -700,6 +705,17 @@
      "state": {
       "title": "State",
       "type": "string"
+     },
+     "state_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State Reason"
      },
      "story_id": {
       "format": "uuid",
@@ -1963,6 +1979,21 @@
      "total"
     ],
     "title": "Counts",
+    "type": "object"
+   },
+   "CoverSearchBody": {
+    "properties": {
+     "query": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "title": "CoverSearchBody",
     "type": "object"
    },
    "CoverView": {
@@ -9237,6 +9268,81 @@
      }
     ],
     "summary": "Delete Cover",
+    "tags": [
+     "newsroom"
+    ]
+   }
+  },
+  "/api/articles/{article_id}/cover/search": {
+   "post": {
+    "description": "Look for the cover with a person's own words (D-233): the library's first photo becomes\nthe cover and 換一張 goes through the rest (no model call). On a published article the site\nchanges with it.",
+    "operationId": "search_cover_api_articles__article_id__cover_search_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CoverSearchBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverView"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Search Cover",
     "tags": [
      "newsroom"
     ]

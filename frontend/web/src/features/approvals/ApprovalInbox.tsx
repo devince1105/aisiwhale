@@ -136,7 +136,9 @@ function Card({
           <div className="mt-3 grid gap-2">
             <label className="grid gap-1 text-sm">
               <span className="text-muted">
-                {card.canSendBack ? "意見（退回修改時必填：寫手會照這段修改）" : "理由（選填，駁回時建議填寫）"}
+                {card.canSendBack && card.returnsLeft !== 0
+                  ? "意見（退回修改時必填：寫手會照這段修改）"
+                  : "理由（選填，駁回時建議填寫）"}
               </span>
               <textarea
                 value={reason}
@@ -155,11 +157,17 @@ function Card({
               >
                 {card.command?.approve ?? "核准"}
               </button>
-              {card.canSendBack ? (
+              {card.canSendBack && card.returnsLeft !== 0 ? (
                 <button
                   type="button"
                   disabled={busy || !reason.trim()}
-                  title={reason.trim() ? undefined : "先寫下要改什麼"}
+                  title={
+                    !reason.trim()
+                      ? "先寫下要改什麼"
+                      : card.returnsLeft === 1
+                        ? "這是最後一次可以退回"
+                        : undefined
+                  }
                   onClick={() => onDecide("revise", reason.trim())}
                   className="rounded-lg border border-line px-4 py-1.5 text-sm disabled:opacity-50"
                 >
@@ -175,6 +183,9 @@ function Card({
                 {card.command?.reject ?? (card.canSendBack ? "駁回（放棄這則）" : "駁回")}
               </button>
             </div>
+            {card.canSendBack && card.returnsLeft === 0 ? (
+              <p className="text-sm text-muted">已經退回 2 次，不能再退回修改：請核准或駁回。首圖可以在上面直接換。</p>
+            ) : null}
           </div>
         )
       ) : null}

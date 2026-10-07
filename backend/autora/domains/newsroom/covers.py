@@ -4,7 +4,8 @@ the company's own storage.
 Marketing chooses it while the article is drafted (the ``cover`` task, ``agents/cover.py``) with
 two tools: ``search_images`` (what the library has) and ``set_cover`` (download the one chosen,
 cut it, store it). A person sees it on the approval card and can swap it for another photo from
-the same search, or take it off; neither asks the model again.
+the same search, look again with their own words (D-233), or take it off; none of these asks the
+model again.
 
 - The library is Pixabay (Pexels too once it issues keys again): its licence allows commercial
   use without attribution, and asks that a photo be downloaded and served from one's own
@@ -133,7 +134,8 @@ class Pixabay:
             {
                 "key": self._key,
                 "q": query,
-                "lang": "en",
+                # marketing searches in English; a person may write Chinese (D-233)
+                "lang": "zh" if _chinese(query) else "en",
                 # photos and illustrations (a modern chip is mostly a 3D render); vectors are
                 # icons and clip art, filtered out below
                 "image_type": "all",
@@ -173,6 +175,10 @@ class Pixabay:
         if len(response.content) > MAX_DOWNLOAD:
             raise CoverError("the photo is too large to download")
         return response.content
+
+
+def _chinese(text: str) -> bool:
+    return any("\u4e00" <= c <= "\u9fff" or "\u3400" <= c <= "\u4dbf" for c in text)
 
 
 class FixtureLibrary:
@@ -721,6 +727,44 @@ async def swap_cover(
     row.alt = {"zh-TW": f"示意圖：{photo.tags}", "en": f"Illustration: {photo.tags}"}
     row.state = CoverState.ACTIVE.value
     if old != key:
+        await _forget(store, old)
+    await session.flush()
+    return row
+
+
+async def search_cover(
+    session: AsyncSession,
+    *,
+    company_id: uuid.UUID,
+    story_id: uuid.UUID,
+    query: str,
+    library: ImageLibrary,
+    store: CoverStore,
+) -> StoryCover:
+    """A person looks for the cover in their own words (D-233): the library's first photo that
+    no other article shows becomes the cover, and the rest are what 換一張 goes through. No model
+    call. It also puts a cover on a story that had none, or whose cover a person took off."""
+    query = " ".join(query.split())[:100]
+    if not query:
+        raise CoverError("say what the picture should show")
+    found = await library.search(query, limit=20)
+    taken = await used_elsewhere(session, company_id, story_id, found)
+    free = [p for p in found if p.id not in taken]
+    if not free:
+        raise CoverError(f"the library has no photo for 「{query}」 yet: try other words")
+    photo = free[0]
+    key, url, width, height, size = await _store(library, store, story_id, photo)
+    row = await cover_of(session, story_id)
+    old = row.key if row is not None else None
+    if row is None:
+        row = StoryCover(company_id=company_id, story_id=story_id)
+        session.add(row)
+    _show(row, photo, key=key, url=url, width=width, height=height, size=size)
+    row.alt = {"zh-TW": f"示意圖：{photo.tags}", "en": f"Illustration: {photo.tags}"}
+    row.query, row.run_id = query, None
+    row.candidates = [p.as_json() for p in free[1:]][:KEEP_CANDIDATES]
+    row.state = CoverState.ACTIVE.value
+    if old is not None and old != key:
         await _forget(store, old)
     await session.flush()
     return row

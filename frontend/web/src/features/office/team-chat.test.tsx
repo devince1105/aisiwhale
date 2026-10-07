@@ -216,6 +216,15 @@ describe("the group beside the office (D-109)", () => {
     await waitFor(() => expect(calls.find((c) => c.url.includes("/decide"))?.body).toEqual({ decision: "revise", reason: "標題太長" }));
   });
 
+  it("an article sent back twice is approved or rejected, not sent back again (D-233)", async () => {
+    serve(feed, [{ id: "ap1", ref_id: TASK, state: "PENDING", payload: { article_id: "a1", returns_left: 0 } }]);
+    open();
+    const asked = await screen.findByTestId("chat-approval");
+    expect(within(asked).queryByRole("button", { name: "退回修改" })).toBeNull();
+    expect(within(asked).getByRole("button", { name: "核准" })).toBeTruthy();
+    expect(within(asked).getByRole("button", { name: "駁回" })).toBeTruthy();
+  });
+
   it("the CEO's command: the buttons say what they do, and it cannot be sent back (D-201)", async () => {
     const CMD = "0192f000-0000-7000-8000-0000000000e1";
     const calls = serve(

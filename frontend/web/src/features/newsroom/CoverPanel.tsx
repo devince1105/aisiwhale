@@ -1,12 +1,14 @@
 // The article's cover where a person decides (D-142): the photo marketing chose, whose it is, and
 // 換一張 (the next photo from the same search, no model call) or 拿掉 (none; marketing picks no
-// other). On a published article the site changes with it.
+// other). 重找 looks again with the person's own words (D-233): a new cover without sending the
+// article back. On a published article the site changes with it.
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import type { Schemas } from "@/api/client";
-import { removeCover, swapCover } from "@/api/queries";
+import { removeCover, searchCover, swapCover } from "@/api/queries";
 import { coverSrc } from "@/features/site/Cover";
 
 export type CoverView = Schemas["CoverView"];
@@ -16,9 +18,23 @@ export function CoverPanel({ articleId, cover }: { articleId: string; cover: Cov
   const onSettled = () => queryClient.invalidateQueries({ queryKey: ["newsroom", "article", articleId] });
   const swap = useMutation({ mutationFn: () => swapCover(articleId), onSettled });
   const remove = useMutation({ mutationFn: () => removeCover(articleId), onSettled });
-  const busy = swap.isPending || remove.isPending;
-  const error = swap.error ?? remove.error;
-  if (!cover) return <p className="text-sm text-muted">首圖：行銷沒有找到合適的圖片（或尚未找）。</p>;
+  const search = useMutation({ mutationFn: (query: string) => searchCover(articleId, query), onSettled });
+  const busy = swap.isPending || remove.isPending || search.isPending;
+  const error = swap.error ?? remove.error ?? search.error;
+  const finder = <CoverSearch busy={busy} onSearch={(query) => search.mutate(query)} />;
+  const failed = error ? (
+    <p role="alert" className="text-danger">
+      {error.message}
+    </p>
+  ) : null;
+  if (!cover)
+    return (
+      <div className="grid gap-1 text-sm" data-testid="cover-panel">
+        <p className="text-muted">首圖：行銷沒有找到合適的圖片（或尚未找）。</p>
+        {finder}
+        {failed}
+      </div>
+    );
   const shown = cover.state === "active";
   return (
     <div className="flex flex-wrap items-start gap-3" data-testid="cover-panel">
@@ -72,12 +88,40 @@ export function CoverPanel({ articleId, cover }: { articleId: string; cover: Cov
             </button>
           ) : null}
         </div>
-        {error ? (
-          <p role="alert" className="text-danger">
-            {error.message}
-          </p>
-        ) : null}
+        {finder}
+        {failed}
       </div>
     </div>
+  );
+}
+
+/** 重找: the person's own words for the library (Chinese or English), no model call (D-233). */
+function CoverSearch({ busy, onSearch }: { busy: boolean; onSearch: (query: string) => void }) {
+  const [words, setWords] = useState("");
+  const query = words.trim();
+  return (
+    <form
+      className="flex flex-wrap gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (query) onSearch(query);
+      }}
+    >
+      <input
+        aria-label="用自己的話找首圖"
+        value={words}
+        maxLength={100}
+        onChange={(event) => setWords(event.target.value)}
+        placeholder="自己找：例如 晶圓廠、股市看板"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-transparent px-2 py-1 text-sm"
+      />
+      <button
+        type="submit"
+        disabled={busy || !query}
+        className="rounded-lg border border-line px-3 py-1 text-sm disabled:opacity-50"
+      >
+        重找
+      </button>
+    </form>
   );
 }

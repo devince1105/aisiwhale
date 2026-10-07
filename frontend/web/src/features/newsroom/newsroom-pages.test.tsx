@@ -107,6 +107,7 @@ const ARTICLE_DETAIL: ArticleDetail = {
   workflow_run_ids: ["run1"],
   section: null,
   section_given: false,
+  in_production: false,
 };
 
 const event = (event_type: string, payload: object): EventEnvelope =>

@@ -18,6 +18,8 @@ from autora.db.models import (
     WorkflowRun,
 )
 from autora.db.repositories.companies import upsert_policy
+from autora.domains.newsroom import admin
+from autora.domains.newsroom.agents.editor import review_context
 from autora.domains.newsroom.models import (
     Article,
     ArticleVersion,
@@ -29,6 +31,8 @@ from autora.domains.newsroom.models import (
 from autora.domains.newsroom.policy import AUTO_APPROVE_KEY, CEO_DECIDES_WHEN_UNANSWERED_KEY
 from autora.domains.newsroom.workflow import TEMPLATE_NAME, start_story
 from autora.runtime.actor import Actor
+from autora.runtime.approvals import ApprovalError
+from autora.runtime.behaviors import RunContext
 from tests.conftest import unique_company
 
 OPERATOR = Actor.human("operator")
@@ -424,6 +428,10 @@ async def test_too_many_revisions_drop_the_story(committed, e2e_settings):
     assert (await room.get(WorkflowRun, room.run.id)).state == "CANCELLED"
     assert (await room.article()).state == "REJECTED"
     assert (await room.get(Story, room.story.id)).state == "DROPPED"
+    # the decided card says why, and that nothing is at work on it any more (D-233)
+    detail = await _detail(room)
+    assert detail.state_reason == "still not ready after 2 revisions"
+    assert not detail.in_production
 
 
 async def test_a_person_rejects_the_article(committed, e2e_settings):
@@ -502,6 +510,93 @@ async def test_a_person_sends_it_back_and_it_comes_back_changed(committed, e2e_s
     await room.worker.run_until_idle()
     assert (await room.article()).state == "PUBLISHED"
     assert (await room.get(WorkflowRun, room.run.id)).state == "SUCCEEDED"
+
+
+async def _pending(room) -> Approval:
+    async with room.committed() as session:
+        return await session.scalar(
+            select(Approval)
+            .where(Approval.company_id == room.company.id, Approval.state == "PENDING")
+            .order_by(Approval.created_at.desc(), Approval.id.desc())
+            .limit(1)
+        )
+
+
+async def _send_back(room, approval, reason):
+    async with room.committed() as session:
+        await room.runtime.approvals.decide(
+            session, approval.id, outcome="revise", actor=OPERATOR, reason=reason
+        )
+        await session.commit()
+
+
+async def _detail(room):
+    async with room.committed() as session:
+        return await admin.article_detail(session, (await room.article()).id)
+
+
+async def test_a_draft_that_used_its_revisions_is_sent_back_and_still_comes_back(
+    committed, e2e_settings
+):
+    """D-233: the editor sent the draft back twice before a person saw it. The person sends it
+    back, the editor objects once more, and it is a new round — not, as before, the story
+    dropped at that objection — and the article comes back to the person."""
+    room = await Newsroom().start(committed, e2e_settings)
+    _break_each_draft(room, times=2)
+    await room.worker.run_until_idle()
+    assert (await room.article()).revision_count == 2
+    await _send_back(room, await _pending(room), "首段寫明這是哪一週")
+    _break_each_draft(room, times=1)  # the editor objects to the person's round once
+    await room.worker.run_until_idle()
+
+    tasks = await room.tasks()
+    assert [t.output["verdict"] for t in tasks["review"]] == [
+        "revise", "revise", "accept", "revise", "accept"
+    ]  # fmt: skip
+    assert tasks["draft"][3].display_name == "撰稿：Lumen City microgrid（退回後第 2 輪）"
+    assert [t.state for t in tasks["approve"]] == ["SUCCEEDED", "WAITING_APPROVAL"]
+    article = await room.article()
+    assert article.state == "IN_REVIEW" and article.revision_count == 1
+    assert (await room.get(Story, room.story.id)).state == "IN_PRODUCTION"
+    assert (await _detail(room)).in_production
+    again = await _pending(room)
+    assert again.task_id == tasks["approve"][1].id and again.payload["returns_left"] == 1
+
+    # the reviews of the person's round were told what the person asked for
+    async with committed() as session:
+        review = await session.get(Task, tasks["review"][3].id)
+        text = await review_context(
+            session,
+            RunContext(
+                company_id=room.company.id,
+                project_id=review.project_id,
+                task=review,
+                agent=room.agents["editor"],
+                run_id=uuid.uuid4(),
+            ),
+        )
+    assert "A person sent this article back at approval" in text
+    assert "«首段寫明這是哪一週»" in text and "Revisions so far: 1 of 2" in text
+
+
+async def test_a_person_sends_it_back_twice_at_most(committed, e2e_settings):
+    """D-233: the card offers 退回修改 while the run has a round for it; a third is refused, rather
+    than cancelling the run and leaving the article a draft nobody writes."""
+    room = await Newsroom().start(committed, e2e_settings)
+    await room.worker.run_until_idle()
+    for left, reason in ((2, "換個標題"), (1, "再短一點")):
+        approval = await _pending(room)
+        assert approval.payload["returns_left"] == left
+        await _send_back(room, approval, reason)
+        await room.worker.run_until_idle()
+    last = await _pending(room)
+    assert last.payload["returns_left"] == 0
+    with pytest.raises(ApprovalError, match="sent back 2 times already"):
+        await _send_back(room, last, "還是不對")
+    assert (await room.get(Approval, last.id)).state == "PENDING"
+    assert (await room.article()).state == "IN_REVIEW"
+    await room.worker.run_until_idle()
+    assert (await room.tasks())["approve"][-1].state == "WAITING_APPROVAL"
 
 
 async def test_a_published_article_can_be_taken_down_and_put_back(committed, e2e_settings):
