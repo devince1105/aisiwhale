@@ -103,6 +103,13 @@ class ArticleDraft(BaseModel):
     versions: dict[str, uuid.UUID] = Field(min_length=1, max_length=5)
 
 
+COVER_IS_NOT_YOURS = (
+    "The cover image is not yours: a person changes it on the approval card. An issue that only "
+    "asks for another picture needs no change to the text; write the draft again as it is and say "
+    "so in change_summary."
+)
+
+
 def revision_issues(ctx: RunContext) -> list[dict[str, Any]]:
     """The editor's issues for a revision task (empty: a first draft)."""
     raw = (ctx.task.input.get("params") or {}).get("issues") or []
@@ -195,6 +202,8 @@ async def draft_context(session: AsyncSession, ctx: RunContext) -> str | None:
             where = " ".join(str(issue[k]) for k in ("lang", "block_ref") if issue.get(k))
             lines.append(f"- {f'[{where}] ' if where else ''}{issue.get('message', '')}")
         lines.append("Read the current draft (read_draft), fix every issue, give change_summary.")
+        # D-233: a person sending it back for another picture had the text rewritten for it
+        lines.append(COVER_IS_NOT_YOURS)
     return "\n".join(lines)
 
 

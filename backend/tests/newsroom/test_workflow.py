@@ -577,6 +577,7 @@ async def test_a_draft_that_used_its_revisions_is_sent_back_and_still_comes_back
         )
     assert "A person sent this article back at approval" in text
     assert "«首段寫明這是哪一週»" in text and "Revisions so far: 1 of 2" in text
+    assert "a picture they asked for is not a reason to send the draft back" in text
 
 
 async def test_a_person_sends_it_back_twice_at_most(committed, e2e_settings):
