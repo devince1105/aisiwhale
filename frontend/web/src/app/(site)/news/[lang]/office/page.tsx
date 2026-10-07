@@ -25,7 +25,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
           {w.badge}
         </span>
       </div>
-      <p className="mt-3 max-w-3xl leading-relaxed text-muted">{w.intro}</p>
+      <p className="mt-3 leading-relaxed text-muted">{w.intro}</p>
       <div className="mt-6">
         {/* on a capable computer, the office kept between pages moves in here (D-176) */}
         <OfficeSlot lang={lang} theme={theme} />
