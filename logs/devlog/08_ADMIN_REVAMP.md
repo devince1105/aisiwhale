@@ -630,3 +630,28 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - ruff、lint-imports、`gen_openapi --check`、`gen-api:check`、tsc、eslint、vitest（1,031 項）都通過；`test_admin_permissions.py`、`test_admin_audit.py`、`test_membership_p2_api.py` 通過。
 - 真實瀏覽器：在 e2e 環境寫入 5 個題材（其中一個標題是 `=HYPERLINK(...)`），在題材頁篩選「已選定」、依分數排序後按「匯出 CSV」。下載的檔案以 BOM 開頭、順序和畫面相同、公式前面有 `'`，提示「已匯出 5 筆」；操作紀錄頁出現「匯出題材 CSV」，操作者是 admin@e2e.test。看截圖時發現畫面上的分數是 40、檔案裡是 0.400，改成和畫面一樣。
 - 完整套件（合併 AD-12 之後）：後端 2,531 項、vitest 1,031 項、build、Playwright e2e 17 項（1 項略過）全部通過。
+
+## 2026-10-07：AD-14 讓之後的頁面直接用新外殼
+
+在 `.claude/worktrees/ad14`（分支 `admin/ad14`）做。AD-14 不是一個新頁面，是讓 TR-10 交易頁、P6a 研究工作頁和之後的頁面不再各自手寫。P3 鯨幣頁已經由會員工作階段用新元件做好（DataTable、ConfirmDialog），不必再改。
+
+### 做了什麼
+
+- **檢查清單** `logs/admin/02_NEW_ADMIN_PAGE.md`：外殼、列表、權限與稽核、互動、驗證五段，每一項都指向實際的檔案與元件。交易提案的 TR-10 列、營利藍圖的 §12（P6a）和改版計畫的 AD-14 都加上連結。清單也提醒：交易與研究大概需要新的權限鍵，**加之前先和使用者確認哪些角色可以做**。
+- **把慣例變成測試**，沒做到 CI 就會失敗，不靠記憶：
+  - 後端把每條路由需要的權限鍵寫進 openapi.json 的 `x-permission`（`permissions.label_openapi`，在 `create_app` 包住 `app.openapi`）。產生的 TypeScript 型別不受影響。`test_admin_permissions.py` 新增一項：openapi 裡的 `x-permission` 必須和 `ROUTES` 完全一致。
+  - 前端 `admin-ui/conventions.test.ts` 讀 openapi.json 和原始碼，檢查三件事：
+    1. 有權限鍵的寫入路由，在 `audit/labels.ts` 都有中文名稱（操作紀錄不會出現英文函式名）；
+    2. 頁面要求的權限鍵（`useCan`、導覽的 `need`、看板的 `moves.ts`）都是某條路由真的有的鍵（打錯字會被抓到）；
+    3. `app/admin` 底下每一頁都在導覽地圖上（有麵包屑、側欄、⌘K），例外只有登入頁與 `/admin/newsroom` 這個轉址頁。
+- **檢查時發現並修正的地方**：
+  - **側欄的「鯨幣」對 editor 和 viewer 也顯示**，但他們沒有 `coins:view`，一打開查錢包就是 403。導覽項目加上 `need: "coins:view"`。
+  - **Dashboard 的專案、預算與資金、代理三個區塊在 `<main>` 外面**，各自用 `mx-auto max-w-7xl px-4` 模仿頁寬。改成 `DashboardView` 接收 children，三個區塊放進同一個 `AdminPage`；頁面只有一個 `<main>`，寬度跟著外殼。
+  - **執行軌跡與任務頁的「載入中」和錯誤是手寫的一段文字**，改成在 `AdminPage` 裡用 `PageHeader`＋`LoadingState`／`ErrorState`，載入或失敗時也有麵包屑。
+- 其他頁面（代理、每日週期、事件時間軸、新聞室、VIP 授予、鯨幣、操作紀錄、權限、設定、審批）都已經用 `AdminPage`＋`PageHeader`；辦公室是全螢幕 3D，刻意不放進 `AdminPage`。
+
+### 驗證
+
+- 前端 `conventions.test.ts` 3 項；先故意刪掉一個稽核名稱、把導覽的鍵打錯、加一個不在導覽上的 `/admin/zzprobe` 頁，三項都如預期失敗並指出是哪一個，改回後通過。
+- 後端 `test_admin_permissions.py` 12 項通過（含新的 openapi 一致性檢查）；`gen-api:check` 確認型別沒變。
+- 真實瀏覽器：Dashboard 頁只有一個 `<main>`，三個區塊的標題都在裡面，手機寬度 390px 沒有橫向捲動；打開不存在的執行軌跡，錯誤顯示在外殼裡。截圖時發現錯誤頁沒有麵包屑，補上 `PageHeader`。

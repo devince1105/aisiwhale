@@ -13,6 +13,8 @@ the machines' (CI, scripts, the worker), recorded as ``operator`` in the audit t
 
 from __future__ import annotations
 
+from typing import Any
+
 from autora.db.models import AdminRoleName
 
 NEWSROOM = "newsroom:edit"
@@ -112,3 +114,14 @@ def needed(method: str, route: str) -> str | None:
 
 def permissions_of(role: str) -> frozenset[str]:
     return ROLE_PERMISSIONS.get(role, frozenset())
+
+
+def label_openapi(schema: dict[str, Any]) -> dict[str, Any]:
+    """Each operation that needs a key says which, as ``x-permission`` (AD-14): the web app's
+    tests read it from openapi.json — a write without a name in the audit trail, or a page that
+    asks for a key no route has, fails there rather than in someone's memory."""
+    for path, operations in schema.get("paths", {}).items():
+        for method, operation in operations.items():
+            if isinstance(operation, dict) and (key := needed(method.upper(), path)) is not None:
+                operation["x-permission"] = key
+    return schema

@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import { taskQuery, traceQuery } from "@/api/queries";
+import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { ErrorState, LoadingState } from "@/features/admin-ui/states";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
 import { traceRows, traceSummary } from "./model";
@@ -18,7 +20,20 @@ async function loadBlob(runId: string, seq: number): Promise<unknown> {
   );
 }
 
-const message = (text: string) => <p className="mx-auto max-w-5xl px-4 pt-8 md:px-6">{text}</p>;
+// loading and failing inside the shell too (AD-14): the breadcrumbs stay, and the states look
+// like every other page's
+const loading = (title: string) => (
+  <AdminPage width="read">
+    <PageHeader title={title} />
+    <LoadingState />
+  </AdminPage>
+);
+const failed = (title: string, text: string) => (
+  <AdminPage width="read">
+    <PageHeader title={title} />
+    <ErrorState>{text}</ErrorState>
+  </AdminPage>
+);
 
 /** /trace/[runId]: the run's real events and steps. Stays live through the company stream. */
 export function TracePage({ runId }: { runId: string }) {
@@ -26,8 +41,8 @@ export function TracePage({ runId }: { runId: string }) {
   const task = useQuery({ ...taskQuery(trace.data?.task_id ?? ""), enabled: Boolean(trace.data) });
   useCompanyStream(trace.data?.company_id ?? null);
 
-  if (trace.isPending) return message("載入中…");
-  if (trace.error) return message(`無法載入軌跡：${trace.error.message}`);
+  if (trace.isPending) return loading("執行軌跡");
+  if (trace.error) return failed("執行軌跡", `無法載入軌跡：${trace.error.message}`);
   const rows = traceRows(trace.data);
   return (
     <TraceView
@@ -44,7 +59,7 @@ export function TracePage({ runId }: { runId: string }) {
 export function TaskPage({ taskId }: { taskId: string }) {
   const task = useQuery(taskQuery(taskId));
   useCompanyStream(task.data?.company_id ?? null);
-  if (task.isPending) return message("載入中…");
-  if (task.error) return message(`無法載入任務：${task.error.message}`);
+  if (task.isPending) return loading("任務");
+  if (task.error) return failed("任務", `無法載入任務：${task.error.message}`);
   return <TaskView task={task.data} />;
 }

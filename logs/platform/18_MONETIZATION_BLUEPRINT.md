@@ -297,6 +297,8 @@ reader_credentials (reader_id, password_hash)   ← 只有開放密碼登入時�
 
 ## 12. 研究任務（P6a／P6b）
 
+> P6a 的後台研究工作頁照 `logs/admin/02_NEW_ADMIN_PAGE.md` 做（AD-14）。
+
 ### 12.1 LEGAL REVIEW REQUIRED
 
 本節**不是法律結論**，只把需要律師判斷的維度拆開，讓律師的回答能直接對應到系統設定。

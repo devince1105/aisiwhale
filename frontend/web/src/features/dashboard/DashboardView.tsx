@@ -164,12 +164,15 @@ export function DashboardView({
   companyName,
   model,
   pendingApprovals = null,
+  children,
 }: {
   companyId: string;
   companyName: string;
   model: DashboardModel;
   /** From GET /api/approvals; null while unknown. */
   pendingApprovals?: number | null;
+  /** The panels below the figures (projects, finance, agents), inside the same page. */
+  children?: ReactNode;
 }) {
   const { money, agents, tasks, goal } = model;
   return (
@@ -263,6 +266,7 @@ export function DashboardView({
       </div>
 
       <RevenueSection revenue={model.revenue} />
+      {children}
     </AdminPage>
   );
 }

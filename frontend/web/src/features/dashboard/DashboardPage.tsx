@@ -38,20 +38,17 @@ function CompanyDashboard({ company }: { company: Company }) {
   );
   return (
     <>
-      <DashboardView
-        companyId={company.id}
-        companyName={company.name}
-        model={model}
-        pendingApprovals={pending.data ?? null}
-      />
-      <ProjectsPanel companyId={company.id} />
-      <FinancePanel companyId={company.id} />
-      <section className="mx-auto max-w-7xl px-4 md:px-6 pb-12" aria-labelledby="agents-heading">
-        <h2 id="agents-heading" className="mb-3 text-lg font-semibold">
-          代理
-        </h2>
-        <AgentList />
-      </section>
+      {/* one page: the panels are inside its <main>, at its width (AD-14) */}
+      <DashboardView companyId={company.id} companyName={company.name} model={model} pendingApprovals={pending.data ?? null}>
+        <ProjectsPanel companyId={company.id} />
+        <FinancePanel companyId={company.id} />
+        <section className="mt-8" aria-labelledby="agents-heading">
+          <h2 id="agents-heading" className="mb-3 text-lg font-semibold">
+            代理
+          </h2>
+          <AgentList />
+        </section>
+      </DashboardView>
       <AgentPanel />
     </>
   );

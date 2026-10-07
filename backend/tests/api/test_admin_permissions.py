@@ -213,3 +213,15 @@ async def test_a_refused_attempt_is_in_the_record(api, db_session, newsroom_room
         )
     ).all()
     assert (row.status, row.actor["id"]) == (403, f"admin:{viewer}")
+
+
+def test_openapi_names_each_routes_key():
+    """AD-14: the web app's tests read the keys from openapi.json (conventions.test.ts)."""
+    schema = create_app().openapi()
+    named = {
+        (method.upper(), path): operation["x-permission"]
+        for path, operations in schema["paths"].items()
+        for method, operation in operations.items()
+        if "x-permission" in operation
+    }
+    assert named == permissions.ROUTES

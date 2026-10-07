@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +12,7 @@ from autora.app import load_event_catalogs
 from autora.db.session import dispose_engine, get_engine, get_sessionmaker
 from autora.infra.settings import get_settings
 from autora.realtime.gateway import EventHub
-from autora_api import problems
+from autora_api import permissions, problems
 from autora_api.audit import AuditMiddleware
 from autora_api.deps import OFFICE_CALL
 from autora_api.live import LIVE
@@ -121,4 +122,12 @@ def create_app() -> FastAPI:
     app.include_router(team.router)
     app.include_router(meta.router)
     app.include_router(ws.router)
+    openapi = app.openapi
+
+    def labelled_openapi() -> dict[str, Any]:
+        if app.openapi_schema is None:
+            permissions.label_openapi(openapi())
+        return app.openapi_schema  # type: ignore[return-value]
+
+    app.openapi = labelled_openapi  # type: ignore[method-assign]
     return app

@@ -10728,7 +10728,8 @@
     "summary": "Access",
     "tags": [
      "admin-access"
-    ]
+    ],
+    "x-permission": "access:manage"
    },
    "post": {
     "description": "The reader must have signed up; they open the back office once their address is proven.",
@@ -10791,7 +10792,8 @@
     "summary": "Let In",
     "tags": [
      "admin-access"
-    ]
+    ],
+    "x-permission": "access:manage"
    }
   },
   "/api/admin/access/{reader_id}": {
@@ -10848,7 +10850,8 @@
     "summary": "Take Out",
     "tags": [
      "admin-access"
-    ]
+    ],
+    "x-permission": "access:manage"
    },
    "put": {
     "operationId": "change_role_api_admin_access__reader_id__put",
@@ -10920,7 +10923,8 @@
     "summary": "Change Role",
     "tags": [
      "admin-access"
-    ]
+    ],
+    "x-permission": "access:manage"
    }
   },
   "/api/admin/activity": {
@@ -11264,7 +11268,8 @@
     "summary": "List Admin Actions",
     "tags": [
      "admin-audit"
-    ]
+    ],
+    "x-permission": "audit:view"
    }
   },
   "/api/admin/audit/export": {
@@ -11510,7 +11515,8 @@
     "summary": "Export Admin Actions",
     "tags": [
      "admin-audit"
-    ]
+    ],
+    "x-permission": "audit:view"
    }
   },
   "/api/admin/auth/google/start": {
@@ -11761,7 +11767,8 @@
     "summary": "Adjust Coins",
     "tags": [
      "admin-coins"
-    ]
+    ],
+    "x-permission": "coins:adjust"
    }
   },
   "/api/admin/coins/reconcile": {
@@ -11942,7 +11949,8 @@
     "summary": "Get Wallet",
     "tags": [
      "admin-coins"
-    ]
+    ],
+    "x-permission": "coins:view"
    }
   },
   "/api/admin/me/prefs": {
@@ -12058,7 +12066,8 @@
     "summary": "Put Prefs",
     "tags": [
      "admin-me"
-    ]
+    ],
+    "x-permission": "self:prefs"
    }
   },
   "/api/admin/memberships/comps": {
@@ -12265,7 +12274,8 @@
     "summary": "Grant Comp",
     "tags": [
      "admin-memberships"
-    ]
+    ],
+    "x-permission": "memberships:grant"
    }
   },
   "/api/admin/memberships/comps/export": {
@@ -12578,7 +12588,8 @@
     "summary": "Revoke Comp",
     "tags": [
      "admin-memberships"
-    ]
+    ],
+    "x-permission": "memberships:grant"
    }
   },
   "/api/admin/settings": {
@@ -12636,7 +12647,8 @@
     "summary": "List Settings",
     "tags": [
      "admin-settings"
-    ]
+    ],
+    "x-permission": "system:settings"
    }
   },
   "/api/admin/settings/{key}": {
@@ -12703,7 +12715,8 @@
     "summary": "Reset Setting",
     "tags": [
      "admin-settings"
-    ]
+    ],
+    "x-permission": "system:settings"
    },
    "put": {
     "operationId": "set_setting_api_admin_settings__key__put",
@@ -12778,7 +12791,8 @@
     "summary": "Set Setting",
     "tags": [
      "admin-settings"
-    ]
+    ],
+    "x-permission": "system:settings"
    }
   },
   "/api/analytics/beacon": {
@@ -13117,7 +13131,8 @@
     "summary": "Decide",
     "tags": [
      "approvals"
-    ]
+    ],
+    "x-permission": "approvals:decide"
    }
   },
   "/api/articles/{article_id}": {
@@ -13277,7 +13292,8 @@
     "summary": "Set Article Access",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/cover": {
@@ -13342,7 +13358,8 @@
     "summary": "Delete Cover",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/cover/ask": {
@@ -13417,7 +13434,8 @@
     "summary": "Ask Cover",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/cover/search": {
@@ -13492,7 +13510,8 @@
     "summary": "Search Cover",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/cover/swap": {
@@ -13557,7 +13576,8 @@
     "summary": "Swap Cover",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/republish": {
@@ -13626,7 +13646,8 @@
     "summary": "Post Republish",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/revise": {
@@ -13701,7 +13722,8 @@
     "summary": "Post Revise",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/section": {
@@ -13787,7 +13809,8 @@
     "summary": "Set Article Section",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/articles/{article_id}/unpublish": {
@@ -13866,7 +13889,8 @@
     "summary": "Post Unpublish",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/auth/email/resend": {
@@ -14692,7 +14716,8 @@
     "summary": "Post Company",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "company:manage"
    }
   },
   "/api/companies/{company_id}": {
@@ -14897,7 +14922,8 @@
     "summary": "Hire",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "agents:manage"
    }
   },
   "/api/companies/{company_id}/agents/{agent_id}/pause": {
@@ -14982,7 +15008,8 @@
     "summary": "Pause",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "agents:manage"
    }
   },
   "/api/companies/{company_id}/agents/{agent_id}/resume": {
@@ -15066,7 +15093,8 @@
     "summary": "Resume",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "agents:manage"
    }
   },
   "/api/companies/{company_id}/agents/{agent_id}/retire": {
@@ -15151,7 +15179,8 @@
     "summary": "Retire",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "agents:manage"
    }
   },
   "/api/companies/{company_id}/articles": {
@@ -15654,7 +15683,8 @@
     "summary": "Set Budget",
     "tags": [
      "finance"
-    ]
+    ],
+    "x-permission": "finance:edit"
    }
   },
   "/api/companies/{company_id}/finance/capital": {
@@ -15729,7 +15759,8 @@
     "summary": "Add Capital",
     "tags": [
      "finance"
-    ]
+    ],
+    "x-permission": "finance:edit"
    }
   },
   "/api/companies/{company_id}/kpis": {
@@ -15932,7 +15963,8 @@
     "summary": "Put Office Theme",
     "tags": [
      "companies"
-    ]
+    ],
+    "x-permission": "company:manage"
    }
   },
   "/api/companies/{company_id}/org": {
@@ -16128,7 +16160,8 @@
     "summary": "Pause",
     "tags": [
      "projects"
-    ]
+    ],
+    "x-permission": "projects:manage"
    }
   },
   "/api/companies/{company_id}/projects/{project_id}/resume": {
@@ -16212,7 +16245,8 @@
     "summary": "Resume",
     "tags": [
      "projects"
-    ]
+    ],
+    "x-permission": "projects:manage"
    }
   },
   "/api/companies/{company_id}/realtime/snapshot": {
@@ -16556,7 +16590,8 @@
     "summary": "Create Source",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/companies/{company_id}/sources/export": {
@@ -17133,7 +17168,8 @@
     "summary": "Post Team Message",
     "tags": [
      "team"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/companies/{company_id}/workflows": {
@@ -17207,7 +17243,8 @@
     "summary": "Post Workflow",
     "tags": [
      "workflows"
-    ]
+    ],
+    "x-permission": "workflows:run"
    }
   },
   "/api/companies/{company_id}/workflows/failed": {
@@ -17361,7 +17398,8 @@
     "summary": "Post Restart",
     "tags": [
      "workflows"
-    ]
+    ],
+    "x-permission": "workflows:run"
    }
   },
   "/api/cycles/{cycle_id}": {
@@ -19980,7 +20018,8 @@
     "summary": "Start",
     "tags": [
      "newsroom"
-    ]
+    ],
+    "x-permission": "newsroom:edit"
    }
   },
   "/api/tasks/{task_id}": {
