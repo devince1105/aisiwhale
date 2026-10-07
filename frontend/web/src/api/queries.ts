@@ -75,6 +75,7 @@ export type StorySort = NonNullable<QueryOf<"list_stories_api_companies__company
 export type ArticleSort = NonNullable<QueryOf<"list_articles_api_companies__company_id__articles_get">["sort"]>;
 export type SourceSort = NonNullable<QueryOf<"list_sources_api_companies__company_id__sources_get">["sort"]>;
 export type CompSort = NonNullable<QueryOf<"list_comps_api_admin_memberships_comps_get">["sort"]>;
+export type AuditSort = NonNullable<QueryOf<"list_admin_actions_api_admin_audit_get">["sort"]>;
 
 /** One page of a table (AD-05): what the address says — the words, the order, the page. */
 export interface ListArgs<S extends string> {
@@ -707,6 +708,34 @@ export function compsQuery(
       unwrap(
         await api.GET("/api/admin/memberships/comps", {
           params: { query: { company: companySlug, running, ...listQuery(args) } },
+        }),
+      ),
+  });
+}
+
+export type AdminAction = Schemas["AdminActionOut"];
+
+/** Who did what in the back office (AD-06): a page of it, newest first. ``companyId`` null:
+ * every company's, and what belongs to none. */
+export function auditQuery(
+  companyId: string | null,
+  filters: { failed?: boolean | null; target_type?: string | null },
+  args: ListArgs<AuditSort> = {},
+  api: ApiClient = defaultApi,
+) {
+  return queryOptions({
+    queryKey: ["audit", companyId, filters, args] as const,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/admin/audit", {
+          params: {
+            query: {
+              ...(companyId ? { company_id: companyId } : {}),
+              ...(filters.failed != null ? { failed: filters.failed } : {}),
+              ...(filters.target_type ? { target_type: filters.target_type } : {}),
+              ...listQuery(args),
+            },
+          },
         }),
       ),
   });

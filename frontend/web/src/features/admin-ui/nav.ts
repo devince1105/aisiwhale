@@ -52,6 +52,10 @@ export const ADMIN_NAV: readonly NavGroup[] = [
       { key: "memberships", go: "v", label: "VIP 授予", href: "/admin/memberships", icon: "member" },
     ],
   },
+  {
+    label: "系統",
+    items: [{ key: "audit", go: "l", label: "操作紀錄", href: "/admin/audit", icon: "audit" }],
+  },
 ];
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);

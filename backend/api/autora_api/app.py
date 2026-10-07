@@ -12,7 +12,9 @@ from autora.db.session import dispose_engine, get_engine, get_sessionmaker
 from autora.infra.settings import get_settings
 from autora.realtime.gateway import EventHub
 from autora_api import problems
+from autora_api.audit import AuditMiddleware
 from autora_api.routers import (
+    admin_audit,
     admin_auth,
     admin_memberships,
     approvals,
@@ -57,6 +59,8 @@ def create_app() -> FastAPI:
     problems.install(app)
     # The web app runs on its own origin (localhost:3000 in dev). WebSockets are not subject
     # to CORS; they authenticate with the token in the query string.
+    # who did what in the back office (AD-06): inside CORS, so a refused preflight is not a change
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_settings().cors_origins,
@@ -87,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin_auth.router)
     app.include_router(admin_memberships.router)
+    app.include_router(admin_audit.router)
     app.include_router(contact.router)
     app.include_router(payments.router)
     app.include_router(watchlist.router)

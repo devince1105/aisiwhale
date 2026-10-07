@@ -9,6 +9,7 @@ from autora.db.models.agents import (
     AgentStatus,
     MemoryKind,
 )
+from autora.db.models.audit import AdminAction
 from autora.db.models.company import (
     CommandOutcome,
     CommandRecord,
@@ -87,6 +88,7 @@ from autora.db.models.tasks import (
 )
 
 __all__ = [
+    "AdminAction",
     "AGENT_RUN_TERMINAL",
     "ActivityState",
     "Agent",

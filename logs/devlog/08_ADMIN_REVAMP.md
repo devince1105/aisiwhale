@@ -11,7 +11,8 @@
 | 3 | AD-03 ⌘K 指令面板與快捷鍵 | AD-02（`nav.ts`） | ✅ 2026-10-07 |
 | 4 | AD-04 後端列表規格 | — | ✅ 2026-10-07 |
 | 4b | AD-05 DataTable | AD-04 | ✅ 2026-10-07 |
-| 5 | AD-06 管理操作稽核、AD-07 詳情頁 | AD-04 | ⏳ |
+| 5 | AD-06 管理操作稽核 | AD-04 | ✅ 2026-10-07 |
+| 5b | AD-07 詳情頁與 Drawer 預覽 | AD-06 | ⏳ |
 | 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ⏳ |
 | 7 | AD-08、AD-10、AD-11、AD-12、AD-13 | — | ⏳ |
 
@@ -222,3 +223,58 @@
   - 空的表格與錯誤狀態。
 - `comps.test.tsx` 新增批次撤銷：只送出仍有效的兩筆，用同一個理由。
 - vitest 79 個檔案、946 項中只有 1 項失敗，是 `timeline` 的計時測試在機器負載高時超時，單獨重跑 8 項全過（時間軸我沒有動）。lint 通過；typecheck 只有持股工作階段未提交的 `features/site/*`（HD-12）報錯，不是我的檔案。
+
+---
+
+## 2026-10-07：AD-06 管理操作稽核
+
+AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 main（ef2b84c，合併提交 e2aef53），內容沒有改動。推送前我在乾淨的 worktree 上，把 ef2b84c 疊在當時的 origin/main 上驗證過：typecheck、lint、vitest 941 項、build、e2e 17 項全部通過。
+
+### 做了什麼
+
+- **資料表 `admin_actions`（遷移 0076）**，欄位：
+  - `actor`、`method`；
+  - `route`：路由樣板，例如 `/api/articles/{article_id}/unpublish`；
+  - `action`：endpoint 名稱；
+  - `target_type`、`target_id`：路徑裡第一個 id，例如 `{article_id}` 就是 `article`；
+  - `company_id`、`status`；
+  - `input`：送出的 query 與 JSON body；
+  - `ip`。
+
+  只能新增：沿用 0002 的 `autora_forbid_mutation()` trigger，UPDATE 和 DELETE 都會被拒絕。
+- **寫入方式（`autora_api/audit.py`）**：`require_operator` 放行一個寫入請求時，把操作者記在 `request.state` 上；`AuditMiddleware` 是純 ASGI middleware，在 app 讀取請求內容時順便留一份，等回應開始時寫入一列。
+  - 被拒絕的嘗試（409、422）也會記錄；app 沒送出回應就失敗時記成 500。
+  - 讀取（GET、HEAD、OPTIONS）不記錄；沒有登入的請求也不記錄。
+  - 這一列在回應送出之前寫入，所以呼叫者的下一個請求就看得到。寫入失敗時只記 log，回應照常送出：那時修改已經 commit，再回錯誤只會誤導人。
+  - 使用 app 自己的 `get_session`（遵守 dependency override），所以測試和請求共用同一個交易。
+- **公司的判斷順序**：路徑的 `company_id` → query 或 body 的 `company_id` → `?company=` 的 slug → 用目標表查出所屬公司（文章、題材、審批、代理、專案、來源、工作流程）。
+- **遮蔽與截斷**：鍵名含 pass、token、secret、authorization、cookie、api_key 的值改成 `***`；超過 2,000 字的文字截斷並註明原長度；body 超過 64 KB 不保存，只記大小；整份 input 超過 16 KB 時只保存鍵名。
+- **`GET /api/admin/audit`**：沿用 AD-04 的分頁規格。篩選：`company_id`、`actor`、`target_type`、`target_id`、`action`、`failed`、`since`、`until`；`q` 搜尋路由、動作、對象 id 和操作者。管理員以 email 顯示（`actor_label`），但資料庫只存 reader id（D-024）。
+- **前端 `/admin/audit`「操作紀錄」**：側欄新增「系統」群組，快捷鍵 `g l`。用 DataTable 顯示時間、誰、動作（27 個路由各有中文名稱）、對象（文章和題材可以點開）、結果（完成、被拒 4xx、錯誤 5xx）、送出的內容（摺疊）。篩選：範圍（這間公司／所有公司）、結果、對象種類；也支援我的篩選器。
+
+### 和計畫不同的地方
+
+- **計畫裡的 `before`、`after`（修改前後的欄位）沒有做**，改成記錄送出的內容和結果。要做前後差異，得在 27 個路由裡逐一寫「修改前讀一次」，而且每加一個路由就多一處要記得維護，和「新路由自動被記錄」的設計衝突。狀態的變化本來就記在 `state_transitions` 和事件裡，AD-07 的活動時間軸會把兩者合在一起顯示。
+- **計畫說要修好 newsroom 那 5 個沒有記下操作者的動作**：middleware 會自動記錄所有寫入路由，所以它們現在都有紀錄（測試檢查了閱讀權限、分類、新增來源），不需要逐一改 handler。
+- **管理員登入和登出不記錄**：它們在門外，不經過 `require_operator`。是否要另外記錄登入，留到 AD-09 RBAC 再一起決定。
+
+### 防止漏掉的測試
+
+`test_every_write_route_goes_through_the_door_or_is_named_here` 會列出 app 裡所有寫入路由。FastAPI 0.142 的 `include_router` 不再把路由攤平，而是包成 `_IncludedRouter`，所以要從 `original_router` 遞迴取出。每個寫入路由都必須經過 `require_operator`（也就是會被記錄），否則就要列在 `PUBLIC_WRITES` 白名單裡。白名單目前 16 個，都是讀者自己的帳號與自選股、公開網站、PAYUNi 通知，以及後台登入本身。之後新增的寫入路由如果沒有走這個門，又沒有列進白名單，測試就會失敗。
+
+### 遷移編號
+
+0074 已經被持股 HD-12 的 `tw_flows` 用掉。臨時上班修正（D-237）的工作階段原本也打算用 0074，我在它推送前提醒了撞號，協調後由對方用 0075，我改用 0076。
+
+### 驗證
+
+- `alembic upgrade head`、`alembic check`（模型與遷移沒有差異）、`downgrade -1` 後再 `upgrade` 都通過（在自己的資料庫 `autora_ad` 上）。
+- `tests/api/test_admin_audit.py` 共 7 項：
+  - 每個寫入路由都經過門或在白名單；
+  - 審批決定的紀錄：操作者、路由樣板、對象、公司、送出內容、狀態 200，重複決定的 409 也有紀錄；
+  - 讀取和未登入的請求不記錄；
+  - 閱讀權限、分類、新增來源三個動作都有紀錄，對象和公司正確；
+  - UPDATE 和 DELETE 會被 trigger 擋下；
+  - 列表的排序、`failed`、`q`、`target_id` 篩選，以及未登入回 401；
+  - 遮蔽、截斷、非 JSON 與過大 body 的處理。
+- 前端 `features/audit/audit.test.tsx`：列表的顯示；`ACTION_LABEL` 的每個路由都存在於 openapi.json。

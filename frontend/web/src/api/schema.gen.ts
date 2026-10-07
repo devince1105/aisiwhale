@@ -4,6 +4,27 @@
  */
 
 export interface paths {
+    "/api/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Admin Actions
+         * @description ``q`` searches the route, the action, the target's id and who (by stored id). ``failed``:
+         *     only refused (4xx/5xx) or only done (2xx/3xx).
+         */
+        get: operations["list_admin_actions_api_admin_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/auth/google/start": {
         parameters: {
             query?: never;
@@ -1977,6 +1998,54 @@ export interface components {
              * @enum {string}
              */
             kind: "agent" | "system" | "human";
+        };
+        /** AdminActionOut */
+        AdminActionOut: {
+            /** Action */
+            action: string;
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Actor Label */
+            actor_label: string;
+            /** Company Id */
+            company_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
+            /** Ip */
+            ip: string | null;
+            /** Method */
+            method: string;
+            /** Route */
+            route: string;
+            /** Status */
+            status: number;
+            /** Target Id */
+            target_id: string | null;
+            /** Target Type */
+            target_type: string | null;
+        };
+        /** AdminActionPage */
+        AdminActionPage: {
+            /** Items */
+            items: components["schemas"]["AdminActionOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
         };
         /** AdminMe */
         AdminMe: {
@@ -5446,6 +5515,50 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    list_admin_actions_api_admin_audit_get: {
+        parameters: {
+            query?: {
+                company_id?: string | null;
+                actor?: string | null;
+                target_type?: string | null;
+                target_id?: string | null;
+                action?: string | null;
+                failed?: boolean | null;
+                since?: string | null;
+                until?: string | null;
+                sort?: "-created_at" | "created_at";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminActionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     google_start_api_admin_auth_google_start_get: {
         parameters: {
             query?: {

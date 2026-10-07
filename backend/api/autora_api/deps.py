@@ -18,6 +18,7 @@ from autora.db.session import get_sessionmaker
 from autora.infra.email import Sender, build_sender
 from autora.infra.settings import Settings, get_settings
 from autora.runtime.actor import Actor
+from autora_api import audit
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -132,7 +133,8 @@ async def require_operator(
     admin signed in to the back office (D-055, D-230).
 
     One who changes something calls the worker in, if it is off its shifts (D-205): an approval,
-    a draft sent back, a brief, a project resumed. Reading calls nobody."""
+    a draft sent back, a brief, a project resumed. Reading calls nobody. And what they change is
+    written down, who and what (AD-06, audit.py)."""
     expected = settings.api_bearer_token.get_secret_value()
     actor: Actor | None = None
     if credentials is not None and secrets.compare_digest(credentials.credentials, expected):
@@ -144,6 +146,7 @@ async def require_operator(
     if actor is not None:
         if request.method not in READ_ONLY:
             OFFICE_CALL.mark()
+        audit.mark(request, actor)
         return actor
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
