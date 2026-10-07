@@ -163,12 +163,13 @@ describe("機構排行", () => {
     cleanup();
     render(
       <RankingView
-        ranking={{ ...RANKING, rows: [], total: 0 }}
+        ranking={{ ...RANKING, rows: [], total: 0, filers: 0 }}
         lang="zh-TW"
         params={{}}
       />,
     );
     expect(screen.getByText("這一季的資料還在整理中，稍後再看。")).toBeTruthy();
+    expect(screen.queryByText(/0 家機構/)).toBeNull(); // nobody read yet: no count of nobody
   });
 
   it("its first ten under the institutions' cards, with the way to all of it", () => {

@@ -278,9 +278,11 @@ export function RankingView({
       <Breadcrumb lang={lang} here={[{ label: r.title }]} />
       <header className="mt-4">
         <h1 className="text-3xl font-bold">{r.heading}</h1>
-        <p className="mt-2 text-sm text-muted">
-          {r.intro(quarterOf(lang, period), count(lang, ranking.filers))}
-        </p>
+        {ranking.filers ? (
+          <p className="mt-2 text-sm text-muted">
+            {r.intro(quarterOf(lang, period), count(lang, ranking.filers))}
+          </p>
+        ) : null}
       </header>
 
       <form
