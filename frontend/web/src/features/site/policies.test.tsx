@@ -37,7 +37,7 @@ describe("who runs the site", () => {
     const footer = screen.getByTestId("site-footer");
     expect(footer.textContent).not.toContain("經營者");
     expect(footer.textContent).not.toContain("@");
-    const hrefs = Array.from(footer.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    const hrefs = Array.from(footer.querySelectorAll("nav a")).map((a) => a.getAttribute("href"));
     expect(hrefs).toEqual([
       "/news/zh-TW/pricing",
       "/news/zh-TW/terms",

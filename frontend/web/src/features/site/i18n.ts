@@ -315,6 +315,11 @@ const WORDS = {
       consent: ["送出即表示你同意本站依", "使用你的資料，僅用於回覆這則留言。"] as [string, string],
     },
     contactLink: "聯絡我們",
+    coffee: {
+      lead: ["覺得內容有幫助嗎？", "歡迎請我喝杯咖啡，支持艾矽鯨持續更新。"] as [string, string],
+      button: "Buy me a coffee",
+      newTab: "（另開新分頁）",
+    },
     operator: "經營者",
     contact: "聯絡信箱",
     phone: "電話",
@@ -920,6 +925,11 @@ const WORDS = {
       consent: ["By sending, you agree that we use your details under our ", ", only to reply to this message."] as [string, string],
     },
     contactLink: "Contact us",
+    coffee: {
+      lead: ["Find this useful?", "A coffee helps keep AiSiWhale going."] as [string, string],
+      button: "Buy me a coffee",
+      newTab: " (opens in a new tab)",
+    },
     operator: "Operated by",
     contact: "Contact",
     phone: "Phone",

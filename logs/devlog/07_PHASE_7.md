@@ -4352,6 +4352,22 @@ T-611 之後，商業迴圈已經有 CEO 評估機會、策略師把機會寫成
 
 **驗證**（本機 `web-3002`、`/news/zh-TW/office`）：視窗 1,280px 時一行（文字 774px／段落 1,120px）；800px 時畫面本身不夠寬，自然折成兩行；手機 375px 三行、沒有橫向捲動。英文版句子較長，桌機上仍是兩行。`tsc`（`.next/` 以外 0 個錯誤）、eslint 通過。
 
+## D-250：網站 Footer 加「Buy me a coffee」（10/07）
+
+**起因**：使用者：「我希望加入 donate button "Buy me a coffee" 放在 Footer，UIUX 排版可以參考一般有使用這機制的網站或Blog」，連結 https://buymeacoffee.com/vince115。
+
+**做法**：
+- 一般部落格的放法：頁尾右側一小段說明加一個醒目的按鈕；手機版放在政策連結和市場資料下方。免責聲明仍是頁尾最後一列。
+- 說明分兩行：「覺得內容有幫助嗎？」「歡迎請我喝杯咖啡，支持艾矽鯨持續更新。」（英文：Find this useful? / A coffee helps keep AiSiWhale going.）。
+- 按鈕用 Buy Me a Coffee 的黃色（#FFDD00）、深色字、圓角，加咖啡杯圖示；文字兩種語言都用服務名稱「Buy me a coffee」，讓讀者一眼認得。深色、淺色主題都用同一個黃色。
+- 另開新分頁（`target="_blank"`、`rel="noopener noreferrer"`），螢幕閱讀器會念出「另開新分頁」。
+- 只是一般連結：不載入 Buy Me a Coffee 的小工具程式或圖片，不多一個第三方網域、不設 cookie，也不影響載入速度。
+
+**驗證**：
+- 新測試 `footer-coffee.test.tsx`：連結、另開新分頁、兩種語言的說明、免責聲明仍是最後一列。原本「頁尾只有五個政策連結」的測試改成只看 `nav` 裡的連結。
+- `vitest run src/features/site`：229 項通過；`tsc`、`eslint` 沒有錯誤。
+- 本機預覽（接正式 API）看過桌面深色、淺色（中英文）與手機版：說明在桌面靠右兩行、按鈕在下；手機版在市場資料下方，沒有橫向捲動。
+
 ## 提交紀錄
 
 | 提交 | 日期 | 內容 | 持續整合 |
