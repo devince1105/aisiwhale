@@ -16,6 +16,10 @@ nothing about the reader either way.
 - GET  /api/public/holdings?lang=zh-TW[&company=<slug>]: the holdings dashboard's cards (HD-05)
 - GET  /api/public/holdings/people/{slug}?lang=zh-TW[&company=<slug>]: a person page — the whole
   table only for a reader signed in (D-159), the first ten for anybody
+- GET  /api/public/institutions?lang=zh-TW[&period=][&q=][&sort=value|change|filed][&order=]
+  [&limit=50][&offset=0]: 機構排行, every 13F filer's quarter in dollars (HD-11)
+- GET  /api/public/institutions/{cik}?lang=zh-TW[&period=]: an institution's page — its largest
+  ten holdings for anybody, the rest and its buys and sells signed in; queued if never asked
 - POST /api/analytics/beacon: {article_id, lang, event_type, session_hash} -> 204
 """
 
@@ -79,6 +83,12 @@ from autora.domains.newsroom.price_history import (
     history,
     refresh_us,
     tiingo_rows,
+)
+from autora.domains.newsroom.rankings import (
+    PublicInstitution,
+    PublicRanking,
+    institution,
+    ranking,
 )
 from autora.domains.newsroom.sentiment import PublicSentiment, stock_sentiment
 from autora.domains.newsroom.site import (
@@ -554,6 +564,57 @@ async def get_portfolio(
     page = await portfolio(session, company_id, slug, lang, signed_in=reader is not None)
     if page is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"no holdings page for {slug}")
+    response.headers["Cache-Control"] = "private, no-store"
+    return page
+
+
+LANG = Query(pattern=r"^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$", max_length=10)
+
+
+@router.get("/api/public/institutions")
+async def get_ranking(
+    session: Session,
+    response: Response,
+    lang: Annotated[str, LANG],
+    period: date | None = None,
+    q: Annotated[str | None, Query(max_length=100)] = None,
+    sort: Literal["value", "change", "filed"] = "value",
+    order: Literal["desc", "asc"] = "desc",
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0, le=20_000)] = 0,
+) -> PublicRanking:
+    """機構排行 (HD-11): every 13F filer's quarter, largest first, in dollars. The same for
+    every reader; a quarter not offered is the default one (the latest all due)."""
+    response.headers["Cache-Control"] = "public, max-age=600"  # the index is read every ten
+    return await ranking(
+        session,
+        lang=lang,
+        period=period,
+        q=q,
+        sort=sort,
+        ascending=order == "asc",
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/api/public/institutions/{cik}")
+async def get_institution(
+    cik: Annotated[str, Path(pattern=r"^\d{1,10}$")],
+    session: Session,
+    response: Response,
+    lang: Annotated[str, LANG],
+    period: date | None = None,
+    autora_reader: SessionCookie = None,
+) -> PublicInstitution:
+    """An institution's page (HD-11): open to anybody, its ten largest holdings; the rest, and
+    its estimated buys and sells, for a reader signed in (free, D-159). Opened for the first
+    time, its holdings are queued to be worked out (404: no 13F for the quarter)."""
+    reader = await reader_for(session, autora_reader)
+    page = await institution(session, cik, lang=lang, period=period, signed_in=reader is not None)
+    if page is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no 13F from {cik} for the quarter")
+    await session.commit()  # a page queued is kept
     response.headers["Cache-Control"] = "private, no-store"
     return page
 

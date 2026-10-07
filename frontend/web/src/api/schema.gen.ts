@@ -1457,6 +1457,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/institutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ranking
+         * @description 機構排行 (HD-11): every 13F filer's quarter, largest first, in dollars. The same for
+         *     every reader; a quarter not offered is the default one (the latest all due).
+         */
+        get: operations["get_ranking_api_public_institutions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/institutions/{cik}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Institution
+         * @description An institution's page (HD-11): open to anybody, its ten largest holdings; the rest, and
+         *     its estimated buys and sells, for a reader signed in (free, D-159). Opened for the first
+         *     time, its holdings are queued to be worked out (404: no 13F for the quarter).
+         */
+        get: operations["get_institution_api_public_institutions__cik__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/public/markets": {
         parameters: {
             query?: never;
@@ -3763,6 +3806,22 @@ export interface components {
              */
             period: string;
         };
+        /** PublicFiling */
+        PublicFiling: {
+            /** Accession */
+            accession: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Form */
+            form: string;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Url */
+            url: string;
+        };
         /** PublicGold */
         PublicGold: {
             /**
@@ -3860,6 +3919,105 @@ export interface components {
             symbol: string | null;
             /** Weight */
             weight: number;
+        };
+        /** PublicInstitution */
+        PublicInstitution: {
+            /** Bought */
+            bought: components["schemas"]["PublicInstitutionHolding"][];
+            /** Change Usd */
+            change_usd: number | null;
+            /** Cik */
+            cik: string;
+            /** Computed At */
+            computed_at: string | null;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Entries */
+            entries: number;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Filed Name */
+            filed_name: string;
+            /** Filings */
+            filings: components["schemas"]["PublicFiling"][];
+            /** Group */
+            group: string | null;
+            /** In Doubt */
+            in_doubt: boolean;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Net Bought Usd */
+            net_bought_usd: number | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Periods */
+            periods: string[];
+            /** Previous Period */
+            previous_period: string | null;
+            /** Previous Stock Value Usd */
+            previous_stock_value_usd: number | null;
+            /** Previous Value Usd */
+            previous_value_usd: number | null;
+            /** Profile */
+            profile: string | null;
+            /** Rank */
+            rank: number | null;
+            /** Sold */
+            sold: components["schemas"]["PublicInstitutionHolding"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "queued" | "failed";
+            /** Stock Value Usd */
+            stock_value_usd: number | null;
+            /** Stocks */
+            stocks: number | null;
+            /** Top */
+            top: components["schemas"]["PublicInstitutionHolding"][];
+            /** Top Total */
+            top_total: number;
+            /** Value Usd */
+            value_usd: number;
+        };
+        /** PublicInstitutionHolding */
+        PublicInstitutionHolding: {
+            /** Change */
+            change: string | null;
+            /** Cusip */
+            cusip: string;
+            /** Name */
+            name: string;
+            /** Previous Shares */
+            previous_shares: number;
+            /** Previous Value Usd */
+            previous_value_usd: number;
+            /** Shares */
+            shares: number;
+            /** Split */
+            split: string | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Traded Usd */
+            traded_usd: number | null;
+            /** Value Usd */
+            value_usd: number;
+            /** Weight Pct */
+            weight_pct: number | null;
         };
         /** PublicIntraday */
         PublicIntraday: {
@@ -4106,6 +4264,58 @@ export interface components {
             source: string;
             /** Value */
             value: number;
+        };
+        /** PublicRankRow */
+        PublicRankRow: {
+            /** Change Pct */
+            change_pct: number | null;
+            /** Change Usd */
+            change_usd: number | null;
+            /** Cik */
+            cik: string;
+            /** Entries */
+            entries: number;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Filed Name */
+            filed_name: string;
+            /** Group */
+            group: string | null;
+            /** In Doubt */
+            in_doubt: boolean;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Name */
+            name: string;
+            /** Previous Value Usd */
+            previous_value_usd: number | null;
+            /** Profile */
+            profile: string | null;
+            /** Rank */
+            rank: number;
+            /** Value Usd */
+            value_usd: number;
+        };
+        /** PublicRanking */
+        PublicRanking: {
+            /** Filers */
+            filers: number;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Periods */
+            periods: string[];
+            /** Previous Period */
+            previous_period: string | null;
+            /** Rows */
+            rows: components["schemas"]["PublicRankRow"][];
+            /** Total */
+            total: number;
         };
         /** PublicRatings */
         PublicRatings: {
@@ -7765,6 +7975,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicPortfolio"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ranking_api_public_institutions_get: {
+        parameters: {
+            query: {
+                lang: string;
+                period?: string | null;
+                q?: string | null;
+                sort?: "value" | "change" | "filed";
+                order?: "desc" | "asc";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_institution_api_public_institutions__cik__get: {
+        parameters: {
+            query: {
+                lang: string;
+                period?: string | null;
+            };
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicInstitution"];
                 };
             };
             /** @description Validation Error */

@@ -52,7 +52,7 @@ def test_an_institution_filing_as_several_is_one_group():
     for f in FILERS.values():
         if f.group:
             groups.setdefault(f.group, []).append(f.zh or f.en)
-    assert sorted(groups) == ["capital", "ubs", "vanguard"]
+    assert sorted(groups) == ["capital", "trowe", "ubs", "vanguard"]
     assert len(groups["vanguard"]) == 6 and all(n.startswith("先鋒") for n in groups["vanguard"])
     assert all(n.startswith("資本集團") for n in groups["capital"])
 

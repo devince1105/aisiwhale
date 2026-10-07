@@ -23,8 +23,10 @@ asked for again.
 thousands — T. Rowe Price's second quarter of 2026 says US$1 billion for about US$1 trillion. The
 cover page cannot tell, so a filing whose entries average under ``IN_DOUBT_AVERAGE`` (the 100
 largest average over US$4 million) has the first rows of its table read once its run has time to
-spare (``check_scales``): most shares worth under a dollar, and its ``scale`` is 1000. Every
-total is in dollars.
+spare (``check_scales``): most shares worth under a dollar, and its rows are in thousands. Its
+total may be too, or not: Coston, McIsaac & Partners wrote its rows in thousands and its total in
+dollars. So its ``scale`` is 1000 only when the table's own dollars are about a thousand times
+the total (``thirteenf_tables.total_scale``). Every total is in dollars.
 """
 
 from __future__ import annotations
@@ -410,7 +412,12 @@ async def check_scales(
             filing.scale_attempts += 1
             filing.error = f"scale: {type(error).__name__}: {error}"[:500]
             return False
-        filing.scale = thirteenf_tables.scale_of(table)
+        filing.scale = thirteenf_tables.total_scale(
+            table,
+            thirteenf_tables.scale_of(table),
+            int(filing.entries or 0),
+            int(filing.value_usd or 0),
+        )
         return True
 
     checked = await paced(

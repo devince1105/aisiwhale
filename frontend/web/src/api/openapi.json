@@ -4950,6 +4950,40 @@
     "title": "PublicFiledQuarter",
     "type": "object"
    },
+   "PublicFiling": {
+    "properties": {
+     "accession": {
+      "title": "Accession",
+      "type": "string"
+     },
+     "filed": {
+      "format": "date",
+      "title": "Filed",
+      "type": "string"
+     },
+     "form": {
+      "title": "Form",
+      "type": "string"
+     },
+     "in_thousands": {
+      "title": "In Thousands",
+      "type": "boolean"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "accession",
+     "form",
+     "filed",
+     "url",
+     "in_thousands"
+    ],
+    "title": "PublicFiling",
+    "type": "object"
+   },
    "PublicGold": {
     "properties": {
      "as_of": {
@@ -5229,6 +5263,367 @@
      "weight"
     ],
     "title": "PublicHolding",
+    "type": "object"
+   },
+   "PublicInstitution": {
+    "properties": {
+     "bought": {
+      "items": {
+       "$ref": "#/components/schemas/PublicInstitutionHolding"
+      },
+      "title": "Bought",
+      "type": "array"
+     },
+     "change_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change Usd"
+     },
+     "cik": {
+      "title": "Cik",
+      "type": "string"
+     },
+     "computed_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Computed At"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+     },
+     "entries": {
+      "title": "Entries",
+      "type": "integer"
+     },
+     "filed": {
+      "format": "date",
+      "title": "Filed",
+      "type": "string"
+     },
+     "filed_name": {
+      "title": "Filed Name",
+      "type": "string"
+     },
+     "filings": {
+      "items": {
+       "$ref": "#/components/schemas/PublicFiling"
+      },
+      "title": "Filings",
+      "type": "array"
+     },
+     "group": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group"
+     },
+     "in_doubt": {
+      "title": "In Doubt",
+      "type": "boolean"
+     },
+     "in_thousands": {
+      "title": "In Thousands",
+      "type": "boolean"
+     },
+     "locked": {
+      "title": "Locked",
+      "type": "boolean"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "net_bought_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Net Bought Usd"
+     },
+     "period": {
+      "format": "date",
+      "title": "Period",
+      "type": "string"
+     },
+     "periods": {
+      "items": {
+       "format": "date",
+       "type": "string"
+      },
+      "title": "Periods",
+      "type": "array"
+     },
+     "previous_period": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Period"
+     },
+     "previous_stock_value_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Stock Value Usd"
+     },
+     "previous_value_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Value Usd"
+     },
+     "profile": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Profile"
+     },
+     "rank": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rank"
+     },
+     "sold": {
+      "items": {
+       "$ref": "#/components/schemas/PublicInstitutionHolding"
+      },
+      "title": "Sold",
+      "type": "array"
+     },
+     "status": {
+      "enum": [
+       "ready",
+       "queued",
+       "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "stock_value_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stock Value Usd"
+     },
+     "stocks": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stocks"
+     },
+     "top": {
+      "items": {
+       "$ref": "#/components/schemas/PublicInstitutionHolding"
+      },
+      "title": "Top",
+      "type": "array"
+     },
+     "top_total": {
+      "title": "Top Total",
+      "type": "integer"
+     },
+     "value_usd": {
+      "title": "Value Usd",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "cik",
+     "name",
+     "filed_name",
+     "group",
+     "profile",
+     "period",
+     "periods",
+     "rank",
+     "value_usd",
+     "previous_value_usd",
+     "change_usd",
+     "entries",
+     "filed",
+     "in_thousands",
+     "in_doubt",
+     "filings",
+     "status",
+     "computed_at",
+     "previous_period",
+     "stock_value_usd",
+     "previous_stock_value_usd",
+     "stocks",
+     "net_bought_usd",
+     "counts",
+     "top",
+     "top_total",
+     "bought",
+     "sold",
+     "locked"
+    ],
+    "title": "PublicInstitution",
+    "type": "object"
+   },
+   "PublicInstitutionHolding": {
+    "properties": {
+     "change": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change"
+     },
+     "cusip": {
+      "title": "Cusip",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "previous_shares": {
+      "title": "Previous Shares",
+      "type": "integer"
+     },
+     "previous_value_usd": {
+      "title": "Previous Value Usd",
+      "type": "integer"
+     },
+     "shares": {
+      "title": "Shares",
+      "type": "integer"
+     },
+     "split": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Split"
+     },
+     "symbol": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Symbol"
+     },
+     "title_of_class": {
+      "title": "Title Of Class",
+      "type": "string"
+     },
+     "traded_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Traded Usd"
+     },
+     "value_usd": {
+      "title": "Value Usd",
+      "type": "integer"
+     },
+     "weight_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight Pct"
+     }
+    },
+    "required": [
+     "symbol",
+     "name",
+     "cusip",
+     "title_of_class",
+     "change",
+     "shares",
+     "previous_shares",
+     "value_usd",
+     "previous_value_usd",
+     "weight_pct",
+     "traded_usd",
+     "split"
+    ],
+    "title": "PublicInstitutionHolding",
     "type": "object"
    },
    "PublicIntraday": {
@@ -5988,6 +6383,174 @@
      "source"
     ],
     "title": "PublicQuote",
+    "type": "object"
+   },
+   "PublicRankRow": {
+    "properties": {
+     "change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change Pct"
+     },
+     "change_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change Usd"
+     },
+     "cik": {
+      "title": "Cik",
+      "type": "string"
+     },
+     "entries": {
+      "title": "Entries",
+      "type": "integer"
+     },
+     "filed": {
+      "format": "date",
+      "title": "Filed",
+      "type": "string"
+     },
+     "filed_name": {
+      "title": "Filed Name",
+      "type": "string"
+     },
+     "group": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Group"
+     },
+     "in_doubt": {
+      "title": "In Doubt",
+      "type": "boolean"
+     },
+     "in_thousands": {
+      "title": "In Thousands",
+      "type": "boolean"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "previous_value_usd": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Value Usd"
+     },
+     "profile": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Profile"
+     },
+     "rank": {
+      "title": "Rank",
+      "type": "integer"
+     },
+     "value_usd": {
+      "title": "Value Usd",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "rank",
+     "cik",
+     "name",
+     "filed_name",
+     "value_usd",
+     "previous_value_usd",
+     "change_usd",
+     "change_pct",
+     "entries",
+     "filed",
+     "in_thousands",
+     "in_doubt",
+     "group",
+     "profile"
+    ],
+    "title": "PublicRankRow",
+    "type": "object"
+   },
+   "PublicRanking": {
+    "properties": {
+     "filers": {
+      "title": "Filers",
+      "type": "integer"
+     },
+     "period": {
+      "format": "date",
+      "title": "Period",
+      "type": "string"
+     },
+     "periods": {
+      "items": {
+       "format": "date",
+       "type": "string"
+      },
+      "title": "Periods",
+      "type": "array"
+     },
+     "previous_period": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Period"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/PublicRankRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "period",
+     "previous_period",
+     "periods",
+     "filers",
+     "total",
+     "rows"
+    ],
+    "title": "PublicRanking",
     "type": "object"
    },
    "PublicRatings": {
@@ -13934,6 +14497,226 @@
      }
     },
     "summary": "Get Portfolio",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/institutions": {
+   "get": {
+    "description": "機構排行 (HD-11): every 13F filer's quarter, largest first, in dollars. The same for\nevery reader; a quarter not offered is the default one (the latest all due).",
+    "operationId": "get_ranking_api_public_institutions_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "period",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Period"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "value",
+       "enum": [
+        "value",
+        "change",
+        "filed"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "order",
+      "required": false,
+      "schema": {
+       "default": "desc",
+       "enum": [
+        "desc",
+        "asc"
+       ],
+       "title": "Order",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "offset",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "maximum": 20000,
+       "minimum": 0,
+       "title": "Offset",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicRanking"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Ranking",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/institutions/{cik}": {
+   "get": {
+    "description": "An institution's page (HD-11): open to anybody, its ten largest holdings; the rest, and\nits estimated buys and sells, for a reader signed in (free, D-159). Opened for the first\ntime, its holdings are queued to be worked out (404: no 13F for the quarter).",
+    "operationId": "get_institution_api_public_institutions__cik__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "cik",
+      "required": true,
+      "schema": {
+       "pattern": "^\\d{1,10}$",
+       "title": "Cik",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "lang",
+      "required": true,
+      "schema": {
+       "maxLength": 10,
+       "pattern": "^[a-z]{2}(-[A-Z][A-Za-z]{1,3})?$",
+       "title": "Lang",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "period",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Period"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicInstitution"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Institution",
     "tags": [
      "public"
     ]

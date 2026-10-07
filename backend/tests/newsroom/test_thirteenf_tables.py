@@ -12,6 +12,7 @@ from autora.domains.newsroom.thirteenf_tables import (
     scaled,
     sec_chunks,
     table_url,
+    total_scale,
 )
 from autora.infra.http import FetchRefused
 
@@ -110,6 +111,22 @@ async def test_thousands_are_told_by_the_price_per_share():
     assert scale_of(t) == 1000
     holdings = scaled(t, 1000)
     assert holdings.in_thousands and holdings.total_value == 5 * 150_000
+
+
+async def test_a_cover_page_total_is_in_thousands_only_when_the_table_says_a_thousand_times_more():
+    # T. Rowe Price, 2026Q2: 4,722 rows in thousands, and a total of 999,124,702 — thousands too
+    trowe = table(*(row(f"CO {n}", f"{n:09d}", 211_589, 1_500_000) for n in range(1, 300)))
+    first = await read_table(chunked({URL: trowe}), URL, rows=200)
+    assert scale_of(first) == 1000
+    assert total_scale(first, 1000, entries=4722, total=999_124_702) == 1000
+    # Coston, McIsaac & Partners: rows in thousands (GSK: 1,381 shares worth "72"), its total
+    # in dollars — the table's US$13.5 million is its total's 13,500,000, not a thousand times it
+    coston = table(*(row(f"CO {n}", f"{n:09d}", 450, 10_000) for n in range(1, 31)))
+    whole = await read_table(chunked({URL: coston}), URL, rows=200)
+    assert (whole.complete, scale_of(whole)) == (True, 1000)
+    assert total_scale(whole, 1000, entries=30, total=13_500_000) == 1
+    # rows in dollars: so is the total
+    assert total_scale(whole, 1, entries=30, total=13_500) == 1
 
 
 async def test_the_table_is_the_folder_s_largest_xml_but_the_cover_page():
