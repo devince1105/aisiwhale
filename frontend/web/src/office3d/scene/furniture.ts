@@ -315,15 +315,18 @@ function lounge(): Part[] {
   ];
 }
 
-/** The meeting table (D-120, D-239), built along its own x with its open end at +x: in the room
- * that end faces the projection screen. Four chairs a side facing each other and one at the far
- * end facing the screen — nine — none in front of it. */
-export const MEETING_TABLE = { length: 3.6, width: 1.2 } as const;
-/** The projection screen on the meeting room's west wall (D-239): about centred on the table, and
- * short of the back corner where the whiteboard stands at an angle. */
-export const MEETING_SCREEN = { z: -5.45, width: 2.3 } as const;
-/** Where the side chairs sit along the table: four a side, 0.9 apart. */
-const MEETING_SIDE_CHAIRS = [-1.35, -0.45, 0.45, 1.35] as const;
+/** The meeting table (D-120, D-239, D-240), built along its own x with its open end at +x. Four
+ * chairs a side facing each other and one at the far end, the chair's, facing down the table —
+ * nine. In the room the chair's end is at the east wall, with the screen behind it. */
+export const MEETING_TABLE = { length: 5.0, width: 1.4 } as const;
+/** The projection screen on the meeting room's east wall, behind the chair at the head of the
+ * table (D-240): about centred on the table, and short of the back corner where the whiteboard
+ * stands at an angle. */
+export const MEETING_SCREEN = { z: -5.65, width: 1.9 } as const;
+/** Where the side chairs sit along the table: four a side, 1.25 apart — sized for the figures who
+ * would sit in them, not for the chairs: at AVATAR_SCALE a seated figure is about 1.3 m across,
+ * arms and all, its head alone about 0.8 m (D-240). At 0.9 they would sit shoulder in shoulder. */
+const MEETING_SIDE_CHAIRS = [-1.875, -0.625, 0.625, 1.875] as const;
 
 function meetingSet(): Part[] {
   const { length, width } = MEETING_TABLE;
@@ -331,8 +334,8 @@ function meetingSet(): Part[] {
     block(length, 0.06, width, [0, TOP - 0.06, 0], P.tableWood),
     block(0.12, TOP - 0.06, width - 0.4, [-length / 2 + 0.4, 0, 0], P.metal),
     block(0.12, TOP - 0.06, width - 0.4, [length / 2 - 0.4, 0, 0], P.metal),
-    block(0.5, 0.02, 0.35, [-0.9, TOP, 0.15], P.keyboard),
-    block(0.5, 0.02, 0.35, [0.9, TOP, -0.15], P.keyboard),
+    block(0.5, 0.02, 0.35, [-1.25, TOP, 0.2], P.keyboard),
+    block(0.5, 0.02, 0.35, [1.25, TOP, -0.2], P.keyboard),
   ];
   for (const x of MEETING_SIDE_CHAIRS) {
     parts.push(...place(officeChair(P.cushion), x, width / 2 + 0.35));
@@ -672,17 +675,18 @@ function shellCore(): Part[] {
     parts.push(block(WALL, 0.02, span, [x, 0, mid], P.metal));
   }
 
-  // the meeting room's projection screen, on its west wall at the table's open end (D-239); the
-  // picture that hung there gave way to it
+  // the meeting room's projection screen, on its east wall behind the chair at the head of the
+  // table (D-239, D-240): it faces west, down the table; the picture that hung there moved to the
+  // west wall
   {
-    const x = CEO_OFFICE.maxX + WALL_HALF;
+    const x = MEETING_ROOM.maxX - WALL_HALF;
     // a dark border round the white face, or it is the wall's colour and only its roller shows
-    parts.push(box(0.02, 1.52, MEETING_SCREEN.width + 0.12, [x + 0.01, 1.7, MEETING_SCREEN.z], P.metal));
-    parts.push(box(0.03, 1.4, MEETING_SCREEN.width, [x + 0.025, 1.7, MEETING_SCREEN.z], P.whiteboard));
-    parts.push(box(0.14, 0.12, MEETING_SCREEN.width + 0.2, [x + 0.07, 2.5, MEETING_SCREEN.z], P.metal));
+    parts.push(box(0.02, 1.52, MEETING_SCREEN.width + 0.12, [x - 0.01, 1.7, MEETING_SCREEN.z], P.metal));
+    parts.push(box(0.03, 1.4, MEETING_SCREEN.width, [x - 0.025, 1.7, MEETING_SCREEN.z], P.whiteboard));
+    parts.push(box(0.14, 0.12, MEETING_SCREEN.width + 0.2, [x - 0.07, 2.5, MEETING_SCREEN.z], P.metal));
   }
   // pictures on the inner walls (the outer walls' own are with them)
-  parts.push(...place(picture(0.6, 0.6, P.picture[2]), MEETING_ROOM.maxX - WALL_HALF, -6.2, -Math.PI / 2, 1.7));
+  parts.push(...place(picture(0.6, 0.6, P.picture[2]), CEO_OFFICE.maxX + WALL_HALF, -6.2, Math.PI / 2, 1.7));
   parts.push(...place(picture(0.6, 0.8, P.picture[3]), PANTRY.minX + WALL_HALF, -6.9, Math.PI / 2, 1.8));
   return parts;
 }
@@ -699,19 +703,44 @@ function innerWall(x: number): Part[] {
 }
 
 /** The back rooms' glass fronts (frames only; the panes are their own mesh), with their doors. */
-const GLASS_FRONTS: readonly (readonly [number, number])[] = [
+export const GLASS_FRONTS: readonly (readonly [number, number])[] = [
   [CEO_OFFICE.minX, CEO_OFFICE.maxX],
   [MEETING_ROOM.minX, MEETING_ROOM.maxX],
   [PANTRY.minX, PANTRY.maxX], // glassed in too (D-132)
 ];
 
-function glassFront([from, to]: readonly [number, number]): Part[] {
+/** A glass front's door openings, left to right. */
+function openingsIn([from, to]: readonly [number, number]): (readonly [number, number])[] {
+  return DOORS.filter((d) => d.x >= from && d.x <= to)
+    .map((d) => [d.x - d.width / 2, d.x + d.width / 2] as const)
+    .sort((a, b) => a[0] - b[0]);
+}
+
+/** Where a glass front's posts stand: evenly along it, but none in a doorway or crowding its
+ * frame. Spaced without regard to the doors, one fell inside each of the three back rooms' doors
+ * and stood in the middle of the way in. */
+export function glassFrontPosts(front: readonly [number, number]): number[] {
+  const [from, to] = front;
+  const len = to - from;
+  const posts = Math.ceil(len / 1.4);
+  const doors = openingsIn(front);
+  return Array.from({ length: posts + 1 }, (_, i) => from + (i * len) / posts).filter(
+    (x) => !doors.some(([a, b]) => x > a - 0.15 && x < b + 0.15),
+  );
+}
+
+function glassFront(front: readonly [number, number]): Part[] {
+  const [from, to] = front;
   const parts: Part[] = [];
   const len = to - from;
   parts.push(box(len, 0.08, 0.12, [(from + to) / 2, INNER_WALL_H - 0.04, BACK_ROOMS_Z], P.mullion));
-  parts.push(box(len, 0.06, 0.12, [(from + to) / 2, 0.03, BACK_ROOMS_Z], P.mullion));
-  const posts = Math.ceil(len / 1.4);
-  for (let i = 0; i <= posts; i++) parts.push(block(0.06, INNER_WALL_H, 0.12, [from + (i * len) / posts, 0, BACK_ROOMS_Z], P.mullion));
+  // the bottom rail stops at each door: no sill across the way in
+  let start = from;
+  for (const [a, b] of [...openingsIn(front), [to, to] as const]) {
+    if (a > start) parts.push(box(a - start, 0.06, 0.12, [(start + a) / 2, 0.03, BACK_ROOMS_Z], P.mullion));
+    start = b;
+  }
+  for (const x of glassFrontPosts(front)) parts.push(block(0.06, INNER_WALL_H, 0.12, [x, 0, BACK_ROOMS_Z], P.mullion));
   return parts;
 }
 
