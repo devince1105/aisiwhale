@@ -65,7 +65,8 @@ export const TONE_INK: Record<string, string> = {
 /** A box in the console's style: hard edges, two-tone border, no rounding. */
 export const BOX = "border-2 border-[color:var(--console-edge-dim)] bg-[color:var(--console-panel)]";
 
-/** The console's own dark green (the back office), or the public site's colours (D-177). */
+/** The console's own dark green, or the site's colours — the public site's (D-177) and, since
+ * D-245, the back office's too: there the green was out of place among the admin's own colours. */
 export type BoardLook = "console" | "site";
 
 /**
@@ -96,27 +97,5 @@ export function consoleVars(look: BoardLook = "console"): Record<string, string>
     "--console-text": CONSOLE.text,
     "--console-text-dim": CONSOLE.textDim,
     "--console-accent": CONSOLE.accent,
-  };
-}
-
-/**
- * The console's colours as the app's own theme tokens (D-007), for the page around the office
- * to wear while the 2D view is on screen: the header, the numbers strip and the panels then
- * follow without any of them knowing about this file. Scoped to the page's root element, so
- * every other page keeps the app's theme.
- */
-export function terminalVars(): Record<string, string> {
-  return {
-    "--color-canvas": CONSOLE.bg,
-    "--color-surface": CONSOLE.panel,
-    "--color-line": CONSOLE.edgeDim,
-    "--color-ink": CONSOLE.text,
-    "--color-muted": CONSOLE.textDim,
-    "--color-accent": CONSOLE.accent,
-    "--color-accent-ink": CONSOLE.bg,
-    "--color-ok": CONSOLE.ok,
-    "--color-warn": CONSOLE.warn,
-    "--color-danger": CONSOLE.danger,
-    "--color-neutral": CONSOLE.edge,
   };
 }

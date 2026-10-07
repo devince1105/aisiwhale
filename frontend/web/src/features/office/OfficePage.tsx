@@ -10,7 +10,7 @@ import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 import { dashboardModel } from "@/features/dashboard/model";
 import { useNow } from "@/hooks/useNow";
-import { OfficeCanvas, terminalVars, parseView, type OfficeView, type ThemeId } from "@/office3d/OfficeCanvas";
+import { OfficeCanvas, parseView, type OfficeView, type ThemeId } from "@/office3d/OfficeCanvas";
 import { useRealtime, type RealtimeState } from "@/stores/realtime";
 import { useUi } from "@/stores/ui";
 
@@ -154,10 +154,9 @@ function CompanyOffice({ company }: { company: Company }) {
   return (
     <main
       className="flex h-[calc(100dvh-var(--admin-bar,0px))] flex-col bg-canvas text-ink"
+      // which view is on screen; the page keeps the back office's own colours in both (D-245: the
+      // 2D view's terminal green, page and all, was out of place in it)
       data-terminal={mode === "2d"}
-      // the 2D office is a terminal; while it is on screen the page around it wears the same
-      // colours, by overriding the app's own tokens here and nowhere else (D-007)
-      style={mode === "2d" ? terminalVars() : undefined}
     >
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
         <div>
@@ -211,6 +210,7 @@ function CompanyOffice({ company }: { company: Company }) {
             departmentNames={departmentNames}
             theme={officeTheme.data}
             onTheme={(theme) => chooseTheme.mutate(theme)}
+            boardLook="site"
           />
         </div>
         {/* the team group beside the office (D-109); on a narrow screen, over it */}

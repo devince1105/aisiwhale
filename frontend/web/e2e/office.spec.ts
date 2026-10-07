@@ -209,23 +209,25 @@ async function sceneSettled(page: Page): Promise<void> {
   );
 }
 
-test("the 2D office turns the whole page into a terminal; 3D gives it back", async ({ page }) => {
+test("the 2D office keeps the back office's colours; the page says which view is on (D-245)", async ({ page }) => {
   await open(page, "&view=3d");
   await sceneSettled(page);
   const shell = page.locator("main[data-terminal]");
   await expect(shell).toHaveAttribute("data-terminal", "false");
+  const header = shell.locator("header").first();
+  const colour = await header.evaluate((el) => getComputedStyle(el).borderBottomColor);
   const views = page.getByRole("group", { name: "顯示方式" });
 
   await views.getByRole("button", { name: "2D", exact: true }).click();
   await expect(shell).toHaveAttribute("data-terminal", "true");
-  // the office's own chrome wears the console's colours, not only the board; the back office's
-  // sidebar and top bar around it (AD-02) keep the site's theme
-  const header = shell.locator("header").first();
-  await expect(header).toHaveCSS("border-bottom-color", "rgb(29, 63, 53)");
+  // no longer a terminal: the page around the board keeps the admin's own colours, not the
+  // console's green (rgb(29, 63, 53)) that used to take it over
+  await expect(header).toHaveCSS("border-bottom-color", colour);
+  await expect(header).not.toHaveCSS("border-bottom-color", "rgb(29, 63, 53)");
 
   await views.getByRole("button", { name: "3D", exact: true }).click();
   await expect(shell).toHaveAttribute("data-terminal", "false");
-  await expect(header).not.toHaveCSS("border-bottom-color", "rgb(29, 63, 53)");
+  await expect(header).toHaveCSS("border-bottom-color", colour);
 });
 
 test("the 2D board and back to 3D: the office draws again", async ({ page }) => {

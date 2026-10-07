@@ -409,7 +409,7 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - **誰是什麼角色**：
   - `ADMIN_EMAILS` 上、而且 email 已驗證的人一律是 owner；
   - 操作者權杖也是 owner：只給機器（CI、腳本、worker）用，操作紀錄記為 `operator`（D-234 ②）；
-  - 其他人由 owner 加進新的 `admin_roles` 資料表（遷移 0078），四種角色擇一，email 也必須已驗證。
+  - 其他人由 owner 加進新的 `admin_roles` 資料表（遷移 0079），四種角色擇一，email 也必須已驗證。
 - **`/api/admin/auth/me` 和登入的回應**多了 `role` 與 `permissions`。
 - **`/api/admin/access`**（`access:manage`）：列出 owner 名單、其他管理員和各角色的權限；可以加入（對方須已在網站註冊）、改角色、移除。不能改或移除自己（避免 owner 不小心把自己鎖在外面）。ADMIN_EMAILS 上的人不能在這裡被加入或修改。
 - **前端**：
@@ -440,6 +440,7 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
   - owner 加入、改角色、移除一個人的完整流程（加入前登入回 403、加入後可以登入、editor 打不開權限頁、移除後 cookie 失效）；
   - 不能改自己的角色；email 未驗證時有角色也進不來；被拒的嘗試記進操作紀錄（狀態 403、操作者是那位 viewer）。
 - 既有的 `test_admin_auth.py`、`test_google_api.py` 原本整筆比對 `/me` 的回應（`{"via", "email"}`），現在回應多了角色，改成比對 via、email、role。這是我改了回應造成的，不是測試本身有錯。
-- 遷移 0078：在自己的資料庫上 upgrade、`alembic check`（沒有差異）、downgrade 後再 upgrade 都通過。
+- 遷移 0079（原本是 0078，持股工作階段的正式環境修正 0078_prices_paced 先推，照約定我改號）：在自己的資料庫上 upgrade、`alembic check`（沒有差異）、downgrade 後再 upgrade 都通過。
 - 前端 `features/access/access.test.tsx` 共 6 項：側欄與指令面板依權限過濾；`useCan` 的預設與限制；看板移動對應的權限鍵；viewer 看到審批卡片但沒有決定按鈕；權限頁的顯示（不能改自己）、改角色、移除前確認、加入。vitest 86 個檔案、1,018 項全過；typecheck、lint 通過。
 - 真實瀏覽器：用 e2e 的管理員打開權限頁並截圖，頂欄顯示「擁有者」，權限表正確。
+- 推送前的完整驗證（在 0078 改號之前）：後端 pytest 2,509 項、Playwright e2e 17 項全過。之後合併了 origin/main：持股工作階段的 0078_prices_paced（D-244），以及 D-245（後台 2D 辦公室配色，同時把側欄的收合鈕移到標題列）。`AdminShell.tsx` 的衝突只在 `SidebarContent` 的開頭，保留了 D-245 的 `onToggle` 和我的 `useCan()`。合併並改號後，重建自己的資料庫跑 0001→0079、`alembic check`、typecheck、lint、vitest 1,018 項、API 與價格測試 325 項、e2e 17 項，全部通過。

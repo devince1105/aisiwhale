@@ -13,7 +13,6 @@ request with a pause between, and every later refresh only the months since its 
 
 from __future__ import annotations
 
-import asyncio
 import csv
 import io
 import logging
@@ -30,6 +29,7 @@ from autora.domains.newsroom.price_history import (
     HISTORY_MONTHS,
     PAUSE_SECONDS,
     Bar,
+    Pacer,
     _months_back,
     _store,
     months_between,
@@ -77,21 +77,25 @@ def parse_taifex_csv(text: str) -> list[Bar]:
 
 
 async def refresh_txf1(
-    session: AsyncSession, get: GetCsv, *, today: date, pause: float = PAUSE_SECONDS
+    session: AsyncSession,
+    get: GetCsv,
+    *,
+    today: date,
+    pause: float = PAUSE_SECONDS,
+    pacer: Pacer | None = None,
 ) -> int:
     """Bring TXF1's bars up to ``today``: the last year first, then back to five years.
-    How many bars were written."""
-    written, requests = 0, 0
+    How many bars were written. ``pacer``: the run's requests, as ``refresh_tw``'s."""
+    written = 0
+    pacer = pacer or Pacer(pause)
 
     async def month_of(month: date) -> list[Bar] | None:
-        nonlocal requests
-        if requests:
-            await asyncio.sleep(pause)
-        requests += 1
+        await pacer.next()
         nxt = (month.replace(day=28) + timedelta(days=4)).replace(day=1)
         try:
             return parse_taifex_csv(await get(month, min(nxt - timedelta(days=1), today)))
         except Exception as error:  # noqa: BLE001 — one month missing is next time's
+            pacer.failures += 1
             log.warning("prices: TXF1 %s not read: %s", f"{month:%Y-%m}", type(error).__name__)
             return None
 

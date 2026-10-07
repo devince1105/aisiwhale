@@ -95,8 +95,8 @@ reads 0.667) and Tiingo's closes and splits decide."""
 MIN_COVERAGE = Decimal("0.8")
 PRICED_SHARE = Decimal("0.9")
 TIINGO_PER_RUN = 2
-"""Six an hour: with the price refreshes' (D-059, up to 48 in an hour twice a weekday) inside
-Tiingo's 50; about 36 stretches a weekday shift."""
+"""Six an hour: with the price refresh's 24 (D-244) inside Tiingo's 50; about 36 stretches a
+weekday shift."""
 TIINGO_PAUSE = 2.0
 QUOTES_PER_RUN = 50
 """Finnhub quotes a run (75 s at ``QUOTE_PAUSE``): the latest quarter's top 90% — some 250
