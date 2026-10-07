@@ -128,6 +128,117 @@ async def test_a_call_lasts_no_longer_than_the_overtime_left():
     assert timedelta(seconds=0.08) <= end - start < timedelta(seconds=0.2)
 
 
+async def test_a_call_cut_short_by_a_deploy_still_counts_its_overtime():
+    """D-237: a deploy stops the worker in the middle of a call; the time it was in is still
+    overtime, written down as it goes."""
+    ledger = Ledger()
+    worker = Scripted(called_at=NOON + timedelta(milliseconds=1), work=10_000, overtime=ledger)
+    await _run(worker, 0.2)
+    ((start, end),) = ledger.calls
+    assert timedelta(seconds=0.1) <= end - start < timedelta(seconds=0.3)
+
+
+class Hours:
+    """A scheduler whose due schedule takes hours: ``newsroom.refresh_prices`` once 93 more US
+    stocks were tracked on 10/06 — 120 of them asked of Tiingo 75 seconds apart."""
+
+    def __init__(self):
+        self.passes = 0
+
+    async def tick(self):
+        self.passes += 1
+        await asyncio.sleep(3600)
+        return []
+
+
+class Nothing:
+    """Nothing to reap or expire, and a session that only commits."""
+
+    async def reap_expired_leases(self, session):
+        return []
+
+    async def expire_due(self, session):
+        return []
+
+    def __call__(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return None
+
+    async def commit(self):
+        pass
+
+
+class Desk(Worker):
+    """A worker with a real pass — maintenance, schedules, dispatch — whose dispatch only notes
+    when it was reached, and whether the worker was on a call then."""
+
+    def __init__(self, *, start, called_at=None, shifts=OFF, overtime=None):
+        loop = asyncio.get_running_loop()
+        began = loop.time()
+        self.dispatched: list[bool] = []
+
+        async def ask():
+            return called_at
+
+        super().__init__(
+            worker_id="desk",
+            session_factory=Nothing(),  # type: ignore[arg-type]
+            task_manager=Nothing(),  # type: ignore[arg-type]
+            runner=None,  # type: ignore[arg-type]
+            approvals=Nothing(),  # type: ignore[arg-type]
+            scheduler=Hours(),  # type: ignore[arg-type]
+            poll_interval=0.005,
+            idle_poll_interval=0.005,
+            maintenance_interval=0.01,
+            grace=0.05,
+            shifts=shifts,
+            on_call=ask,
+            overtime=overtime,
+            call_poll_interval=0.01,
+            call_idle=0.05,
+            call_limit=3600,
+            clock=lambda: start + timedelta(seconds=loop.time() - began),
+        )
+
+    async def dispatch(self):
+        self.dispatched.append(self._call is not None)
+        return 0
+
+
+async def test_a_schedule_that_takes_hours_does_not_hold_up_the_shift():
+    """D-237: on 10/06 the 18:20 price refresh held the worker's pass from 18:20 until a deploy
+    at 20:34 — no task claimed, no other schedule fired. The schedules run beside the passes now,
+    one scheduler pass at a time."""
+    worker = Desk(start=NOON, shifts=None)
+    await asyncio.wait_for(_run(worker, 0.3), timeout=2)  # and a stop is not held up either
+    assert len(worker.dispatched) > 10  # pass after pass while the schedule runs
+    assert worker.scheduler.passes == 1  # not a second one beside the first
+
+
+async def test_the_night_of_10_06_a_call_while_the_shift_s_schedule_still_runs():
+    """D-237: the shift ends during a schedule that takes hours, and a person sends a draft back
+    afterwards. The worker comes in for it at once — and fires no schedule on the call: what came
+    due off the shifts waits for the next one (D-193). On 10/06 each worker that came in started
+    the overdue 18:20 price refresh first and was stopped by the next deploy before the writer
+    was given anything."""
+    shift_end = datetime(2026, 10, 6, 8, 0, tzinfo=UTC)  # OFF's shift is 07:00-08:00 UTC
+    ledger = Ledger()
+    worker = Desk(
+        start=shift_end - timedelta(milliseconds=50),
+        called_at=shift_end + timedelta(milliseconds=20),
+        overtime=ledger,
+    )
+    await asyncio.wait_for(_run(worker, 0.4), timeout=2)
+    assert worker.scheduler.passes == 1  # the shift's, still running when it ended
+    assert any(worker.dispatched)  # the person's work was looked for on the call
+    assert len(ledger.calls) == 1  # and the call ended and was written down
+
+
 def test_a_call_is_over_when_idle_long_enough_or_at_its_limit():
     call = Call(started=NOON, until=NOON + timedelta(hours=1))
     idle = timedelta(minutes=3)

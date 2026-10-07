@@ -132,6 +132,22 @@ class WorkerOvertime(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
+class OfficeCallRecord(Base):
+    """When a person last changed something in the back office (D-205), written down (D-237).
+
+    The API answers the worker's "has anyone called?" from its memory, so the database sleeps
+    through the question; this one row is that memory kept for the API's next start, so a deploy
+    in the minute after a person acts — or in the middle of a call — does not forget the call.
+    Written when a person changes something (the database is awake: they are using it), read
+    when the API starts (right after the deploy's migrations woke it)."""
+
+    __tablename__ = "office_call"
+    __table_args__ = (CheckConstraint("id = 1", name="one_row"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    called_at: Mapped[datetime]
+
+
 class PolicyDecision(IdMixin, Base):
     """Audit row for every policy decision (append-only, trigger in migration 0009)."""
 

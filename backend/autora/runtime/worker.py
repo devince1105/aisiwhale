@@ -6,10 +6,14 @@ index), so they never step on each other.
 
 Each tick:
 - **maintenance** (every ``maintenance_interval``): reclaim expired leases (crashed or stalled
-  workers), expire overdue approvals, fire due schedules, plus whatever ``maintenance_jobs``
-  the composition root added (Phase 6 moves the company's cycle along there — the runtime does
-  not know what a cycle is). Each job commits on its own; one failing does not stop the others
-  or the loop.
+  workers), expire overdue approvals, plus whatever ``maintenance_jobs`` the composition root
+  added (Phase 6 moves the company's cycle along there — the runtime does not know what a cycle
+  is). Each job commits on its own; one failing does not stop the others or the loop.
+- **schedules** (D-237): the due ones are fired beside the passes, never inside them — one can
+  take hours (the price refresh asks Tiingo for each tracked US stock 75 seconds apart), and
+  inside a pass it held up every task, the end of the shift and the answer to a call. One
+  scheduler pass at a time; none on a call (D-205), so what came due off the shifts waits for
+  the next one (D-193).
 - **services** (T-514): run the READY service tasks (workflow steps no agent runs, e.g. approve
   and publish an article) through their handlers, each in its own transaction.
 - **dispatch**: for every active agent whose role has a behavior and that this worker is not
@@ -101,6 +105,8 @@ class Worker:
     clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
     on_outcome: Callable[[RunOutcome], Awaitable[None]] | None = None
     _running: dict[uuid.UUID, asyncio.Task[RunOutcome | None]] = field(default_factory=dict)
+    _schedules: asyncio.Task[list[str]] | None = None
+    """The scheduler's pass, running beside the worker's (D-237)."""
     _last_maintenance: datetime | None = None
     _call: Call | None = None
     _answered: datetime | None = None
@@ -137,6 +143,8 @@ class Worker:
                 await asyncio.wait_for(stop.wait(), timeout=wait)
             except TimeoutError:
                 pass
+        if self._call is not None:  # stopped on a call — a deploy: the time in is still overtime,
+            await self._end_call(self.clock())  # written before the grace Render's kill may cut
         await self.shutdown()
 
     async def _at_work(self) -> bool:
@@ -153,7 +161,9 @@ class Worker:
 
     async def _off_duty(self, stop: asyncio.Event) -> None:
         """Clocked out (D-193): let what runs finish, then wait for the next shift without a
-        query — or, on call (D-205), until a person does something in the back office."""
+        query — or, on call (D-205), until a person does something in the back office. A schedule
+        still firing from the shift goes on beside this until it is done (D-237): it does not
+        keep the worker from answering a call."""
         if self._running:
             await asyncio.wait(list(self._running.values()), timeout=self.poll_interval)
             return
@@ -220,15 +230,19 @@ class Worker:
             except Exception:  # noqa: BLE001 - the work is done; only the record is lost
                 log.exception("cannot write down the overtime of a call")
 
-    async def tick(self) -> int:
-        """One pass: maintenance if due, service steps, then claim and start runs. Returns the
-        service steps handled plus the runs started."""
+    async def tick(self, *, wait_for_schedules: bool = False) -> int:
+        """One pass: maintenance if due (and the due schedules set off beside it, D-237), service
+        steps, then claim and start runs. ``wait_for_schedules``: the schedules fire before the
+        rest, as drains and tests need. Returns the service steps handled plus the runs started."""
         now = self.clock()
         if self._last_maintenance is None or now - self._last_maintenance >= timedelta(
             seconds=self.maintenance_interval
         ):
             await self.maintain()
+            self._fire_schedules()
             self._last_maintenance = now
+        if wait_for_schedules and self._schedules is not None:
+            await self._schedules
         handled = 0
         if self.services is not None:
             try:
@@ -240,7 +254,7 @@ class Worker:
     async def run_until_idle(self, max_ticks: int = 1000) -> None:
         """Tick until nothing is running and nothing can be claimed (tests, one-off drains)."""
         for _ in range(max_ticks):
-            started = await self.tick()
+            started = await self.tick(wait_for_schedules=True)
             if not self._running:
                 if started == 0:
                     return
@@ -249,10 +263,15 @@ class Worker:
         raise RuntimeError(f"worker not idle after {max_ticks} ticks")
 
     async def shutdown(self) -> None:
-        if not self._running:
+        """In-flight runs and schedules get ``grace`` seconds; a schedule cut short rolls back and
+        is fired again once its lease expires."""
+        started = [*self._running.values()]
+        if self._schedules is not None and not self._schedules.done():
+            started.append(self._schedules)
+        if not started:
             return
-        log.info("waiting up to %.0fs for %d run(s)", self.grace, len(self._running))
-        _, pending = await asyncio.wait(list(self._running.values()), timeout=self.grace)
+        log.info("waiting up to %.0fs for %d run(s) and schedule(s)", self.grace, len(started))
+        _, pending = await asyncio.wait(started, timeout=self.grace)
         for task in pending:
             task.cancel()
         if pending:
@@ -282,11 +301,25 @@ class Worker:
                     await session.commit()
             except Exception:  # noqa: BLE001
                 log.exception("maintenance job %s failed", name)
-        if self.scheduler is not None:
+
+    def _fire_schedules(self) -> None:
+        """Set off the scheduler's pass beside the worker's (D-237), unless one is still going —
+        or the worker is on a call (D-205): it came in for what a person did, and the schedules
+        that came due off the shifts wait for the next one (D-193)."""
+        if self.scheduler is None or self._call is not None:
+            return
+        if self._schedules is not None and not self._schedules.done():
+            return
+        scheduler = self.scheduler
+
+        async def fire() -> list[str]:
             try:
-                await self.scheduler.tick()
+                return await scheduler.tick()
             except Exception:  # noqa: BLE001
                 log.exception("scheduler tick failed")
+                return []
+
+        self._schedules = asyncio.create_task(fire(), name="schedules")
 
     # --- dispatch --------------------------------------------------------------------------
 

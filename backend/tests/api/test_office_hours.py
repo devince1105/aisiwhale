@@ -83,3 +83,35 @@ async def test_the_worker_s_question_and_the_api_s_answer_agree(api, db_settings
     assert await ask() == OFFICE_CALL.at
 
     assert await api_caller(url, "wrong", transport=transport)() is None  # refused: no call
+
+
+async def test_a_restarted_api_remembers_the_call(api, db_session):
+    """D-237: the call is written down when a person acts, and an API that starts afresh reads it
+    back — a deploy in the minute after a person acts, or in the middle of a call, no longer
+    loses it. Reading writes nothing."""
+    from datetime import timedelta
+
+    from sqlalchemy import func, select
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from autora.db.models import OfficeCallRecord
+    from autora_api.deps import OFFICE_CALL, OfficeCall
+
+    count = select(func.count()).select_from(OfficeCallRecord)
+    OFFICE_CALL.at = None
+    await api.get("/api/office-hours")
+    assert await db_session.scalar(count) == 0  # reading calls nobody, and writes nothing
+
+    await api.post(f"/api/approvals/{uuid.uuid4()}/decide", json={"decision": "approve"})
+    called = OFFICE_CALL.at
+    factory = async_sessionmaker(
+        bind=await db_session.connection(), join_transaction_mode="create_savepoint"
+    )
+    restarted = OfficeCall()  # a new process: nothing in memory
+    await restarted.recall(factory)
+    assert restarted.at == called
+
+    OFFICE_CALL.at = called - timedelta(hours=1)  # a clock behind: the record does not go back
+    await OFFICE_CALL.keep(await db_session.connection())
+    assert await db_session.scalar(select(OfficeCallRecord.called_at)) == called
+    assert await db_session.scalar(count) == 1
