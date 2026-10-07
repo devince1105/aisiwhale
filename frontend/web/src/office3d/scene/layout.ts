@@ -58,7 +58,7 @@ export const SPINE_X = -3.05;
 /** Rooms along the back wall; their fronts are at z = BACK_ROOMS_Z. */
 export const BACK_ROOMS_Z = -3.2;
 export const CEO_OFFICE = { minX: -12, maxX: -5, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: -7.4, doorWidth: 1.2 } as const;
-export const MEETING_ROOM = { minX: -5, maxX: 4, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: 2.6, doorWidth: 1.2 } as const;
+export const MEETING_ROOM = { minX: -5, maxX: 4, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: 3.0, doorWidth: 1.2 } as const;
 /** Glassed in like the others (D-132), its door toward the work row's right half. */
 export const PANTRY = { minX: 4, maxX: 12, minZ: -8, maxZ: BACK_ROOMS_Z, doorX: 6.4, doorWidth: 1.2 } as const;
 /** The walkways between the zones. */
@@ -413,14 +413,15 @@ export const DECOR: Decor[] = [
   d("ceo_shelf", [-8.0, -7.6], [2.2, 0.5]),
   d("ceo_sofa", [-5.7, -5.8], [0.9, 2.0], -QUARTER),
   d("plant", [-11.4, -3.8], [0.6, 0.6]),
-  // meeting room: four a side and one at the head (D-239), along the room's long side; the chair
-  // at the head is at the east end, with the projection screen on the wall behind it (D-240)
-  // (5 m by 1.4 with the chairs 1.25 apart, sized for the figures; back from the front glass, clear
-  // of the door's open leaf)
-  d("meeting_set", [-0.625, -5.9], [5.9, 2.7], Math.PI),
-  // the whiteboard at 45° in the corner behind the chair, beside the screen, turned to the table
-  d("whiteboard", [3.1, -7.2], [1.5, 1.5], -Math.PI / 4),
-  d("plant", [-4.5, -7.5], [0.6, 0.6]),
+  // meeting room (D-239 - D-241): the screen on the west wall, the farthest from the door and one
+  // the default camera sees; the table's open end faces it, the chair's seat at that end's corner
+  // by the whiteboard, and the far end, by the door, left open. 5 m by 1.4 with the chairs 1.25
+  // apart, sized for the figures; back from the front glass, clear of the door's open leaf
+  d("meeting_set", [-0.55, -5.9], [5.6, 2.7], Math.PI),
+  // the whiteboard at 45° in the north-west corner beside the screen: it faces the table, and the
+  // camera too
+  d("whiteboard", [-4.1, -7.2], [1.5, 1.5], Math.PI / 4),
+  d("plant", [3.5, -7.5], [0.6, 0.6]),
   // pantry
   d("pantry_counter", [6.4, -7.65], [4.2, 0.7]),
   d("fridge", [9.0, -7.55], [0.9, 0.8]),
