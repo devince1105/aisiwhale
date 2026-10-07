@@ -1,15 +1,14 @@
 "use client";
 
-// The newsroom's sources (T-517): where stories come from, and a form to add one.
+// The newsroom's sources (T-517): where stories come from — a table (AD-05) — and a form to add one.
 import { useState, type FormEvent } from "react";
 
 import type { NewSource } from "@/api/queries";
 
-import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
+import { DataTable, type Column, type SortControl } from "@/features/admin-ui/DataTable";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
 import { formatTime, type SourceView } from "./model";
-import { Empty } from "./parts";
 
 const KINDS: Record<string, string> = {
   rss: "RSS / Atom",
@@ -19,25 +18,45 @@ const KINDS: Record<string, string> = {
   gdelt: "GDELT",
 };
 
-export function SourcesView({ sources }: { sources: readonly SourceView[] | undefined }) {
-  if (!sources) return <Empty>載入中…</Empty>;
-  if (sources.length === 0) return <Empty>還沒有來源。</Empty>;
+const COLUMNS: readonly Column<SourceView>[] = [
+  {
+    key: "status",
+    header: "狀態",
+    className: "whitespace-nowrap",
+    cell: (source) => (
+      <StatusLozenge tone={source.status === "active" ? "ok" : "warn"}>{source.status === "active" ? "啟用" : "暫停"}</StatusLozenge>
+    ),
+  },
+  { key: "name", header: "名稱", sort: "name", className: "font-medium", cell: (source) => source.name },
+  { key: "kind", header: "種類", className: "whitespace-nowrap text-muted", cell: (source) => KINDS[source.kind] ?? source.kind },
+  {
+    key: "target",
+    header: "網址或查詢",
+    className: "max-w-xs truncate text-muted",
+    cell: (source) => source.url ?? String(source.config.query ?? ""),
+  },
+  {
+    key: "stats",
+    header: "信任度・項目",
+    className: "whitespace-nowrap text-xs text-muted",
+    cell: (source) =>
+      `信任度 ${Number(source.trust_level).toFixed(1)}・${source.items} 則項目・${
+        source.last_polled_at ? `上次讀取 ${formatTime(source.last_polled_at)}` : "尚未讀取"
+      }`,
+  },
+];
+
+export function SourcesView({
+  sources,
+  sort,
+  error = null,
+}: {
+  sources: readonly SourceView[] | undefined;
+  sort?: SortControl;
+  error?: string | null;
+}) {
   return (
-    <ul className="divide-y divide-line rounded border border-line bg-surface text-sm">
-      {sources.map((source) => (
-        <li key={source.id} {...ROW} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${ROW_FOCUS}`}>
-          <StatusLozenge tone={source.status === "active" ? "ok" : "warn"}>{source.status === "active" ? "啟用" : "暫停"}</StatusLozenge>
-          <span className="font-medium">{source.name}</span>
-          <span className="text-muted">{KINDS[source.kind] ?? source.kind}</span>
-          <span className="truncate text-muted">{source.url ?? String(source.config.query ?? "")}</span>
-          <span className="grow" />
-          <span className="text-xs text-muted">
-            信任度 {Number(source.trust_level).toFixed(1)}・{source.items} 則項目・
-            {source.last_polled_at ? `上次讀取 ${formatTime(source.last_polled_at)}` : "尚未讀取"}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <DataTable label="來源" rows={sources} columns={COLUMNS} rowKey={(source) => source.id} sort={sort} error={error} empty="還沒有來源。" />
   );
 }
 

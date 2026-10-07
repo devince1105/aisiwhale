@@ -345,20 +345,15 @@ describe("a story", () => {
 });
 
 describe("the lists", () => {
-  it("stories: filter by state, link to each story and its article", () => {
-    const onFilter = vi.fn();
+  it("stories: link to each story and its article (the state filter is the table's, AD-05)", () => {
     render(
-      <StoriesView
-        stories={[{ ...STORY_DETAIL, state: "PUBLISHED", article: { id: ARTICLE, state: "PUBLISHED", slug: "s", title: "t" } }]}
-        filter="ALL"
-        onFilter={onFilter}
-      />,
+      <StoriesView stories={[{ ...STORY_DETAIL, state: "PUBLISHED", article: { id: ARTICLE, state: "PUBLISHED", slug: "s", title: "t" } }]} />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: "製作中" }));
-    expect(onFilter).toHaveBeenCalledWith("IN_PRODUCTION");
+    const row = screen.getByRole("link", { name: "Lumen City microgrid" }).closest("tr")!;
     expect(screen.getByRole("link", { name: "Lumen City microgrid" }).getAttribute("href")).toBe(`/admin/newsroom/stories/${STORY}`);
-    expect(screen.getByRole("link", { name: "文章" }).getAttribute("href")).toBe(`/admin/newsroom/articles/${ARTICLE}`);
-    expect(screen.getByText(/分數 72・3 則來源項目・1 則主張/)).toBeTruthy();
+    expect(within(row).getByRole("link", { name: "文章" }).getAttribute("href")).toBe(`/admin/newsroom/articles/${ARTICLE}`);
+    expect(within(row).getByText("72")).toBeTruthy();
+    expect(within(row).getByText("3 則來源項目・1 則主張")).toBeTruthy();
   });
 
   it("articles: state, version, languages, readers", () => {
@@ -432,13 +427,13 @@ describe("the data", () => {
   it("asks for the version, the state and the workflow's events", async () => {
     const { api, requests } = client();
     await articleQuery(ARTICLE, 2, api).queryFn!({} as never);
-    await storiesQuery(C, "PUBLISHED", null, api).queryFn!({ pageParam: null } as never);
-    await storiesQuery(C, null, "台股", api).queryFn!({ pageParam: "next" } as never);
+    await storiesQuery(C, "PUBLISHED", {}, api).queryFn!({} as never);
+    await storiesQuery(C, null, { q: "台股", cursor: "next", sort: "title" }, api).queryFn!({} as never);
     await workflowEventsQuery(C, "run1", api).queryFn!({} as never);
     expect(requests.map((r) => r.url)).toEqual([
       `http://api/api/articles/${ARTICLE}?version=2`,
       `http://api/api/companies/${C}/stories?state=PUBLISHED&limit=50`,
-      `http://api/api/companies/${C}/stories?limit=50&cursor=next&q=${encodeURIComponent("台股")}`,
+      `http://api/api/companies/${C}/stories?limit=50&cursor=next&q=${encodeURIComponent("台股")}&sort=title`,
       `http://api/api/events?company_id=${C}&correlation_id=run1&limit=500`,
     ]);
   });

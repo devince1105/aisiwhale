@@ -5,6 +5,7 @@
 import { infiniteQueryOptions, QueryClient, queryOptions, type InfiniteData } from "@tanstack/react-query";
 
 import { api as defaultApi, unwrap, type ApiClient, type Schemas } from "./client";
+import type { operations } from "./schema.gen";
 
 /** One of the site's sections (D-047), as the API spells them. */
 export type Section = NonNullable<Schemas["ArticleSectionBody"]["section"]>;
@@ -68,6 +69,30 @@ const paged = {
   getNextPageParam: <T,>(last: Page<T>) => last.next_cursor ?? null,
 };
 
+type QueryOf<K extends keyof operations> = NonNullable<operations[K]["parameters"]["query"]>;
+export type ApprovalSort = NonNullable<QueryOf<"list_approvals_api_approvals_get">["sort"]>;
+export type StorySort = NonNullable<QueryOf<"list_stories_api_companies__company_id__stories_get">["sort"]>;
+export type ArticleSort = NonNullable<QueryOf<"list_articles_api_companies__company_id__articles_get">["sort"]>;
+export type SourceSort = NonNullable<QueryOf<"list_sources_api_companies__company_id__sources_get">["sort"]>;
+export type CompSort = NonNullable<QueryOf<"list_comps_api_admin_memberships_comps_get">["sort"]>;
+
+/** One page of a table (AD-05): what the address says — the words, the order, the page. */
+export interface ListArgs<S extends string> {
+  q?: string | null;
+  sort?: S | null;
+  cursor?: string | null;
+  limit?: number;
+}
+
+function listQuery<S extends string>(args: ListArgs<S>) {
+  return {
+    limit: args.limit ?? PAGE_SIZE,
+    ...(args.cursor ? { cursor: args.cursor } : {}),
+    ...(args.q ? { q: args.q } : {}),
+    ...(args.sort ? { sort: args.sort } : {}),
+  };
+}
+
 /** The query a list sends for one page: the cursor only after the first, ``q`` only when set. */
 function pageQuery(cursor: string | null, q?: string | null, limit = PAGE_SIZE) {
   return { limit, ...(cursor ? { cursor } : {}), ...(q ? { q } : {}) };
@@ -119,13 +144,20 @@ export function taskQuery(taskId: string, api: ApiClient = defaultApi) {
 export type ApprovalState = "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
 
 /** The inbox, a page at a time (AD-04), oldest first. */
-export function approvalsQuery(companyId: string, state: ApprovalState = "PENDING", api: ApiClient = defaultApi) {
+export function approvalsQuery(
+  companyId: string,
+  state: ApprovalState = "PENDING",
+  args: Pick<ListArgs<ApprovalSort>, "q" | "sort"> = {},
+  api: ApiClient = defaultApi,
+) {
   return infiniteQueryOptions({
-    queryKey: [...queryKeys.approvals(companyId, state), "list"] as const,
+    queryKey: [...queryKeys.approvals(companyId, state), "list", args] as const,
     queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET("/api/approvals", {
-          params: { query: { company_id: companyId, state, ...pageQuery(pageParam) } },
+          params: {
+            query: { company_id: companyId, state, ...pageQuery(pageParam, args.q), ...(args.sort ? { sort: args.sort } : {}) },
+          },
         }),
       ),
     ...paged,
@@ -201,21 +233,21 @@ export function kpisQuery(companyId: string, api: ApiClient = defaultApi) {
 
 export type StoryState = "DISCOVERED" | "SELECTED" | "IN_PRODUCTION" | "PUBLISHED" | "DROPPED" | "IGNORED";
 
+/** One page of stories (AD-05), as the table's address asks. */
 export function storiesQuery(
   companyId: string,
   state: StoryState | null = null,
-  q: string | null = null,
+  args: ListArgs<StorySort> = {},
   api: ApiClient = defaultApi,
 ) {
-  return infiniteQueryOptions({
-    queryKey: [...queryKeys.stories(companyId, state), q] as const,
-    queryFn: async ({ pageParam }) =>
+  return queryOptions({
+    queryKey: [...queryKeys.stories(companyId, state), args] as const,
+    queryFn: async () =>
       unwrap(
         await api.GET("/api/companies/{company_id}/stories", {
-          params: { path: { company_id: companyId }, query: { ...(state ? { state } : {}), ...pageQuery(pageParam, q) } },
+          params: { path: { company_id: companyId }, query: { ...(state ? { state } : {}), ...listQuery(args) } },
         }),
       ),
-    ...paged,
   });
 }
 
@@ -227,6 +259,20 @@ export function storyQuery(storyId: string, api: ApiClient = defaultApi) {
   });
 }
 
+/** One page of articles (AD-05), as the table's address asks. */
+export function articlesPageQuery(companyId: string, args: ListArgs<ArticleSort> = {}, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: [...queryKeys.articles(companyId), "page", args] as const,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/companies/{company_id}/articles", {
+          params: { path: { company_id: companyId }, query: listQuery(args) },
+        }),
+      ),
+  });
+}
+
+/** Articles a page at a time, newest change first: the team chat's titles. */
 export function articlesQuery(companyId: string, q: string | null = null, api: ApiClient = defaultApi) {
   return infiniteQueryOptions({
     queryKey: [...queryKeys.articles(companyId), q] as const,
@@ -252,16 +298,16 @@ export function articleQuery(articleId: string, version: number | null = null, a
   });
 }
 
-export function sourcesQuery(companyId: string, q: string | null = null, api: ApiClient = defaultApi) {
-  return infiniteQueryOptions({
-    queryKey: [...queryKeys.sources(companyId), q] as const,
-    queryFn: async ({ pageParam }) =>
+/** One page of sources (AD-05), as the table's address asks. */
+export function sourcesQuery(companyId: string, args: ListArgs<SourceSort> = {}, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: [...queryKeys.sources(companyId), args] as const,
+    queryFn: async () =>
       unwrap(
         await api.GET("/api/companies/{company_id}/sources", {
-          params: { path: { company_id: companyId }, query: pageQuery(pageParam, q) },
+          params: { path: { company_id: companyId }, query: listQuery(args) },
         }),
       ),
-    ...paged,
   });
 }
 
@@ -638,16 +684,20 @@ export type Comp = Schemas["Comp"];
 export type GrantCompInput = Schemas["GrantComp"];
 
 /** VIP given by an admin (D-228, P2): newest first; ``running`` keeps only those giving access now. */
-export function compsQuery(companySlug: string, running = false, q: string | null = null, api: ApiClient = defaultApi) {
-  return infiniteQueryOptions({
-    queryKey: [...queryKeys.comps(companySlug, running), q] as const,
-    queryFn: async ({ pageParam }) =>
+export function compsQuery(
+  companySlug: string,
+  running = false,
+  args: ListArgs<CompSort> = {},
+  api: ApiClient = defaultApi,
+) {
+  return queryOptions({
+    queryKey: [...queryKeys.comps(companySlug, running), args] as const,
+    queryFn: async () =>
       unwrap(
         await api.GET("/api/admin/memberships/comps", {
-          params: { query: { company: companySlug, running, ...pageQuery(pageParam, q) } },
+          params: { query: { company: companySlug, running, ...listQuery(args) } },
         }),
       ),
-    ...paged,
   });
 }
 

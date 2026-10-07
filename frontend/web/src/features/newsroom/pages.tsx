@@ -10,7 +10,8 @@ import { useState } from "react";
 import {
   addSource,
   articleQuery,
-  articlesQuery,
+  articlesPageQuery,
+  type ArticleSort,
   republishArticle,
   setArticleAccess,
   setArticleSection,
@@ -22,11 +23,14 @@ import {
   unpublishArticle,
   workflowEventsQuery,
   type Section,
+  type SourceSort,
+  type StorySort,
   type StoryState,
 } from "@/api/queries";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { ListToolbar, Pager, sortControl, type FilterDef } from "@/features/admin-ui/DataTable";
 import { ErrorState } from "@/features/admin-ui/states";
-import { usePaged } from "@/features/admin-ui/usePaged";
+import { useListState } from "@/features/admin-ui/useListState";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
@@ -35,7 +39,8 @@ import { ArticleView } from "./ArticleView";
 import type { ArticleDetail, StoryDetail } from "./model";
 import { Empty } from "./parts";
 import { AddSourceForm, SourcesView } from "./SourcesView";
-import { StoriesView, type StoryFilter } from "./StoriesView";
+import { label, STORY_STATE } from "./model";
+import { STORY_STATES, StoriesView } from "./StoriesView";
 import { StoryView } from "./StoryView";
 import { CoverPanel } from "./CoverPanel";
 
@@ -66,16 +71,24 @@ export function StoriesPage() {
   return <CompanyScope>{(company) => <CompanyStories company={company} />}</CompanyScope>;
 }
 
+const STORY_SORTS: readonly StorySort[] = ["-last_item_at", "last_item_at", "-score", "-first_seen_at", "title"];
+const STORY_FILTER: FilterDef<"state"> = {
+  key: "state",
+  label: "狀態",
+  options: STORY_STATES.map((state) => ({ value: state, label: label(STORY_STATE, state)[0] })),
+};
+
 function CompanyStories({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const [filter, setFilter] = useState<StoryFilter>("ALL");
-  const stories = usePaged(storiesQuery(company.id, filter === "ALL" ? null : (filter as StoryState)));
+  const list = useListState(["state"], STORY_SORTS);
+  const state = (STORY_STATES as readonly string[]).includes(list.filters.state ?? "") ? (list.filters.state as StoryState) : null;
+  const page = useQuery(storiesQuery(company.id, state, { q: list.q, sort: list.sort, cursor: list.cursor }));
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的題材`} />
-      {stories.error ? <ErrorState>{stories.error.message}</ErrorState> : null}
-      <StoriesView stories={stories.items} filter={filter} onFilter={setFilter} />
-      {stories.footer}
+      <ListToolbar list={list} filters={[STORY_FILTER]} placeholder="搜尋題材標題…" views="stories" />
+      <StoriesView stories={page.data?.items} sort={sortControl(list, STORY_SORTS, "-last_item_at")} error={page.error?.message} />
+      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
     </AdminPage>
   );
 }
@@ -84,15 +97,18 @@ export function ArticlesPage() {
   return <CompanyScope>{(company) => <CompanyArticles company={company} />}</CompanyScope>;
 }
 
+const ARTICLE_SORTS: readonly ArticleSort[] = ["-updated_at", "updated_at", "-created_at", "title"];
+
 function CompanyArticles({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const articles = usePaged(articlesQuery(company.id));
+  const list = useListState([], ARTICLE_SORTS);
+  const page = useQuery(articlesPageQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }));
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的文章`} />
-      {articles.error ? <ErrorState>{articles.error.message}</ErrorState> : null}
-      <ArticlesView articles={articles.items} />
-      {articles.footer}
+      <ListToolbar list={list} placeholder="搜尋標題或網址代稱…" views="articles" />
+      <ArticlesView articles={page.data?.items} sort={sortControl(list, ARTICLE_SORTS, "-updated_at")} error={page.error?.message} />
+      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
     </AdminPage>
   );
 }
@@ -101,17 +117,22 @@ export function SourcesPage() {
   return <CompanyScope>{(company) => <CompanySources company={company} />}</CompanyScope>;
 }
 
+const SOURCE_SORTS: readonly SourceSort[] = ["created_at", "-created_at", "name"];
+
 function CompanySources({ company }: { company: Company }) {
   useCompanyStream(company.id);
-  const sources = usePaged(sourcesQuery(company.id));
+  const list = useListState([], SOURCE_SORTS);
+  const page = useQuery(sourcesQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }));
   const queryClient = useQueryClient();
   return (
     <AdminPage>
       <PageHeader title={`${company.name} 的來源`} />
-      {sources.error ? <ErrorState>{sources.error.message}</ErrorState> : null}
-      <SourcesView sources={sources.items} />
-      {sources.footer}
-      <h2 className="mt-8 mb-3 text-lg font-semibold">新增來源</h2>
+      <ListToolbar list={list} placeholder="搜尋名稱或網址…" />
+      <SourcesView sources={page.data?.items} sort={sortControl(list, SOURCE_SORTS, "created_at")} error={page.error?.message} />
+      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
+      <h2 id="add-source" className="mt-8 mb-3 text-lg font-semibold">
+        新增來源
+      </h2>
       <AddSourceForm
         onAdd={async (body) => {
           await addSource(company.id, body);

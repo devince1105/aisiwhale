@@ -3,17 +3,16 @@
 // VIP given by an admin, for internal testing (D-228, P2-B): who has it, until when, why, and
 // ending one. A comp is not a sale — no order, payment or revenue — and ending one only takes
 // away what the comp gave; the server works out what is left. Nothing here decides access.
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { compsQuery, grantComp, revokeComp, type Comp } from "@/api/queries";
+import { compsQuery, grantComp, revokeComp, type Comp, type CompSort } from "@/api/queries";
 import { Button } from "@/features/admin-ui/Button";
+import { DataTable, ListToolbar, Pager, sortControl, type Column, type FilterDef, type SortControl } from "@/features/admin-ui/DataTable";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
-import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
-import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
-import { usePaged } from "@/features/admin-ui/usePaged";
+import { useListState } from "@/features/admin-ui/useListState";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -45,9 +44,12 @@ export function CompsPage() {
   return <CompanyScope>{(company) => <CompanyComps company={company} />}</CompanyScope>;
 }
 
+const COMP_SORTS: readonly CompSort[] = ["-created_at", "created_at", "-expires_at", "expires_at"];
+const RUNNING: FilterDef<"running"> = { key: "running", label: "狀態", options: [{ value: "1", label: "有效中" }] };
+
 function CompanyComps({ company }: { company: Company }) {
-  const [running, setRunning] = useState(false);
-  const comps = usePaged(compsQuery(company.slug, running));
+  const list = useListState(["running"], COMP_SORTS);
+  const page = useQuery(compsQuery(company.slug, list.filters.running === "1", { q: list.q, sort: list.sort, cursor: list.cursor }));
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["memberships", "comps", company.slug] });
 
@@ -60,16 +62,15 @@ function CompanyComps({ company }: { company: Company }) {
 
       <GrantForm companySlug={company.slug} onDone={refresh} />
 
-      <div className="mt-8 mb-3 flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">授予紀錄</h2>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={running} onChange={(e) => setRunning(e.target.checked)} />
-          只看有效中
-        </label>
-      </div>
-      {comps.error ? <ErrorState>無法載入：{comps.error.message}</ErrorState> : null}
-      <CompsTable comps={comps.items} onRevoked={refresh} />
-      {comps.footer}
+      <h2 className="mt-8 mb-3 text-lg font-semibold">授予紀錄</h2>
+      <ListToolbar list={list} filters={[RUNNING]} placeholder="搜尋 email 或理由…" views="comps" />
+      <CompsTable
+        comps={page.data?.items}
+        onRevoked={refresh}
+        sort={sortControl(list, COMP_SORTS, "-created_at")}
+        error={page.error ? `無法載入：${page.error.message}` : null}
+      />
+      <Pager list={list} shown={page.data?.items.length ?? 0} total={page.data?.total ?? null} nextCursor={page.data?.next_cursor} />
     </AdminPage>
   );
 }
@@ -146,35 +147,129 @@ function GrantForm({ companySlug, onDone }: { companySlug: string; onDone: () =>
   );
 }
 
-export function CompsTable({ comps, onRevoked }: { comps: Comp[] | undefined; onRevoked: () => unknown }) {
-  if (comps === undefined) return <LoadingState />;
-  if (comps.length === 0) return <EmptyState>沒有授予紀錄。</EmptyState>;
+const STATUS_TONE = { 有效中: "ok", 已撤銷: "danger", 已到期: "neutral" } as const;
+
+function columns(onRevoked: () => unknown): Column<Comp>[] {
+  return [
+    { key: "email", header: "讀者", className: "break-all", cell: (comp) => comp.email ?? "（讀者已不存在）" },
+    {
+      key: "status",
+      header: "狀態",
+      className: "whitespace-nowrap",
+      cell: (comp) => <StatusLozenge tone={STATUS_TONE[compStatus(comp)]}>{compStatus(comp)}</StatusLozenge>,
+    },
+    {
+      key: "period",
+      header: "期間",
+      sort: "expires_at",
+      className: "whitespace-nowrap",
+      cell: (comp) => (
+        <>
+          {when(comp.started_at)} – {when(comp.expires_at)}
+          {comp.revoked_at ? <div className="text-xs text-muted">撤銷於 {when(comp.revoked_at)}</div> : null}
+        </>
+      ),
+    },
+    {
+      key: "reason",
+      header: "理由",
+      cell: (comp) => (
+        <>
+          {comp.reason}
+          {comp.revoke_reason ? <div className="text-xs text-muted">撤銷理由：{comp.revoke_reason}</div> : null}
+        </>
+      ),
+    },
+    {
+      key: "actor",
+      header: "授予者",
+      sort: "created_at",
+      className: "text-xs break-all text-muted",
+      cell: (comp) => (
+        <>
+          {actorOf(comp.actor)}
+          {comp.revoked_by ? <div>撤銷：{actorOf(comp.revoked_by)}</div> : null}
+        </>
+      ),
+    },
+    { key: "revoke", header: "", align: "right", cell: (comp) => <RevokeOne comp={comp} onRevoked={onRevoked} /> },
+  ];
+}
+
+export function CompsTable({
+  comps,
+  onRevoked,
+  sort,
+  error = null,
+}: {
+  comps: Comp[] | undefined;
+  onRevoked: () => unknown;
+  sort?: SortControl;
+  error?: string | null;
+}) {
+  const [revoking, setRevoking] = useState<Comp[] | null>(null);
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs text-muted">
-          <tr>
-            <th className="py-2 pr-3">讀者</th>
-            <th className="py-2 pr-3">狀態</th>
-            <th className="py-2 pr-3">期間</th>
-            <th className="py-2 pr-3">理由</th>
-            <th className="py-2 pr-3">授予者</th>
-            <th className="py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {comps.map((comp) => (
-            <CompRow key={comp.id} comp={comp} onRevoked={onRevoked} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <DataTable
+        label="授予紀錄"
+        rows={comps}
+        columns={columns(onRevoked)}
+        rowKey={(comp) => comp.id}
+        rowTestId={(comp) => `comp-${comp.id}`}
+        sort={sort}
+        error={error}
+        empty="沒有授予紀錄。"
+        bulk={[{ label: "撤銷選取的授予", tone: "danger", run: (rows) => setRevoking(rows.filter((c) => c.running)) }]}
+      />
+      {revoking ? <RevokeMany comps={revoking} onDone={onRevoked} onClose={() => setRevoking(null)} /> : null}
+    </>
   );
 }
 
-const STATUS_TONE = { 有效中: "ok", 已撤銷: "danger", 已到期: "neutral" } as const;
+/** The checked comps that are still running, ended with one reason, one after another. */
+function RevokeMany({ comps, onDone, onClose }: { comps: Comp[]; onDone: () => unknown; onClose: () => void }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const revoke = useMutation({
+    mutationFn: async (reason: string) => {
+      const errors: string[] = [];
+      for (const comp of comps) {
+        try {
+          await revokeComp(comp.id, reason);
+        } catch (error) {
+          errors.push(`${comp.email ?? comp.id}：${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      return errors;
+    },
+    onSuccess: async (errors) => {
+      await onDone();
+      if (errors.length) setFailed(errors.join("；"));
+      else onClose();
+    },
+  });
+  if (comps.length === 0) {
+    return (
+      <ConfirmDialog title="沒有可撤銷的授予" confirmLabel="知道了" tone="primary" onConfirm={onClose} onCancel={onClose}>
+        選取的授予都已經撤銷或到期。
+      </ConfirmDialog>
+    );
+  }
+  return (
+    <ConfirmDialog
+      title={`撤銷 ${comps.length} 筆 VIP 授予？`}
+      confirmLabel="確認撤銷"
+      reason={{ placeholder: "撤銷理由（必填，套用到每一筆）", maxLength: REASON_MAX }}
+      busy={revoke.isPending}
+      error={failed ? `有些沒有撤銷：${failed}` : revoke.isError ? revoke.error.message : null}
+      onConfirm={(reason) => revoke.mutate(reason)}
+      onCancel={onClose}
+    >
+      {comps.map((c) => c.email ?? c.id).join("、")}。只結束授予給的 VIP；讀者自己付費的部分不受影響。
+    </ConfirmDialog>
+  );
+}
 
-function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) {
+function RevokeOne({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) {
   const [asking, setAsking] = useState(false);
   const revoke = useMutation({
     mutationFn: (reason: string) => revokeComp(comp.id, reason),
@@ -183,45 +278,25 @@ function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) 
       await onRevoked();
     },
   });
-  const status = compStatus(comp);
+  if (!comp.running) return null;
   return (
-    <tr {...ROW} className={`border-t border-line align-top ${ROW_FOCUS}`} data-testid={`comp-${comp.id}`}>
-      <td className="py-2 pr-3 break-all">{comp.email ?? "（讀者已不存在）"}</td>
-      <td className="py-2 pr-3 whitespace-nowrap">
-        <StatusLozenge tone={STATUS_TONE[status]}>{status}</StatusLozenge>
-      </td>
-      <td className="py-2 pr-3 whitespace-nowrap">
-        {when(comp.started_at)} – {when(comp.expires_at)}
-        {comp.revoked_at ? <div className="text-xs text-muted">撤銷於 {when(comp.revoked_at)}</div> : null}
-      </td>
-      <td className="py-2 pr-3">
-        {comp.reason}
-        {comp.revoke_reason ? <div className="text-xs text-muted">撤銷理由：{comp.revoke_reason}</div> : null}
-      </td>
-      <td className="py-2 pr-3 text-xs break-all text-muted">
-        {actorOf(comp.actor)}
-        {comp.revoked_by ? <div>撤銷：{actorOf(comp.revoked_by)}</div> : null}
-      </td>
-      <td className="py-2 text-right">
-        {comp.running ? (
-          <Button size="sm" onClick={() => setAsking(true)}>
-            撤銷
-          </Button>
-        ) : null}
-        {asking ? (
-          <ConfirmDialog
-            title={`撤銷 ${comp.email ?? "這位讀者"} 的 VIP？`}
-            confirmLabel="確認撤銷"
-            reason={{ placeholder: "撤銷理由（必填）", maxLength: REASON_MAX }}
-            busy={revoke.isPending}
-            error={revoke.isError ? `沒有撤銷：${revoke.error.message}` : null}
-            onConfirm={(reason) => revoke.mutate(reason)}
-            onCancel={() => setAsking(false)}
-          >
-            只結束這筆授予給的 VIP；讀者自己付費的部分不受影響。
-          </ConfirmDialog>
-        ) : null}
-      </td>
-    </tr>
+    <>
+      <Button size="sm" onClick={() => setAsking(true)}>
+        撤銷
+      </Button>
+      {asking ? (
+        <ConfirmDialog
+          title={`撤銷 ${comp.email ?? "這位讀者"} 的 VIP？`}
+          confirmLabel="確認撤銷"
+          reason={{ placeholder: "撤銷理由（必填）", maxLength: REASON_MAX }}
+          busy={revoke.isPending}
+          error={revoke.isError ? `沒有撤銷：${revoke.error.message}` : null}
+          onConfirm={(reason) => revoke.mutate(reason)}
+          onCancel={() => setAsking(false)}
+        >
+          只結束這筆授予給的 VIP；讀者自己付費的部分不受影響。
+        </ConfirmDialog>
+      ) : null}
+    </>
   );
 }
