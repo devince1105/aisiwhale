@@ -36,6 +36,8 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "system:settings": "系統設定：上班時段、加班上限、聯絡表單上限",
   "trading:view": "查看交易紀錄：決定、訂單、損益（D-248，交易頁上線後生效）",
   "trading:approve": "核准交易代理提出的交易（D-248，交易頁上線後生效）",
+  "research:view": "查看研究任務與結果（D-251，研究頁上線後生效）",
+  "research:run": "啟動、取消、重跑研究任務（D-251，研究頁上線後生效）",
   "self:prefs": "自己的通知設定",
 };
 

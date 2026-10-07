@@ -297,7 +297,7 @@ reader_credentials (reader_id, password_hash)   ← 只有開放密碼登入時�
 
 ## 12. 研究任務（P6a／P6b）
 
-> P6a 的後台研究工作頁照 `logs/admin/02_NEW_ADMIN_PAGE.md` 做（AD-14）。
+> P6a 的後台研究工作頁照 `logs/admin/02_NEW_ADMIN_PAGE.md` 做（AD-14）；看研究用 `research:view`、啟動研究用 `research:run`，都只有 owner（D-251）。
 
 ### 12.1 LEGAL REVIEW REQUIRED
 

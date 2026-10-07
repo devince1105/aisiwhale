@@ -26,7 +26,11 @@
     - 交易頁的**每一條讀取路由**（決定、訂單、損益、風險拒絕）都要在 `ROUTES` 加 `("GET", 路由): trading:view`；讀取預設是全部角色都能看，不加就會漏給 editor 和 viewer；
     - 核准交易的寫入路由對應 `trading:approve`，前端用 `useCan("trading:approve")` 決定是否顯示核准按鈕；
     - 導覽項目加 `need: "trading:view"`，editor 和 viewer 的側欄就不會出現交易頁。
-  - 研究頁（P6a）等其他新的鍵，**加之前先和使用者確認哪些角色可以做**（AD-09 只定了四種角色）。
+  - **研究頁（P6a）用 `research:view` 與 `research:run`**（D-251，已在權限表），**只有 owner 有**：
+    - 研究頁的每一條讀取路由（任務列表、結果）都要在 `ROUTES` 加 GET 的 `research:view`；
+    - 啟動、取消、重跑研究任務的寫入路由對應 `research:run`；
+    - 導覽項目加 `need: "research:view"`，其他角色的側欄不會出現研究頁。
+  - 之後其他新的鍵，**加之前先和使用者確認哪些角色可以做**（AD-09 只定了四種角色）。
   - 讀取預設所有後台角色都能看；只有敏感的讀取（操作紀錄、讀者錢包）在 `ROUTES` 裡加 GET 的鍵。
 - [ ] **前端用 `useCan("鍵")` 決定要不要顯示按鈕或表單**，側欄項目用 `need`。🔒 頁面要求的鍵必須是某條路由真的有的鍵（`x-permission`，從 openapi.json 讀）。後端一樣會擋（403），前端隱藏只是不讓人點到一定會失敗的東西。
 - [ ] **在 `features/audit/labels.ts` 的 `ACTION_LABEL` 為每條新寫入路由取中文名稱**。🔒 有權限鍵的寫入路由沒有名稱會失敗。

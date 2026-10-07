@@ -67,6 +67,14 @@ def test_the_four_roles():
             if key in permissions.permissions_of(r)
         }
         assert having == {"owner", "finance"}, key
+    # D-251: research is an owner's alone, for now
+    for key in ("research:view", "research:run"):
+        having = {
+            r
+            for r in ("owner", "editor", "finance", "viewer")
+            if key in permissions.permissions_of(r)
+        }
+        assert having == {"owner"}, key
     assert permissions.permissions_of("nobody") == frozenset()
 
 

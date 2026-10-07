@@ -663,3 +663,9 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 
 - 交易頁還沒做，所以目前沒有路由用到這兩個鍵。TR-10 要做的事寫進檢查清單和交易提案：讀取路由預設所有後台角色都能看，所以交易頁的**每一條讀取路由**都要在權限表加 GET 的鍵；核准路由對應 `trading:approve`；導覽項目加 `need: "trading:view"`。
 - 合併 origin/main 後，前端 1,034 項、後端 `tests/api` 338 項與 `tests/e2e` 8 項通過。
+
+### D-251：研究頁先只給 owner（2026-10-08）
+
+使用者決定：**研究頁（P6a）先只給 owner**。權限表新增 `research:view`（看研究任務與結果）、`research:run`（啟動、取消、重跑），只放在 `ALL`，其他三種角色都沒有，由 `test_admin_permissions.py` 鎖住。角色與權限頁補上說明；檢查清單與營利藍圖 §12 寫明研究頁每一條讀取路由要加 GET 的鍵、導覽項目加 `need: "research:view"`。和 D-225（P6a 只給 Admin 與內部測試）一致。
+
+- 驗證：`test_admin_permissions.py` 12 項、前端角色與權限頁與 `conventions.test.ts` 9 項、tsc、`gen_openapi --check` 通過（研究頁還沒有路由，openapi 不變）。
