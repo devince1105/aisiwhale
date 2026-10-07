@@ -361,6 +361,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approvals/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Approval Report */
+        get: operations["approval_report_api_approvals_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals/{approval_id}/decide": {
         parameters: {
             query?: never;
@@ -2494,6 +2511,29 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** ApprovalReport */
+        ApprovalReport: {
+            /** Days */
+            days: number;
+            /** Deciders */
+            deciders: components["schemas"]["Decider"][];
+            /** Kinds */
+            kinds: components["schemas"]["KindOutcomes"][];
+            /** Pending */
+            pending: number;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** Stuck */
+            stuck: components["schemas"]["Stuck"][];
+            /** Stuck Hours */
+            stuck_hours: number;
+            /** Stuck Total */
+            stuck_total: number;
+            total: components["schemas"]["Outcomes"];
+        };
         /**
          * ApprovalState
          * @enum {string}
@@ -3398,6 +3438,23 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** Decider */
+        Decider: {
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Approved */
+            approved: number;
+            /** Decided */
+            decided: number;
+            /** Label */
+            label: string;
+            /** Rejected */
+            rejected: number;
+            /** Returned */
+            returned: number;
+        };
         /** DecisionIn */
         DecisionIn: {
             /**
@@ -3720,6 +3777,25 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** KindOutcomes */
+        KindOutcomes: {
+            /** Approved */
+            approved: number;
+            /** Decided */
+            decided: number;
+            /** Expired */
+            expired: number;
+            /** Kind */
+            kind: string;
+            /** Median Hours */
+            median_hours: number | null;
+            /** P90 Hours */
+            p90_hours: number | null;
+            /** Rejected */
+            rejected: number;
+            /** Returned */
+            returned: number;
         };
         /** Kpis */
         Kpis: {
@@ -4085,6 +4161,23 @@ export interface components {
              * @default []
              */
             unplaced: components["schemas"]["AgentOut"][];
+        };
+        /** Outcomes */
+        Outcomes: {
+            /** Approved */
+            approved: number;
+            /** Decided */
+            decided: number;
+            /** Expired */
+            expired: number;
+            /** Median Hours */
+            median_hours: number | null;
+            /** P90 Hours */
+            p90_hours: number | null;
+            /** Rejected */
+            rejected: number;
+            /** Returned */
+            returned: number;
         };
         /** Page[AdminMovement] */
         Page_AdminMovement_: {
@@ -5623,6 +5716,22 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Stuck */
+        Stuck: {
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Summary */
+            summary: string;
+            /** Waited Hours */
+            waited_hours: number;
+        };
         /** TaskDetailOut */
         TaskDetailOut: {
             /** Attempt */
@@ -6825,6 +6934,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approval_report_api_approvals_report_get: {
+        parameters: {
+            query: {
+                company_id: string;
+                days?: number;
+                stuck_hours?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalReport"];
                 };
             };
             /** @description Validation Error */

@@ -810,6 +810,18 @@ export async function resetSetting(key: string, api: ApiClient = defaultApi) {
   return unwrap(await api.DELETE("/api/admin/settings/{key}", { params: { path: { key } } }));
 }
 
+export type ApprovalReport = Schemas["ApprovalReport"];
+
+/** How the approvals have gone over the last ``days`` (AD-12): decided how and how fast, by kind
+ * and by who decided, and what has waited past ``stuckHours`` now. */
+export function approvalReportQuery(companyId: string, days: number, stuckHours = 24, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: ["approvals", companyId, "report", days, stuckHours] as const,
+    queryFn: async () =>
+      unwrap(await api.GET("/api/approvals/report", { params: { query: { company_id: companyId, days, stuck_hours: stuckHours } } })),
+  });
+}
+
 /** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
 export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
   return unwrap(await api.POST("/api/admin/memberships/comps", { body }));

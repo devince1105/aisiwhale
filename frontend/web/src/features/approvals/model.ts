@@ -34,6 +34,10 @@ const KIND_LABEL: Record<string, string> = {
   official_report: "名人交易申報",
 };
 
+export function kindLabel(kind: string): string {
+  return KIND_LABEL[kind] ?? kind;
+}
+
 const ACTOR_KIND: Record<string, string> = { system: "系統", human: "人員", agent: "代理" };
 
 export interface ApprovalCard {

@@ -1077,6 +1077,68 @@
     "title": "ApprovalPage",
     "type": "object"
    },
+   "ApprovalReport": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     },
+     "deciders": {
+      "items": {
+       "$ref": "#/components/schemas/Decider"
+      },
+      "title": "Deciders",
+      "type": "array"
+     },
+     "kinds": {
+      "items": {
+       "$ref": "#/components/schemas/KindOutcomes"
+      },
+      "title": "Kinds",
+      "type": "array"
+     },
+     "pending": {
+      "title": "Pending",
+      "type": "integer"
+     },
+     "since": {
+      "format": "date-time",
+      "title": "Since",
+      "type": "string"
+     },
+     "stuck": {
+      "items": {
+       "$ref": "#/components/schemas/Stuck"
+      },
+      "title": "Stuck",
+      "type": "array"
+     },
+     "stuck_hours": {
+      "title": "Stuck Hours",
+      "type": "integer"
+     },
+     "stuck_total": {
+      "title": "Stuck Total",
+      "type": "integer"
+     },
+     "total": {
+      "$ref": "#/components/schemas/Outcomes"
+     }
+    },
+    "required": [
+     "since",
+     "days",
+     "total",
+     "kinds",
+     "deciders",
+     "pending",
+     "stuck_hours",
+     "stuck",
+     "stuck_total"
+    ],
+    "title": "ApprovalReport",
+    "type": "object"
+   },
    "ApprovalState": {
     "enum": [
      "PENDING",
@@ -3354,6 +3416,45 @@
     "title": "Decide",
     "type": "object"
    },
+   "Decider": {
+    "properties": {
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "approved": {
+      "title": "Approved",
+      "type": "integer"
+     },
+     "decided": {
+      "title": "Decided",
+      "type": "integer"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "rejected": {
+      "title": "Rejected",
+      "type": "integer"
+     },
+     "returned": {
+      "title": "Returned",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "actor",
+     "label",
+     "decided",
+     "approved",
+     "returned",
+     "rejected"
+    ],
+    "title": "Decider",
+    "type": "object"
+   },
    "DecisionIn": {
     "properties": {
      "decision": {
@@ -4190,6 +4291,68 @@
      }
     },
     "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "KindOutcomes": {
+    "properties": {
+     "approved": {
+      "title": "Approved",
+      "type": "integer"
+     },
+     "decided": {
+      "title": "Decided",
+      "type": "integer"
+     },
+     "expired": {
+      "title": "Expired",
+      "type": "integer"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "median_hours": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median Hours"
+     },
+     "p90_hours": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P90 Hours"
+     },
+     "rejected": {
+      "title": "Rejected",
+      "type": "integer"
+     },
+     "returned": {
+      "title": "Returned",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "decided",
+     "approved",
+     "returned",
+     "rejected",
+     "expired",
+     "median_hours",
+     "p90_hours",
+     "kind"
+    ],
+    "title": "KindOutcomes",
     "type": "object"
    },
    "Kpis": {
@@ -5043,6 +5206,63 @@
      "headcount"
     ],
     "title": "OrgOut",
+    "type": "object"
+   },
+   "Outcomes": {
+    "properties": {
+     "approved": {
+      "title": "Approved",
+      "type": "integer"
+     },
+     "decided": {
+      "title": "Decided",
+      "type": "integer"
+     },
+     "expired": {
+      "title": "Expired",
+      "type": "integer"
+     },
+     "median_hours": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Median Hours"
+     },
+     "p90_hours": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P90 Hours"
+     },
+     "rejected": {
+      "title": "Rejected",
+      "type": "integer"
+     },
+     "returned": {
+      "title": "Returned",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "decided",
+     "approved",
+     "returned",
+     "rejected",
+     "expired",
+     "median_hours",
+     "p90_hours"
+    ],
+    "title": "Outcomes",
     "type": "object"
    },
    "Page_AdminMovement_": {
@@ -9492,6 +9712,48 @@
     "title": "StorySummary",
     "type": "object"
    },
+   "Stuck": {
+    "properties": {
+     "expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     },
+     "waited_hours": {
+      "title": "Waited Hours",
+      "type": "number"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "summary",
+     "waited_hours",
+     "expires_at"
+    ],
+    "title": "Stuck",
+    "type": "object"
+   },
    "TaskDetailOut": {
     "properties": {
      "attempt": {
@@ -12305,6 +12567,94 @@
      }
     ],
     "summary": "List Approvals",
+    "tags": [
+     "approvals"
+    ]
+   }
+  },
+  "/api/approvals/report": {
+   "get": {
+    "operationId": "approval_report_api_approvals_report_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "company_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Company Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "days",
+      "required": false,
+      "schema": {
+       "default": 30,
+       "maximum": 365,
+       "minimum": 1,
+       "title": "Days",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "stuck_hours",
+      "required": false,
+      "schema": {
+       "default": 24,
+       "maximum": 720,
+       "minimum": 1,
+       "title": "Stuck Hours",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApprovalReport"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Approval Report",
     "tags": [
      "approvals"
     ]

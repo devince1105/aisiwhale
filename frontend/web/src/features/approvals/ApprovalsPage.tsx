@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useMemo } from "react";
 
 import {
@@ -17,7 +18,7 @@ import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { useListState } from "@/features/admin-ui/useListState";
 import { ActivityTimeline } from "@/features/audit/ActivityTimeline";
 import { usePaged } from "@/features/admin-ui/usePaged";
-import { CompanyScope, type Company } from "@/features/company/CompanyScope";
+import { CompanyScope, withCompany, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 import { useNow } from "@/hooks/useNow";
 import type { AgentState } from "@/realtime/reducer";
@@ -59,7 +60,14 @@ function CompanyApprovals({ company }: { company: Company }) {
 
   return (
     <AdminPage width="read">
-      <PageHeader title={`${company.name} 的審批收件匣`} />
+      <PageHeader
+        title={`${company.name} 的審批收件匣`}
+        actions={
+          <Link href={withCompany("/admin/approvals/report", company.id)} className="text-sm text-accent hover:underline">
+            審批報表
+          </Link>
+        }
+      />
       <ListToolbar list={list} placeholder="搜尋摘要或動作…" views="approvals" density={false} />
       <label className="mb-3 flex items-center gap-2 text-xs text-muted">
         順序

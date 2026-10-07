@@ -24,6 +24,7 @@ from autora_api.routers import (
     admin_me,
     admin_memberships,
     admin_settings,
+    approval_report,
     approvals,
     auth,
     coins,
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(events.router)
     app.include_router(runs.router)
     app.include_router(tasks.router)
+    app.include_router(approval_report.router)  # before the inbox's own routes
     app.include_router(approvals.router)
     app.include_router(workflows.router)
     app.include_router(realtime.router)
