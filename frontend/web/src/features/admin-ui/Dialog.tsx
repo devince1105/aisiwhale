@@ -9,15 +9,19 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./Button";
 import { Icon } from "./icons";
 
-function Modal({
+/** A modal <dialog>, rendered while open: the pieces below, and the command palette, build on it. */
+export function Modal({
   onClose,
   label,
   className,
+  marker,
   children,
 }: {
   onClose: () => void;
   label: string;
   className: string;
+  /** A ``data-*`` attribute to find this dialog by (``data-palette``). */
+  marker?: string;
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -43,6 +47,7 @@ function Modal({
     <dialog
       ref={ref}
       aria-label={label}
+      {...(marker ? { [`data-${marker}`]: "" } : {})}
       // a click on the backdrop lands on the dialog itself, not on its content
       onClick={(event) => {
         if (event.target === event.currentTarget) close.current();

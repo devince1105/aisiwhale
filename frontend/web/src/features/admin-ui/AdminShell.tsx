@@ -1,22 +1,27 @@
 "use client";
 
 // The back office's shell (AD-02): a sidebar with the company switcher and every page (nav.ts),
-// collapsible to icons and a drawer on a phone; a top bar with the live badge, the theme and who
-// is signed in. Pages draw only their own content (AdminPage, PageHeader).
+// collapsible to icons and a drawer on a phone; a top bar with the command palette's box, the
+// live badge, the theme and who is signed in; and the keyboard (AD-03, hotkeys.ts). Pages draw
+// only their own content (AdminPage, PageHeader).
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { approvalsQuery } from "@/api/queries";
 import { useCompanyChoice, withCompany } from "@/features/company/CompanyScope";
 import { ThemeToggle } from "@/features/site/ThemeToggle";
 
 import { Button } from "./Button";
+import { buildCommands } from "./commands";
+import { CommandPalette, ShortcutHelp } from "./CommandPalette";
 import { LiveStatus } from "./ConnectionBadge";
 import { Drawer } from "./Dialog";
+import { moveRow, openRow, useHotkeys } from "./hotkeys";
 import { Icon } from "./icons";
 import { activeNav, ADMIN_NAV, type NavItem } from "./nav";
+import { recentVisits } from "./recent";
 
 const COLLAPSED = "autora.admin.sidebar";
 
@@ -39,15 +44,54 @@ function saveCollapsed(collapsed: boolean): void {
 export function AdminShell({ email, onSignOut, children }: { email: string | null; onSignOut: () => void; children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [palette, setPalette] = useState(false);
+  const [help, setHelp] = useState(false);
   const pathname = usePathname() ?? "";
+  const router = useRouter();
+  const { requested, companies, company } = useCompanyChoice();
+  const companyId = company?.id ?? requested;
   useEffect(() => setCollapsed(savedCollapsed()), []);
   // a link followed in the phone's drawer closes it
   useEffect(() => setMenuOpen(false), [pathname]);
 
-  const toggle = () => {
-    setCollapsed(!collapsed);
-    saveCollapsed(!collapsed);
-  };
+  const toggle = () =>
+    setCollapsed((was) => {
+      saveCollapsed(!was);
+      return !was;
+    });
+
+  useHotkeys({
+    palette: () => setPalette((open) => !open),
+    search: () => setPalette(true),
+    help: () => setHelp(true),
+    go: (letter) => {
+      const item = ADMIN_NAV.flatMap((g) => g.items).find((i) => i.go === letter);
+      if (!item) return false;
+      router.push(companyId ? withCompany(item.href, companyId) : item.href);
+      return true;
+    },
+    row: moveRow,
+    openRow,
+  });
+
+  // read when it opens: what was visited since, and the companies as they are now
+  const commands = useMemo(
+    () =>
+      palette
+        ? buildCommands({
+            companyId,
+            companies: companies.data ?? [],
+            recent: recentVisits(),
+            go: (href) => router.push(href),
+            toggleSidebar: toggle,
+            showHelp: () => setHelp(true),
+            signOut: onSignOut,
+          })
+        : [],
+    // toggle and onSignOut are new functions every render; what the list shows does not change
+    // with them, and toggle reads the state it flips when it runs
+    [palette, companyId, companies.data, router],
+  );
 
   return (
     // --admin-bar: the top bar's height, for a page that fills the rest of the screen (the office)
@@ -70,6 +114,8 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
           </Button>
         </div>
       </aside>
+      {palette ? <CommandPalette commands={commands} onClose={() => setPalette(false)} /> : null}
+      {help ? <ShortcutHelp onClose={() => setHelp(false)} /> : null}
       {menuOpen ? (
         <Drawer title="後台選單" side="left" onClose={() => setMenuOpen(false)}>
           <SidebarContent collapsed={false} />
@@ -80,6 +126,18 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
           <Button variant="subtle" size="sm" className="md:hidden" onClick={() => setMenuOpen(true)} aria-label="開啟選單">
             <Icon name="menu" />
           </Button>
+          <button
+            type="button"
+            onClick={() => setPalette(true)}
+            className="flex h-8 w-full max-w-sm items-center gap-2 rounded-md border border-line bg-canvas px-3 text-left text-sm text-muted hover:border-muted"
+          >
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true" className="size-4 shrink-0">
+              <circle cx="9" cy="9" r="5.5" />
+              <path d="M13 13l4 4" strokeLinecap="round" />
+            </svg>
+            <span className="grow truncate">搜尋或跳頁…</span>
+            <kbd className="hidden rounded border border-line px-1.5 text-[11px] sm:inline">⌘K</kbd>
+          </button>
           <span className="grow" />
           <LiveStatus />
           <ThemeToggle lang="zh-TW" />

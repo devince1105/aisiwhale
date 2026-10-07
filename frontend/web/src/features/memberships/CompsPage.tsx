@@ -9,6 +9,7 @@ import { useState } from "react";
 import { compsQuery, grantComp, revokeComp, type Comp } from "@/api/queries";
 import { Button } from "@/features/admin-ui/Button";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
@@ -182,7 +183,7 @@ function CompRow({ comp, onRevoked }: { comp: Comp; onRevoked: () => unknown }) 
   });
   const status = compStatus(comp);
   return (
-    <tr className="border-t border-line align-top" data-testid={`comp-${comp.id}`}>
+    <tr {...ROW} className={`border-t border-line align-top ${ROW_FOCUS}`} data-testid={`comp-${comp.id}`}>
       <td className="py-2 pr-3 break-all">{comp.email ?? "（讀者已不存在）"}</td>
       <td className="py-2 pr-3 whitespace-nowrap">
         <StatusLozenge tone={STATUS_TONE[status]}>{status}</StatusLozenge>

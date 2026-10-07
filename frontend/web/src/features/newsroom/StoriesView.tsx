@@ -1,6 +1,7 @@
 // The newsroom's stories (T-517): what the sources brought, clustered; what is being made of them.
 import Link from "next/link";
 
+import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
 import { Empty } from "./parts";
@@ -42,7 +43,7 @@ export function StoriesView({
           {stories.map((story) => {
             const [state, tone] = label(STORY_STATE, story.state);
             return (
-              <li key={story.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <li key={story.id} {...ROW} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${ROW_FOCUS}`}>
                 <StatusLozenge tone={tone}>{state}</StatusLozenge>
                 <Link href={`/admin/newsroom/stories/${story.id}`} className="font-medium hover:text-accent">
                   {story.title}

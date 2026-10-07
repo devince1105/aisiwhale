@@ -8,6 +8,7 @@ import type { Schemas } from "@/api/client";
 import type { AgentAction, NewAgent } from "@/api/queries";
 import { Button } from "@/features/admin-ui/Button";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
 import { Face } from "@/features/agent-panel/Face";
 import { ROLE_LABEL, STATE_LABEL } from "@/features/agent-panel/model";
@@ -50,7 +51,7 @@ export function AgentsView({
       {error ? <ErrorState>{error}</ErrorState> : null}
       <ul className="mt-2 divide-y divide-line rounded-lg border border-line bg-surface text-sm">
         {agents.map((agent) => (
-          <li key={agent.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <li key={agent.id} {...ROW} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${ROW_FOCUS}`}>
             <Face name={agent.display_name} role={agent.role} avatarKey={agent.avatar_key} size={28} />
             <span className="font-medium">{personName(agent.display_name)}</span>
             <span className="text-muted">{ROLE_LABEL[agent.role] ?? agent.role}</span>

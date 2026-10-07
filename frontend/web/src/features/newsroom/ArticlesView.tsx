@@ -1,6 +1,7 @@
 // The newsroom's articles (T-517): drafts, in review, published.
 import Link from "next/link";
 
+import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
 import { ARTICLE_STATE, formatTime, label, type ArticleSummary } from "./model";
@@ -25,7 +26,7 @@ export function ArticlesView({ articles }: { articles: readonly ArticleSummary[]
         {articles.map((article) => {
           const [state, tone] = label(ARTICLE_STATE, article.state);
           return (
-            <tr key={article.id}>
+            <tr key={article.id} {...ROW} className={ROW_FOCUS}>
               <td className="px-3 py-2">
                 <StatusLozenge tone={tone}>{state}</StatusLozenge>
               </td>

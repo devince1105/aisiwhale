@@ -12,6 +12,8 @@ export interface NavItem {
   also?: readonly string[];
   /** A count shown beside the label. */
   count?: "pending-approvals";
+  /** The second key of its ``g`` shortcut (AD-03): ``g`` then this letter opens it. */
+  go: string;
 }
 
 export interface NavGroup {
@@ -23,31 +25,31 @@ export const ADMIN_NAV: readonly NavGroup[] = [
   {
     label: "總覽",
     items: [
-      { key: "dashboard", label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" },
-      { key: "office", label: "辦公室", href: "/admin/office", icon: "office" },
+      { key: "dashboard", go: "d", label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" },
+      { key: "office", go: "o", label: "辦公室", href: "/admin/office", icon: "office" },
     ],
   },
   {
     label: "工作",
     items: [
-      { key: "approvals", label: "審批收件匣", href: "/admin/approvals", icon: "inbox", count: "pending-approvals" },
-      { key: "cycles", label: "每日週期", href: "/admin/cycles", icon: "cycle" },
-      { key: "timeline", label: "事件時間軸", href: "/admin/timeline", icon: "timeline", also: ["/admin/trace", "/admin/tasks"] },
+      { key: "approvals", go: "i", label: "審批收件匣", href: "/admin/approvals", icon: "inbox", count: "pending-approvals" },
+      { key: "cycles", go: "c", label: "每日週期", href: "/admin/cycles", icon: "cycle" },
+      { key: "timeline", go: "t", label: "事件時間軸", href: "/admin/timeline", icon: "timeline", also: ["/admin/trace", "/admin/tasks"] },
     ],
   },
   {
     label: "新聞室",
     items: [
-      { key: "stories", label: "題材", href: "/admin/newsroom/stories", icon: "story" },
-      { key: "articles", label: "文章", href: "/admin/newsroom/articles", icon: "article" },
-      { key: "sources", label: "來源", href: "/admin/newsroom/sources", icon: "source" },
+      { key: "stories", go: "s", label: "題材", href: "/admin/newsroom/stories", icon: "story" },
+      { key: "articles", go: "a", label: "文章", href: "/admin/newsroom/articles", icon: "article" },
+      { key: "sources", go: "f", label: "來源", href: "/admin/newsroom/sources", icon: "source" },
     ],
   },
   {
     label: "組織與會員",
     items: [
-      { key: "agents", label: "代理", href: "/admin/agents", icon: "agents" },
-      { key: "memberships", label: "VIP 授予", href: "/admin/memberships", icon: "member" },
+      { key: "agents", go: "p", label: "代理", href: "/admin/agents", icon: "agents" },
+      { key: "memberships", go: "v", label: "VIP 授予", href: "/admin/memberships", icon: "member" },
     ],
   },
 ];

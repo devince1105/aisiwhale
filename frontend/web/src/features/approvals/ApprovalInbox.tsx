@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { ApiError } from "@/api/client";
+import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { ROW, ROW_FOCUS, sequencePending } from "@/features/admin-ui/hotkeys";
 
 import { Folded } from "./Folded";
 import { STATES, type ApprovalCard, type ApprovalState, type Decision, type OfficialReportCheck } from "./model";
@@ -64,9 +66,45 @@ function Card({
   preview?: (card: ApprovalCard) => ReactNode;
 }) {
   const [reason, setReason] = useState("");
+  const [asking, setAsking] = useState(false);
+  const opinion = useRef<HTMLTextAreaElement>(null);
   const pending = card.state === "PENDING";
+  const open = pending && !sent && !busy;
+  const approveLabel = card.command?.approve ?? "核准";
+  // the card selected with j / k (AD-03): a asks to approve, r goes to the opinion box
+  const onKey = (event: KeyboardEvent<HTMLLIElement>) => {
+    if (event.target !== event.currentTarget || !open || sequencePending()) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "a") {
+      event.preventDefault();
+      setAsking(true);
+    } else if (event.key === "r") {
+      event.preventDefault();
+      opinion.current?.focus();
+    }
+  };
   return (
-    <li className="min-w-0 rounded-xl border border-line bg-surface p-4" data-testid={`approval-${card.id}`}>
+    <li
+      {...ROW}
+      onKeyDown={onKey}
+      className={`min-w-0 rounded-xl border border-line bg-surface p-4 ${ROW_FOCUS}`}
+      data-testid={`approval-${card.id}`}
+    >
+      {asking ? (
+        <ConfirmDialog
+          title={`${approveLabel}這則？`}
+          confirmLabel={approveLabel}
+          tone="primary"
+          onConfirm={() => {
+            setAsking(false);
+            onDecide("approve", reason.trim() || null);
+          }}
+          onCancel={() => setAsking(false)}
+        >
+          {card.command?.title ?? card.summary}
+          {reason.trim() ? `（附意見：${reason.trim()}）` : null}
+        </ConfirmDialog>
+      ) : null}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-xs text-muted">
           {card.kind}
@@ -141,6 +179,7 @@ function Card({
                   : "理由（選填，駁回時建議填寫）"}
               </span>
               <textarea
+                ref={opinion}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={8000}

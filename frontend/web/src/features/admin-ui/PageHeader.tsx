@@ -5,11 +5,12 @@
 // it, and the page's actions on the right.
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { withCompany } from "@/features/company/CompanyScope";
 
-import { crumbsFor, type Crumb } from "./nav";
+import { activeNav, crumbsFor, type Crumb } from "./nav";
+import { rememberVisit } from "./recent";
 
 const WIDTH = { wide: "max-w-7xl", read: "max-w-5xl" } as const;
 
@@ -34,6 +35,12 @@ export function PageHeader({
   const pathname = usePathname() ?? "";
   const company = useSearchParams()?.get("company") ?? null;
   const trail = [...crumbsFor(pathname), ...(crumbs ?? [])];
+  // a detail page with a plain title is one to come back to from the palette (AD-03)
+  useEffect(() => {
+    const section = activeNav(pathname);
+    if (typeof title !== "string" || !section || pathname === section.item.href) return;
+    rememberVisit({ href: pathname, title, section: section.item.label });
+  }, [pathname, title]);
   return (
     <header className="mb-6">
       {trail.length ? (

@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import type { NewSource } from "@/api/queries";
 
+import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
 
 import { formatTime, type SourceView } from "./model";
@@ -24,7 +25,7 @@ export function SourcesView({ sources }: { sources: readonly SourceView[] | unde
   return (
     <ul className="divide-y divide-line rounded border border-line bg-surface text-sm">
       {sources.map((source) => (
-        <li key={source.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <li key={source.id} {...ROW} className={`flex flex-wrap items-center gap-3 px-4 py-3 ${ROW_FOCUS}`}>
           <StatusLozenge tone={source.status === "active" ? "ok" : "warn"}>{source.status === "active" ? "啟用" : "暫停"}</StatusLozenge>
           <span className="font-medium">{source.name}</span>
           <span className="text-muted">{KINDS[source.kind] ?? source.kind}</span>
