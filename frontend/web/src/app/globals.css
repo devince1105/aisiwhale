@@ -21,9 +21,9 @@
   --color-alert: #ffebe9;
   --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
-  /* the footer's Buy me a coffee (D-250): the service's orange-yellow button, dark words, white coffee */
-  --color-coffee: #ffc107;
-  --color-coffee-hover: #ffb300;
+  /* the footer's Buy me a coffee (D-250): a soft amber button, dark words, white coffee */
+  --color-coffee: #ffd54f;
+  --color-coffee-hover: #ffca28;
   --color-coffee-ink: #0d0c22;
   --color-coffee-bean: #ffffff;
   /* prices, the Taiwanese way: red is up, green is down (D-048) */
@@ -90,9 +90,9 @@ html[data-site-theme="light"] [data-admin]:not([data-theme]) {
   --color-alert: #ffebe9;
   --color-alert-ink: #82071e;
   --color-neutral: #9aa3af;
-  /* the footer's Buy me a coffee (D-250): the service's orange-yellow button, dark words, white coffee */
-  --color-coffee: #ffc107;
-  --color-coffee-hover: #ffb300;
+  /* the footer's Buy me a coffee (D-250): a soft amber button, dark words, white coffee */
+  --color-coffee: #ffd54f;
+  --color-coffee-hover: #ffca28;
   --color-coffee-ink: #0d0c22;
   --color-coffee-bean: #ffffff;
 }
