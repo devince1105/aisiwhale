@@ -39,6 +39,9 @@ export const queryKeys = {
   projects: (companyId: string) => ["projects", companyId] as const,
   /** VIP given by an admin for internal testing (D-228): by company slug, all or running only. */
   comps: (companySlug: string, running: boolean) => ["memberships", "comps", companySlug, running] as const,
+  /** A reader's Whale Coins in the back office (P3-C-2), and the ledger's check. */
+  coinWallet: (companySlug: string, email: string, cursor: string | null) => ["coins", "wallet", companySlug, email, cursor] as const,
+  coinReconcile: () => ["coins", "reconcile"] as const,
   /** The office's team group (D-109). */
   team: (companyId: string) => ["team", companyId] as const,
 };
@@ -772,4 +775,37 @@ export async function revokeComp(grantId: string, reason: string, api: ApiClient
       body: { reason },
     }),
   );
+}
+
+export type AdminCoinWallet = Schemas["AdminWallet"];
+export type AdminCoinMovement = Schemas["AdminMovement"];
+export type CoinAdjustment = Schemas["Adjustment"];
+export type CoinReconciliation = Schemas["Reconciliation"];
+
+/** A reader's wallet, found by address: tier, cap, balance and every movement, newest first. */
+export function coinWalletQuery(companySlug: string, email: string, cursor: string | null = null, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.coinWallet(companySlug, email, cursor),
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/admin/coins/wallet", {
+          params: { query: { email, company: companySlug, ...(cursor ? { cursor } : {}) } },
+        }),
+      ),
+    enabled: email.length > 0,
+  });
+}
+
+/** Coins up or down for a reader, with a reason; past the tier's cap only with ``override_cap``.
+ * ``request_id`` is made once per form and kept on a retry, so a double submit is one. */
+export async function adjustCoins(body: CoinAdjustment, api: ApiClient = defaultApi) {
+  return unwrap(await api.POST("/api/admin/coins/adjustments", { body }));
+}
+
+/** The whole ledger checked against itself, now. Reads only. */
+export function coinReconcileQuery(api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: queryKeys.coinReconcile(),
+    queryFn: async () => unwrap(await api.GET("/api/admin/coins/reconcile")),
+  });
 }

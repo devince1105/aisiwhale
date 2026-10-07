@@ -271,6 +271,57 @@
     "title": "Actor",
     "type": "object"
    },
+   "Adjustment": {
+    "properties": {
+     "amount": {
+      "maximum": 10000.0,
+      "minimum": -10000.0,
+      "title": "Amount",
+      "type": "integer"
+     },
+     "company": {
+      "anyOf": [
+       {
+        "maxLength": 100,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Company"
+     },
+     "email": {
+      "maxLength": 254,
+      "title": "Email",
+      "type": "string"
+     },
+     "override_cap": {
+      "default": false,
+      "title": "Override Cap",
+      "type": "boolean"
+     },
+     "reason": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+     },
+     "request_id": {
+      "format": "uuid",
+      "title": "Request Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "email",
+     "amount",
+     "reason",
+     "request_id"
+    ],
+    "title": "Adjustment",
+    "type": "object"
+   },
    "AdminActionOut": {
     "properties": {
      "action": {
@@ -436,6 +487,173 @@
      "email"
     ],
     "title": "AdminMe",
+    "type": "object"
+   },
+   "AdminMovement": {
+    "properties": {
+     "actor": {
+      "additionalProperties": true,
+      "title": "Actor",
+      "type": "object"
+     },
+     "amount": {
+      "title": "Amount",
+      "type": "integer"
+     },
+     "balance_after": {
+      "title": "Balance After",
+      "type": "integer"
+     },
+     "cap": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cap"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "idempotency_key": {
+      "title": "Idempotency Key",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+     },
+     "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "ref_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ref Id"
+     },
+     "ref_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ref Type"
+     },
+     "requested": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Requested"
+     },
+     "reverses_txn_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reverses Txn Id"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "amount",
+     "balance_after",
+     "occurred_at",
+     "requested",
+     "cap",
+     "idempotency_key",
+     "reverses_txn_id",
+     "ref_type",
+     "ref_id",
+     "actor",
+     "reason",
+     "meta"
+    ],
+    "title": "AdminMovement",
+    "type": "object"
+   },
+   "AdminWallet": {
+    "properties": {
+     "balance": {
+      "title": "Balance",
+      "type": "integer"
+     },
+     "cap": {
+      "title": "Cap",
+      "type": "integer"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "history": {
+      "$ref": "#/components/schemas/Page_AdminMovement_"
+     },
+     "reader_id": {
+      "format": "uuid",
+      "title": "Reader Id",
+      "type": "string"
+     },
+     "tier": {
+      "enum": [
+       "free",
+       "vip"
+      ],
+      "title": "Tier",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reader_id",
+     "email",
+     "tier",
+     "cap",
+     "balance",
+     "history"
+    ],
+    "title": "AdminWallet",
     "type": "object"
    },
    "AgentDecision": {
@@ -1888,6 +2106,104 @@
      "quotes"
     ],
     "title": "ClaimView",
+    "type": "object"
+   },
+   "CoinMovement": {
+    "properties": {
+     "amount": {
+      "title": "Amount",
+      "type": "integer"
+     },
+     "balance_after": {
+      "title": "Balance After",
+      "type": "integer"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "month": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Month"
+     },
+     "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+     },
+     "ref_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ref Id"
+     },
+     "ref_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ref Type"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "amount",
+     "balance_after",
+     "occurred_at"
+    ],
+    "title": "CoinMovement",
+    "type": "object"
+   },
+   "CoinWallet": {
+    "properties": {
+     "balance": {
+      "title": "Balance",
+      "type": "integer"
+     },
+     "history": {
+      "$ref": "#/components/schemas/Page_CoinMovement_"
+     },
+     "monthly": {
+      "$ref": "#/components/schemas/Monthly"
+     },
+     "tier": {
+      "enum": [
+       "free",
+       "vip"
+      ],
+      "title": "Tier",
+      "type": "string"
+     }
+    },
+    "required": [
+     "balance",
+     "tier",
+     "monthly",
+     "history"
+    ],
+    "title": "CoinWallet",
     "type": "object"
    },
    "Comp": {
@@ -4055,6 +4371,53 @@
     "title": "Me",
     "type": "object"
    },
+   "Monthly": {
+    "properties": {
+     "amount": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount"
+     },
+     "cap": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cap"
+     },
+     "granted": {
+      "title": "Granted",
+      "type": "boolean"
+     },
+     "grants_on": {
+      "title": "Grants On",
+      "type": "boolean"
+     },
+     "month": {
+      "title": "Month",
+      "type": "string"
+     }
+    },
+    "required": [
+     "amount",
+     "cap",
+     "month",
+     "granted",
+     "grants_on"
+    ],
+    "title": "Monthly",
+    "type": "object"
+   },
    "NewAgent": {
     "properties": {
      "avatar_key": {
@@ -4488,6 +4851,70 @@
      "headcount"
     ],
     "title": "OrgOut",
+    "type": "object"
+   },
+   "Page_AdminMovement_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/AdminMovement"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "Page[AdminMovement]",
+    "type": "object"
+   },
+   "Page_CoinMovement_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/CoinMovement"
+      },
+      "title": "Items",
+      "type": "array"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "items",
+     "total"
+    ],
+    "title": "Page[CoinMovement]",
     "type": "object"
    },
    "Period": {
@@ -7785,6 +8212,35 @@
     "title": "RealtimeSnapshot",
     "type": "object"
    },
+   "Reconciliation": {
+    "properties": {
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "problems": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Problems",
+      "type": "array"
+     },
+     "totals": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Totals",
+      "type": "object"
+     }
+    },
+    "required": [
+     "ok",
+     "problems",
+     "totals"
+    ],
+    "title": "Reconciliation",
+    "type": "object"
+   },
    "Register": {
     "properties": {
      "email": {
@@ -10185,6 +10641,251 @@
     "summary": "Me",
     "tags": [
      "admin-auth"
+    ]
+   }
+  },
+  "/api/admin/coins/adjustments": {
+   "post": {
+    "operationId": "adjust_coins_api_admin_coins_adjustments_post",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Adjustment"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminMovement"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Adjust Coins",
+    "tags": [
+     "admin-coins"
+    ]
+   }
+  },
+  "/api/admin/coins/reconcile": {
+   "get": {
+    "operationId": "reconcile_coins_api_admin_coins_reconcile_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Reconciliation"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Reconcile Coins",
+    "tags": [
+     "admin-coins"
+    ]
+   }
+  },
+  "/api/admin/coins/wallet": {
+   "get": {
+    "operationId": "get_wallet_api_admin_coins_wallet_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "email",
+      "required": true,
+      "schema": {
+       "maxLength": 254,
+       "title": "Email",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AdminWallet"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get Wallet",
+    "tags": [
+     "admin-coins"
     ]
    }
   },
@@ -14907,6 +15608,118 @@
     "summary": "List Events",
     "tags": [
      "events"
+    ]
+   }
+  },
+  "/api/me/coins": {
+   "get": {
+    "operationId": "get_coins_api_me_coins_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "company",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 100,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Company"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cursor",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 500,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cursor"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 50,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 200,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoinWallet"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Coins",
+    "tags": [
+     "coins"
     ]
    }
   },

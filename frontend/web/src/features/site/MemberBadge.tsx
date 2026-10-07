@@ -7,6 +7,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SITE_COMPANY } from "@/config";
 
 import { can, fetchMe, isMember, signOut, type Me } from "./auth";
+import { fetchCoins } from "./coins";
 import { useDismiss } from "./dismiss";
 import { formatDate, words, type Lang } from "./i18n";
 
@@ -67,13 +68,15 @@ export function initial(email: string): string {
 }
 
 /** Signed in (D-087): a round avatar with the address's first letter, in place of the address;
- * it opens who they are — their address, a member's date — their watchlist, and sign-out. */
+ * it opens who they are — their address, a member's date — their coins, their watchlist, and
+ * sign-out. The coins' balance is asked for when the menu opens, not on every page (P3-C). */
 function ReaderMenu({ lang, me, onSignOut }: { lang: Lang; me: Me; onSignOut: () => void }) {
   const w = words(lang);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const menu = useId();
   useDismiss(box, open, useCallback(() => setOpen(false), []));
+  const coins = useOpenedBalance(open && can(me, "coins"));
   return (
     <div ref={box} className="relative" data-testid="member-badge">
       <button
@@ -101,6 +104,11 @@ function ReaderMenu({ lang, me, onSignOut }: { lang: Lang; me: Me; onSignOut: ()
             </p>
           ) : null}
           <div className="border-t border-line pt-1">
+            {can(me, "coins") ? (
+              <a href={`/news/${lang}/coins`} className="block px-4 py-1.5 hover:bg-canvas hover:text-accent" data-testid="coins-link">
+                {coins === null ? w.coins.menu : w.coins.menuWith(coins.toLocaleString(lang))}
+              </a>
+            ) : null}
             {can(me, "watchlist") ? (
               <a href={`/news/${lang}/watchlist`} className="block px-4 py-1.5 hover:bg-canvas hover:text-accent">
                 {w.watch.title}
@@ -121,4 +129,21 @@ function ReaderMenu({ lang, me, onSignOut }: { lang: Lang; me: Me; onSignOut: ()
       ) : null}
     </div>
   );
+}
+
+/** The reader's coin balance, read each time the menu opens; null until it answers or when it
+ * could not, so the menu says only "鯨幣" rather than a number it does not know. */
+function useOpenedBalance(opened: boolean): number | null {
+  const [balance, setBalance] = useState<number | null>(null);
+  useEffect(() => {
+    if (!opened) return;
+    let live = true;
+    void fetchCoins({ company: SITE_COMPANY, limit: 1 }).then((wallet) => {
+      if (live) setBalance(wallet && wallet !== "signed-out" ? wallet.balance : null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [opened]);
+  return balance;
 }

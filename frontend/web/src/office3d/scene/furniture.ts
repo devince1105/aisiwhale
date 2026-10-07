@@ -315,14 +315,16 @@ function lounge(): Part[] {
   ];
 }
 
-/** The meeting table (D-120, D-239, D-240), built along its own x with its open end at +x. Four
- * chairs a side facing each other and one at the far end, the chair's, facing down the table —
- * nine. In the room the chair's end is at the east wall, with the screen behind it. */
+/** The meeting table (D-120, D-239 - D-241), built along its own x with its open end at +x, the
+ * end that faces the projection screen. Four chairs a side facing each other, and the chair's —
+ * tall, its own cushion — at the open end's corner on the +z side: nearest the screen and the
+ * whiteboard, turned to the whole table, and to one side of the screen rather than in front of
+ * it. The far end, by the door, is left open: the way in and out (D-241). */
 export const MEETING_TABLE = { length: 5.0, width: 1.4 } as const;
-/** The projection screen on the meeting room's east wall, behind the chair at the head of the
- * table (D-240): about centred on the table, and short of the back corner where the whiteboard
- * stands at an angle. */
-export const MEETING_SCREEN = { z: -5.65, width: 1.9 } as const;
+/** The projection screen on the meeting room's west wall, the one farthest from its door and seen
+ * from the default camera (D-241): a little south of the table's middle, clear of the chair and of
+ * the whiteboard in the north-west corner. */
+export const MEETING_SCREEN = { z: -5.55, width: 2.0 } as const;
 /** Where the side chairs sit along the table: four a side, 1.25 apart — sized for the figures who
  * would sit in them, not for the chairs: at AVATAR_SCALE a seated figure is about 1.3 m across,
  * arms and all, its head alone about 0.8 m (D-240). At 0.9 they would sit shoulder in shoulder. */
@@ -337,14 +339,16 @@ function meetingSet(): Part[] {
     block(0.5, 0.02, 0.35, [-1.25, TOP, 0.2], P.keyboard),
     block(0.5, 0.02, 0.35, [1.25, TOP, -0.2], P.keyboard),
   ];
+  const side = width / 2 + 0.35;
   for (const x of MEETING_SIDE_CHAIRS) {
-    parts.push(...place(officeChair(P.cushion), x, width / 2 + 0.35));
-    parts.push(...place(officeChair(P.cushion), x, -width / 2 - 0.35, Math.PI));
+    parts.push(...place(officeChair(P.cushion), x, side));
+    parts.push(...place(officeChair(P.cushion), x, -side, Math.PI));
   }
-  const end = -length / 2 - 0.55;
-  parts.push(...place(officeChair(P.cushion), end, 0, -Math.PI / 2));
-  // centred on what it covers (from the end chair to the table's open end), as its footprint is
-  return place(parts, -(end - 0.3 + length / 2) / 2, 0);
+  // the chair's, at the corner by the screen, turned halfway between the table's length and across
+  const chairX = length / 2 + 0.25;
+  parts.push(...place(officeChair(P.armchair, true), chairX, side, Math.PI / 4));
+  // centred on what it covers (from the far end to the chair's back), as its footprint is
+  return place(parts, -(-length / 2 + chairX + 0.3) / 2, 0);
 }
 
 function whiteboard(): Part[] {
@@ -675,18 +679,17 @@ function shellCore(): Part[] {
     parts.push(block(WALL, 0.02, span, [x, 0, mid], P.metal));
   }
 
-  // the meeting room's projection screen, on its east wall behind the chair at the head of the
-  // table (D-239, D-240): it faces west, down the table; the picture that hung there moved to the
-  // west wall
+  // the meeting room's projection screen, on its west wall — the farthest from the door, and one
+  // the default camera sees (D-239, D-241); it faces east, at the table's open end
   {
-    const x = MEETING_ROOM.maxX - WALL_HALF;
+    const x = CEO_OFFICE.maxX + WALL_HALF;
     // a dark border round the white face, or it is the wall's colour and only its roller shows
-    parts.push(box(0.02, 1.52, MEETING_SCREEN.width + 0.12, [x - 0.01, 1.7, MEETING_SCREEN.z], P.metal));
-    parts.push(box(0.03, 1.4, MEETING_SCREEN.width, [x - 0.025, 1.7, MEETING_SCREEN.z], P.whiteboard));
-    parts.push(box(0.14, 0.12, MEETING_SCREEN.width + 0.2, [x - 0.07, 2.5, MEETING_SCREEN.z], P.metal));
+    parts.push(box(0.02, 1.52, MEETING_SCREEN.width + 0.12, [x + 0.01, 1.7, MEETING_SCREEN.z], P.metal));
+    parts.push(box(0.03, 1.4, MEETING_SCREEN.width, [x + 0.025, 1.7, MEETING_SCREEN.z], P.whiteboard));
+    parts.push(box(0.14, 0.12, MEETING_SCREEN.width + 0.2, [x + 0.07, 2.5, MEETING_SCREEN.z], P.metal));
   }
   // pictures on the inner walls (the outer walls' own are with them)
-  parts.push(...place(picture(0.6, 0.6, P.picture[2]), CEO_OFFICE.maxX + WALL_HALF, -6.2, Math.PI / 2, 1.7));
+  parts.push(...place(picture(0.6, 0.6, P.picture[2]), MEETING_ROOM.maxX - WALL_HALF, -6.2, -Math.PI / 2, 1.7));
   parts.push(...place(picture(0.6, 0.8, P.picture[3]), PANTRY.minX + WALL_HALF, -6.9, Math.PI / 2, 1.8));
   return parts;
 }
