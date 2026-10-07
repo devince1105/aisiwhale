@@ -3,7 +3,8 @@
 - POST /api/auth/register         {email, password, lang?} -> 202, always
 - POST /api/auth/login            {email, password} -> the reader, and a session cookie
 - POST /api/auth/logout           -> 204, the session revoked and the cookie cleared
-- GET  /api/auth/me               -> who is signed in, and until when they are a member
+- GET  /api/auth/me               -> who is signed in, and until when they are a member; and,
+                                     once a month per tier, their coins (P3-B, when on)
 - POST /api/auth/email/verify     {token} -> 204, the address proven
 - POST /api/auth/email/resend     {lang?} -> 202, a new link to prove it (signed in)
 - POST /api/auth/password/forgot  {email, lang?} -> 202, always
@@ -22,6 +23,7 @@ work, so a try that fails is still counted.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Annotated, Literal
@@ -56,7 +58,8 @@ from autora.accounts import (
 )
 from autora.accounts import emails as reader_emails
 from autora.accounts import google as google_signin
-from autora.accounts.entitlement import entitlement_for
+from autora.accounts.coins import grant_monthly
+from autora.accounts.entitlement import Tier, entitlement_for
 from autora.accounts.service import SESSION_VALID_FOR
 from autora.db.models import Company
 from autora.infra.email import EmailError
@@ -71,6 +74,8 @@ from autora_api.deps import (
     is_admin,
     settings_dep,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 
@@ -280,7 +285,25 @@ async def me(
         return None
     answer = await _me(session, reader, company, settings)
     await session.commit()  # last_seen_at
+    await _grant_this_month(session, answer)
     return answer
+
+
+async def _grant_this_month(session: AsyncSession, answer: Me) -> None:
+    """The month's coins for the tier just worked out (P3-B, D-235), in a transaction of its own
+    after ``/me``'s commit: the ledger's checks run at commit, and nothing about coins may break
+    the header. A failure is logged and tried again on the next ``/me``; the key keeps it once."""
+    try:
+        await grant_monthly(
+            session,
+            answer.reader_id,
+            tier=Tier(answer.tier),
+            email_verified=answer.email_verified,
+        )
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        log.exception("monthly coin grant failed for reader %s", answer.reader_id)
 
 
 @router.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

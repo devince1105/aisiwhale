@@ -6,6 +6,7 @@ balance, reconcile. It knows nothing of tiers, months, sign-ins or addresses: wh
 and when, is the grant policy's (P3-B); what a coin buys is each feature's (P4 onwards).
 """
 
+from autora.accounts.coins.grants import grant_monthly
 from autora.accounts.coins.ledger import (
     CapExceeded,
     CoinError,
@@ -48,6 +49,7 @@ __all__ = [
     "adjust",
     "balance",
     "grant",
+    "grant_monthly",
     "reconcile",
     "refund",
     "spend",
