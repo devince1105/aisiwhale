@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from autora.domains.newsroom import price_history
 from autora.domains.newsroom.market_strip import TW_STOCKS, US_STOCKS
@@ -31,6 +31,13 @@ TIINGO_ROW = {
     "date": "2026-10-06T00:00:00.000Z", "adjOpen": 10.0, "adjHigh": 11.0, "adjLow": 9.0,
     "adjClose": 10.5, "adjVolume": 1000, "splitFactor": 1.0,
 }  # fmt: skip
+
+
+@pytest.fixture(autouse=True)
+async def nothing_asked_yet(db_session):
+    """Other tests' workers ran the refresh with the database committed (offline: every symbol
+    read, none asked of an exchange); in here, inside the test's own transaction, none was."""
+    await db_session.execute(delete(PriceFetch).where(PriceFetch.market.in_(("tw", "us"))))
 
 
 @pytest.fixture
