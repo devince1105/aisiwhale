@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { approvalsQuery, cyclesQuery, kpisQuery } from "@/api/queries";
+import { cyclesQuery, kpisQuery, pendingCountQuery } from "@/api/queries";
 import { AgentList, AgentPanel } from "@/features/agent-panel/AgentPanel";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
@@ -22,7 +22,7 @@ export function DashboardPage() {
 function CompanyDashboard({ company }: { company: Company }) {
   useCompanyStream(company.id);
   const kpis = useQuery(kpisQuery(company.id));
-  const pending = useQuery(approvalsQuery(company.id));
+  const pending = useQuery(pendingCountQuery(company.id));
   // today's goal comes from the day the company planned, not from a standing target (AC-12)
   const cycles = useQuery(cyclesQuery(company.id));
   const realtime = useRealtime((state) => state.company);
@@ -42,7 +42,7 @@ function CompanyDashboard({ company }: { company: Company }) {
         companyId={company.id}
         companyName={company.name}
         model={model}
-        pendingApprovals={pending.data?.length ?? null}
+        pendingApprovals={pending.data ?? null}
       />
       <ProjectsPanel companyId={company.id} />
       <FinancePanel companyId={company.id} />

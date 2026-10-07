@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
-import { fetchArticlePage, fetchPortfolios } from "@/features/site/api";
+import { fetchArticlePage, fetchPortfolios, fetchRanking } from "@/features/site/api";
+import { TopRanking } from "@/features/site/Institutions";
 import { isView, KINDS, PortfolioCards, WatchTabs, type View } from "@/features/site/Portfolios";
 import { loadSidebar, taipeiToday } from "@/features/site/sidebarData";
 import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
@@ -43,7 +44,9 @@ export default async function Page({ params, searchParams }: { params: Params; s
   // the calendar opens on the day's month, else this one, its days already marked (D-084)
   // 持股觀察 opens on its cards (HD-06); a card that cannot be loaded does not take the page down
   const portfolios = view === "people" || view === "groups";
-  const [{ articles, total }, sidebar, cards] = await Promise.all([
+  // the institutions' tab ends with the ranking's first ten (HD-11); a ranking that cannot be
+  // loaded leaves the cards alone
+  const [{ articles, total }, sidebar, cards, top] = await Promise.all([
     // a tab of cards shows no stories: none asked for
     portfolios
       ? Promise.resolve({ articles: [], total: 0 })
@@ -56,6 +59,7 @@ export default async function Page({ params, searchParams }: { params: Params; s
         }),
     loadSidebar(lang, { section, month: (day ?? taipeiToday()).slice(0, 7) }),
     portfolios ? fetchPortfolios(lang, { company }).catch(() => []) : Promise.resolve([]),
+    view === "groups" ? fetchRanking(lang, { limit: 10 }).catch(() => null) : Promise.resolve(null),
   ]);
   return (
     <ArticleList
@@ -78,11 +82,14 @@ export default async function Page({ params, searchParams }: { params: Params; s
       }
       only={
         view === "people" || view === "groups" ? (
-          <PortfolioCards
-            cards={cards.filter((card) => KINDS[view].includes(card.kind))}
-            lang={lang}
-            heading={view === "groups" ? w.portfolio.groupsHeading : undefined}
-          />
+          <>
+            <PortfolioCards
+              cards={cards.filter((card) => KINDS[view].includes(card.kind))}
+              lang={lang}
+              heading={view === "groups" ? w.portfolio.groupsHeading : undefined}
+            />
+            {top ? <TopRanking ranking={top} lang={lang} /> : null}
+          </>
         ) : null
       }
     />

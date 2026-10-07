@@ -21,3 +21,37 @@ export function ErrorState({ children }: { children: ReactNode }) {
     </p>
   );
 }
+
+/** Under a list loaded a page at a time (AD-04): how many of how many, and the next page. */
+export function LoadMore({
+  shown,
+  total,
+  more,
+  loading,
+  onMore,
+}: {
+  shown: number;
+  total: number | null;
+  more: boolean;
+  loading: boolean;
+  onMore: () => void;
+}) {
+  if (total === null || total === 0) return null;
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted" data-testid="load-more">
+      <span className="tabular-nums">
+        顯示 {shown} / 共 {total} 筆
+      </span>
+      {more ? (
+        <button
+          type="button"
+          onClick={onMore}
+          disabled={loading}
+          className="rounded-md border border-line bg-surface px-3 py-1 text-sm text-ink hover:bg-canvas disabled:opacity-50"
+        >
+          {loading ? "載入中…" : "載入更多"}
+        </button>
+      ) : null}
+    </div>
+  );
+}

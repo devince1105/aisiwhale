@@ -160,7 +160,8 @@ async def test_a_quarter_is_read_whole_against_the_one_before_and_kept(db_sessio
     db_session.add_all(
         [
             filing("9001", "0000009001-26-000002", Q2, filed=date(2026, 8, 10), value=1000),
-            filing("9001", "0000009001-26-000001", Q1, filed=date(2026, 5, 10), value=500),
+            # the quarter before: its total in thousands, as its rows are (5 is US$5,000)
+            filing("9001", "0000009001-26-000001", Q1, filed=date(2026, 5, 10), value=5),
         ]
     )
     await db_session.flush()

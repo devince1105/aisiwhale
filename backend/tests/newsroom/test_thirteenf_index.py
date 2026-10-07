@@ -468,7 +468,7 @@ async def test_filings_in_doubt_have_their_first_rows_read_largest_first(db_sess
 
     db_session.add_all(
         [
-            doubtful("80255", "0000080255-26-000001", 999_124_702),  # in thousands
+            doubtful("80255", "0000080255-26-000001", 999_124_702),  # in thousands, total too
             doubtful("2", "0000000002-26-000001", 5_000_000),  # a small adviser, in dollars
             doubtful("3", "0000000003-26-000001", 1_000),  # its table is not there
         ]
@@ -476,7 +476,8 @@ async def test_filings_in_doubt_have_their_first_rows_read_largest_first(db_sess
     await db_session.flush()
     listings, bodies = {}, {}
     rows = {
-        "80255": [row(f"CO {n}", f"{n:09d}", 150, 1000) for n in range(1, 400)],
+        # 500 entries of 1,998,249 thousand: 999,124,702 thousand, the cover page's total
+        "80255": [row(f"CO {n}", f"{n:09d}", 1_998_249, 15_000_000) for n in range(1, 400)],
         "2": [row(f"CO {n}", f"{n:09d}", 150_000, 1000) for n in range(1, 30)],
     }
     for cik, accession in (("80255", "0000080255-26-000001"), ("2", "0000000002-26-000001"),

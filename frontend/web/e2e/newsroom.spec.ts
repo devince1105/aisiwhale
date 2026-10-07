@@ -78,11 +78,11 @@ test("a story from the feeds to the public site, and from the office to its draf
     .poll(
       async () =>
         (
-          await api<unknown[]>(
+          await api<{ total: number }>(
             page,
             `/api/approvals?company_id=${company}&state=PENDING`,
           )
-        ).length,
+        ).total,
       {
         timeout: 120_000,
       },

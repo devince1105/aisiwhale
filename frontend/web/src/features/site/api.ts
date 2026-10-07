@@ -26,6 +26,10 @@ export type PublicSentiment = Schemas["PublicSentiment"];
 export type PublicRatings = Schemas["PublicRatings"];
 export type PublicPortfolioCard = Schemas["PublicPortfolioCard"];
 export type PublicPortfolio = Schemas["PublicPortfolio"];
+export type PublicRanking = Schemas["PublicRanking"];
+export type PublicRankRow = Schemas["PublicRankRow"];
+export type PublicInstitution = Schemas["PublicInstitution"];
+export type PublicInstitutionHolding = Schemas["PublicInstitutionHolding"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -259,6 +263,43 @@ export async function fetchPortfolio(
     params: { path: { slug }, query: { lang, company: options.company } },
   });
   if (response.status === 404) return null;
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+export interface RankingQuery {
+  period?: string;
+  q?: string;
+  sort?: "value" | "change" | "filed";
+  order?: "desc" | "asc";
+  limit?: number;
+  offset?: number;
+}
+
+/** 機構排行 (HD-11): every 13F filer's quarter in dollars, the same for every reader. */
+export async function fetchRanking(
+  lang: string,
+  query: RankingQuery = {},
+  options: SiteClientOptions = {},
+): Promise<PublicRanking> {
+  const { data, error, response } = await client(options).GET("/api/public/institutions", {
+    params: { query: { lang, ...query } },
+  });
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+/** An institution's page (HD-11), or null for a filer with no 13F for the quarter. The reader's
+ * cookie decides how much of it comes back (D-159): pass it when the server renders for one. */
+export async function fetchInstitution(
+  cik: string,
+  lang: string,
+  options: SiteClientOptions & { period?: string } = {},
+): Promise<PublicInstitution | null> {
+  const { data, error, response } = await client(options).GET("/api/public/institutions/{cik}", {
+    params: { path: { cik }, query: { lang, period: options.period } },
+  });
+  if (response.status === 404 || response.status === 422) return null;
   if (error !== undefined || !data) throw ApiError.from(response, error);
   return data;
 }

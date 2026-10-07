@@ -2,7 +2,7 @@
 // not hold (run details, traces, task history, approvals...). Each factory returns plain query
 // options, so pages use them with useQuery / useSuspenseQuery and tests call queryFn directly.
 // Freshness comes from events: src/api/invalidation.ts invalidates the matching keys.
-import { QueryClient, queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, QueryClient, queryOptions, type InfiniteData } from "@tanstack/react-query";
 
 import { api as defaultApi, unwrap, type ApiClient, type Schemas } from "./client";
 
@@ -41,6 +41,37 @@ export const queryKeys = {
   /** The office's team group (D-109). */
   team: (companyId: string) => ["team", companyId] as const,
 };
+
+// --- lists, a page at a time (AD-04) ---------------------------------------------------------
+
+/** What every back-office list returns: ?cursor=&limit=&q=&sort= → a page. */
+export interface Page<T> {
+  items: T[];
+  next_cursor?: string | null;
+  total: number;
+}
+
+export const PAGE_SIZE = 50;
+
+/** The rows of every page loaded so far; undefined while the first is loading. */
+export function itemsOf<T>(data: InfiniteData<Page<T>> | undefined): T[] | undefined {
+  return data?.pages.flatMap((page) => page.items);
+}
+
+/** How many rows the list has in all (the filters', not the pages loaded). */
+export function totalOf<T>(data: InfiniteData<Page<T>> | undefined): number | null {
+  return data?.pages[0]?.total ?? null;
+}
+
+const paged = {
+  initialPageParam: null as string | null,
+  getNextPageParam: <T,>(last: Page<T>) => last.next_cursor ?? null,
+};
+
+/** The query a list sends for one page: the cursor only after the first, ``q`` only when set. */
+function pageQuery(cursor: string | null, q?: string | null, limit = PAGE_SIZE) {
+  return { limit, ...(cursor ? { cursor } : {}), ...(q ? { q } : {}) };
+}
 
 export function companiesQuery(api: ApiClient = defaultApi) {
   return queryOptions({
@@ -85,15 +116,28 @@ export function taskQuery(taskId: string, api: ApiClient = defaultApi) {
   });
 }
 
-export function approvalsQuery(
-  companyId: string,
-  state: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED" = "PENDING",
-  api: ApiClient = defaultApi,
-) {
+export type ApprovalState = "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
+
+/** The inbox, a page at a time (AD-04), oldest first. */
+export function approvalsQuery(companyId: string, state: ApprovalState = "PENDING", api: ApiClient = defaultApi) {
+  return infiniteQueryOptions({
+    queryKey: [...queryKeys.approvals(companyId, state), "list"] as const,
+    queryFn: async ({ pageParam }) =>
+      unwrap(
+        await api.GET("/api/approvals", {
+          params: { query: { company_id: companyId, state, ...pageQuery(pageParam) } },
+        }),
+      ),
+    ...paged,
+  });
+}
+
+/** How many wait for a decision: the inbox's total, asked with one row. */
+export function pendingCountQuery(companyId: string, api: ApiClient = defaultApi) {
   return queryOptions({
-    queryKey: queryKeys.approvals(companyId, state),
+    queryKey: [...queryKeys.approvals(companyId, "PENDING"), "count"] as const,
     queryFn: async () =>
-      unwrap(await api.GET("/api/approvals", { params: { query: { company_id: companyId, state } } })),
+      unwrap(await api.GET("/api/approvals", { params: { query: { company_id: companyId, limit: 1 } } })).total,
   });
 }
 
@@ -157,15 +201,21 @@ export function kpisQuery(companyId: string, api: ApiClient = defaultApi) {
 
 export type StoryState = "DISCOVERED" | "SELECTED" | "IN_PRODUCTION" | "PUBLISHED" | "DROPPED" | "IGNORED";
 
-export function storiesQuery(companyId: string, state: StoryState | null = null, api: ApiClient = defaultApi) {
-  return queryOptions({
-    queryKey: queryKeys.stories(companyId, state),
-    queryFn: async () =>
+export function storiesQuery(
+  companyId: string,
+  state: StoryState | null = null,
+  q: string | null = null,
+  api: ApiClient = defaultApi,
+) {
+  return infiniteQueryOptions({
+    queryKey: [...queryKeys.stories(companyId, state), q] as const,
+    queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET("/api/companies/{company_id}/stories", {
-          params: { path: { company_id: companyId }, query: state ? { state } : {} },
+          params: { path: { company_id: companyId }, query: { ...(state ? { state } : {}), ...pageQuery(pageParam, q) } },
         }),
       ),
+    ...paged,
   });
 }
 
@@ -177,15 +227,16 @@ export function storyQuery(storyId: string, api: ApiClient = defaultApi) {
   });
 }
 
-export function articlesQuery(companyId: string, api: ApiClient = defaultApi) {
-  return queryOptions({
-    queryKey: queryKeys.articles(companyId),
-    queryFn: async () =>
+export function articlesQuery(companyId: string, q: string | null = null, api: ApiClient = defaultApi) {
+  return infiniteQueryOptions({
+    queryKey: [...queryKeys.articles(companyId), q] as const,
+    queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET("/api/companies/{company_id}/articles", {
-          params: { path: { company_id: companyId } },
+          params: { path: { company_id: companyId }, query: pageQuery(pageParam, q) },
         }),
       ),
+    ...paged,
   });
 }
 
@@ -201,15 +252,33 @@ export function articleQuery(articleId: string, version: number | null = null, a
   });
 }
 
-export function sourcesQuery(companyId: string, api: ApiClient = defaultApi) {
-  return queryOptions({
-    queryKey: queryKeys.sources(companyId),
-    queryFn: async () =>
+export function sourcesQuery(companyId: string, q: string | null = null, api: ApiClient = defaultApi) {
+  return infiniteQueryOptions({
+    queryKey: [...queryKeys.sources(companyId), q] as const,
+    queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET("/api/companies/{company_id}/sources", {
-          params: { path: { company_id: companyId } },
+          params: { path: { company_id: companyId }, query: pageQuery(pageParam, q) },
         }),
       ),
+    ...paged,
+  });
+}
+
+/** The command palette's search (AD-03 on AD-04): a few articles and stories whose titles
+ * have every word typed. */
+export function adminSearchQuery(companyId: string, q: string, api: ApiClient = defaultApi) {
+  return queryOptions({
+    queryKey: ["newsroom", "search", companyId, q] as const,
+    queryFn: async () => {
+      const query = pageQuery(null, q, 5);
+      const [articles, stories] = await Promise.all([
+        api.GET("/api/companies/{company_id}/articles", { params: { path: { company_id: companyId }, query } }).then(unwrap),
+        api.GET("/api/companies/{company_id}/stories", { params: { path: { company_id: companyId }, query } }).then(unwrap),
+      ]);
+      return { articles: articles.items, stories: stories.items };
+    },
+    staleTime: 30_000,
   });
 }
 
@@ -580,15 +649,16 @@ export type Comp = Schemas["Comp"];
 export type GrantCompInput = Schemas["GrantComp"];
 
 /** VIP given by an admin (D-228, P2): newest first; ``running`` keeps only those giving access now. */
-export function compsQuery(companySlug: string, running = false, api: ApiClient = defaultApi) {
-  return queryOptions({
-    queryKey: queryKeys.comps(companySlug, running),
-    queryFn: async () =>
+export function compsQuery(companySlug: string, running = false, q: string | null = null, api: ApiClient = defaultApi) {
+  return infiniteQueryOptions({
+    queryKey: [...queryKeys.comps(companySlug, running), q] as const,
+    queryFn: async ({ pageParam }) =>
       unwrap(
         await api.GET("/api/admin/memberships/comps", {
-          params: { query: { company: companySlug, running } },
+          params: { query: { company: companySlug, running, ...pageQuery(pageParam, q) } },
         }),
       ),
+    ...paged,
   });
 }
 

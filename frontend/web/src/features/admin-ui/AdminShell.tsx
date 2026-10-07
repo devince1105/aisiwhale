@@ -9,12 +9,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import { approvalsQuery } from "@/api/queries";
+import { adminSearchQuery, pendingCountQuery } from "@/api/queries";
 import { useCompanyChoice, withCompany } from "@/features/company/CompanyScope";
 import { ThemeToggle } from "@/features/site/ThemeToggle";
 
 import { Button } from "./Button";
-import { buildCommands } from "./commands";
+import { buildCommands, searchCommands } from "./commands";
 import { CommandPalette, ShortcutHelp } from "./CommandPalette";
 import { LiveStatus } from "./ConnectionBadge";
 import { Drawer } from "./Dialog";
@@ -46,6 +46,8 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
   const [menuOpen, setMenuOpen] = useState(false);
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [asked, setAsked] = useState("");
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const { requested, companies, company } = useCompanyChoice();
@@ -73,6 +75,20 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
     row: moveRow,
     openRow,
   });
+
+  // what is typed in the palette, asked of the server once the typing pauses (AD-04's ``q``)
+  useEffect(() => {
+    const timer = setTimeout(() => setAsked(typed.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [typed]);
+  const searched = useQuery({
+    ...adminSearchQuery(companyId ?? "", asked),
+    enabled: palette && Boolean(companyId) && asked !== "",
+  });
+  const remote = useMemo(
+    () => (searched.data && asked === typed.trim() ? searchCommands(searched.data, (href) => router.push(href)) : []),
+    [searched.data, asked, typed, router],
+  );
 
   // read when it opens: what was visited since, and the companies as they are now
   const commands = useMemo(
@@ -114,7 +130,18 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
           </Button>
         </div>
       </aside>
-      {palette ? <CommandPalette commands={commands} onClose={() => setPalette(false)} /> : null}
+      {palette ? (
+        <CommandPalette
+          commands={commands}
+          onClose={() => {
+            setPalette(false);
+            setTyped("");
+          }}
+          onQuery={setTyped}
+          remote={remote}
+          searching={searched.isFetching || asked !== typed.trim()}
+        />
+      ) : null}
       {help ? <ShortcutHelp onClose={() => setHelp(false)} /> : null}
       {menuOpen ? (
         <Drawer title="後台選單" side="left" onClose={() => setMenuOpen(false)}>
@@ -160,8 +187,8 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
   // the address's company before the list has loaded, so the links keep it from the start
   const companyId = company?.id ?? requested;
   const active = activeNav(pathname)?.item.key ?? null;
-  const pending = useQuery({ ...approvalsQuery(companyId ?? ""), enabled: Boolean(companyId) });
-  const counts: Record<NonNullable<NavItem["count"]>, number> = { "pending-approvals": pending.data?.length ?? 0 };
+  const pending = useQuery({ ...pendingCountQuery(companyId ?? ""), enabled: Boolean(companyId) });
+  const counts: Record<NonNullable<NavItem["count"]>, number> = { "pending-approvals": pending.data ?? 0 };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -166,6 +166,25 @@ def scale_of(table: Table) -> int:
     return 1000 if thirteenf._looks_like_thousands(table.holdings) else 1
 
 
+APART = 1000**0.5
+"""Between "the same" and "a thousand times as much", on a log scale: a total estimated from
+a table's first rows is off by a few times at most, never by thirty."""
+
+
+def total_scale(table: Table, rows_scale: int, entries: int, total: int) -> int:
+    """What a cover page's total is multiplied by to be dollars. Its rows in dollars, and so is
+    the total. Its rows in thousands: the table's dollars — all of it, or its first rows' as
+    many times over as it has entries — are a thousand times the total when it was written in
+    thousands too (T. Rowe Price, 2026Q2), about the same when it was written in dollars after
+    all (Coston, McIsaac & Partners wrote its rows in thousands and its total in dollars)."""
+    if rows_scale == 1 or total <= 0:
+        return 1
+    rows_value = sum(p.value for p in table.holdings.positions.values())
+    if not table.complete and table.rows:
+        rows_value = rows_value * max(entries, table.rows) / table.rows
+    return 1000 if rows_value * rows_scale / total >= APART else 1
+
+
 def scaled(table: Table, scale: int) -> thirteenf.Holdings:
     """The table's holdings in dollars."""
     holdings = table.holdings

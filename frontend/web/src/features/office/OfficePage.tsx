@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { approvalsQuery, kpisQuery, officeHoursQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
+import { kpisQuery, pendingCountQuery, officeHoursQuery, officeThemeQuery, orgQuery, queryKeys, setOfficeTheme } from "@/api/queries";
 import { AgentPanel } from "@/features/agent-panel/AgentPanel";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
@@ -135,7 +135,7 @@ function CompanyOffice({ company }: { company: Company }) {
   const kpis = useQuery(kpisQuery(company.id));
   const org = useQuery(orgQuery(company.id));
   const departmentNames = useMemo(() => departmentNames_(org.data), [org.data]);
-  const pending = useQuery(approvalsQuery(company.id));
+  const pending = useQuery(pendingCountQuery(company.id));
   // the office's style is the company's (D-178): the same in every browser, and the site's
   // AI 編輯部 shows the site's company in it
   const queries = useQueryClient();
@@ -197,7 +197,7 @@ function CompanyOffice({ company }: { company: Company }) {
           </button>
         </div>
       </header>
-      <MiniDashboardView model={model} pendingApprovals={pending.data?.length ?? null} />
+      <MiniDashboardView model={model} pendingApprovals={pending.data ?? null} />
       <DepartmentStrip companyId={company.id} />
       <div className="flex min-h-0 flex-1">
         {/* clipped to its own area: a name tag near the edge must not sit over the team group */}

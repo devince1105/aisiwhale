@@ -1,7 +1,8 @@
 """VIP given by an admin, for internal testing (D-228, P2).
 
 - POST /api/admin/memberships/comps                    {email, until, reason, company?} -> 201
-- GET  /api/admin/memberships/comps[?company&running]  -> the comps, newest first
+- GET  /api/admin/memberships/comps[?company&running]  -> the comps, newest first, a page at a time
+                                                         (?cursor=&limit=&q=&sort=, AD-04)
 - GET  /api/admin/memberships/comps/{grant_id}         -> one comp
 - POST /api/admin/memberships/comps/{grant_id}/revoke  {reason} -> the comp, ended now
 
@@ -19,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -30,6 +31,7 @@ from autora.company import memberships
 from autora.company.memberships import REASON_MAX, MembershipError
 from autora.db.models import Company, MembershipGrant
 from autora_api.deps import Operator, Session
+from autora_api.pagination import Listing, Page, matches, page_list, sort_by
 
 router = APIRouter(prefix="/api/admin/memberships", tags=["admin-memberships"])
 
@@ -64,6 +66,13 @@ class Comp(BaseModel):
     revoke_reason: str | None
     running: bool
     """Giving access right now: not revoked and not run out."""
+
+
+class CompPage(Page[Comp]):
+    pass
+
+
+CompSort = Literal["-created_at", "created_at", "-expires_at", "expires_at"]
 
 
 async def _company(session, slug: str | None) -> Company:
@@ -139,13 +148,33 @@ async def grant_comp(body: GrantComp, session: Session, actor: Operator) -> Comp
 async def list_comps(
     session: Session,
     _: Operator,
+    listing: Listing,
     company: CompanySlug = None,
     running: bool = False,
-) -> list[Comp]:
+    sort: CompSort = "-created_at",
+) -> CompPage:
+    """``q`` searches the reader's address and the reasons. Comps are few (internal testing),
+    so the page is cut from the whole list here rather than in SQL."""
     found = await _company(session, company)
     now = datetime.now(UTC)
     rows = await memberships.comp_grants(session, found.id, running_at=now if running else None)
-    return [await _view(session, grant, ref, now) for grant, ref in rows]
+    views = [(grant, await _view(session, grant, ref, now)) for grant, ref in rows]
+    if listing.words:
+        views = [
+            (grant, view)
+            for grant, view in views
+            if matches(listing.words, view.email, view.reason, view.revoke_reason)
+        ]
+    columns = {"created_at": MembershipGrant.created_at, "expires_at": MembershipGrant.expires_at}
+    order = sort_by(sort, columns)
+    page, next_cursor, total = page_list(
+        views,
+        sort=order,
+        value=lambda pair: getattr(pair[0], order.key),
+        row_id=lambda pair: pair[0].id,
+        listing=listing,
+    )
+    return CompPage(items=[view for _, view in page], next_cursor=next_cursor, total=total)
 
 
 @router.get("/comps/{grant_id}")

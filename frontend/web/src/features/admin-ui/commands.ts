@@ -7,7 +7,7 @@ import type { Visit } from "./recent";
 
 export interface Command {
   id: string;
-  group: "最近瀏覽" | "前往" | "切換公司" | "動作";
+  group: "最近瀏覽" | "前往" | "切換公司" | "動作" | "搜尋結果";
   label: string;
   /** Shown after the label, and searched too. */
   hint?: string;
@@ -75,5 +75,30 @@ export function pick(commands: readonly Command[], query: string): Command[] {
   return [
     ...found.filter((c) => c.label.toLowerCase().startsWith(first)),
     ...found.filter((c) => !c.label.toLowerCase().startsWith(first)),
+  ];
+}
+
+/** The server's matches for what was typed (AD-04's ``q``): articles and stories by title. */
+export function searchCommands(
+  found: { articles: readonly { id: string; title: string }[]; stories: readonly { id: string; title: string }[] },
+  go: (href: string) => void,
+): Command[] {
+  return [
+    ...found.articles.map<Command>((a) => ({
+      id: `article:${a.id}`,
+      group: "搜尋結果",
+      label: a.title,
+      hint: "文章",
+      icon: "article",
+      run: () => go(`/admin/newsroom/articles/${a.id}`),
+    })),
+    ...found.stories.map<Command>((s) => ({
+      id: `story:${s.id}`,
+      group: "搜尋結果",
+      label: s.title,
+      hint: "題材",
+      icon: "story",
+      run: () => go(`/admin/newsroom/stories/${s.id}`),
+    })),
   ];
 }

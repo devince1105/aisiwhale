@@ -12,6 +12,7 @@ import {
   restartWorkflow,
 } from "@/api/queries";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
+import { usePaged } from "@/features/admin-ui/usePaged";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 import { useNow } from "@/hooks/useNow";
@@ -33,7 +34,7 @@ export function ApprovalsPage() {
 function CompanyApprovals({ company }: { company: Company }) {
   useCompanyStream(company.id);
   const [state, setState] = useState<ApprovalState>("PENDING");
-  const approvals = useQuery(approvalsQuery(company.id, state));
+  const approvals = usePaged(approvalsQuery(company.id, state));
   const failed = useQuery(failedWorkflowsQuery(company.id));
   // a command names its project by id; the card says which one it is (D-201)
   const projects = useQuery(projectsQuery(company.id));
@@ -53,7 +54,7 @@ function CompanyApprovals({ company }: { company: Company }) {
       <ApprovalInbox
         state={state}
         onState={setState}
-        cards={approvals.data?.map((a) => approvalCard(a, agents, now, projectNames))}
+        cards={approvals.items?.map((a) => approvalCard(a, agents, now, projectNames))}
         loadError={approvals.error?.message ?? null}
         decide={(id, decision, reason) => decideApproval(id, decision, reason)}
         live={connection.status === "live"}
@@ -67,6 +68,7 @@ function CompanyApprovals({ company }: { company: Company }) {
         }
       />
       {/* the other thing the inbox is for: work that failed and could be run again (AC-9) */}
+      {approvals.footer}
       <FailedRuns
         runs={failed.data}
         onRestart={async (runId) => {

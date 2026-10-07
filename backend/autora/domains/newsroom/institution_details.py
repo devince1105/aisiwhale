@@ -264,8 +264,12 @@ async def read_quarter(
     for filing in filings:
         url = await thirteenf_tables.table_url(fetch, filing.cik, filing.accession)
         table = await thirteenf_tables.read_table(chunks, url)
-        filing.scale = thirteenf_tables.scale_of(table)
-        parts.append(thirteenf_tables.scaled(table, filing.scale))
+        rows_scale = thirteenf_tables.scale_of(table)
+        # the rows' units for the holdings; the cover page's own for the ranking's total
+        filing.scale = thirteenf_tables.total_scale(
+            table, rows_scale, int(filing.entries or 0), int(filing.value_usd or 0)
+        )
+        parts.append(thirteenf_tables.scaled(table, rows_scale))
     return thirteenf.combine(parts)
 
 

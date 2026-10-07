@@ -433,11 +433,13 @@ describe("the data", () => {
   it("asks for the version, the state and the workflow's events", async () => {
     const { api, requests } = client();
     await articleQuery(ARTICLE, 2, api).queryFn!({} as never);
-    await storiesQuery(C, "PUBLISHED", api).queryFn!({} as never);
+    await storiesQuery(C, "PUBLISHED", null, api).queryFn!({ pageParam: null } as never);
+    await storiesQuery(C, null, "台股", api).queryFn!({ pageParam: "next" } as never);
     await workflowEventsQuery(C, "run1", api).queryFn!({} as never);
     expect(requests.map((r) => r.url)).toEqual([
       `http://api/api/articles/${ARTICLE}?version=2`,
-      `http://api/api/companies/${C}/stories?state=PUBLISHED`,
+      `http://api/api/companies/${C}/stories?state=PUBLISHED&limit=50`,
+      `http://api/api/companies/${C}/stories?limit=50&cursor=next&q=${encodeURIComponent("台股")}`,
       `http://api/api/events?company_id=${C}&correlation_id=run1&limit=500`,
     ]);
   });

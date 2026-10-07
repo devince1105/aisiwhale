@@ -61,7 +61,8 @@ describe("the screen invents nothing (AC-S6)", () => {
     // And one animation, by name: the market strip's slow drift (D-048) moves its scroll
     // position, frame by frame. It changes where the figures are, never what they are.
     // And the stock search's wait for a word rather than every letter (D-061): it only delays
-    // when the API is asked; the results are the API's.
+    // when the API is asked; the results are the API's. The back office's command palette waits
+    // the same way before it searches (AD-04).
     // And the public site's demo office (D-155), the one place a timer *does* move the store: it
     // plays a scripted office to visitors, made-up people labelled 示範畫面 on the page. It
     // invents what it shows on purpose, so it is kept out of the back office (see the test below).
@@ -69,6 +70,7 @@ describe("the screen invents nothing (AC-S6)", () => {
       "features/site/PaymentDone.tsx:",
       "features/site/drift.ts:",
       "features/site/Watchlist.tsx:",
+      "features/admin-ui/AdminShell.tsx:",
       "features/demo-office/player.ts:",
     ];
     expect(hits(timers, "features").filter((hit) => !named.some((file) => hit.startsWith(file)))).toEqual([]);

@@ -59,7 +59,7 @@ function context(overrides: Partial<CommandContext> = {}): CommandContext {
 function shell(children: ReactNode = <main>page</main>) {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
   client.setQueryData(queryKeys.companies(), COMPANIES);
-  client.setQueryData(queryKeys.approvals("c1", "PENDING"), []);
+  client.setQueryData([...queryKeys.approvals("c1", "PENDING"), "count"], 0);
   return render(
     <QueryClientProvider client={client}>
       <AdminShell email="admin@aisiwhale.test" onSignOut={vi.fn()}>

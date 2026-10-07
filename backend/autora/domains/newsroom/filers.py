@@ -12,9 +12,9 @@ up here. The ten 機構觀點 managers' names are ``institutions``'s, so 貝萊�
 across the site; and every Chinese name passes the writers' check (``taiwan_usage_problems``).
 
 **One institution, several filers**: Vanguard files as five (two since its 2026 split), Capital
-Group as three, UBS as two. Each is its own row — they are separate filings — named by the
-institution's Taiwan name and which part it is (先鋒資本管理; 資本集團 and the part's own English
-name), with a ``group`` to put them together.
+Group as three, UBS and T. Rowe Price as two. Each is its own row — they are separate filings —
+named by the institution's Taiwan name and which part it is (先鋒資本管理; 資本集團 and the
+part's own English name), with a ``group`` to put them together.
 
 The followed filers (``holdings.PROFILES``: Berkshire, Bridgewater…) are named by their
 profiles, as on the cards.
@@ -109,7 +109,8 @@ FILERS: dict[str, Filer] = {
     "1811242": Filer("Vanguard Global Advisers", "先鋒全球顧問", "vanguard"),
     "1680208": Filer("Vanguard Asset Management (UK)", "先鋒資產管理（英國）", "vanguard"),
     "102909": Filer("Vanguard Group", "先鋒集團", "vanguard"),
-    "80255": Filer("T. Rowe Price", "普徠仕"),
+    "80255": Filer("T. Rowe Price", "普徠仕", "trowe"),
+    "1897612": Filer("T. Rowe Price Investment Management", "普徠仕投資管理", "trowe"),
     "1037389": Filer("Renaissance Technologies", "文藝復興科技"),
     "1179392": Filer("Two Sigma Investments"),
     "873630": Filer("HSBC", "匯豐"),

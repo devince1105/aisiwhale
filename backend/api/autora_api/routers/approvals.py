@@ -11,6 +11,7 @@ from sqlalchemy import select
 from autora.db.models import Approval, ApprovalState
 from autora.runtime.approvals import ApprovalError
 from autora_api.deps import Operator, RuntimeDep, Session
+from autora_api.pagination import Listing, Page, page_rows, search, sort_by
 
 router = APIRouter(prefix="/api/approvals", tags=["approvals"])
 
@@ -35,6 +36,13 @@ class ApprovalOut(BaseModel):
     created_at: datetime
 
 
+class ApprovalPage(Page[ApprovalOut]):
+    pass
+
+
+ApprovalSort = Literal["created_at", "-created_at"]
+
+
 class DecisionIn(BaseModel):
     decision: Literal["approve", "reject", "revise"]
     """``revise``: send it back with changes asked for (D-044); needs a ``reason``."""
@@ -47,14 +55,31 @@ async def list_approvals(
     session: Session,
     _: Operator,
     company_id: uuid.UUID,
+    listing: Listing,
     state: ApprovalState | None = ApprovalState.PENDING,
-) -> list[ApprovalOut]:
-    """The approval inbox. Oldest first, so the longest-waiting request is on top."""
+    sort: ApprovalSort = "created_at",
+) -> ApprovalPage:
+    """The approval inbox, a page at a time (AD-04). Oldest first by default, so the
+    longest-waiting request is on top; ``q`` searches the summary, kind and action."""
     stmt = select(Approval).where(Approval.company_id == company_id)
     if state is not None:
         stmt = stmt.where(Approval.state == state)
-    rows = await session.scalars(stmt.order_by(Approval.created_at, Approval.id))
-    return [ApprovalOut.model_validate(row, from_attributes=True) for row in rows]
+    if (
+        words := search(listing.words, Approval.summary, Approval.kind, Approval.action)
+    ) is not None:
+        stmt = stmt.where(words)
+    rows, next_cursor, total = await page_rows(
+        session,
+        stmt,
+        sort=sort_by(sort, {"created_at": Approval.created_at}),
+        id_column=Approval.id,
+        listing=listing,
+    )
+    return ApprovalPage(
+        items=[ApprovalOut.model_validate(row, from_attributes=True) for (row,) in rows],
+        next_cursor=next_cursor,
+        total=total,
+    )
 
 
 @router.post("/{approval_id}/decide")

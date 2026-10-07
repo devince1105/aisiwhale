@@ -82,7 +82,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Comps */
+        /**
+         * List Comps
+         * @description ``q`` searches the reader's address and the reasons. Comps are few (internal testing),
+         *     so the page is cut from the whole list here rather than in SQL.
+         */
         get: operations["list_comps_api_admin_memberships_comps_get"];
         put?: never;
         /**
@@ -163,7 +167,8 @@ export interface paths {
         };
         /**
          * List Approvals
-         * @description The approval inbox. Oldest first, so the longest-waiting request is on top.
+         * @description The approval inbox, a page at a time (AD-04). Oldest first by default, so the
+         *     longest-waiting request is on top; ``q`` searches the summary, kind and action.
          */
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
@@ -760,7 +765,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Articles */
+        /**
+         * List Articles
+         * @description Articles a page at a time (AD-04), last changed first; ``q`` searches the title and
+         *     the slug.
+         */
         get: operations["list_articles_api_companies__company_id__articles_get"];
         put?: never;
         post?: never;
@@ -1016,7 +1025,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Sources */
+        /**
+         * List Sources
+         * @description Sources a page at a time (AD-04), oldest first; ``q`` searches the name and the URL.
+         */
         get: operations["list_sources_api_companies__company_id__sources_get"];
         put?: never;
         /** Create Source */
@@ -1034,7 +1046,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Stories */
+        /**
+         * List Stories
+         * @description Stories a page at a time (AD-04), newest activity first; ``q`` searches the title.
+         */
         get: operations["list_stories_api_companies__company_id__stories_get"];
         put?: never;
         post?: never;
@@ -1470,6 +1485,49 @@ export interface paths {
          *     free (D-159) — so the answer differs by reader and is not to be kept by anybody between.
          */
         get: operations["get_portfolio_api_public_holdings_people__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/institutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ranking
+         * @description 機構排行 (HD-11): every 13F filer's quarter, largest first, in dollars. The same for
+         *     every reader; a quarter not offered is the default one (the latest all due).
+         */
+        get: operations["get_ranking_api_public_institutions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/public/institutions/{cik}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Institution
+         * @description An institution's page (HD-11): open to anybody, its ten largest holdings; the rest, and
+         *     its estimated buys and sells, for a reader signed in (free, D-159). Opened for the first
+         *     time, its holdings are queued to be worked out (404: no 13F for the quarter).
+         */
+        get: operations["get_institution_api_public_institutions__cik__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2017,6 +2075,15 @@ export interface components {
             /** Task Id */
             task_id: string | null;
         };
+        /** ApprovalPage */
+        ApprovalPage: {
+            /** Items */
+            items: components["schemas"]["ApprovalOut"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
+        };
         /**
          * ApprovalState
          * @enum {string}
@@ -2130,6 +2197,15 @@ export interface components {
             views: number;
             /** Workflow Run Ids */
             workflow_run_ids: string[];
+        };
+        /** ArticlePage */
+        ArticlePage: {
+            /** Items */
+            items: components["schemas"]["ArticleSummary"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
         };
         /** ArticleRef */
         ArticleRef: {
@@ -2458,6 +2534,15 @@ export interface components {
              * Format: date-time
              */
             started_at: string;
+        };
+        /** CompPage */
+        CompPage: {
+            /** Items */
+            items: components["schemas"]["Comp"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
         };
         /** CompanyCreate */
         CompanyCreate: {
@@ -3802,6 +3887,22 @@ export interface components {
              */
             period: string;
         };
+        /** PublicFiling */
+        PublicFiling: {
+            /** Accession */
+            accession: string;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Form */
+            form: string;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Url */
+            url: string;
+        };
         /** PublicGold */
         PublicGold: {
             /**
@@ -3899,6 +4000,105 @@ export interface components {
             symbol: string | null;
             /** Weight */
             weight: number;
+        };
+        /** PublicInstitution */
+        PublicInstitution: {
+            /** Bought */
+            bought: components["schemas"]["PublicInstitutionHolding"][];
+            /** Change Usd */
+            change_usd: number | null;
+            /** Cik */
+            cik: string;
+            /** Computed At */
+            computed_at: string | null;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Entries */
+            entries: number;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Filed Name */
+            filed_name: string;
+            /** Filings */
+            filings: components["schemas"]["PublicFiling"][];
+            /** Group */
+            group: string | null;
+            /** In Doubt */
+            in_doubt: boolean;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Net Bought Usd */
+            net_bought_usd: number | null;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Periods */
+            periods: string[];
+            /** Previous Period */
+            previous_period: string | null;
+            /** Previous Stock Value Usd */
+            previous_stock_value_usd: number | null;
+            /** Previous Value Usd */
+            previous_value_usd: number | null;
+            /** Profile */
+            profile: string | null;
+            /** Rank */
+            rank: number | null;
+            /** Sold */
+            sold: components["schemas"]["PublicInstitutionHolding"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "queued" | "failed";
+            /** Stock Value Usd */
+            stock_value_usd: number | null;
+            /** Stocks */
+            stocks: number | null;
+            /** Top */
+            top: components["schemas"]["PublicInstitutionHolding"][];
+            /** Top Total */
+            top_total: number;
+            /** Value Usd */
+            value_usd: number;
+        };
+        /** PublicInstitutionHolding */
+        PublicInstitutionHolding: {
+            /** Change */
+            change: string | null;
+            /** Cusip */
+            cusip: string;
+            /** Name */
+            name: string;
+            /** Previous Shares */
+            previous_shares: number;
+            /** Previous Value Usd */
+            previous_value_usd: number;
+            /** Shares */
+            shares: number;
+            /** Split */
+            split: string | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Traded Usd */
+            traded_usd: number | null;
+            /** Value Usd */
+            value_usd: number;
+            /** Weight Pct */
+            weight_pct: number | null;
         };
         /** PublicIntraday */
         PublicIntraday: {
@@ -4145,6 +4345,58 @@ export interface components {
             source: string;
             /** Value */
             value: number;
+        };
+        /** PublicRankRow */
+        PublicRankRow: {
+            /** Change Pct */
+            change_pct: number | null;
+            /** Change Usd */
+            change_usd: number | null;
+            /** Cik */
+            cik: string;
+            /** Entries */
+            entries: number;
+            /**
+             * Filed
+             * Format: date
+             */
+            filed: string;
+            /** Filed Name */
+            filed_name: string;
+            /** Group */
+            group: string | null;
+            /** In Doubt */
+            in_doubt: boolean;
+            /** In Thousands */
+            in_thousands: boolean;
+            /** Name */
+            name: string;
+            /** Previous Value Usd */
+            previous_value_usd: number | null;
+            /** Profile */
+            profile: string | null;
+            /** Rank */
+            rank: number;
+            /** Value Usd */
+            value_usd: number;
+        };
+        /** PublicRanking */
+        PublicRanking: {
+            /** Filers */
+            filers: number;
+            /**
+             * Period
+             * Format: date
+             */
+            period: string;
+            /** Periods */
+            periods: string[];
+            /** Previous Period */
+            previous_period: string | null;
+            /** Rows */
+            rows: components["schemas"]["PublicRankRow"][];
+            /** Total */
+            total: number;
         };
         /** PublicRatings */
         PublicRatings: {
@@ -4519,6 +4771,15 @@ export interface components {
          * @enum {string}
          */
         SourceKind: "rss" | "url_list" | "search_query" | "twse_announcements" | "gdelt";
+        /** SourcePage */
+        SourcePage: {
+            /** Items */
+            items: components["schemas"]["SourceView"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
+        };
         /** SourceView */
         SourceView: {
             /** Config */
@@ -4645,6 +4906,15 @@ export interface components {
             title: string;
             /** Workflow Run Ids */
             workflow_run_ids: string[];
+        };
+        /** StoryPage */
+        StoryPage: {
+            /** Items */
+            items: components["schemas"]["StorySummary"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
         };
         /**
          * StoryState
@@ -5202,6 +5472,10 @@ export interface operations {
             query?: {
                 company?: string | null;
                 running?: boolean;
+                sort?: "-created_at" | "created_at" | "-expires_at" | "expires_at";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -5217,7 +5491,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Comp"][];
+                    "application/json": components["schemas"]["CompPage"];
                 };
             };
             /** @description Validation Error */
@@ -5376,6 +5650,10 @@ export interface operations {
             query: {
                 company_id: string;
                 state?: components["schemas"]["ApprovalState"] | null;
+                sort?: "created_at" | "-created_at";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
             };
             header?: never;
             path?: never;
@@ -5391,7 +5669,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApprovalOut"][];
+                    "application/json": components["schemas"]["ApprovalPage"];
                 };
             };
             /** @description Validation Error */
@@ -6493,7 +6771,10 @@ export interface operations {
     list_articles_api_companies__company_id__articles_get: {
         parameters: {
             query?: {
+                sort?: "-updated_at" | "updated_at" | "-created_at" | "title";
+                cursor?: string | null;
                 limit?: number;
+                q?: string | null;
             };
             header?: never;
             path: {
@@ -6511,7 +6792,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ArticleSummary"][];
+                    "application/json": components["schemas"]["ArticlePage"];
                 };
             };
             /** @description Validation Error */
@@ -6980,7 +7261,12 @@ export interface operations {
     };
     list_sources_api_companies__company_id__sources_get: {
         parameters: {
-            query?: never;
+            query?: {
+                sort?: "created_at" | "-created_at" | "name";
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
             header?: never;
             path: {
                 company_id: string;
@@ -6997,7 +7283,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SourceView"][];
+                    "application/json": components["schemas"]["SourcePage"];
                 };
             };
             /** @description Validation Error */
@@ -7052,7 +7338,10 @@ export interface operations {
         parameters: {
             query?: {
                 state?: components["schemas"]["StoryState"] | null;
+                sort?: "-last_item_at" | "last_item_at" | "-score" | "-first_seen_at" | "title";
+                cursor?: string | null;
                 limit?: number;
+                q?: string | null;
             };
             header?: never;
             path: {
@@ -7070,7 +7359,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StorySummary"][];
+                    "application/json": components["schemas"]["StoryPage"];
                 };
             };
             /** @description Validation Error */
@@ -7841,6 +8130,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicPortfolio"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ranking_api_public_institutions_get: {
+        parameters: {
+            query: {
+                lang: string;
+                period?: string | null;
+                q?: string | null;
+                sort?: "value" | "change" | "filed";
+                order?: "desc" | "asc";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicRanking"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_institution_api_public_institutions__cik__get: {
+        parameters: {
+            query: {
+                lang: string;
+                period?: string | null;
+            };
+            header?: never;
+            path: {
+                cik: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicInstitution"];
                 };
             };
             /** @description Validation Error */

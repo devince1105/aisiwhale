@@ -55,11 +55,11 @@ function recorder() {
 describe("the comps page's requests", () => {
   it("lists, grants and revokes where the API expects them", async () => {
     const { api, requests } = recorder();
-    await compsQuery("aisiwhale", true, api).queryFn!({} as never);
+    await compsQuery("aisiwhale", true, null, api).queryFn!({ pageParam: null } as never);
     await grantComp({ email: "tester@example.com", until: FUTURE, reason: "內測", company: "aisiwhale" }, api);
     await revokeComp("g1", "測完了", api);
     expect(requests).toEqual([
-      { method: "GET", url: "http://api/api/admin/memberships/comps?company=aisiwhale&running=true", body: null },
+      { method: "GET", url: "http://api/api/admin/memberships/comps?company=aisiwhale&running=true&limit=50", body: null },
       {
         method: "POST",
         url: "http://api/api/admin/memberships/comps",

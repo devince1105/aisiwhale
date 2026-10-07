@@ -59,8 +59,8 @@ describe("typed client", () => {
 
   it("sends commands as REST with query and body parameters", async () => {
     const { api, requests } = mockApi(() => json({ id: "x" }));
-    await approvalsQuery("c1", "PENDING", api).queryFn!({} as never);
-    expect(requests[0].url).toBe("http://api.test/api/approvals?company_id=c1&state=PENDING");
+    await approvalsQuery("c1", "PENDING", api).queryFn!({ pageParam: null } as never);
+    expect(requests[0].url).toBe("http://api.test/api/approvals?company_id=c1&state=PENDING&limit=50");
     await decideApproval("ap1", "approve", null, api);
     expect(requests[1].method).toBe("POST");
     expect(await requests[1].json()).toEqual({ decision: "approve", reason: null });
