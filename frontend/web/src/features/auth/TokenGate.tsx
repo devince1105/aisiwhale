@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useCallback, useEffect, type ReactNode } from "react";
 
 import { AdminShell } from "@/features/admin-ui/AdminShell";
+import { PermissionsProvider } from "@/features/admin-ui/permissions";
 
 import { fetchAdminMe, loginHref, signOutAdmin } from "./adminAuth";
 
@@ -40,9 +41,11 @@ export function TokenGate({ children }: { children: ReactNode }) {
     // the shell reads ?company=; the boundary lets a page without dynamic params prerender
     return (
       <Suspense>
-        <AdminShell email={me.data.email} onSignOut={signOut}>
-          {children}
-        </AdminShell>
+        <PermissionsProvider permissions={me.data.permissions}>
+          <AdminShell email={me.data.email} role={me.data.role ?? null} onSignOut={signOut}>
+            {children}
+          </AdminShell>
+        </PermissionsProvider>
       </Suspense>
     );
   }

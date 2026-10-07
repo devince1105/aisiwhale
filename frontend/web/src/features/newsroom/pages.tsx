@@ -34,6 +34,7 @@ import { ListToolbar, Pager, sortControl, type FilterDef } from "@/features/admi
 import { Drawer } from "@/features/admin-ui/Dialog";
 import { ErrorState } from "@/features/admin-ui/states";
 import { useListState } from "@/features/admin-ui/useListState";
+import { useCan } from "@/features/admin-ui/permissions";
 import { usePeek } from "@/features/admin-ui/usePeek";
 import { ViewSwitch } from "@/features/admin-ui/ViewSwitch";
 import { ArticleBoard, StoryBoard } from "@/features/board/Boards";
@@ -153,6 +154,7 @@ export function SourcesPage() {
 const SOURCE_SORTS: readonly SourceSort[] = ["created_at", "-created_at", "name"];
 
 function CompanySources({ company }: { company: Company }) {
+  const can = useCan();
   useCompanyStream(company.id);
   const list = useListState([], SOURCE_SORTS);
   const page = useQuery(sourcesQuery(company.id, { q: list.q, sort: list.sort, cursor: list.cursor }));
@@ -166,12 +168,14 @@ function CompanySources({ company }: { company: Company }) {
       <h2 id="add-source" className="mt-8 mb-3 text-lg font-semibold">
         新增來源
       </h2>
+      {can("newsroom:edit") ? (
       <AddSourceForm
         onAdd={async (body) => {
           await addSource(company.id, body);
           await queryClient.invalidateQueries({ queryKey: ["newsroom", "sources", company.id] });
         }}
       />
+      ) : null}
     </AdminPage>
   );
 }
@@ -234,6 +238,7 @@ export function StoryPage({ storyId }: { storyId: string }) {
 }
 
 function LoadedStory({ story }: { story: StoryDetail }) {
+  const can = useCan();
   useCompanyStream(story.company_id);
   const events = useTimeline(story.company_id, story.workflow_run_ids);
   const queryClient = useQueryClient();
@@ -246,7 +251,7 @@ function LoadedStory({ story }: { story: StoryDetail }) {
       story={story}
       activity={<ActivityTimeline targetType="story" targetId={story.id} />}
       events={events}
-      onStart={() => start.mutate()}
+      onStart={can("newsroom:edit") ? () => start.mutate() : undefined}
       starting={start.isPending}
       startError={start.error?.message ?? null}
     />
@@ -261,6 +266,7 @@ export function ArticlePage({ articleId }: { articleId: string }) {
 }
 
 function LoadedArticle({ article }: { article: ArticleDetail }) {
+  const can = useCan();
   useCompanyStream(article.company_id);
   const [lang, setLang] = useState(article.primary_lang);
   const events = useTimeline(article.company_id, article.workflow_run_ids);
@@ -277,7 +283,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
       lang={lang}
       onLang={setLang}
       events={events}
-      onSite={{
+      onSite={can("newsroom:edit") ? {
         unpublish: (reason) => unpublish.mutate(reason),
         republish: () => republish.mutate(),
         revise: (reason) => revise.mutate(reason),
@@ -285,7 +291,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         setSection: (to) => section.mutate(to),
         busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending || section.isPending,
         error: (unpublish.error ?? republish.error ?? revise.error ?? access.error ?? section.error)?.message ?? null,
-      }}
+      } : undefined}
       activity={<ActivityTimeline targetType="article" targetId={article.id} />}
       cover={<CoverPanel articleId={article.id} cover={article.cover} asked={article.cover_asked} />}
     />

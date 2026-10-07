@@ -21,7 +21,8 @@ import { Drawer } from "./Dialog";
 import { moveRow, openRow, useHotkeys } from "./hotkeys";
 import { Icon } from "./icons";
 import { ToastProvider } from "./Toast";
-import { activeNav, ADMIN_NAV, type NavItem } from "./nav";
+import { activeNav, navFor, type NavItem } from "./nav";
+import { useCan } from "./permissions";
 import { recentVisits } from "./recent";
 
 const COLLAPSED = "autora.admin.sidebar";
@@ -42,7 +43,21 @@ function saveCollapsed(collapsed: boolean): void {
   }
 }
 
-export function AdminShell({ email, onSignOut, children }: { email: string | null; onSignOut: () => void; children: ReactNode }) {
+const ROLE_LABEL: Record<string, string> = { owner: "擁有者", editor: "編輯", finance: "財務", viewer: "檢視" };
+
+export function AdminShell({
+  email,
+  role = null,
+  onSignOut,
+  children,
+}: {
+  email: string | null;
+  role?: string | null;
+  onSignOut: () => void;
+  children: ReactNode;
+}) {
+  const can = useCan();
+  const nav = navFor(can);
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [palette, setPalette] = useState(false);
@@ -68,7 +83,7 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
     search: () => setPalette(true),
     help: () => setHelp(true),
     go: (letter) => {
-      const item = ADMIN_NAV.flatMap((g) => g.items).find((i) => i.go === letter);
+      const item = nav.flatMap((g) => g.items).find((i) => i.go === letter);
       if (!item) return false;
       router.push(companyId ? withCompany(item.href, companyId) : item.href);
       return true;
@@ -96,6 +111,7 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
     () =>
       palette
         ? buildCommands({
+            nav,
             companyId,
             companies: companies.data ?? [],
             recent: recentVisits(),
@@ -171,6 +187,7 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
           <ThemeToggle lang="zh-TW" />
           <span data-testid="admin-who" className="hidden max-w-48 truncate text-xs text-muted sm:inline">
             {email ?? "操作者權杖"}
+            {role ? `・${ROLE_LABEL[role] ?? role}` : null}
           </span>
           <Button variant="subtle" size="sm" onClick={onSignOut}>
             登出
@@ -185,6 +202,7 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
 }
 
 function SidebarContent({ collapsed }: { collapsed: boolean }) {
+  const can = useCan();
   const pathname = usePathname() ?? "";
   const { requested, company } = useCompanyChoice();
   // the address's company before the list has loaded, so the links keep it from the start
@@ -202,7 +220,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
       </div>
       {collapsed ? null : <CompanySwitcher />}
       <nav aria-label="後台導覽" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {ADMIN_NAV.map((group) => (
+        {navFor(can).map((group) => (
           <div key={group.label} className="mb-3">
             {collapsed ? (
               <div className="mx-2 my-2 border-t border-line" aria-hidden="true" />

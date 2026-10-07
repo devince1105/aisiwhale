@@ -14,6 +14,8 @@ export interface NavItem {
   count?: "pending-approvals";
   /** The second key of its ``g`` shortcut (AD-03): ``g`` then this letter opens it. */
   go: string;
+  /** The permission it needs to be shown (AD-09); none: every role may read it. */
+  need?: string;
 }
 
 export interface NavGroup {
@@ -55,9 +57,17 @@ export const ADMIN_NAV: readonly NavGroup[] = [
   },
   {
     label: "系統",
-    items: [{ key: "audit", go: "l", label: "操作紀錄", href: "/admin/audit", icon: "audit" }],
+    items: [{ key: "audit", go: "l", label: "操作紀錄", href: "/admin/audit", icon: "audit", need: "audit:view" },
+      { key: "access", go: "r", label: "角色與權限", href: "/admin/settings/access", icon: "access", need: "access:manage" }],
   },
 ];
+
+/** The map as a role sees it (AD-09): the pages it may not open left out, and empty groups. */
+export function navFor(can: (key: string) => boolean): NavGroup[] {
+  return ADMIN_NAV.map((group) => ({ ...group, items: group.items.filter((item) => !item.need || can(item.need)) })).filter(
+    (group) => group.items.length > 0,
+  );
+}
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 

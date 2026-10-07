@@ -16,11 +16,12 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from autora.accounts import OAuthPurpose, authenticate, ratelimit, sign_out, start_session
 from autora.infra.settings import Settings
+from autora_api import permissions
 from autora_api.deps import (
     ADMIN_COOKIE,
     ADMIN_SESSION_VALID_FOR,
@@ -30,6 +31,7 @@ from autora_api.deps import (
     admin_for,
     is_admin,
     require_operator,
+    role_of,
     settings_dep,
 )
 from autora_api.routers.auth import WRONG, begin_google, limit, set_admin_cookie
@@ -51,6 +53,10 @@ class AdminMe(BaseModel):
     via: Literal["email", "token"]
     email: str | None
     """The admin's address, to show them who they are signed in as; None with the token."""
+    role: str | None = None
+    """Their back-office role (AD-09): owner, editor, finance or viewer."""
+    permissions: list[str] = []
+    """What the role may do, for the pages to hide what it may not (the API still decides)."""
 
 
 @router.post("/login")
@@ -64,10 +70,12 @@ async def login(
     if not await is_admin(session, reader, settings):
         await session.commit()  # a rehashed password, if any
         raise HTTPException(status.HTTP_403_FORBIDDEN, "this account may not open the back office")
+    role = await role_of(session, reader, settings)
     token = await start_session(session, reader, valid_for=ADMIN_SESSION_VALID_FOR)
     await session.commit()
     set_admin_cookie(response, token, settings)
-    return AdminMe(via="email", email=reader.email)
+    allowed = sorted(permissions.permissions_of(role or ""))
+    return AdminMe(via="email", email=reader.email, role=role, permissions=allowed)
 
 
 @router.get("/google/start")
@@ -86,16 +94,20 @@ async def google_start(
 
 @router.get("/me", dependencies=[Depends(require_operator)])
 async def me(
+    request: Request,
     session: Session,
     settings: SettingsDep,
     autora_admin: AdminCookie = None,
 ) -> AdminMe:
-    """Who is calling. ``require_operator`` has already refused anybody else."""
+    """Who is calling, and as what. ``require_operator`` has already refused anybody else (and
+    found their role)."""
+    role = getattr(request.state, "admin_role", None)
+    allowed = sorted(permissions.permissions_of(role or ""))
     reader = await admin_for(session, autora_admin, settings)
     await session.commit()  # last_seen_at
     if reader is not None:
-        return AdminMe(via="email", email=reader.email)
-    return AdminMe(via="token", email=None)
+        return AdminMe(via="email", email=reader.email, role=role, permissions=allowed)
+    return AdminMe(via="token", email=None, role=role, permissions=allowed)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

@@ -6,6 +6,7 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ApiError } from "@/api/client";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
 import { ROW, ROW_FOCUS, sequencePending } from "@/features/admin-ui/hotkeys";
+import { useCan } from "@/features/admin-ui/permissions";
 
 import { Folded } from "./Folded";
 import { STATES, type ApprovalCard, type ApprovalState, type Decision, type OfficialReportCheck } from "./model";
@@ -71,7 +72,8 @@ function Card({
   const [asking, setAsking] = useState(false);
   const opinion = useRef<HTMLTextAreaElement>(null);
   const pending = card.state === "PENDING";
-  const open = pending && !sent && !busy;
+  const mayDecide = useCan()("approvals:decide");
+  const open = pending && !sent && !busy && mayDecide;
   const approveLabel = card.command?.approve ?? "核准";
   // the card selected with j / k (AD-03): a asks to approve, r goes to the opinion box
   const onKey = (event: KeyboardEvent<HTMLLIElement>) => {
@@ -169,7 +171,9 @@ function Card({
         </div>
       ) : null}
 
-      {pending ? (
+      {pending && !mayDecide ? (
+        <p className="mt-3 text-sm text-muted">你的角色只能檢視，不能決定審批。</p>
+      ) : pending ? (
         sent ? (
           <p className="mt-3 text-sm text-muted" role="status">
             {SENT_LABEL[sent]}，等待更新…

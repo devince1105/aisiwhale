@@ -27,6 +27,17 @@ export function targetsFrom(entity: Entity, from: string): string[] {
   return MOVES[entity].filter((m) => m.from === from).map((m) => m.to);
 }
 
+/** The permission each move needs (AD-09): deciding an approval, or changing the newsroom. */
+export const MOVE_NEEDS: Record<MoveAction, string> = {
+  approve: "approvals:decide",
+  send_back: "approvals:decide",
+  reject: "approvals:decide",
+  unpublish: "newsroom:edit",
+  republish: "newsroom:edit",
+  revise: "newsroom:edit",
+  start: "newsroom:edit",
+};
+
 /** How each move asks before it is made. ``reason``: required (the writer works from it, or the
  * record keeps why), or none. */
 export const MOVE_INFO: Record<MoveAction, { verb: string; reason: "required" | "none"; tone: "danger" | "primary" }> = {

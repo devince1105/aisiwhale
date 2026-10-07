@@ -13,16 +13,16 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession, async_sessionmaker
 
-from autora.accounts import Reader, reader_for
+from autora.accounts import Reader, email_verified, reader_for
 from autora.accounts.entitlement import admin_authorized
 from autora.accounts.google import GoogleOAuth
 from autora.app import Runtime, build_runtime
-from autora.db.models import OfficeCallRecord
+from autora.db.models import AdminRole, AdminRoleName, OfficeCallRecord
 from autora.db.session import get_sessionmaker
 from autora.infra.email import Sender, build_sender
 from autora.infra.settings import Settings, get_settings
 from autora.runtime.actor import Actor
-from autora_api import audit
+from autora_api import audit, permissions
 
 log = logging.getLogger(__name__)
 _bearer = HTTPBearer(auto_error=False)
@@ -90,10 +90,22 @@ ADMIN_SESSION_VALID_FOR = timedelta(days=14)
 """Shorter than a reader's 60 days: this one can spend the company's money."""
 
 
+async def role_of(session: AsyncSession, reader: Reader, settings: Settings) -> str | None:
+    """A person's back-office role (AD-09): owner for an address on ADMIN_EMAILS, else the role
+    an owner gave them, else none. Either way only for an address proven to be theirs."""
+    if await admin_authorized(session, reader, settings.admin_emails):
+        return AdminRoleName.OWNER.value
+    given = await session.get(AdminRole, reader.id)
+    if given is None or not await email_verified(session, reader):
+        return None
+    return given.role
+
+
 async def is_admin(session: AsyncSession, reader: Reader, settings: Settings) -> bool:
-    """Authorization, apart from how they signed in (D-230): an address on ADMIN_EMAILS **and**
-    proven to be theirs. Knowing an admin's address — even registering it — opens nothing."""
-    return await admin_authorized(session, reader, settings.admin_emails)
+    """Authorization, apart from how they signed in (D-230): an address on ADMIN_EMAILS, or one
+    an owner let in (AD-09), **and** proven to be theirs. Knowing an admin's address — even
+    registering it — opens nothing."""
+    return await role_of(session, reader, settings) is not None
 
 
 async def admin_for(session: AsyncSession, token: str | None, settings: Settings) -> Reader | None:
@@ -170,20 +182,34 @@ async def require_operator(
 
     One who changes something calls the worker in, if it is off its shifts (D-205): an approval,
     a draft sent back, a brief, a project resumed. Reading calls nobody. And what they change is
-    written down, who and what (AD-06, audit.py)."""
+    written down, who and what (AD-06, audit.py) — refused attempts too.
+
+    What they may do is their role's (AD-09, permissions.py): the token and ADMIN_EMAILS are
+    owners; a route that needs a key the role lacks is refused with 403."""
     expected = settings.api_bearer_token.get_secret_value()
     actor: Actor | None = None
+    role: str | None = None
     if credentials is not None and secrets.compare_digest(credentials.credentials, expected):
         actor = Actor.human("operator")
+        role = AdminRoleName.OWNER.value
     else:
         reader = await admin_for(session, autora_admin, settings)
         if reader is not None:
             actor = admin_actor(reader)
+            role = await role_of(session, reader, settings)
     if actor is not None:
+        audit.mark(request, actor)
+        request.state.admin_role = role
+        route = request.scope.get("route")
+        key = permissions.needed(request.method, getattr(route, "path", ""))
+        if key is not None and key not in permissions.permissions_of(role or ""):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"your role ({role}) does not have {key}",
+            )
         if request.method not in READ_ONLY:
             OFFICE_CALL.mark()
             await OFFICE_CALL.keep(session.bind)
-        audit.mark(request, actor)
         return actor
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

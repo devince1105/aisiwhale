@@ -13,7 +13,7 @@
 | 4b | AD-05 DataTable | AD-04 | ✅ 2026-10-07 |
 | 5 | AD-06 管理操作稽核 | AD-04 | ✅ 2026-10-07 |
 | 5b | AD-07 詳情頁與 Drawer 預覽 | AD-06 | ✅ 2026-10-07 |
-| 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ⏳ |
+| 6 | AD-09 RBAC（排在 P8 開放付款、TR-12 之前） | AD-06 | ✅ 2026-10-07 |
 | 7 | AD-08 看板 | AD-05、AD-07 | ✅ 2026-10-07 |
 | 8 | AD-10、AD-11、AD-12、AD-13 | — | ⏳ |
 
@@ -389,3 +389,57 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
   - vitest 85 個檔案 1,011 項中只有 1 項失敗，是 `office3d/agents/avatar.test.tsx` 在負載 20 時超時，單獨重跑 12 項全過；
   - build 通過；Playwright e2e 17 項通過；
   - 完整後端 pytest 2,498 項中只有 1 項失敗，是 `tests/e2e/test_recovery.py::test_killed_worker_is_recovered_without_duplicates`（會殺掉 worker 行程的測試），單獨重跑兩次都通過，那個檔案我也沒有動。
+
+---
+
+## 2026-10-07：AD-09 角色與權限
+
+在 `.claude/worktrees/ad09`（分支 `admin/ad09`，從 AD-08 分出）做。
+
+### 做了什麼
+
+- **權限表 `autora_api/permissions.py`**：權限鍵的格式是 `模組:動作`，共 12 個。每一個「經過後台的寫入路由」都用「方法＋路由樣板」對應到一個鍵；讀取路由只有列出來的才需要鍵（`GET /api/admin/audit` 需要 `audit:view`、讀者鯨幣明細 `GET /api/admin/coins/wallet` 需要 `coins:view`、`/api/admin/access` 需要 `access:manage`），其餘所有角色都能讀。
+- **四種角色**（D-234 ①）：
+  - owner：全部權限；
+  - editor：`newsroom:edit`、`approvals:decide`、`projects:manage`、`workflows:run`；
+  - finance：`finance:edit`、`memberships:grant`、`coins:adjust`、`coins:view`；
+  - viewer：沒有任何權限，只能讀。
+  - 鯨幣調整是權限鍵，不是另一種角色（D-234 ①）。
+- **在哪裡檢查**：`require_operator` 找出目前請求對應的路由（`request.scope["route"]`），查權限表；角色沒有那個鍵就回 403 problem+json，訊息裡會寫出缺的是哪個鍵。被拒的嘗試也會照 AD-06 記進操作紀錄。**不用改任何 router**：檢查集中在門口，和 AD-06 的稽核是同一種做法，所以其他工作階段負責的 router（例如鯨幣）不必動。
+- **誰是什麼角色**：
+  - `ADMIN_EMAILS` 上、而且 email 已驗證的人一律是 owner；
+  - 操作者權杖也是 owner：只給機器（CI、腳本、worker）用，操作紀錄記為 `operator`（D-234 ②）；
+  - 其他人由 owner 加進新的 `admin_roles` 資料表（遷移 0078），四種角色擇一，email 也必須已驗證。
+- **`/api/admin/auth/me` 和登入的回應**多了 `role` 與 `permissions`。
+- **`/api/admin/access`**（`access:manage`）：列出 owner 名單、其他管理員和各角色的權限；可以加入（對方須已在網站註冊）、改角色、移除。不能改或移除自己（避免 owner 不小心把自己鎖在外面）。ADMIN_EMAILS 上的人不能在這裡被加入或修改。
+- **前端**：
+  - `TokenGate` 把 `/me` 回來的權限放進 `PermissionsProvider`，元件用 `useCan()` 判斷要不要顯示。不在登入頁面裡時（例如單獨渲染元件的測試）一律顯示，所以既有測試不受影響。真正的檢查仍然在 API。
+  - 側欄、⌘K 指令面板、`g` 快捷鍵都不顯示角色打不開的頁面（`nav.ts` 每個項目可設定 `need`），整組都沒有可顯示的項目時連組名一起隱藏。
+  - 看板只提供角色能做的移動（`MOVE_NEEDS`）。
+  - 審批卡片：沒有 `approvals:decide` 的人看得到內容，但看不到決定按鈕，改顯示「只能檢視」。
+  - 其他依權限隱藏的：授予與撤銷 VIP、代理的暫停／恢復／解雇與雇用表單、文章的上下架／修改／閱讀權限／分類、題材的開始製作、新增來源。
+  - 頂欄在 email 後面顯示角色。
+- **新頁面「角色與權限」**（`/admin/settings/access`，系統群組，快捷鍵 `g r`，只有 owner 看得到）：
+  - 擁有者名單（環境變數設定，在這裡不能修改）；
+  - 其他管理員表格：可以改角色、移除（先確認）、加入；
+  - 角色權限表：權限鍵從 API 讀取，並附上中文說明。
+
+### 和計畫不同的地方
+
+- **計畫說 ADMIN_EMAILS 降級成「第一次登入時自動給 owner」的初始名單，我改成「ADMIN_EMAILS 永遠是 owner」**，資料表只記其他人。這樣不會在登入時暗中寫入資料，owner 名單也一直由部署設定決定。代價是要移除一位環境變數裡的 owner，得改設定，不能在後台操作。
+- **首圖面板（`CoverPanel`）沒有依權限隱藏**：那是另一個工作階段負責的檔案。沒有權限的人按了會收到 403 的錯誤訊息。
+- **鯨幣頁**（會員工作階段負責）：查詢讀者明細需要 `coins:view`，沒有權限時頁面會顯示 API 的錯誤。對方希望顯示「沒有權限」，我已請它在自己的頁面處理。
+
+### 驗證
+
+- 後端 `tests/api/test_admin_permissions.py` 共 11 項：
+  - 權限表雙向完整：每個後台寫入路由都有鍵，每個鍵都對應到真的路由；
+  - 四種角色的權限；
+  - **四種角色各自把權限表裡的每一個路由都打一次**：只有缺少權限鍵的才回 403，其餘不是 403，回應是 problem+json 並寫出缺的鍵；所有角色都能讀審批；
+  - 權杖與 ADMIN_EMAILS 都是 owner，`/me` 的權限清單正確；
+  - owner 加入、改角色、移除一個人的完整流程（加入前登入回 403、加入後可以登入、editor 打不開權限頁、移除後 cookie 失效）；
+  - 不能改自己的角色；email 未驗證時有角色也進不來；被拒的嘗試記進操作紀錄（狀態 403、操作者是那位 viewer）。
+- 既有的 `test_admin_auth.py`、`test_google_api.py` 原本整筆比對 `/me` 的回應（`{"via", "email"}`），現在回應多了角色，改成比對 via、email、role。這是我改了回應造成的，不是測試本身有錯。
+- 遷移 0078：在自己的資料庫上 upgrade、`alembic check`（沒有差異）、downgrade 後再 upgrade 都通過。
+- 前端 `features/access/access.test.tsx` 共 6 項：側欄與指令面板依權限過濾；`useCan` 的預設與限制；看板移動對應的權限鍵；viewer 看到審批卡片但沒有決定按鈕；權限頁的顯示（不能改自己）、改角色、移除前確認、加入。vitest 86 個檔案、1,018 項全過；typecheck、lint 通過。
+- 真實瀏覽器：用 e2e 的管理員打開權限頁並截圖，頂欄顯示「擁有者」，權限表正確。

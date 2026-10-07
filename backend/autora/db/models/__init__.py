@@ -1,6 +1,7 @@
 """All SQLAlchemy models. Importing this package registers every table on ``Base.metadata``
 (Alembic's env.py relies on that)."""
 
+from autora.db.models.access import AdminRole, AdminRoleName
 from autora.db.models.agents import (
     ActivityState,
     Agent,
@@ -90,6 +91,8 @@ from autora.db.models.tasks import (
 
 __all__ = [
     "AdminAction",
+    "AdminRole",
+    "AdminRoleName",
     "AGENT_RUN_TERMINAL",
     "ActivityState",
     "Agent",

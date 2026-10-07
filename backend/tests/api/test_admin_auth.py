@@ -44,7 +44,9 @@ async def _sign_in(api, db_session) -> str:
     await _admin_account(db_session)
     response = await _post(api, LOGIN, {"email": ADMIN, "password": PASSWORD})
     assert response.status_code == 200, response.text
-    assert response.json() == {"via": "email", "email": ADMIN}
+    body = response.json()
+    # who, and as what (AD-09): an address on ADMIN_EMAILS is an owner
+    assert (body["via"], body["email"], body["role"]) == ("email", ADMIN, "owner")
     cookie = response.cookies[ADMIN_COOKIE]
     api.cookies.set(ADMIN_COOKIE, cookie)
     return cookie
@@ -55,7 +57,8 @@ async def test_an_admin_signed_in_uses_the_back_office_without_the_token(api, db
     assert (await _get(api, f"/api/companies/{company.id}/finance")).status_code == 401
     await _sign_in(api, db_session)
     assert (await _get(api, f"/api/companies/{company.id}/finance")).status_code == 200
-    assert (await _get(api, ME)).json() == {"via": "email", "email": ADMIN}
+    me = (await _get(api, ME)).json()
+    assert (me["via"], me["email"], me["role"]) == ("email", ADMIN, "owner")
 
     # what an admin does is recorded as theirs, by id — never by address (D-024)
     await api.post(
@@ -91,7 +94,8 @@ async def test_a_wrong_password_says_only_that(api, db_session, mailbox):
 
 
 async def test_the_token_still_opens_the_back_office(api, db_session):
-    assert (await api.get(ME)).json() == {"via": "token", "email": None}
+    me = (await api.get(ME)).json()
+    assert (me["via"], me["email"], me["role"]) == ("token", None, "owner")
     assert (await _get(api, ME)).status_code == 401
 
 

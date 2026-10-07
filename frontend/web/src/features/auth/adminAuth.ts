@@ -7,6 +7,9 @@ import { API_URL } from "@/config";
 export interface AdminMe {
   via: "email" | "token";
   email: string | null;
+  /** The back-office role (AD-09) and what it may do; absent from an API before roles. */
+  role?: string | null;
+  permissions?: string[];
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<Response> {

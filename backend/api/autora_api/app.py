@@ -15,6 +15,7 @@ from autora_api import problems
 from autora_api.audit import AuditMiddleware
 from autora_api.deps import OFFICE_CALL
 from autora_api.routers import (
+    admin_access,
     admin_activity,
     admin_audit,
     admin_auth,
@@ -101,6 +102,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_coins.router)
     app.include_router(admin_audit.router)
     app.include_router(admin_activity.router)
+    app.include_router(admin_access.router)
     app.include_router(contact.router)
     app.include_router(payments.router)
     app.include_router(watchlist.router)

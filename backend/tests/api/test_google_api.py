@@ -265,7 +265,7 @@ async def test_an_admin_comes_in_with_google_to_the_back_office(browser, fake):
     assert back.headers["location"] == f"{SITE}/admin/approvals"
     assert back.cookies.get(ADMIN_COOKIE) and SESSION_COOKIE not in back.cookies
     me = await browser.get("/api/admin/auth/me")
-    assert me.json() == {"via": "email", "email": ADMIN}
+    assert (me.json()["via"], me.json()["email"], me.json()["role"]) == ("email", ADMIN, "owner")
 
 
 async def test_somebody_else_does_not_and_no_reader_is_made_for_trying(browser, fake, db_session):

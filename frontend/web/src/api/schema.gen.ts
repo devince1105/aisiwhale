@@ -4,6 +4,45 @@
  */
 
 export interface paths {
+    "/api/admin/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Access */
+        get: operations["access_api_admin_access_get"];
+        put?: never;
+        /**
+         * Let In
+         * @description The reader must have signed up; they open the back office once their address is proven.
+         */
+        post: operations["let_in_api_admin_access_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/access/{reader_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Role */
+        put: operations["change_role_api_admin_access__reader_id__put"];
+        post?: never;
+        /** Take Out */
+        delete: operations["take_out_api_admin_access__reader_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/activity": {
         parameters: {
             query?: never;
@@ -102,7 +141,8 @@ export interface paths {
         };
         /**
          * Me
-         * @description Who is calling. ``require_operator`` has already refused anybody else.
+         * @description Who is calling, and as what. ``require_operator`` has already refused anybody else (and
+         *     found their role).
          */
         get: operations["me_api_admin_auth_me_get"];
         put?: never;
@@ -2027,6 +2067,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Access */
+        Access: {
+            /** Members */
+            members: components["schemas"]["Member"][];
+            /** Owners */
+            owners: string[];
+            /** Roles */
+            roles: {
+                [key: string]: string[];
+            };
+        };
         /** ActivityEntry */
         ActivityEntry: {
             /** Action */
@@ -2193,6 +2244,13 @@ export interface components {
             /** Email */
             email: string | null;
             /**
+             * Permissions
+             * @default []
+             */
+            permissions: string[];
+            /** Role */
+            role?: string | null;
+            /**
              * Via
              * @enum {string}
              */
@@ -2239,6 +2297,11 @@ export interface components {
             /** Reverses Txn Id */
             reverses_txn_id: string | null;
         };
+        /**
+         * AdminRoleName
+         * @enum {string}
+         */
+        AdminRoleName: "owner" | "editor" | "finance" | "viewer";
         /** AdminWallet */
         AdminWallet: {
             /** Balance */
@@ -2739,6 +2802,10 @@ export interface components {
             balance: string;
             /** Recorded */
             recorded: boolean;
+        };
+        /** ChangeRole */
+        ChangeRole: {
+            role: components["schemas"]["AdminRoleName"];
         };
         /**
          * Checkout
@@ -3672,6 +3739,12 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** LetIn */
+        LetIn: {
+            /** Email */
+            email: string;
+            role: components["schemas"]["AdminRoleName"];
+        };
         /** Login */
         Login: {
             /** Email */
@@ -3706,6 +3779,31 @@ export interface components {
              * @enum {string}
              */
             tier: "public" | "free" | "vip";
+        };
+        /** Member */
+        Member: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Granted By */
+            granted_by: {
+                [key: string]: unknown;
+            };
+            /**
+             * Reader Id
+             * Format: uuid
+             */
+            reader_id: string;
+            role: components["schemas"]["AdminRoleName"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** Monthly */
         Monthly: {
@@ -5803,6 +5901,140 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    access_api_admin_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Access"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    let_in_api_admin_access_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_role_api_admin_access__reader_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reader_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRole"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Member"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    take_out_api_admin_access__reader_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reader_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     activity_api_admin_activity_get: {
         parameters: {
             query: {

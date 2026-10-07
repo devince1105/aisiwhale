@@ -7,10 +7,11 @@
 import { useState, type ReactNode } from "react";
 
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { useCan } from "@/features/admin-ui/permissions";
 import { useToast } from "@/features/admin-ui/Toast";
 
 import type { BoardCard } from "./Board";
-import { moveFor, MOVE_INFO, targetsFrom, type Entity, type Move } from "./moves";
+import { MOVE_INFO, MOVE_NEEDS, MOVES, moveFor, type Entity, type Move } from "./moves";
 
 interface Moving {
   card: BoardCard;
@@ -43,6 +44,7 @@ export function useBoardMoves({
   dialog: ReactNode;
 } {
   const toast = useToast();
+  const can = useCan();
   const [asking, setAsking] = useState<Moving | null>(null);
   // card id -> where it is going, and the card as it was (to put it back)
   const [moved, setMoved] = useState<Record<string, Moving>>({});
@@ -126,5 +128,8 @@ export function useBoardMoves({
       </ConfirmDialog>
     ) : null;
 
-  return { place, count, busy, targets: (card) => targetsFrom(entity, card.column), ask, dialog };
+  // only the moves this role may make (AD-09)
+  const targets = (card: BoardCard) =>
+    MOVES[entity].filter((m) => m.from === card.column && can(MOVE_NEEDS[m.action])).map((m) => m.to);
+  return { place, count, busy, targets, ask, dialog };
 }

@@ -762,6 +762,28 @@ export function activityQuery(targetType: "article" | "story" | "approval", targ
   });
 }
 
+export type AccessList = Schemas["Access"];
+export type AccessMember = Schemas["Member"];
+export type AdminRoleName = AccessMember["role"];
+
+/** Who may open the back office, and as what (AD-09): an owner's page. */
+export function accessQuery(api: ApiClient = defaultApi) {
+  return queryOptions({ queryKey: ["access"] as const, queryFn: async () => unwrap(await api.GET("/api/admin/access")) });
+}
+
+export async function letIn(email: string, role: AdminRoleName, api: ApiClient = defaultApi) {
+  return unwrap(await api.POST("/api/admin/access", { body: { email, role } }));
+}
+
+export async function changeRole(readerId: string, role: AdminRoleName, api: ApiClient = defaultApi) {
+  return unwrap(await api.PUT("/api/admin/access/{reader_id}", { params: { path: { reader_id: readerId } }, body: { role } }));
+}
+
+export async function takeOut(readerId: string, api: ApiClient = defaultApi) {
+  const result = await api.DELETE("/api/admin/access/{reader_id}", { params: { path: { reader_id: readerId } } });
+  if (!result.response.ok) unwrap(result);
+}
+
 /** Give a reader VIP until a date, with a reason. No order, payment or revenue (D-228). */
 export async function grantComp(body: GrantCompInput, api: ApiClient = defaultApi) {
   return unwrap(await api.POST("/api/admin/memberships/comps", { body }));

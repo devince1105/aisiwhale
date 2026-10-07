@@ -12,6 +12,7 @@ import { DataTable, ListToolbar, Pager, sortControl, type Column, type FilterDef
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
 import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { StatusLozenge } from "@/features/admin-ui/StatusLozenge";
+import { useCan } from "@/features/admin-ui/permissions";
 import { useListState } from "@/features/admin-ui/useListState";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 
@@ -48,6 +49,7 @@ const COMP_SORTS: readonly CompSort[] = ["-created_at", "created_at", "-expires_
 const RUNNING: FilterDef<"running"> = { key: "running", label: "狀態", options: [{ value: "1", label: "有效中" }] };
 
 function CompanyComps({ company }: { company: Company }) {
+  const can = useCan();
   const list = useListState(["running"], COMP_SORTS);
   const page = useQuery(compsQuery(company.slug, list.filters.running === "1", { q: list.q, sort: list.sort, cursor: list.cursor }));
   const queryClient = useQueryClient();
@@ -60,7 +62,7 @@ function CompanyComps({ company }: { company: Company }) {
         description="內部測試用（D-228）：不建立訂單、付款或營收，結帳仍關閉。"
       />
 
-      <GrantForm companySlug={company.slug} onDone={refresh} />
+      {can("memberships:grant") ? <GrantForm companySlug={company.slug} onDone={refresh} /> : null}
 
       <h2 className="mt-8 mb-3 text-lg font-semibold">授予紀錄</h2>
       <ListToolbar list={list} filters={[RUNNING]} placeholder="搜尋 email 或理由…" views="comps" />
@@ -149,7 +151,7 @@ function GrantForm({ companySlug, onDone }: { companySlug: string; onDone: () =>
 
 const STATUS_TONE = { 有效中: "ok", 已撤銷: "danger", 已到期: "neutral" } as const;
 
-function columns(onRevoked: () => unknown): Column<Comp>[] {
+function columns(onRevoked: () => unknown, mayRevoke: boolean): Column<Comp>[] {
   return [
     { key: "email", header: "讀者", className: "break-all", cell: (comp) => comp.email ?? "（讀者已不存在）" },
     {
@@ -192,7 +194,7 @@ function columns(onRevoked: () => unknown): Column<Comp>[] {
         </>
       ),
     },
-    { key: "revoke", header: "", align: "right", cell: (comp) => <RevokeOne comp={comp} onRevoked={onRevoked} /> },
+    ...(mayRevoke ? [{ key: "revoke", header: "", align: "right" as const, cell: (comp: Comp) => <RevokeOne comp={comp} onRevoked={onRevoked} /> }] : []),
   ];
 }
 
@@ -208,18 +210,19 @@ export function CompsTable({
   error?: string | null;
 }) {
   const [revoking, setRevoking] = useState<Comp[] | null>(null);
+  const can = useCan();
   return (
     <>
       <DataTable
         label="授予紀錄"
         rows={comps}
-        columns={columns(onRevoked)}
+        columns={columns(onRevoked, can("memberships:grant"))}
         rowKey={(comp) => comp.id}
         rowTestId={(comp) => `comp-${comp.id}`}
         sort={sort}
         error={error}
         empty="沒有授予紀錄。"
-        bulk={[{ label: "撤銷選取的授予", tone: "danger", run: (rows) => setRevoking(rows.filter((c) => c.running)) }]}
+        bulk={can("memberships:grant") ? [{ label: "撤銷選取的授予", tone: "danger", run: (rows) => setRevoking(rows.filter((c) => c.running)) }] : undefined}
       />
       {revoking ? <RevokeMany comps={revoking} onDone={onRevoked} onClose={() => setRevoking(null)} /> : null}
     </>

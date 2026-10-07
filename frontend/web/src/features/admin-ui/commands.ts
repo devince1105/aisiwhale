@@ -2,7 +2,7 @@
 import { withCompany } from "@/features/company/CompanyScope";
 
 import type { IconName } from "./icons";
-import { ADMIN_NAV } from "./nav";
+import { ADMIN_NAV, type NavGroup } from "./nav";
 import type { Visit } from "./recent";
 
 export interface Command {
@@ -24,6 +24,8 @@ export interface CommandContext {
   toggleSidebar: () => void;
   showHelp: () => void;
   signOut: () => void;
+  /** The pages this role may open (AD-09); every page when not given. */
+  nav?: readonly NavGroup[];
 }
 
 export function buildCommands(ctx: CommandContext): Command[] {
@@ -36,7 +38,7 @@ export function buildCommands(ctx: CommandContext): Command[] {
       hint: visit.section,
       run: () => ctx.go(visit.href),
     })),
-    ...ADMIN_NAV.flatMap((group) =>
+    ...(ctx.nav ?? ADMIN_NAV).flatMap((group) =>
       group.items.map<Command>((item) => ({
         id: `go:${item.key}`,
         group: "前往",

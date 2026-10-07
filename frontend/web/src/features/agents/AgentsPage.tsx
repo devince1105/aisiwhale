@@ -7,6 +7,7 @@ import { AdminPage, PageHeader } from "@/features/admin-ui/PageHeader";
 import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
+import { useCan } from "@/features/admin-ui/permissions";
 import { ErrorState } from "@/features/admin-ui/states";
 
 import { AgentsView, HireForm } from "./AgentsView";
@@ -17,6 +18,7 @@ export function AgentsPage() {
 }
 
 function CompanyAgents({ company }: { company: Company }) {
+  const can = useCan();
   useCompanyStream(company.id);
   const agents = useQuery(agentsQuery(company.id));
   const roles = useQuery(rolesQuery());
@@ -33,6 +35,8 @@ function CompanyAgents({ company }: { company: Company }) {
           await queryClient.invalidateQueries({ queryKey: ["agents", company.id] });
         }}
       />
+      {can("agents:manage") ? (
+        <>
       <h2 className="mt-8 mb-3 text-lg font-semibold">雇用代理</h2>
       <HireForm
         roles={roles.data?.roles}
@@ -42,6 +46,8 @@ function CompanyAgents({ company }: { company: Company }) {
           await queryClient.invalidateQueries({ queryKey: ["agents", company.id] });
         }}
       />
+        </>
+      ) : null}
     </AdminPage>
   );
 }

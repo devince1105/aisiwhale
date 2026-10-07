@@ -1,6 +1,41 @@
 {
  "components": {
   "schemas": {
+   "Access": {
+    "properties": {
+     "members": {
+      "items": {
+       "$ref": "#/components/schemas/Member"
+      },
+      "title": "Members",
+      "type": "array"
+     },
+     "owners": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Owners",
+      "type": "array"
+     },
+     "roles": {
+      "additionalProperties": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "title": "Roles",
+      "type": "object"
+     }
+    },
+    "required": [
+     "owners",
+     "members",
+     "roles"
+    ],
+    "title": "Access",
+    "type": "object"
+   },
    "ActivityEntry": {
     "properties": {
      "action": {
@@ -473,6 +508,25 @@
       ],
       "title": "Email"
      },
+     "permissions": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Permissions",
+      "type": "array"
+     },
+     "role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role"
+     },
      "via": {
       "enum": [
        "email",
@@ -613,6 +667,16 @@
     ],
     "title": "AdminMovement",
     "type": "object"
+   },
+   "AdminRoleName": {
+    "enum": [
+     "owner",
+     "editor",
+     "finance",
+     "viewer"
+    ],
+    "title": "AdminRoleName",
+    "type": "string"
    },
    "AdminWallet": {
     "properties": {
@@ -1992,6 +2056,18 @@
      "balance"
     ],
     "title": "CapitalOut",
+    "type": "object"
+   },
+   "ChangeRole": {
+    "properties": {
+     "role": {
+      "$ref": "#/components/schemas/AdminRoleName"
+     }
+    },
+    "required": [
+     "role"
+    ],
+    "title": "ChangeRole",
     "type": "object"
    },
    "Checkout": {
@@ -4296,6 +4372,24 @@
     "title": "Lead",
     "type": "object"
    },
+   "LetIn": {
+    "properties": {
+     "email": {
+      "maxLength": 254,
+      "title": "Email",
+      "type": "string"
+     },
+     "role": {
+      "$ref": "#/components/schemas/AdminRoleName"
+     }
+    },
+    "required": [
+     "email",
+     "role"
+    ],
+    "title": "LetIn",
+    "type": "object"
+   },
    "Login": {
     "properties": {
      "email": {
@@ -4369,6 +4463,47 @@
      "email"
     ],
     "title": "Me",
+    "type": "object"
+   },
+   "Member": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "email": {
+      "title": "Email",
+      "type": "string"
+     },
+     "granted_by": {
+      "additionalProperties": true,
+      "title": "Granted By",
+      "type": "object"
+     },
+     "reader_id": {
+      "format": "uuid",
+      "title": "Reader Id",
+      "type": "string"
+     },
+     "role": {
+      "$ref": "#/components/schemas/AdminRoleName"
+     },
+     "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "reader_id",
+     "email",
+     "role",
+     "granted_by",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "Member",
     "type": "object"
    },
    "Monthly": {
@@ -10113,6 +10248,252 @@
  },
  "openapi": "3.1.0",
  "paths": {
+  "/api/admin/access": {
+   "get": {
+    "operationId": "access_api_admin_access_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Access"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Access",
+    "tags": [
+     "admin-access"
+    ]
+   },
+   "post": {
+    "description": "The reader must have signed up; they open the back office once their address is proven.",
+    "operationId": "let_in_api_admin_access_post",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LetIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Member"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Let In",
+    "tags": [
+     "admin-access"
+    ]
+   }
+  },
+  "/api/admin/access/{reader_id}": {
+   "delete": {
+    "operationId": "take_out_api_admin_access__reader_id__delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "reader_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Reader Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Take Out",
+    "tags": [
+     "admin-access"
+    ]
+   },
+   "put": {
+    "operationId": "change_role_api_admin_access__reader_id__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "reader_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Reader Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChangeRole"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Member"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Change Role",
+    "tags": [
+     "admin-access"
+    ]
+   }
+  },
   "/api/admin/activity": {
    "get": {
     "operationId": "activity_api_admin_activity_get",
@@ -10591,7 +10972,7 @@
   },
   "/api/admin/auth/me": {
    "get": {
-    "description": "Who is calling. ``require_operator`` has already refused anybody else.",
+    "description": "Who is calling, and as what. ``require_operator`` has already refused anybody else (and\nfound their role).",
     "operationId": "me_api_admin_auth_me_get",
     "parameters": [
      {

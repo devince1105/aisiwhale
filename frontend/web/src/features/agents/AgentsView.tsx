@@ -8,6 +8,7 @@ import type { Schemas } from "@/api/client";
 import type { AgentAction, NewAgent } from "@/api/queries";
 import { Button } from "@/features/admin-ui/Button";
 import { ConfirmDialog } from "@/features/admin-ui/Dialog";
+import { useCan } from "@/features/admin-ui/permissions";
 import { ROW, ROW_FOCUS } from "@/features/admin-ui/hotkeys";
 import { EmptyState, ErrorState, LoadingState } from "@/features/admin-ui/states";
 import { Face } from "@/features/agent-panel/Face";
@@ -27,6 +28,7 @@ export function AgentsView({
   onDecide: (agentId: string, action: AgentAction) => Promise<unknown>;
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
+  const manage = useCan()("agents:manage");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,16 +62,20 @@ export function AgentsView({
               {STATUS_LABEL[agent.status] ?? agent.status}
               {agent.activity ? `・${STATE_LABEL[agent.activity.state as ActivityState] ?? agent.activity.state}` : ""}
             </span>
-            <Button
-              size="sm"
-              disabled={busy === agent.id}
-              onClick={() => decide(agent.id, agent.status === "paused" ? "resume" : "pause")}
-            >
-              {agent.status === "paused" ? "恢復工作" : "暫停"}
-            </Button>
-            <Button size="sm" variant="subtle" onClick={() => setConfirming(agent.id)}>
-              解雇
-            </Button>
+            {manage ? (
+              <>
+                <Button
+                  size="sm"
+                  disabled={busy === agent.id}
+                  onClick={() => decide(agent.id, agent.status === "paused" ? "resume" : "pause")}
+                >
+                  {agent.status === "paused" ? "恢復工作" : "暫停"}
+                </Button>
+                <Button size="sm" variant="subtle" onClick={() => setConfirming(agent.id)}>
+                  解雇
+                </Button>
+              </>
+            ) : null}
           </li>
         ))}
       </ul>

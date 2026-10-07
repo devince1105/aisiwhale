@@ -53,7 +53,8 @@ export function StoryView({
   /** Its history (AD-07: ``ActivityTimeline``). */
   activity?: ReactNode;
   events: readonly EventEnvelope[];
-  onStart: () => void;
+  /** None: this role may not start it (AD-09). */
+  onStart?: () => void;
   starting: boolean;
   startError: string | null;
 }) {
@@ -62,7 +63,7 @@ export function StoryView({
       <PageHeader
         title={story.title}
         actions={
-          STARTABLE.has(story.state) ? (
+          onStart && STARTABLE.has(story.state) ? (
             <Button variant="primary" onClick={onStart} disabled={starting}>
               {starting ? "啟動中…" : "開始製作"}
             </Button>
