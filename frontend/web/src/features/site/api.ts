@@ -30,6 +30,9 @@ export type PublicRanking = Schemas["PublicRanking"];
 export type PublicRankRow = Schemas["PublicRankRow"];
 export type PublicInstitution = Schemas["PublicInstitution"];
 export type PublicInstitutionHolding = Schemas["PublicInstitutionHolding"];
+export type PublicTwFlows = Schemas["PublicTwFlows"];
+export type PublicFlowRanking = Schemas["PublicFlowRanking"];
+export type PublicFlowRow = Schemas["PublicFlowRow"];
 
 export interface SiteClientOptions {
   baseUrl?: string;
@@ -300,6 +303,22 @@ export async function fetchInstitution(
     params: { path: { cik }, query: { lang, period: options.period } },
   });
   if (response.status === 404 || response.status === 422) return null;
+  if (error !== undefined || !data) throw ApiError.from(response, error);
+  return data;
+}
+
+export interface FlowQuery {
+  day?: string;
+  group?: "foreign" | "trust" | "dealer" | "total";
+  side?: "buy" | "sell";
+}
+
+/** A trading day's largest net buying or selling by Taiwan's three institutional investors
+ * (HD-12): the exchanges' figures, the same for every reader. */
+export async function fetchTwFlows(query: FlowQuery = {}, options: SiteClientOptions = {}): Promise<PublicFlowRanking> {
+  const { data, error, response } = await client(options).GET("/api/public/tw-flows", {
+    params: { query },
+  });
   if (error !== undefined || !data) throw ApiError.from(response, error);
   return data;
 }

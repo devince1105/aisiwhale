@@ -13,7 +13,16 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, Numeric, UniqueConstraint, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    ForeignKey,
+    Index,
+    Numeric,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Text
@@ -476,6 +485,45 @@ class InstitutionDetail(Base):
     """The ``institution_details.MOVES`` largest estimated buys (new positions included)."""
     sold: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     """The ``institution_details.MOVES`` largest estimated sales (sold out included)."""
+
+
+class TwFlow(Base):
+    """A Taiwan security's day of 三大法人 (HD-12): its net buying in shares by foreign
+    investors (with their dealers), investment trusts and dealers, and the three together, and
+    its foreign ownership ratio — from TWSE's and TPEx's own daily documents (``tw_flows``).
+    Either half may be missing (read later, or not reported that day). Market data, not the
+    company's: no ``company_id``; kept ``tw_flows.KEEP_DAYS``."""
+
+    __tablename__ = "tw_flows"
+    __table_args__ = (Index("ix_tw_flows_symbol_day", "symbol", "day"),)
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    symbol: Mapped[str] = mapped_column(primary_key=True)
+    exchange: Mapped[str]
+    """``TWSE`` (listed) or ``TPEx`` (over the counter)."""
+    name: Mapped[str | None]
+    foreign_net: Mapped[int | None] = mapped_column(BigInteger)
+    trust_net: Mapped[int | None] = mapped_column(BigInteger)
+    dealer_net: Mapped[int | None] = mapped_column(BigInteger)
+    total_net: Mapped[int | None] = mapped_column(BigInteger)
+    foreign_ratio: Mapped[Decimal | None] = mapped_column(Numeric(6, 2))
+    """Per cent of its issued shares held by foreign investors."""
+    foreign_shares: Mapped[int | None] = mapped_column(BigInteger)
+    issued_shares: Mapped[int | None] = mapped_column(BigInteger)
+    read_at: Mapped[datetime]
+
+
+class TwFlowRead(Base):
+    """One of a day's four documents read (HD-12): how many rows it had — none, a holiday —
+    so that it is not asked for again."""
+
+    __tablename__ = "tw_flow_reads"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    source: Mapped[str] = mapped_column(primary_key=True)
+    """``twse_flows``, ``tpex_flows``, ``twse_ratios`` or ``tpex_ratios``."""
+    rows: Mapped[int]
+    read_at: Mapped[datetime]
 
 
 class ThirteenFIndexDay(Base):

@@ -335,6 +335,11 @@ def build_scheduler(
     tables = sec_chunks(user_agent(settings.fetch_contact_email)) if live and settings else None
     scheduler.register(INDEX_SCHEDULE, IndexKeeper(sec, tables).schedule_handler())
     scheduler.register(DETAILS_SCHEDULE, DetailsKeeper(sec, tables).schedule_handler())
+    # Taiwan's 三大法人 from TWSE and TPEx, day by day (HD-12); offline, nobody is asked
+    from autora.domains.newsroom.tw_flows import FLOWS_SCHEDULE, FlowsKeeper
+
+    flows = FlowsKeeper(http_json() if live else None, pause=PAUSE_SECONDS if live else 0)
+    scheduler.register(FLOWS_SCHEDULE, flows.schedule_handler())
     # every listed stock, to look one up (D-061); offline, nothing is asked of anybody
     finnhub = settings.finnhub_api_key if live and settings else None
     keeper = SecuritiesKeeper(

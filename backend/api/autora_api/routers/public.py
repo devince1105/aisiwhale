@@ -20,6 +20,8 @@ nothing about the reader either way.
   [&limit=50][&offset=0]: 機構排行, every 13F filer's quarter in dollars (HD-11)
 - GET  /api/public/institutions/{cik}?lang=zh-TW[&period=]: an institution's page — its largest
   ten holdings for anybody, the rest and its buys and sells signed in; queued if never asked
+- GET  /api/public/tw-flows[?day=][&group=foreign|trust|dealer|total][&side=buy|sell]: a trading
+  day's largest net buying or selling by Taiwan's three institutional investors (HD-12)
 - POST /api/analytics/beacon: {article_id, lang, event_type, session_hash} -> 204
 """
 
@@ -106,6 +108,8 @@ from autora.domains.newsroom.site import (
     published_days,
     record_beacon,
 )
+from autora.domains.newsroom.tw_flows import PublicFlowRanking, PublicTwFlows, for_stock
+from autora.domains.newsroom.tw_flows import ranking as flow_ranking
 from autora.infra.blobstore import BlobNotFound, InvalidBlobKey, build_blob_store
 from autora.infra.settings import get_settings
 from autora_api.deps import Session
@@ -381,6 +385,9 @@ class PublicStock(BaseModel):
     tracks_13f: bool = False
     """Whether its 13F holders are looked for: the strip's stocks, whose CUSIPs are known. Any
     other stock (D-061) has no 13F section, rather than one saying nobody holds it."""
+    institutional: PublicTwFlows | None = None
+    """A Taiwan stock's 三大法人 and foreign ownership, day by day (HD-12); None for a US one,
+    or before the exchanges' figures for it are read."""
 
 
 @lru_cache
@@ -521,6 +528,7 @@ async def get_stock(
         us_listing=stock.tickers[0] if stock.tickers else None,
         tracks_13f=bool(stock.cusips),
         exchange=stock.exchange,
+        institutional=await for_stock(session, stock.symbol) if stock.market == "tw" else None,
     )
 
 
@@ -617,6 +625,21 @@ async def get_institution(
     await session.commit()  # a page queued is kept
     response.headers["Cache-Control"] = "private, no-store"
     return page
+
+
+@router.get("/api/public/tw-flows")
+async def get_tw_flows(
+    session: Session,
+    response: Response,
+    day: date | None = None,
+    group: Literal["foreign", "trust", "dealer", "total"] = "foreign",
+    side: Literal["buy", "sell"] = "buy",
+) -> PublicFlowRanking:
+    """A trading day's largest net buying (or selling) by foreign investors, investment trusts,
+    dealers or the three together (HD-12): TWSE's and TPEx's own figures, the same for every
+    reader. A day not offered is the latest one."""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return await flow_ranking(session, day=day, group=group, side=side)
 
 
 def _terms(stock) -> tuple[str, ...]:

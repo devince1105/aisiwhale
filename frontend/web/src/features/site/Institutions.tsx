@@ -13,6 +13,7 @@ import type {
 } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
 import { portfolioHref, quarterOf, watchHref } from "./Portfolios";
+import { MarketSwitch } from "./TwFlows";
 
 export type RankSort = "value" | "change" | "filed";
 
@@ -93,7 +94,7 @@ function pct(value: number | null | undefined): string {
   return `${sign}${Math.abs(value).toFixed(2)}%`;
 }
 
-function Breadcrumb({
+export function Breadcrumb({
   lang,
   here,
 }: {
@@ -276,6 +277,9 @@ export function RankingView({
   return (
     <article className="mx-auto max-w-[56rem] px-4 pt-4 pb-12">
       <Breadcrumb lang={lang} here={[{ label: r.title }]} />
+      <div className="mt-4">
+        <MarketSwitch lang={lang} market="us" />
+      </div>
       <header className="mt-4">
         <h1 className="text-3xl font-bold">{r.heading}</h1>
         {ranking.filers ? (

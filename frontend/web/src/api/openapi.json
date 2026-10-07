@@ -5080,6 +5080,216 @@
     "title": "PublicFiling",
     "type": "object"
    },
+   "PublicFlowDay": {
+    "properties": {
+     "day": {
+      "format": "date",
+      "title": "Day",
+      "type": "string"
+     },
+     "dealer": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Dealer"
+     },
+     "foreign": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign"
+     },
+     "foreign_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign Ratio"
+     },
+     "total": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total"
+     },
+     "trust": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Trust"
+     }
+    },
+    "required": [
+     "day",
+     "foreign",
+     "trust",
+     "dealer",
+     "total",
+     "foreign_ratio"
+    ],
+    "title": "PublicFlowDay",
+    "type": "object"
+   },
+   "PublicFlowRanking": {
+    "properties": {
+     "day": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Day"
+     },
+     "days": {
+      "items": {
+       "format": "date",
+       "type": "string"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "group": {
+      "enum": [
+       "foreign",
+       "trust",
+       "dealer",
+       "total"
+      ],
+      "title": "Group",
+      "type": "string"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/PublicFlowRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "side": {
+      "enum": [
+       "buy",
+       "sell"
+      ],
+      "title": "Side",
+      "type": "string"
+     }
+    },
+    "required": [
+     "day",
+     "days",
+     "group",
+     "side",
+     "rows"
+    ],
+    "title": "PublicFlowRanking",
+    "type": "object"
+   },
+   "PublicFlowRow": {
+    "properties": {
+     "exchange": {
+      "title": "Exchange",
+      "type": "string"
+     },
+     "foreign_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign Ratio"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "net": {
+      "title": "Net",
+      "type": "integer"
+     },
+     "rank": {
+      "title": "Rank",
+      "type": "integer"
+     },
+     "symbol": {
+      "title": "Symbol",
+      "type": "string"
+     }
+    },
+    "required": [
+     "rank",
+     "symbol",
+     "name",
+     "exchange",
+     "net",
+     "foreign_ratio"
+    ],
+    "title": "PublicFlowRow",
+    "type": "object"
+   },
+   "PublicFlowSum": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     },
+     "dealer": {
+      "title": "Dealer",
+      "type": "integer"
+     },
+     "foreign": {
+      "title": "Foreign",
+      "type": "integer"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     },
+     "trust": {
+      "title": "Trust",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "days",
+     "foreign",
+     "trust",
+     "dealer",
+     "total"
+    ],
+    "title": "PublicFlowSum",
+    "type": "object"
+   },
    "PublicGold": {
     "properties": {
      "as_of": {
@@ -6851,6 +7061,16 @@
       "title": "Holders",
       "type": "array"
      },
+     "institutional": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PublicTwFlows"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "market": {
       "title": "Market",
       "type": "string"
@@ -7072,6 +7292,79 @@
      "report_url"
     ],
     "title": "PublicTrade",
+    "type": "object"
+   },
+   "PublicTwFlows": {
+    "properties": {
+     "days": {
+      "items": {
+       "$ref": "#/components/schemas/PublicFlowDay"
+      },
+      "title": "Days",
+      "type": "array"
+     },
+     "exchange": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exchange"
+     },
+     "foreign_ratio": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign Ratio"
+     },
+     "foreign_ratio_change": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign Ratio Change"
+     },
+     "foreign_ratio_day": {
+      "anyOf": [
+       {
+        "format": "date",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Foreign Ratio Day"
+     },
+     "sums": {
+      "items": {
+       "$ref": "#/components/schemas/PublicFlowSum"
+      },
+      "title": "Sums",
+      "type": "array"
+     }
+    },
+    "required": [
+     "days",
+     "sums",
+     "foreign_ratio",
+     "foreign_ratio_day",
+     "foreign_ratio_change",
+     "exchange"
+    ],
+    "title": "PublicTwFlows",
     "type": "object"
    },
    "QuoteView": {
@@ -15665,6 +15958,87 @@
      }
     },
     "summary": "Get Stock Sentiment",
+    "tags": [
+     "public"
+    ]
+   }
+  },
+  "/api/public/tw-flows": {
+   "get": {
+    "description": "A trading day's largest net buying (or selling) by foreign investors, investment trusts,\ndealers or the three together (HD-12): TWSE's and TPEx's own figures, the same for every\nreader. A day not offered is the latest one.",
+    "operationId": "get_tw_flows_api_public_tw_flows_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "day",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Day"
+      }
+     },
+     {
+      "in": "query",
+      "name": "group",
+      "required": false,
+      "schema": {
+       "default": "foreign",
+       "enum": [
+        "foreign",
+        "trust",
+        "dealer",
+        "total"
+       ],
+       "title": "Group",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "side",
+      "required": false,
+      "schema": {
+       "default": "buy",
+       "enum": [
+        "buy",
+        "sell"
+       ],
+       "title": "Side",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicFlowRanking"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Get Tw Flows",
     "tags": [
      "public"
     ]

@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import type { PublicHistory, PublicHolder, PublicStock, PublicTrade } from "./api";
 import { formatDate, words, type Lang } from "./i18n";
+import { TwFlowsSection } from "./TwFlows";
 import { StockChart } from "./StockChart";
 import { WatchButton } from "./WatchButton";
 import { NewsSentiment } from "./NewsSentiment";
@@ -279,6 +280,9 @@ export function StockView({
         </section>
         </>
       ) : null}
+
+      {/* a Taiwan stock's 三大法人 and foreign ownership, day by day (HD-12): the exchanges' own */}
+      {stock.market === "tw" ? <TwFlowsSection flows={stock.institutional} lang={lang} /> : null}
 
       {/* how the week's news about it reads (D-091): the strip's stocks, above our own stories */}
       <NewsSentiment symbol={stock.symbol} lang={lang} />

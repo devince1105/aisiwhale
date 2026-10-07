@@ -200,6 +200,11 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
                 "5-59/10 * * * *",
             ),  # HD-10
             (
+                "newsroom.refresh_tw_flows",
+                "newsroom.refresh_tw_flows",
+                "*/15 7-13 * * 1-5",
+            ),  # HD-12
+            (
                 "newsroom.refresh_official_trades",
                 "newsroom.refresh_official_trades",
                 "20 */6 * * *",

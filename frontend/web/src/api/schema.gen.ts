@@ -1729,6 +1729,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public/tw-flows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tw Flows
+         * @description A trading day's largest net buying (or selling) by foreign investors, investment trusts,
+         *     dealers or the three together (HD-12): TWSE's and TPEx's own figures, the same for every
+         *     reader. A day not offered is the latest one.
+         */
+        get: operations["get_tw_flows_api_public_tw_flows_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/roles": {
         parameters: {
             query?: never;
@@ -3864,6 +3886,71 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** PublicFlowDay */
+        PublicFlowDay: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Dealer */
+            dealer: number | null;
+            /** Foreign */
+            foreign: number | null;
+            /** Foreign Ratio */
+            foreign_ratio: number | null;
+            /** Total */
+            total: number | null;
+            /** Trust */
+            trust: number | null;
+        };
+        /** PublicFlowRanking */
+        PublicFlowRanking: {
+            /** Day */
+            day: string | null;
+            /** Days */
+            days: string[];
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "foreign" | "trust" | "dealer" | "total";
+            /** Rows */
+            rows: components["schemas"]["PublicFlowRow"][];
+            /**
+             * Side
+             * @enum {string}
+             */
+            side: "buy" | "sell";
+        };
+        /** PublicFlowRow */
+        PublicFlowRow: {
+            /** Exchange */
+            exchange: string;
+            /** Foreign Ratio */
+            foreign_ratio: number | null;
+            /** Name */
+            name: string;
+            /** Net */
+            net: number;
+            /** Rank */
+            rank: number;
+            /** Symbol */
+            symbol: string;
+        };
+        /** PublicFlowSum */
+        PublicFlowSum: {
+            /** Days */
+            days: number;
+            /** Dealer */
+            dealer: number;
+            /** Foreign */
+            foreign: number;
+            /** Total */
+            total: number;
+            /** Trust */
+            trust: number;
+        };
         /** PublicGold */
         PublicGold: {
             /**
@@ -4429,6 +4516,7 @@ export interface components {
             exchange?: string | null;
             /** Holders */
             holders: components["schemas"]["PublicHolder"][];
+            institutional?: components["schemas"]["PublicTwFlows"] | null;
             /** Market */
             market: string;
             /** Name */
@@ -4497,6 +4585,21 @@ export interface components {
             ticker?: string | null;
             /** Traded On */
             traded_on: string | null;
+        };
+        /** PublicTwFlows */
+        PublicTwFlows: {
+            /** Days */
+            days: components["schemas"]["PublicFlowDay"][];
+            /** Exchange */
+            exchange: string | null;
+            /** Foreign Ratio */
+            foreign_ratio: number | null;
+            /** Foreign Ratio Change */
+            foreign_ratio_change: number | null;
+            /** Foreign Ratio Day */
+            foreign_ratio_day: string | null;
+            /** Sums */
+            sums: components["schemas"]["PublicFlowSum"][];
         };
         /** QuoteView */
         QuoteView: {
@@ -8434,6 +8537,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicSentiment"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tw_flows_api_public_tw_flows_get: {
+        parameters: {
+            query?: {
+                day?: string | null;
+                group?: "foreign" | "trust" | "dealer" | "total";
+                side?: "buy" | "sell";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicFlowRanking"];
                 };
             };
             /** @description Validation Error */
