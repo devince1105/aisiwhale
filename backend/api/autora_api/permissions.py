@@ -30,6 +30,13 @@ COINS_VIEW = "coins:view"
 AUDIT = "audit:view"
 ACCESS = "access:manage"
 SETTINGS = "system:settings"
+RESEARCH_VIEW = "research:view"
+"""See the research jobs and what they wrote (D-251): owner only."""
+RESEARCH_RUN = "research:run"
+"""Start, cancel or re-run a research job (D-251): owner only.
+
+P6a puts both on its routes, its reads included; until then no route has them. Owner only
+means: in ALL, in no other role's set."""
 TRADING_VIEW = "trading:view"
 """See the trading records — decisions, orders, profit and loss (D-248): owner and finance."""
 TRADING_APPROVE = "trading:approve"
@@ -57,6 +64,8 @@ ALL = frozenset(
         SETTINGS,
         TRADING_VIEW,
         TRADING_APPROVE,
+        RESEARCH_VIEW,
+        RESEARCH_RUN,
         SELF,
     }
 )
