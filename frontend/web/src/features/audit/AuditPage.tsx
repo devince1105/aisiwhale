@@ -133,7 +133,7 @@ export const COLUMNS: readonly Column<AdminAction>[] = [
 const SORTS: readonly AuditSort[] = ["-created_at", "created_at"];
 type Filter = "scope" | "result" | "target";
 const FILTERS: readonly FilterDef<Filter>[] = [
-  { key: "scope", label: "範圍", options: [{ value: "all", label: "所有公司" }] },
+  { key: "scope", label: "範圍", anyLabel: "這間公司", options: [{ value: "all", label: "所有公司" }] },
   {
     key: "result",
     label: "結果",

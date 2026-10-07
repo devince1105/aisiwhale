@@ -262,6 +262,8 @@ export interface FilterDef<F extends string> {
   key: F;
   label: string;
   options: readonly { value: string; label: string }[];
+  /** What no choice means; 全部 unless it means something narrower (這間公司). */
+  anyLabel?: string;
 }
 
 export function ListToolbar<S extends string, F extends string>({
@@ -337,7 +339,7 @@ export function ListToolbar<S extends string, F extends string>({
               }
               className="bg-transparent outline-none"
             >
-              <option value="">全部</option>
+              <option value="">{filter.anyLabel ?? "全部"}</option>
               {filter.options.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
