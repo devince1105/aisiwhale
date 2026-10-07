@@ -31,6 +31,7 @@ export const LEGAL_PAGES = ["terms", "privacy", "refund"] as const;
 export type LegalPage = (typeof LEGAL_PAGES)[number];
 
 const UPDATED = "2026-10-06";
+const TERMS_UPDATED = "2026-10-07"; // 鯨幣 (P3-C-3)
 
 function who(op: Operator, lang: Lang): string {
   if (lang === "en") return op.owner ? `${op.brand} (${op.owner})` : op.brand;
@@ -41,7 +42,7 @@ function terms(lang: Lang, op: Operator): LegalDoc {
   if (lang === "en") {
     return {
       title: "Terms of Service",
-      updated: UPDATED,
+      updated: TERMS_UPDATED,
       sections: [
         {
           heading: "1. Who we are",
@@ -82,27 +83,44 @@ function terms(lang: Lang, op: Operator): LegalDoc {
           ],
         },
         {
-          heading: "5. Use of the content",
+          // Whale Coins (D-223, D-219, D-235): a product draft. For a lawyer to confirm before it is
+          // relied on: that coins are not an electronic stored-value instrument or prepaid value
+          // under Taiwan law, and how changes to the rules are announced and take effect. What
+          // happens to coins when an account is closed is left out until that is confirmed.
+          heading: "5. Whale Coins",
+          body: [
+            [
+              "Whale Coins are points the site gives members, under the rules posted on the site at the time (for example, each month), to use certain features here. They cannot be bought with money.",
+              "Whale Coins are not legal tender, an electronic stored-value instrument or prepaid value, and have no cash value.",
+              "Whale Coins may not be sold, transferred, given away or traded, exchanged for cash or anything else, or withdrawn.",
+              "There are limits on how many Whale Coins are given and how many may be held; coins beyond a limit are not given.",
+              "A change in your membership (for example, VIP ending) does not take back coins you already hold.",
+              "We may change how many Whale Coins are given, the limits, and the features they can be used for; changes are posted on the site.",
+            ],
+          ],
+        },
+        {
+          heading: "6. Use of the content",
           body: [
             "The stories and the site belong to us or to their stated sources. You may read them, share links to them and quote short passages with attribution.",
             "You may not republish members-only stories in full, share your account, or copy the site in bulk by scraping or automated means.",
           ],
         },
         {
-          heading: "6. Changes and interruptions",
+          heading: "7. Changes and interruptions",
           body: [
             "We may change or stop parts of the site. If we stop selling membership altogether, or the site is unavailable for a long time through our fault, members will be refunded for the unused whole months of their membership.",
             "We may update these terms. Changes are posted on this page with a new date; they do not reduce what you have already paid for.",
           ],
         },
         {
-          heading: "7. Liability",
+          heading: "8. Liability",
           body: [
             "We work to keep the site accurate and available but cannot promise it will always be either. To the extent the law allows, our liability to you is limited to what you paid us in the twelve months before the claim.",
           ],
         },
         {
-          heading: "8. Law",
+          heading: "9. Law",
           body: [
             "These terms are governed by the laws of the Republic of China (Taiwan). The Taiwan Taipei District Court is the court of first instance, except where the law provides otherwise.",
           ],
@@ -112,7 +130,7 @@ function terms(lang: Lang, op: Operator): LegalDoc {
   }
   return {
     title: "服務條款",
-    updated: UPDATED,
+    updated: TERMS_UPDATED,
     sections: [
       {
         heading: "一、經營者",
@@ -153,27 +171,42 @@ function terms(lang: Lang, op: Operator): LegalDoc {
         ],
       },
       {
-        heading: "五、內容的使用",
+        // 鯨幣（D-223、D-219、D-235）：產品條款草稿，見英文版的說明——「不是電子票證或儲值金」與
+        // 規則調整的公告方式待律師確認；帳號停用後鯨幣如何處理，確認前不寫入。
+        heading: "五、鯨幣",
+        body: [
+          [
+            "鯨幣是本站依當時公告的規則發放給會員（例如每月發放）、用於使用本站特定功能的點數，不能以金錢購買。",
+            "鯨幣不是法定貨幣、電子票證或儲值金，沒有現金價值。",
+            "鯨幣不得販售、轉讓、贈與或交易，也不得兌換現金或其他財物，不得提領。",
+            "鯨幣的發放與持有都有上限；超過上限的部分不會發放。",
+            "會員資格變更（例如 VIP 到期）時，已持有的鯨幣不會因此被收回。",
+            "我們可能調整鯨幣的發放數量、上限與可使用的功能，調整會公布在本站。",
+          ],
+        ],
+      },
+      {
+        heading: "六、內容的使用",
         body: [
           "本站的報導與網站內容屬於我們或所標示的來源。你可以閱讀、分享報導連結，並在註明出處的情況下引用少量段落。",
           "請勿全文轉載會員專屬報導、與他人共用帳號，或以爬蟲等自動化方式大量複製本站內容。",
         ],
       },
       {
-        heading: "六、服務變更與中斷",
+        heading: "七、服務變更與中斷",
         body: [
           "我們可能調整或停止本站的部分功能。若我們停止販售會員資格，或因我們的原因使本站長時間無法使用，會依會員尚未使用的完整月數退款。",
           "我們可能修改本條款，修改後會公布在本頁並更新日期；修改不會減少你已經付費取得的權益。",
         ],
       },
       {
-        heading: "七、責任限制",
+        heading: "八、責任限制",
         body: [
           "我們會盡力維持本站內容正確、服務穩定，但無法保證永遠如此。在法律允許的範圍內，我們對你的賠償責任以你在請求前 12 個月內支付給我們的金額為上限。",
         ],
       },
       {
-        heading: "八、準據法與管轄",
+        heading: "九、準據法與管轄",
         body: [
           "本條款以中華民國法律為準據法。如有爭議，以臺灣臺北地方法院為第一審管轄法院，但法律另有規定者，從其規定。",
         ],

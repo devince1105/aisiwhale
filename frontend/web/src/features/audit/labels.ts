@@ -18,6 +18,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "/api/companies/{company_id}/projects/{project_id}/resume": "恢復專案",
   "/api/admin/memberships/comps": "授予 VIP",
   "/api/admin/memberships/comps/{grant_id}/revoke": "撤銷 VIP",
+  "/api/admin/coins/adjustments": "調整鯨幣",
   "/api/stories/{story_id}/start": "開始製作",
   "/api/articles/{article_id}/cover/swap": "換一張首圖",
   "/api/articles/{article_id}/cover/search": "重找首圖",

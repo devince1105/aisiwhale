@@ -113,6 +113,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/coins/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adjust Coins */
+        post: operations["adjust_coins_api_admin_coins_adjustments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/coins/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reconcile Coins */
+        get: operations["reconcile_coins_api_admin_coins_reconcile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/coins/wallet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Wallet */
+        get: operations["get_wallet_api_admin_coins_wallet_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/memberships/comps": {
         parameters: {
             query?: never;
@@ -1239,6 +1290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/coins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coins */
+        get: operations["get_coins_api_me_coins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/watchlist": {
         parameters: {
             query?: never;
@@ -2051,6 +2119,27 @@ export interface components {
              */
             kind: "agent" | "system" | "human";
         };
+        /** Adjustment */
+        Adjustment: {
+            /** Amount */
+            amount: number;
+            /** Company */
+            company?: string | null;
+            /** Email */
+            email: string;
+            /**
+             * Override Cap
+             * @default false
+             */
+            override_cap: boolean;
+            /** Reason */
+            reason: string;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+        };
         /** AdminActionOut */
         AdminActionOut: {
             /** Action */
@@ -2108,6 +2197,67 @@ export interface components {
              * @enum {string}
              */
             via: "email" | "token";
+        };
+        /** AdminMovement */
+        AdminMovement: {
+            /** Actor */
+            actor: {
+                [key: string]: unknown;
+            };
+            /** Amount */
+            amount: number;
+            /** Balance After */
+            balance_after: number;
+            /** Cap */
+            cap: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Idempotency Key */
+            idempotency_key: string;
+            /** Kind */
+            kind: string;
+            /** Meta */
+            meta: {
+                [key: string]: unknown;
+            };
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Reason */
+            reason: string | null;
+            /** Ref Id */
+            ref_id: string | null;
+            /** Ref Type */
+            ref_type: string | null;
+            /** Requested */
+            requested: number | null;
+            /** Reverses Txn Id */
+            reverses_txn_id: string | null;
+        };
+        /** AdminWallet */
+        AdminWallet: {
+            /** Balance */
+            balance: number;
+            /** Cap */
+            cap: number;
+            /** Email */
+            email: string;
+            history: components["schemas"]["Page_AdminMovement_"];
+            /**
+             * Reader Id
+             * Format: uuid
+             */
+            reader_id: string;
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "free" | "vip";
         };
         /** AgentDecision */
         AgentDecision: {
@@ -2637,6 +2787,43 @@ export interface components {
             status: string;
             /** Text */
             text: string;
+        };
+        /** CoinMovement */
+        CoinMovement: {
+            /** Amount */
+            amount: number;
+            /** Balance After */
+            balance_after: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Month */
+            month?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Ref Id */
+            ref_id?: string | null;
+            /** Ref Type */
+            ref_type?: string | null;
+        };
+        /** CoinWallet */
+        CoinWallet: {
+            /** Balance */
+            balance: number;
+            history: components["schemas"]["Page_CoinMovement_"];
+            monthly: components["schemas"]["Monthly"];
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "free" | "vip";
         };
         /** Comp */
         Comp: {
@@ -3513,6 +3700,19 @@ export interface components {
              */
             tier: "public" | "free" | "vip";
         };
+        /** Monthly */
+        Monthly: {
+            /** Amount */
+            amount: number | null;
+            /** Cap */
+            cap: number | null;
+            /** Granted */
+            granted: boolean;
+            /** Grants On */
+            grants_on: boolean;
+            /** Month */
+            month: string;
+        };
         /** NewAgent */
         NewAgent: {
             /**
@@ -3703,6 +3903,24 @@ export interface components {
              * @default []
              */
             unplaced: components["schemas"]["AgentOut"][];
+        };
+        /** Page[AdminMovement] */
+        Page_AdminMovement_: {
+            /** Items */
+            items: components["schemas"]["AdminMovement"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
+        };
+        /** Page[CoinMovement] */
+        Page_CoinMovement_: {
+            /** Items */
+            items: components["schemas"]["CoinMovement"][];
+            /** Next Cursor */
+            next_cursor?: string | null;
+            /** Total */
+            total: number;
         };
         /** Period */
         Period: {
@@ -4807,6 +5025,17 @@ export interface components {
             /** Tasks */
             tasks: components["schemas"]["TaskView"][];
         };
+        /** Reconciliation */
+        Reconciliation: {
+            /** Ok */
+            ok: boolean;
+            /** Problems */
+            problems: string[];
+            /** Totals */
+            totals: {
+                [key: string]: number;
+            };
+        };
         /** Register */
         Register: {
             /** Email */
@@ -5757,6 +5986,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adjust_coins_api_admin_coins_adjustments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Adjustment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMovement"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconcile_coins_api_admin_coins_reconcile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Reconciliation"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_wallet_api_admin_coins_wallet_get: {
+        parameters: {
+            query: {
+                email: string;
+                company?: string | null;
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminWallet"];
                 };
             };
             /** @description Validation Error */
@@ -7920,6 +8252,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventsPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coins_api_me_coins_get: {
+        parameters: {
+            query?: {
+                company?: string | null;
+                cursor?: string | null;
+                limit?: number;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinWallet"];
                 };
             };
             /** @description Validation Error */

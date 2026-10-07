@@ -50,6 +50,8 @@ class Capability(StrEnum):
     """持股觀察 in full (D-159): any signed-in reader."""
     WATCHLIST = "watchlist"
     """A watchlist of one's own (D-060): any signed-in reader."""
+    COINS = "coins"
+    """A wallet of Whale Coins to look at (P3-C): any signed-in reader."""
     READ_VIP_ARTICLES = "read_vip_articles"
     """VIP articles in full: a running membership."""
     BUY_MEMBERSHIP = "buy_membership"
@@ -69,7 +71,7 @@ class Entitlement:
     def capabilities(self) -> frozenset[Capability]:
         allowed: set[Capability] = set()
         if self.tier in (Tier.FREE, Tier.VIP):
-            allowed |= {Capability.READ_SIGN_IN_SECTIONS, Capability.WATCHLIST}
+            allowed |= {Capability.READ_SIGN_IN_SECTIONS, Capability.WATCHLIST, Capability.COINS}
             if CHECKOUT_OPEN:
                 allowed.add(Capability.BUY_MEMBERSHIP)
         if self.tier == Tier.VIP:

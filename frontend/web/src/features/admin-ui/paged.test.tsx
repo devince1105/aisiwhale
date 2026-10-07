@@ -85,7 +85,8 @@ describe("the palette's search on the server", () => {
 
   it("says it is searching rather than that nothing was found", () => {
     render(<CommandPalette commands={base()} onClose={vi.fn()} searching />);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "鯨" } });
+    // a word no page or command has (鯨 would now find the 鯨幣 page, P3-C-2)
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "台積電" } });
     expect(screen.getByRole("listbox").textContent).toBe("搜尋中…");
   });
 

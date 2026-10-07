@@ -94,6 +94,27 @@ describe("the policies", () => {
     expect(text).toContain("不會自動續約或自動扣款");
     expect(text).toContain("7 天內");
   });
+
+  it("say what Whale Coins are and are not, in both languages, dated the day they were added (P3-C-3)", () => {
+    const zh = legalDoc("terms", "zh-TW", PERSON);
+    const en = legalDoc("terms", "en", PERSON);
+    const coinsZh = zh.sections.find((s) => s.heading === "五、鯨幣");
+    const coinsEn = en.sections.find((s) => s.heading === "5. Whale Coins");
+    expect(coinsZh && coinsEn).toBeTruthy();
+    const said = JSON.stringify(coinsZh);
+    for (const part of ["不能以金錢購買", "不是法定貨幣", "沒有現金價值", "不得販售、轉讓", "不得提領", "上限", "不會因此被收回", "調整"]) {
+      expect(said).toContain(part);
+    }
+    const saidEn = JSON.stringify(coinsEn);
+    for (const part of ["cannot be bought", "not legal tender", "no cash value", "may not be sold, transferred", "withdrawn", "limits", "does not take back", "may change"]) {
+      expect(saidEn).toContain(part);
+    }
+    expect(said).not.toContain("需法律確認"); // the lawyer's questions are for the code, not the page
+    expect(zh.sections.map((s) => s.heading).slice(4)).toEqual(["五、鯨幣", "六、內容的使用", "七、服務變更與中斷", "八、責任限制", "九、準據法與管轄"]);
+    expect(en.sections.map((s) => s.heading).slice(4)).toEqual(["5. Whale Coins", "6. Use of the content", "7. Changes and interruptions", "8. Liability", "9. Law"]);
+    expect([zh.updated, en.updated]).toEqual(["2026-10-07", "2026-10-07"]);
+    expect(legalDoc("privacy", "zh-TW", PERSON).updated).toBe("2026-10-06"); // not changed, not redated
+  });
 });
 
 describe("a year against twelve months", () => {

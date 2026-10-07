@@ -148,13 +148,15 @@ class Me(BaseModel):
         return self.member_until is not None
 
 
-async def _company_id(session, slug: str | None) -> uuid.UUID | None:
+async def company_id_for(session, slug: str | None) -> uuid.UUID | None:
+    """The company a reader request is about: ``?company=<slug>``, or the oldest there is.
+    ``/me`` and ``/api/me/coins`` both ask it, so their tier is the same."""
     query = select(Company.id) if slug is None else select(Company.id).where(Company.slug == slug)
     return await session.scalar(query.order_by(Company.created_at).limit(1))
 
 
 async def _me(session, reader, slug: str | None, settings: Settings) -> Me:
-    company_id = await _company_id(session, slug)
+    company_id = await company_id_for(session, slug)
     granted = await entitlement_for(
         session, reader, company_id=company_id, admin_emails=settings.admin_emails
     )

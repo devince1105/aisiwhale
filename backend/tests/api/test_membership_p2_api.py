@@ -278,7 +278,11 @@ def test_what_each_tier_may_do():
     admin = Entitlement(tier=Tier.FREE, is_admin=True)
 
     assert public.capabilities == frozenset()
-    assert free.capabilities == {Capability.READ_SIGN_IN_SECTIONS, Capability.WATCHLIST}
+    assert free.capabilities == {
+        Capability.READ_SIGN_IN_SECTIONS,
+        Capability.WATCHLIST,
+        Capability.COINS,  # P3-C
+    }
     assert vip.capabilities == free.capabilities | {Capability.READ_VIP_ARTICLES}
     assert admin.can(Capability.ADMIN) and not admin.can(Capability.READ_VIP_ARTICLES), (
         "an admin opens the back office; VIP articles take a membership like anybody's"

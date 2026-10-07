@@ -283,6 +283,11 @@ def build_scheduler(
     from autora.runtime.scheduler import Scheduler
 
     scheduler = Scheduler(session_factory, worker_id)
+    # the Whale Coin ledger checked against itself, daily (P3-C-3); it only logs
+    from autora.accounts.coins.reconcile import RECONCILE_SCHEDULE
+    from autora.accounts.coins.reconcile import schedule_handler as coin_reconcile
+
+    scheduler.register(RECONCILE_SCHEDULE, coin_reconcile())
     fetcher = build_page_fetcher(settings)
     poller = SourcePoller(fetcher=fetcher, search=build_search_provider(settings))
     scheduler.register(POLL_SCHEDULE, poller.schedule_handler())

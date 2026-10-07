@@ -50,6 +50,7 @@ export const ADMIN_NAV: readonly NavGroup[] = [
     items: [
       { key: "agents", go: "p", label: "代理", href: "/admin/agents", icon: "agents" },
       { key: "memberships", go: "v", label: "VIP 授予", href: "/admin/memberships", icon: "member" },
+      { key: "coins", go: "w", label: "鯨幣", href: "/admin/coins", icon: "coin" },
     ],
   },
   {
