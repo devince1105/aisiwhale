@@ -22,7 +22,8 @@
 ## 3. 權限與稽核
 
 - [ ] **每一條會修改資料的後台路由都要在 `autora_api/permissions.py` 的 `ROUTES` 加權限鍵**（方法＋路由樣板）。🔒 漏了 `test_admin_permissions.py` 會失敗。需要新的鍵時加進 `ALL` 與適當角色的 `ROLE_PERMISSIONS`，並在 `features/access/AccessPage.tsx` 補上說明。
-  - 交易頁（TR-10）、研究頁（P6a）大概需要新的鍵，例如 `trading:view`／`trading:approve`、`research:run`。**加新鍵前先和使用者確認哪些角色可以做**（AD-09 只定了四種角色）。
+  - **交易頁（TR-10）的核准用 `trading:approve`**（D-248，已在權限表）：只有 owner 和 finance 有。核准交易的寫入路由要在 `ROUTES` 對應到這個鍵，前端用 `useCan("trading:approve")` 決定是否顯示核准按鈕。看交易紀錄目前不另設鍵，所有後台角色都能看；要限制再問使用者。
+  - 研究頁（P6a）等其他新的鍵，**加之前先和使用者確認哪些角色可以做**（AD-09 只定了四種角色）。
   - 讀取預設所有後台角色都能看；只有敏感的讀取（操作紀錄、讀者錢包）在 `ROUTES` 裡加 GET 的鍵。
 - [ ] **前端用 `useCan("鍵")` 決定要不要顯示按鈕或表單**，側欄項目用 `need`。🔒 頁面要求的鍵必須是某條路由真的有的鍵（`x-permission`，從 openapi.json 讀）。後端一樣會擋（403），前端隱藏只是不讓人點到一定會失敗的東西。
 - [ ] **在 `features/audit/labels.ts` 的 `ACTION_LABEL` 為每條新寫入路由取中文名稱**。🔒 有權限鍵的寫入路由沒有名稱會失敗。

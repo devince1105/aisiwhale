@@ -30,6 +30,9 @@ COINS_VIEW = "coins:view"
 AUDIT = "audit:view"
 ACCESS = "access:manage"
 SETTINGS = "system:settings"
+TRADING_APPROVE = "trading:approve"
+"""Approve a trade the trading agent proposes (D-248): owner and finance. TR-10 puts it on its
+routes; until then no route has it."""
 SELF = "self:prefs"
 """One's own preferences (AD-10): every role has it."""
 
@@ -48,6 +51,7 @@ ALL = frozenset(
         AUDIT,
         ACCESS,
         SETTINGS,
+        TRADING_APPROVE,
         SELF,
     }
 )
@@ -55,7 +59,9 @@ ALL = frozenset(
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     AdminRoleName.OWNER: ALL,
     AdminRoleName.EDITOR: frozenset({NEWSROOM, APPROVALS, PROJECTS, WORKFLOWS, SELF}),
-    AdminRoleName.FINANCE: frozenset({FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW, SELF}),
+    AdminRoleName.FINANCE: frozenset(
+        {FINANCE, MEMBERSHIPS, COINS_ADJUST, COINS_VIEW, TRADING_APPROVE, SELF}
+    ),
     AdminRoleName.VIEWER: frozenset({SELF}),
 }
 

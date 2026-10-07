@@ -59,6 +59,12 @@ def test_the_four_roles():
     assert "coins:adjust" not in permissions.permissions_of("editor")
     assert "approvals:decide" in permissions.permissions_of("editor")
     assert "access:manage" not in permissions.permissions_of("finance")
+    # D-248: a trade is approved by an owner or finance, nobody else
+    assert {
+        r
+        for r in ("owner", "editor", "finance", "viewer")
+        if "trading:approve" in permissions.permissions_of(r)
+    } == {"owner", "finance"}
     assert permissions.permissions_of("nobody") == frozenset()
 
 
