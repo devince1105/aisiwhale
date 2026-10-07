@@ -1,7 +1,7 @@
 """P3-B: the month's coins — who, how many, which month, and once.
 
-The switch (``policy.MONTHLY_GRANTS_ON``) is off in production until P3-C; these tests turn it on
-for themselves, and one checks that off means nothing at all.
+The switch (``policy.MONTHLY_GRANTS_ON``) is on since D-247; these tests set it themselves,
+and one checks that off means nothing at all.
 """
 
 import ast
@@ -82,16 +82,16 @@ def test_the_numbers_are_d218_s():
     assert policy.POLICY_VERSION == "p3b-2"
 
 
-def test_grants_are_off_until_p3c():
-    """The value as shipped, read from the source: the fixture above turns it on for these
-    tests only."""
+def test_grants_are_on_since_d247():
+    """The value as shipped, read from the source (the fixture above sets it for these tests):
+    off from D-238 until P3-C was verified in production, on since D-247."""
     source = ast.parse(Path(policy.__file__).read_text())
     shipped = {
         node.targets[0].id: node.value.value
         for node in source.body
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant)
     }
-    assert shipped["MONTHLY_GRANTS_ON"] is False
+    assert shipped["MONTHLY_GRANTS_ON"] is True
 
 
 @pytest.mark.parametrize(

@@ -16,10 +16,11 @@ from zoneinfo import ZoneInfo
 
 from autora.accounts.entitlement import Tier
 
-MONTHLY_GRANTS_ON = False
-"""Whether ``/api/auth/me`` gives the month's coins. Off until P3-C shows readers their wallet:
-a coin written cannot be taken back, and the first grant should be one a reader can see. Turning
-it on is a decision of its own and a deploy, like ``entitlement.CHECKOUT_OPEN``."""
+MONTHLY_GRANTS_ON = True
+"""Whether ``/api/auth/me`` gives the month's coins. Shipped off (D-238) until P3-C showed
+readers their wallet and an adjustment was run through in production; turned on by D-247. A coin
+written cannot be taken back: turning it off again is a decision of its own and a deploy, like
+``entitlement.CHECKOUT_OPEN``, and stops new grants only."""
 
 POLICY_VERSION = "p3b-2"
 
