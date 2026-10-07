@@ -268,6 +268,17 @@ export async function searchCover(articleId: string, query: string, api: ApiClie
   );
 }
 
+/** 請行銷換圖 (D-233): marketing finds another cover with the person's words; the article is
+ * not sent back. */
+export async function askCover(articleId: string, ask: string, api: ApiClient = defaultApi) {
+  return unwrap(
+    await api.POST("/api/articles/{article_id}/cover/ask", {
+      params: { path: { article_id: articleId } },
+      body: { ask },
+    }),
+  );
+}
+
 /** Take the article's cover off (D-142); swapping puts one back. */
 export async function removeCover(articleId: string, api: ApiClient = defaultApi) {
   return unwrap(await api.DELETE("/api/articles/{article_id}/cover", { params: { path: { article_id: articleId } } }));

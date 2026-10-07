@@ -582,6 +582,11 @@
        }
       ]
      },
+     "cover_asked": {
+      "default": false,
+      "title": "Cover Asked",
+      "type": "boolean"
+     },
      "distributions": {
       "items": {
        "$ref": "#/components/schemas/DistributionView"
@@ -1979,6 +1984,35 @@
      "total"
     ],
     "title": "Counts",
+    "type": "object"
+   },
+   "CoverAskBody": {
+    "properties": {
+     "ask": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Ask",
+      "type": "string"
+     }
+    },
+    "required": [
+     "ask"
+    ],
+    "title": "CoverAskBody",
+    "type": "object"
+   },
+   "CoverAsked": {
+    "properties": {
+     "workflow_run_id": {
+      "format": "uuid",
+      "title": "Workflow Run Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "workflow_run_id"
+    ],
+    "title": "CoverAsked",
     "type": "object"
    },
    "CoverSearchBody": {
@@ -9268,6 +9302,81 @@
      }
     ],
     "summary": "Delete Cover",
+    "tags": [
+     "newsroom"
+    ]
+   }
+  },
+  "/api/articles/{article_id}/cover/ask": {
+   "post": {
+    "description": "請行銷換圖 (D-233): marketing finds another cover with the person's words. The article is\nnot sent back; its approval waits, and the new cover shows on it when marketing is done.",
+    "operationId": "ask_cover_api_articles__article_id__cover_ask_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_admin",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Admin"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CoverAskBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "202": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CoverAsked"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ask Cover",
     "tags": [
      "newsroom"
     ]

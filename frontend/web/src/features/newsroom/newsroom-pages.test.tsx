@@ -108,6 +108,7 @@ const ARTICLE_DETAIL: ArticleDetail = {
   section: null,
   section_given: false,
   in_production: false,
+  cover_asked: false,
 };
 
 const event = (event_type: string, payload: object): EventEnvelope =>

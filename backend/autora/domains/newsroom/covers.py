@@ -36,6 +36,7 @@ from PIL import Image, ImageOps
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from autora.db.models import Task, TaskState, WorkflowRun
 from autora.domains.newsroom.models import CoverState, StoryCover
 from autora.infra.blobstore import BlobStore
 from autora.infra.s3 import R2Bucket, S3Error, sigv4_headers  # noqa: F401 (sigv4_headers: tests)
@@ -46,6 +47,7 @@ MAX_BYTES = 300_000
 """Try a lower quality until the WebP is under this (a busy photo can be larger at 80)."""
 MAX_DOWNLOAD = 15_000_000
 KEEP_CANDIDATES = 6
+TERMINAL_TASK_STATES = (TaskState.SUCCEEDED, TaskState.FAILED, TaskState.CANCELLED)
 CACHE_SECONDS = 24 * 3600
 """Pixabay asks that search results be cached for 24 hours."""
 
@@ -621,6 +623,22 @@ async def used_elsewhere(
 
 async def cover_of(session: AsyncSession, story_id: uuid.UUID) -> StoryCover | None:
     return await session.scalar(select(StoryCover).where(StoryCover.story_id == story_id))
+
+
+async def cover_at_work(session: AsyncSession, story_id: uuid.UUID) -> bool:
+    """Marketing is finding this story's cover now: a ``cover`` task of one of its workflows is
+    not done (the story's own, or a person's 請行銷換圖, D-233)."""
+    unfinished = await session.scalar(
+        select(func.count())
+        .select_from(Task)
+        .join(WorkflowRun, WorkflowRun.id == Task.workflow_run_id)
+        .where(
+            WorkflowRun.params["story_id"].astext == str(story_id),
+            Task.name == "cover",
+            Task.state.not_in([s.value for s in TERMINAL_TASK_STATES]),
+        )
+    )
+    return bool(unfinished)
 
 
 def _key(story_id: uuid.UUID, photo: Photo) -> str:

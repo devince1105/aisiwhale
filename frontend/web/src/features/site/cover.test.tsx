@@ -15,6 +15,7 @@ import { CoverFigure, coverSrc } from "./Cover";
 vi.mock("@/api/queries", async (actual) => ({
   ...(await actual<typeof import("@/api/queries")>()),
   searchCover: vi.fn(async () => ({})),
+  askCover: vi.fn(async () => ({})),
 }));
 
 afterEach(cleanup);
@@ -90,6 +91,30 @@ describe("the cover where a person decides", () => {
     await waitFor(() => expect(queries.searchCover).toHaveBeenCalledWith("a1", "晶圓廠"));
   });
 
+  it("請行銷換圖 gives the person's words to marketing, and says while it works (D-233)", async () => {
+    const { rerender } = withClient(<CoverPanel articleId="a1" cover={COVER} />);
+    const toMarketing = screen.getByRole("button", { name: "請行銷換圖" }) as HTMLButtonElement;
+    expect(toMarketing.disabled).toBe(true);
+    fireEvent.change(screen.getByRole("textbox", { name: "用自己的話找首圖" }), { target: { value: "台積電晶圓廠" } });
+    fireEvent.click(toMarketing);
+    await waitFor(() => expect(queries.askCover).toHaveBeenCalledWith("a1", "台積電晶圓廠"));
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <CoverPanel articleId="a1" cover={COVER} asked />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByRole("status").textContent).toContain("行銷正在找新的首圖");
+    for (const name of ["換一張", "重找", "請行銷換圖"])
+      expect((screen.getByRole("button", { name }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("a cover taken off is put back before marketing changes it", () => {
+    withClient(<CoverPanel articleId="a1" cover={{ ...COVER, state: "removed" }} />);
+    expect(screen.queryByRole("button", { name: "請行銷換圖" })).toBeNull();
+    expect(screen.getByRole("button", { name: "重找" })).toBeTruthy();
+  });
+
   it("the request goes where the API expects it", async () => {
     const seen: string[] = [];
     const api = createApiClient({
@@ -100,8 +125,13 @@ describe("the cover where a person decides", () => {
       }) as typeof fetch,
     });
     const { searchCover } = await vi.importActual<typeof import("@/api/queries")>("@/api/queries");
+    const { askCover } = await vi.importActual<typeof import("@/api/queries")>("@/api/queries");
     await searchCover("a1", "wafer", api);
-    expect(seen).toEqual(['POST http://api/api/articles/a1/cover/search {"query":"wafer"}']);
+    await askCover("a1", "晶圓廠", api);
+    expect(seen).toEqual([
+      'POST http://api/api/articles/a1/cover/search {"query":"wafer"}',
+      'POST http://api/api/articles/a1/cover/ask {"ask":"晶圓廠"}',
+    ]);
   });
 });
 

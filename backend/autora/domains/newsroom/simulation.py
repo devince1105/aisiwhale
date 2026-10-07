@@ -618,6 +618,12 @@ def _cover(request: ModelRequest) -> FakeTurn:
             }
         )
     found = [out for name, _, r in calls if name == "search_images" and (out := _output(r))]
+    asked = "asked for another cover" in first and _field(first, "What the person asked for")
+    if not found and asked:  # a person's 請行銷換圖 (D-233): their words
+        return FakeTurn(
+            text="Looking again, as asked.",
+            tool_uses=[FakeToolUse(name="search_images", input={"query": asked[:60]})],
+        )
     if not found:
         words = re.findall(r"[A-Za-z]+", _field(first, "Story") or "") or ["finance"]
         query = " ".join(words[:3]) if len(" ".join(words[:3])) >= 2 else "finance news"

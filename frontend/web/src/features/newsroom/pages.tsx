@@ -36,7 +36,7 @@ import { Empty } from "./parts";
 import { AddSourceForm, SourcesView } from "./SourcesView";
 import { StoriesView, type StoryFilter } from "./StoriesView";
 import { StoryView } from "./StoryView";
-import { CoverPanel } from "./CoverPanel";
+import { CoverPanel, coverWatch } from "./CoverPanel";
 
 function Loading({ error }: { error: Error | null }) {
   return (
@@ -147,7 +147,7 @@ function LoadedStory({ story }: { story: StoryDetail }) {
 
 export function ArticlePage({ articleId }: { articleId: string }) {
   const requested = Number(useSearchParams().get("version")) || null;
-  const article = useQuery(articleQuery(articleId, requested));
+  const article = useQuery({ ...articleQuery(articleId, requested), ...coverWatch });
   if (!article.data) return <Loading error={article.error} />;
   return <LoadedArticle article={article.data} />;
 }
@@ -178,7 +178,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending || section.isPending,
         error: (unpublish.error ?? republish.error ?? revise.error ?? access.error ?? section.error)?.message ?? null,
       }}
-      cover={<CoverPanel articleId={article.id} cover={article.cover} />}
+      cover={<CoverPanel articleId={article.id} cover={article.cover} asked={article.cover_asked} />}
     />
   );
 }

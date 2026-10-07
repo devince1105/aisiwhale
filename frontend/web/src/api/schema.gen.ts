@@ -250,6 +250,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/articles/{article_id}/cover/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask Cover
+         * @description 請行銷換圖 (D-233): marketing finds another cover with the person's words. The article is
+         *     not sent back; its approval waits, and the new cover shows on it when marketing is done.
+         */
+        post: operations["ask_cover_api_articles__article_id__cover_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/articles/{article_id}/cover/search": {
         parameters: {
             query?: never;
@@ -2028,6 +2049,11 @@ export interface components {
              */
             company_id: string;
             cover?: components["schemas"]["CoverView"] | null;
+            /**
+             * Cover Asked
+             * @default false
+             */
+            cover_asked: boolean;
             /** Distributions */
             distributions: components["schemas"]["DistributionView"][];
             /** Fact Checks */
@@ -2585,6 +2611,19 @@ export interface components {
             strong_sell: number;
             /** Total */
             readonly total: number;
+        };
+        /** CoverAskBody */
+        CoverAskBody: {
+            /** Ask */
+            ask: string;
+        };
+        /** CoverAsked */
+        CoverAsked: {
+            /**
+             * Workflow Run Id
+             * Format: uuid
+             */
+            workflow_run_id: string;
         };
         /** CoverSearchBody */
         CoverSearchBody: {
@@ -5497,6 +5536,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoverView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_cover_api_articles__article_id__cover_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_admin?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoverAskBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoverAsked"];
                 };
             };
             /** @description Validation Error */

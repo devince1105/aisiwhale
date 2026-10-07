@@ -12,6 +12,7 @@
 - POST /api/articles/{id}/revise                  change a published article (D-045)
 - POST /api/articles/{id}/cover/swap              the next photo from the same search (D-142)
 - POST /api/articles/{id}/cover/search            look again with a person's words (D-233)
+- POST /api/articles/{id}/cover/ask               ask marketing for another cover (D-233)
 - DELETE /api/articles/{id}/cover                 take the cover off
 - GET  /api/companies/{id}/sources                sources with how many items each brought
 - POST /api/companies/{id}/sources                add a source (starts the newsroom schedules)
@@ -50,7 +51,7 @@ from autora.domains.newsroom.site import section_of
 from autora.domains.newsroom.sources import SECTION, SourceConfigError, add_source
 from autora.domains.newsroom.stories import StoryDesk, StoryError
 from autora.domains.newsroom.tools import covers as covers_tool
-from autora.domains.newsroom.workflow import start_article_revision, start_story
+from autora.domains.newsroom.workflow import ask_for_cover, start_article_revision, start_story
 from autora.infra.blobstore import build_blob_store
 from autora.infra.settings import get_settings
 from autora.runtime.fsm import IllegalTransition
@@ -241,6 +242,40 @@ async def search_cover(
     view = admin.cover_view(row)
     assert view is not None
     return view
+
+
+class CoverAskBody(BaseModel):
+    ask: str = Field(min_length=1, max_length=500)
+    """What the picture should show, in a person's words, for marketing (D-149)."""
+
+
+class CoverAsked(BaseModel):
+    workflow_run_id: uuid.UUID
+
+
+@router.post("/api/articles/{article_id}/cover/ask", status_code=status.HTTP_202_ACCEPTED)
+async def ask_cover(
+    article_id: uuid.UUID,
+    body: CoverAskBody,
+    session: Session,
+    _: Operator,
+    runtime: RuntimeDep,
+) -> CoverAsked:
+    """請行銷換圖 (D-233): marketing finds another cover with the person's words. The article is
+    not sent back; its approval waits, and the new cover shows on it when marketing is done."""
+    article = await _article_of(session, article_id)
+    try:
+        run = await ask_for_cover(
+            session,
+            workflows=runtime.workflows,
+            company_id=article.company_id,
+            article_id=article.id,
+            ask=body.ask.strip(),
+        )
+    except StartWorkflowError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await session.commit()
+    return CoverAsked(workflow_run_id=run.id)
 
 
 @router.delete("/api/articles/{article_id}/cover")
