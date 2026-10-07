@@ -168,7 +168,9 @@ async def review_context(session: AsyncSession, ctx: RunContext) -> str | None:
 
 PERSON_SENT_BACK = (
     "A person sent this article back at approval, and the revisions since answer them "
-    "(the count above started again then): «{reason}». Check first that it does what they asked."
+    "(the count above started again then): «{reason}». Check first that it does what they asked "
+    "of the text. The cover image is not in the draft: a person changes it on the approval card, "
+    "so a picture they asked for is not a reason to send the draft back."
 )
 
 

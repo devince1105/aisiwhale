@@ -176,6 +176,8 @@ async def test_the_context_gives_the_claims_and_the_editors_issues(newsroom_room
         text = await draft_context(session, _ctx(room, task))
         assert "The editor's issues:\n- [en 3] Cite the city.\n- Shorter." in text
         assert "read_draft" in text
+        # D-233: a person asking for another picture does not have the text rewritten for it
+        assert "The cover image is not yours: a person changes it on the approval card." in text
 
         task.input = {"params": {"story_id": str(uuid.uuid4())}}
         assert "No story found" in await draft_context(session, _ctx(room, task))
