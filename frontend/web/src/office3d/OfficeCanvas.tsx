@@ -14,7 +14,7 @@ import { onOfficeKey } from "./interaction/picking";
 import { DEFAULT_THEME, THEMES, type ThemeId } from "./palette";
 import { OfficeLog } from "./OfficeLog";
 import { OfficeSettings } from "./OfficeSettings";
-import { terminalVars, type BoardLook } from "./fallback/console";
+import type { BoardLook } from "./fallback/console";
 import { useOfficeTheme } from "./theme";
 import { usePageVisible } from "./usePageVisible";
 
@@ -176,7 +176,8 @@ export interface OfficeCanvasProps {
   departmentNames?: Readonly<Record<string, string>>;
   /** Kept while its page is not shown (D-176): draw nothing, keep everything. */
   paused?: boolean;
-  /** The 2D board's colours: the back office's console, or the public site's (D-177). */
+  /** The 2D board's colours: ``site``, the app's own — what the public site (D-177) and the back
+   * office (D-245) both use — or ``console``, the old terminal green. */
   boardLook?: BoardLook;
   /** The public site's demo (D-178): no settings to change its style, and no line saying why a
    * phone gets the 2D board. */
@@ -349,7 +350,3 @@ export function OfficeCanvas({
     </div>
   );
 }
-
-// The office's public door (eslint boundaries): the page dresses itself in the 2D office's
-// colours while that view is on screen, and this is how it reaches them.
-export { terminalVars };

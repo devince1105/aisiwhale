@@ -117,19 +117,7 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
         data-testid="admin-sidebar"
         className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-line bg-surface md:flex print:hidden ${collapsed ? "w-14" : "w-60"}`}
       >
-        <SidebarContent collapsed={collapsed} />
-        <div className="border-t border-line p-2">
-          <Button
-            variant="subtle"
-            size="sm"
-            onClick={toggle}
-            aria-label={collapsed ? "展開側欄" : "收合側欄"}
-            title={collapsed ? "展開側欄" : "收合側欄"}
-            className="w-full"
-          >
-            <Icon name={collapsed ? "expand" : "collapse"} className="size-4" />
-          </Button>
-        </div>
+        <SidebarContent collapsed={collapsed} onToggle={toggle} />
       </aside>
       {palette ? (
         <CommandPalette
@@ -184,7 +172,9 @@ export function AdminShell({ email, onSignOut, children }: { email: string | nul
   );
 }
 
-function SidebarContent({ collapsed }: { collapsed: boolean }) {
+/** The sidebar's links. ``onToggle``: the desktop sidebar's collapse button, a small icon at the
+ * right of its title (it used to be a bar of its own at the bottom); the phone's drawer has none. */
+function SidebarContent({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => void }) {
   const pathname = usePathname() ?? "";
   const { requested, company } = useCompanyChoice();
   // the address's company before the list has loaded, so the links keep it from the start
@@ -195,10 +185,25 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className={`flex h-12 shrink-0 items-center border-b border-line ${collapsed ? "justify-center" : "px-4"}`}>
-        <Link href={companyId ? withCompany("/admin/dashboard", companyId) : "/admin/dashboard"} className="font-semibold" title="AiSiWhale 後台">
-          {collapsed ? "艾" : "艾矽鯨 後台"}
-        </Link>
+      <div className={`flex h-12 shrink-0 items-center border-b border-line ${collapsed ? "justify-center" : "justify-between gap-2 pr-2 pl-4"}`}>
+        {/* collapsed, there is room for one thing: the button that opens it again (Dashboard is in the list) */}
+        {collapsed && onToggle ? null : (
+          <Link href={companyId ? withCompany("/admin/dashboard", companyId) : "/admin/dashboard"} className="truncate font-semibold" title="AiSiWhale 後台">
+            {collapsed ? "艾" : "艾矽鯨 後台"}
+          </Link>
+        )}
+        {onToggle ? (
+          <Button
+            variant="subtle"
+            size="sm"
+            onClick={onToggle}
+            aria-label={collapsed ? "展開側欄" : "收合側欄"}
+            title={collapsed ? "展開側欄" : "收合側欄"}
+            className="shrink-0 px-1.5"
+          >
+            <Icon name={collapsed ? "expand" : "collapse"} className="size-4" />
+          </Button>
+        ) : null}
       </div>
       {collapsed ? null : <CompanySwitcher />}
       <nav aria-label="後台導覽" className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
