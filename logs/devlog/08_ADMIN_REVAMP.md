@@ -629,3 +629,4 @@ AD-05 沒有自己推送，是由持股工作階段連同 HD-12 一起推上 mai
 - 前端 `admin-ui/export.test.tsx` 3 項：送出的網址只有搜尋、篩選和排序（沒有 cursor）、存檔用後端給的檔名；完成、截斷、失敗三種提示；沒傳 `onExport` 時沒有按鈕。
 - ruff、lint-imports、`gen_openapi --check`、`gen-api:check`、tsc、eslint、vitest（1,031 項）都通過；`test_admin_permissions.py`、`test_admin_audit.py`、`test_membership_p2_api.py` 通過。
 - 真實瀏覽器：在 e2e 環境寫入 5 個題材（其中一個標題是 `=HYPERLINK(...)`），在題材頁篩選「已選定」、依分數排序後按「匯出 CSV」。下載的檔案以 BOM 開頭、順序和畫面相同、公式前面有 `'`，提示「已匯出 5 筆」；操作紀錄頁出現「匯出題材 CSV」，操作者是 admin@e2e.test。看截圖時發現畫面上的分數是 40、檔案裡是 0.400，改成和畫面一樣。
+- 完整套件（合併 AD-12 之後）：後端 2,531 項、vitest 1,031 項、build、Playwright e2e 17 項（1 項略過）全部通過。
