@@ -169,7 +169,13 @@ describe("courier paths", () => {
   });
 
   it("people at the pantry counter stand a figure's width apart, all of them at the counter (D-243)", () => {
-    const xs = [0, 1, 2].map((slot) => pantrySpot(slot).target.spot[0]).sort((a, b) => a - b);
+    const xs = [0, 1, 2]
+      .map((slot) => {
+        const target = pantrySpot(slot).target;
+        if (typeof target !== "object" || !("spot" in target)) throw new Error("a pantry spot is a spot");
+        return target.spot[0];
+      })
+      .sort((a, b) => a - b);
     for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(1.1); // a head is ~0.83 m
     const counter = DECOR.find((d) => d.kind === "pantry_counter")!;
     for (const x of xs) expect(Math.abs(x - counter.at[0])).toBeLessThan(counter.size[0] / 2 - 0.4);
