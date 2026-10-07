@@ -7,8 +7,10 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata = {
-  title: "Autora",
-  description: "AI Autonomous Company",
+  // what readers and the back office see is the brand, 艾矽鯨 (D-043); "autora" stays the
+  // code's own name
+  title: "艾矽鯨",
+  description: "艾矽鯨 AiSiWhale：AI 科技投資動向",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

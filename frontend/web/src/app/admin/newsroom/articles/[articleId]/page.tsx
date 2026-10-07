@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { TokenGate } from "@/features/auth/TokenGate";
 import { ArticlePage } from "@/features/newsroom/pages";
 
-export const metadata = { title: "文章 · 新聞室 · Autora" };
+export const metadata = { title: "文章 · 新聞室 · 艾矽鯨" };
 
 export default async function Page({ params }: { params: Promise<{ articleId: string }> }) {
   const { articleId } = await params;

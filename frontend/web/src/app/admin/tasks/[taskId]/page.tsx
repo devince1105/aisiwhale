@@ -1,7 +1,7 @@
 import { TokenGate } from "@/features/auth/TokenGate";
 import { TaskPage } from "@/features/trace-viewer/TracePage";
 
-export const metadata = { title: "Task · Autora" };
+export const metadata = { title: "Task · 艾矽鯨" };
 
 export default async function Page({ params }: { params: Promise<{ taskId: string }> }) {
   const { taskId } = await params;

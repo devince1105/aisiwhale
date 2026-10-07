@@ -463,7 +463,7 @@ export const LABELS: Label[] = [
   { text: "茶水間", sub: "PANTRY", at: [9.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "總經理室", sub: "CEO OFFICE", at: [-5.95, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
   { text: "會議室", sub: "MEETING ROOM", at: [0.6, 2.5, BACK_ROOMS_Z + 0.08], width: 1.6, kind: "sign" },
-  { text: "AUTORA", sub: "入口 ENTRANCE", at: [ROOM.maxX + 0.21, 2.6, (CORRIDORS.front.minZ + CORRIDORS.front.maxZ) / 2], width: 1.4, kind: "sign", facing: "x" },
+  { text: "AiSiWhale", sub: "入口 ENTRANCE", at: [ROOM.maxX + 0.21, 2.6, (CORRIDORS.front.minZ + CORRIDORS.front.maxZ) / 2], width: 1.4, kind: "sign", facing: "x" },
 ];
 
 /** The doors in the glass fronts (open, the leaf swung into the room on the hinge side). */

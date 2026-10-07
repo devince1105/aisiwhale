@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { TokenGate } from "@/features/auth/TokenGate";
 import { CycleDetailPage } from "@/features/cycles/CycleDetailPage";
 
-export const metadata = { title: "營運週期 · Autora" };
+export const metadata = { title: "營運週期 · 艾矽鯨" };
 
 export default async function Page({ params }: { params: Promise<{ cycleId: string }> }) {
   const { cycleId } = await params;
