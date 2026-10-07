@@ -40,7 +40,8 @@ from autora.company.workflows import StartWorkflowError, start_workflow
 from autora.db.models import Agent, AgentStatus, Approval, Task, WorkflowRun
 from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom import organization, personas
-from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
+from autora.domains.newsroom.covers import cover_at_work, cover_of
+from autora.domains.newsroom.models import Article, ArticleState, CoverState, Story, StoryState
 from autora.domains.newsroom.policy import ceo_decides_when_unanswered
 from autora.domains.newsroom.publisher import (
     NotAllowed,
@@ -232,10 +233,21 @@ UNANSWERED_TEMPLATE = WorkflowTemplate(
 """D-157: the CEO decides an article nobody approved in 24 hours."""
 
 
+COVER_TEMPLATE_NAME = "newsroom.cover_asked_v1"
+
+COVER_TEMPLATE = WorkflowTemplate(
+    name=COVER_TEMPLATE_NAME,
+    nodes=(NodeSpec("cover", "換首圖：{title}", "marketing"),),
+)
+"""D-233: a person asks marketing for another cover from the approval card, in their words. The
+article is not sent back: it waits at approval, and the card shows the new cover when it is in."""
+
+
 def register_templates(templates: TemplateRegistry) -> None:
     templates.register(TEMPLATE)
     templates.register(REVISION_TEMPLATE)
     templates.register(UNANSWERED_TEMPLATE)
+    templates.register(COVER_TEMPLATE)
 
 
 # --- staffing ---------------------------------------------------------------------------------
@@ -360,6 +372,53 @@ async def start_article_revision(
             "issues": [{"message": f"發布後修改（人工）：{reason}"}],
         },
         actor=actor,
+    )
+    return run
+
+
+async def ask_for_cover(
+    session: AsyncSession,
+    *,
+    workflows: WorkflowEngine,
+    company_id: uuid.UUID,
+    article_id: uuid.UUID,
+    ask: str,
+) -> WorkflowRun:
+    """請行銷換圖 (D-233): marketing finds the article another cover with a person's words
+    (D-149's ``ask``), in the project its story was made in. A picture is marketing's, not the
+    writer's: nothing is sent back, and the approval waits with the article as it is."""
+    article = await session.get(Article, article_id)
+    if article is None or article.company_id != company_id:
+        raise StartWorkflowError(f"article {article_id} not found")
+    if article.state == ArticleState.REJECTED:
+        raise StartWorkflowError("the article was turned down: it needs no cover")
+    row = await cover_of(session, article.story_id)
+    if row is not None and row.state == CoverState.REMOVED:
+        raise StartWorkflowError("the cover was taken off: put one back first (放回一張 or 重找)")
+    if await cover_at_work(session, article.story_id):
+        raise StartWorkflowError("marketing is finding this article's cover already")
+    project_id = await session.scalar(
+        select(WorkflowRun.project_id)
+        .where(
+            WorkflowRun.company_id == company_id,
+            WorkflowRun.params["story_id"].astext == str(article.story_id),
+        )
+        .order_by(WorkflowRun.id.desc())
+        .limit(1)
+    )
+    if project_id is None:
+        raise StartWorkflowError(f"no project made story {article.story_id}")
+    run, _ = await workflows.instantiate(
+        session,
+        COVER_TEMPLATE_NAME,
+        company_id=company_id,
+        project_id=project_id,
+        params={
+            "story_id": str(article.story_id),
+            "article_id": str(article.id),
+            "title": article.title[:80],
+            "ask": ask[:500],
+        },
     )
     return run
 

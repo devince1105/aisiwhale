@@ -9,6 +9,7 @@ from sqlalchemy import delete, select
 
 from autora.app import build_runtime, build_worker
 from autora.company.agents import hire_agent
+from autora.company.workflows import StartWorkflowError
 from autora.db.models import (
     AgentActivity,
     Approval,
@@ -29,7 +30,12 @@ from autora.domains.newsroom.models import (
     StoryCover,
 )
 from autora.domains.newsroom.policy import AUTO_APPROVE_KEY, CEO_DECIDES_WHEN_UNANSWERED_KEY
-from autora.domains.newsroom.workflow import TEMPLATE_NAME, start_story
+from autora.domains.newsroom.workflow import (
+    COVER_TEMPLATE_NAME,
+    TEMPLATE_NAME,
+    ask_for_cover,
+    start_story,
+)
 from autora.runtime.actor import Actor
 from autora.runtime.approvals import ApprovalError
 from autora.runtime.behaviors import RunContext
@@ -598,6 +604,54 @@ async def test_a_person_sends_it_back_twice_at_most(committed, e2e_settings):
     assert (await room.article()).state == "IN_REVIEW"
     await room.worker.run_until_idle()
     assert (await room.tasks())["approve"][-1].state == "WAITING_APPROVAL"
+
+
+async def test_a_person_asks_marketing_for_another_cover(committed, e2e_settings):
+    """D-233: 請行銷換圖. A picture is marketing's, not the writer's: marketing looks again with
+    the person's words, nothing is sent back, and the approval waits with the new cover on it."""
+    room = await Newsroom().start(committed, e2e_settings)
+    await room.worker.run_until_idle()
+    approval = await _pending(room)
+    before = await room.get_where(StoryCover, StoryCover.story_id == room.story.id)
+    article = await room.article()
+
+    async def ask(words):
+        async with committed() as session:
+            run = await ask_for_cover(
+                session,
+                workflows=room.runtime.workflows,
+                company_id=room.company.id,
+                article_id=article.id,
+                ask=words,
+            )
+            await session.commit()
+            return run
+
+    run = await ask("晶圓廠的照片")
+    assert run.template_name == COVER_TEMPLATE_NAME
+    assert (await _detail(room)).cover_asked
+    with pytest.raises(StartWorkflowError, match="finding this article's cover already"):
+        await ask("再換一張")
+    await room.worker.run_until_idle()
+
+    after = await room.get_where(StoryCover, StoryCover.story_id == room.story.id)
+    assert after.query == "晶圓廠的照片" and after.provider_id != before.provider_id
+    async with committed() as session:
+        [cover] = (await session.scalars(select(Task).where(Task.workflow_run_id == run.id))).all()
+    assert cover.state == "SUCCEEDED" and cover.input["params"]["ask"] == "晶圓廠的照片"
+    assert cover.display_name == "換首圖：" + article.title[:80]
+    # nothing was sent back: the same approval waits, nobody drafted again
+    assert (await room.get(Approval, approval.id)).state == "PENDING"
+    assert (await room.article()).state == "IN_REVIEW"
+    tasks = await room.tasks()
+    assert len(tasks["draft"]) == len(tasks["approve"]) == 1
+    assert not (await _detail(room)).cover_asked
+
+    async with committed() as session:
+        (await session.get(StoryCover, after.id)).state = "removed"
+        await session.commit()
+    with pytest.raises(StartWorkflowError, match="taken off"):
+        await ask("換回來")
 
 
 async def test_a_published_article_can_be_taken_down_and_put_back(committed, e2e_settings):

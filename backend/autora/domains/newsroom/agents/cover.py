@@ -109,6 +109,10 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
     if params.get("ask"):
         # what a person asked of this cover, in their words (D-149)
         lines.append(f"What the person asked for: {str(params['ask'])[:500]}")
+        lines.append(
+            "A link in it is not an image you can use: the cover comes from the library, or is "
+            "generated."
+        )
     if params.get("generate"):
         # a person's request (D-145): the cover it has is replaced, and kept to swap back to
         lines.append(
@@ -117,6 +121,13 @@ async def cover_context(session: AsyncSession, ctx: RunContext) -> str | None:
         )
     elif existing is not None and existing.state == CoverState.REMOVED:
         lines.append("A person took this story's cover off: report no cover, do not search.")
+    elif existing is not None and params.get("ask"):
+        # 請行銷換圖 on the approval card (D-233): the article waits there for the new one
+        lines.append(
+            f"A person asked for another cover (it has photo {existing.provider_id}, found with "
+            f"{existing.query!r}): search again with what they asked for in mind, and set_cover "
+            "the one that fits it; it replaces the photo it has."
+        )
     elif existing is not None:
         lines.append(
             f"It already has a cover (photo {existing.provider_id}, found with "

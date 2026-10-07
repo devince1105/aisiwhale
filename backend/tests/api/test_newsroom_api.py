@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import select
 
-from autora.db.models import Project, Schedule
+from autora.db.models import Project, Schedule, WorkflowRun
 from autora.domains.newsroom import covers
 from autora.domains.newsroom.models import Story
 from autora.infra.blobstore import LocalFSBlobStore
@@ -177,3 +177,36 @@ async def test_a_person_looks_for_the_cover_in_their_own_words(
     assert refused.status_code == 409 and "try other words" in refused.json()["detail"]
     missing = await api.post(f"/api/articles/{uuid.uuid4()}/cover/search", json={"query": "x"})
     assert missing.status_code == 404
+
+
+async def test_a_person_asks_marketing_for_another_cover(api, newsroom_room, db_session):
+    """D-233: 請行銷換圖 starts marketing's cover step in the story's project; the article is not
+    sent back."""
+    room = newsroom_room
+    article_id = await room.publish()
+    url = f"/api/articles/{article_id}/cover/ask"
+    nowhere = await api.post(url, json={"ask": "晶圓廠"})
+    assert nowhere.status_code == 409 and "no project made story" in nowhere.json()["detail"]
+
+    project = Project(company_id=room.company.id, name="newsroom")
+    db_session.add(project)
+    await db_session.flush()
+    db_session.add(
+        WorkflowRun(
+            company_id=room.company.id,
+            project_id=project.id,
+            template_name="newsroom.story_to_article_v2",
+            params={"story_id": str(room.story.id)},
+            state="SUCCEEDED",
+        )
+    )
+    await db_session.flush()
+    asked = await api.post(url, json={"ask": " 晶圓廠 "})
+    assert asked.status_code == 202, asked.text
+    run = await db_session.get(WorkflowRun, uuid.UUID(asked.json()["workflow_run_id"]))
+    assert run.template_name == "newsroom.cover_asked_v1" and run.project_id == project.id
+    assert run.params["ask"] == "晶圓廠" and run.params["article_id"] == article_id
+    assert (await api.get(f"/api/articles/{article_id}")).json()["cover_asked"] is True
+    again = await api.post(url, json={"ask": "再換"})
+    assert again.status_code == 409 and "already" in again.json()["detail"]
+    assert (await api.post(url, json={"ask": ""})).status_code == 422

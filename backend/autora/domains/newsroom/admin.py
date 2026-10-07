@@ -21,7 +21,7 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import AgentRun, StateTransition, Task, WorkflowRun, WorkflowRunState
-from autora.domains.newsroom.covers import cover_of
+from autora.domains.newsroom.covers import cover_at_work, cover_of
 from autora.domains.newsroom.models import (
     AnalyticsDaily,
     Article,
@@ -228,6 +228,8 @@ class ArticleDetail(ArticleSummary):
     turned it down and why — the editor's last objection, a veto, a person's or the CEO's."""
     in_production: bool = False
     """A workflow is still at work on it (D-233): a draft without one is not being written."""
+    cover_asked: bool = False
+    """Marketing is finding its cover now (D-233: 請行銷換圖, or the story's own cover step)."""
 
 
 def cover_view(row: StoryCover | None) -> CoverView | None:
@@ -649,6 +651,7 @@ async def article_detail(
             .order_by(StateTransition.at.desc(), StateTransition.id.desc())
             .limit(1)
         ),
+        cover_asked=await cover_at_work(session, article.story_id),
         in_production=bool(
             runs
             and await session.scalar(

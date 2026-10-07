@@ -12,7 +12,7 @@ import { useState } from "react";
 
 import { articleQuery } from "@/api/queries";
 import { withCompany } from "@/features/company/CompanyScope";
-import { CoverPanel } from "@/features/newsroom/CoverPanel";
+import { CoverPanel, coverWatch } from "@/features/newsroom/CoverPanel";
 import { ARTICLE_STATE, type ArticleDetail } from "@/features/newsroom/model";
 
 import { changed, diffParagraphs, type DiffLine } from "./diff";
@@ -223,7 +223,7 @@ export function ArticlePreview({
   const [lang, setLang] = useState("zh-TW");
   const [copy, setCopy] = useState<keyof typeof COPY_LABEL>("idle");
   const queryClient = useQueryClient();
-  const head = useQuery(articleQuery(articleId));
+  const head = useQuery({ ...articleQuery(articleId), ...coverWatch });
   /** The submitted version, in the language being read — fetched if the card is still closed. */
   const onCopy = async () => {
     try {
@@ -270,7 +270,7 @@ export function ArticlePreview({
       </div>
       {head.data ? (
         <div className="mt-2">
-          <CoverPanel articleId={articleId} cover={head.data.cover} />
+          <CoverPanel articleId={articleId} cover={head.data.cover} asked={head.data.cover_asked} />
         </div>
       ) : null}
       {open && error ? (
