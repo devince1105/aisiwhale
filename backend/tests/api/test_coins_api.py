@@ -90,7 +90,7 @@ async def test_a_new_reader_holds_nothing_and_the_month_is_not_given(api, db_ses
         "tier": "free",
         "monthly": {
             "amount": 50,
-            "cap": 100,
+            "cap": 300,
             "month": month,
             "granted": False,
             "grants_on": False,  # D-238: shipped off
@@ -164,7 +164,7 @@ async def test_a_month_capped_to_nothing_is_listed(api, db_session, company, mon
     monkeypatch.setattr(policy, "MONTHLY_GRANTS_ON", True)
     reader = await _signed_in(api, db_session, "capped@example.com")
     await grant(
-        db_session, reader, requested=100, cap=100, kind=TxnKind.PROMOTION_GRANT,
+        db_session, reader, requested=300, cap=300, kind=TxnKind.PROMOTION_GRANT,
         idempotency_key=f"promo:capped:{reader}", actor=SYSTEM,
     )  # fmt: skip
     await grant_monthly(db_session, reader, tier=Tier.FREE, email_verified=True)
@@ -173,7 +173,7 @@ async def test_a_month_capped_to_nothing_is_listed(api, db_session, company, mon
     assert wallet["monthly"]["granted"] is True
     assert [(m["kind"], m["amount"]) for m in wallet["history"]["items"]] == [
         ("MONTHLY_GRANT", 0),
-        ("PROMOTION_GRANT", 100),
+        ("PROMOTION_GRANT", 300),
     ]
 
 
@@ -196,7 +196,7 @@ async def test_a_vip_s_month_is_vip_s(api, db_session, company):
     assert comp.status_code == 201, comp.text
     wallet = await _wallet(api, company)
     assert wallet["tier"] == "vip"
-    assert (wallet["monthly"]["amount"], wallet["monthly"]["cap"]) == (500, 1000)
+    assert (wallet["monthly"]["amount"], wallet["monthly"]["cap"]) == (500, 3000)
 
 
 async def test_a_signed_in_reader_may_look_at_coins(api, db_session, company):

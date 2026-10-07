@@ -223,76 +223,81 @@ function AdjustForm({ company, wallet }: { company: Company; wallet: AdminCoinWa
       await queryClient.invalidateQueries({ queryKey: ["coins"] });
     },
   });
+  // The confirmation is a <dialog> with a <form> of its own: kept outside this form, never inside
+  // it — a form within a form is not HTML, and a browser submits the inner one natively (a
+  // reload, no adjustment) instead of letting React handle it.
   return (
-    <form
-      aria-label="調整鯨幣"
-      className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (valid) setAsking(true);
-      }}
-    >
-      <label className="grid gap-1">
-        <span className="text-xs text-muted">數量（正數加、負數扣）</span>
-        <input
-          type="number"
-          required
-          step={1}
-          min={-MAX_ADJUSTMENT}
-          max={MAX_ADJUSTMENT}
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          className="w-32 rounded border border-line bg-canvas px-2 py-1"
-        />
-      </label>
-      <label className="grid flex-1 gap-1">
-        <span className="text-xs text-muted">理由（必填，讀者看不到）</span>
-        <input
-          required
-          maxLength={REASON_MAX}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          className="rounded border border-line bg-canvas px-2 py-1"
-        />
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={override} onChange={(event) => setOverride(event.target.checked)} />
-        超過上限（override）
-      </label>
-      <Button type="submit" variant="primary" disabled={!valid || adjust.isPending}>
-        調整
-      </Button>
-      {shown?.pastCap && !override ? (
-        <p role="status" className="w-full text-sm text-danger">
-          會超過{TIERS[wallet.tier]}上限 {wallet.cap.toLocaleString("zh-TW")}；要超過請勾選 override。
-        </p>
-      ) : null}
-      {adjust.isError && !asking ? (
-        <p role="alert" className="w-full text-sm text-danger">
-          沒有調整：{adjust.error.message}
-        </p>
-      ) : null}
-      {asking && shown ? (
-        <ConfirmDialog
-          title={n > 0 ? `加 ${n} 幣？` : `扣 ${-n} 幣？`}
-          confirmLabel="確認調整"
-          tone={shown.pastCap ? "danger" : "primary"}
-          busy={adjust.isPending}
-          error={adjust.isError ? adjust.error.message : null}
-          onConfirm={() => adjust.mutate()}
-          onCancel={() => setAsking(false)}
-        >
-          <p>
-            {wallet.email}：目前 {wallet.balance.toLocaleString("zh-TW")} → 調整後 {shown.after.toLocaleString("zh-TW")}
+    <>
+      <form
+        aria-label="調整鯨幣"
+        className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (valid) setAsking(true);
+        }}
+      >
+        <label className="grid gap-1">
+          <span className="text-xs text-muted">數量（正數加、負數扣）</span>
+          <input
+            type="number"
+            required
+            step={1}
+            min={-MAX_ADJUSTMENT}
+            max={MAX_ADJUSTMENT}
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            className="w-32 rounded border border-line bg-canvas px-2 py-1"
+          />
+        </label>
+        <label className="grid flex-1 gap-1">
+          <span className="text-xs text-muted">理由（必填，讀者看不到）</span>
+          <input
+            required
+            maxLength={REASON_MAX}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            className="rounded border border-line bg-canvas px-2 py-1"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={override} onChange={(event) => setOverride(event.target.checked)} />
+          超過上限（override）
+        </label>
+        <Button type="submit" variant="primary" disabled={!valid || adjust.isPending}>
+          調整
+        </Button>
+        {shown?.pastCap && !override ? (
+          <p role="status" className="w-full text-sm text-danger">
+            會超過{TIERS[wallet.tier]}上限 {wallet.cap.toLocaleString("zh-TW")}；要超過請勾選 override。
           </p>
-          {shown.pastCap && override ? (
-            <p className="mt-2 font-semibold text-danger" data-testid="override-warning">
-              這會超過{TIERS[wallet.tier]}上限 {wallet.cap.toLocaleString("zh-TW")}，確定要 override 嗎？
+        ) : null}
+        {adjust.isError && !asking ? (
+          <p role="alert" className="w-full text-sm text-danger">
+            沒有調整：{adjust.error.message}
+          </p>
+        ) : null}
+      </form>
+        {asking && shown ? (
+          <ConfirmDialog
+            title={n > 0 ? `加 ${n} 幣？` : `扣 ${-n} 幣？`}
+            confirmLabel="確認調整"
+            tone={shown.pastCap ? "danger" : "primary"}
+            busy={adjust.isPending}
+            error={adjust.isError ? adjust.error.message : null}
+            onConfirm={() => adjust.mutate()}
+            onCancel={() => setAsking(false)}
+          >
+            <p>
+              {wallet.email}：目前 {wallet.balance.toLocaleString("zh-TW")} → 調整後 {shown.after.toLocaleString("zh-TW")}
             </p>
-          ) : null}
-          <p className="mt-2">理由：{reason.trim()}</p>
-        </ConfirmDialog>
-      ) : null}
-    </form>
+            {shown.pastCap && override ? (
+              <p className="mt-2 font-semibold text-danger" data-testid="override-warning">
+                這會超過{TIERS[wallet.tier]}上限 {wallet.cap.toLocaleString("zh-TW")}，確定要 override 嗎？
+              </p>
+            ) : null}
+            <p className="mt-2">理由：{reason.trim()}</p>
+          </ConfirmDialog>
+        ) : null}
+    </>
   );
 }

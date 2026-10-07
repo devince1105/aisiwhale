@@ -21,7 +21,7 @@ MONTHLY_GRANTS_ON = False
 a coin written cannot be taken back, and the first grant should be one a reader can see. Turning
 it on is a decision of its own and a deploy, like ``entitlement.CHECKOUT_OPEN``."""
 
-POLICY_VERSION = "p3b-1"
+POLICY_VERSION = "p3b-2"
 
 GRANT_ZONE = ZoneInfo("Asia/Taipei")
 """A month starts at 00:00 on the 1st in Taipei (D-235 ②) — 16:00 UTC the day before."""
@@ -36,10 +36,11 @@ class MonthlyGrant:
 
 
 MONTHLY: dict[Tier, MonthlyGrant] = {
-    Tier.FREE: MonthlyGrant(amount=50, cap=100),
-    Tier.VIP: MonthlyGrant(amount=500, cap=1000),
+    Tier.FREE: MonthlyGrant(amount=50, cap=300),
+    Tier.VIP: MonthlyGrant(amount=500, cap=3000),
 }
-"""D-218. A tier not here (``public``) gets nothing."""
+"""D-218's monthly amounts; the caps are six months of them (raised from two, before any coin
+was given). A tier not here (``public``) gets nothing."""
 
 
 def eligible(tier: Tier, email_verified: bool) -> bool:

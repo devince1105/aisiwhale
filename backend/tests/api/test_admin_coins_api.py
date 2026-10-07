@@ -122,7 +122,7 @@ async def test_a_wallet_shows_the_tier_s_cap_and_everything_about_each_movement(
     assert (wallet["email"], wallet["tier"], wallet["cap"], wallet["balance"]) == (
         READER,
         "free",
-        100,
+        300,
         30,
     )
     (movement,) = wallet["history"]["items"]
@@ -183,11 +183,11 @@ async def test_an_adjustment_is_made_by_the_admin_signed_in_never_by_the_reader(
 async def test_up_to_the_tier_s_cap_and_past_it_only_when_overridden(
     api, db_session, reader, company
 ):
-    await _fill(db_session, reader, 90)
+    await _fill(db_session, reader, 290)
     within = await api.post(ADJUST, json=_body(company, amount=10))
     assert within.status_code == 201, within.text
-    assert (within.json()["balance_after"], within.json()["cap"]) == (100, 100)
-    assert within.json()["meta"] == {"tier": "free", "tier_cap": 100, "override_cap": False}
+    assert (within.json()["balance_after"], within.json()["cap"]) == (300, 300)
+    assert within.json()["meta"] == {"tier": "free", "tier_cap": 300, "override_cap": False}
 
     past = await api.post(ADJUST, json=_body(company, amount=1))
     assert past.status_code == 422
@@ -196,7 +196,7 @@ async def test_up_to_the_tier_s_cap_and_past_it_only_when_overridden(
 
     over = await api.post(ADJUST, json=_body(company, amount=1, override_cap=True))
     assert over.status_code == 201, over.text
-    assert (over.json()["balance_after"], over.json()["cap"]) == (101, None)
+    assert (over.json()["balance_after"], over.json()["cap"]) == (301, None)
     assert over.json()["meta"]["override_cap"] is True
 
 
@@ -207,9 +207,11 @@ async def test_a_vip_s_cap_is_a_vip_s(api, db_session, reader, company):
         json={"email": READER, "until": until, "reason": "cap test", "company": company.slug},
     )
     assert comp.status_code == 201, comp.text
-    response = await api.post(ADJUST, json=_body(company, amount=1000))
+    response = await api.post(ADJUST, json=_body(company, amount=3000))
     assert response.status_code == 201, response.text
-    assert (response.json()["cap"], response.json()["meta"]["tier"]) == (1000, "vip")
+    assert (response.json()["cap"], response.json()["meta"]["tier"]) == (3000, "vip")
+    past = await api.post(ADJUST, json=_body(company, amount=1))
+    assert past.status_code == 422, "3,000 is a VIP's cap"
 
 
 async def test_down_never_below_zero(api, db_session, reader, company):
