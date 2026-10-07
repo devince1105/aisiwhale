@@ -324,10 +324,16 @@ def build_scheduler(
     )
     scheduler.register(STATS_SCHEDULE, cards.schedule_handler())
     # every 13F filer's quarter from SEC's daily index, for 機構排行 (HD-08), only live
+    # and, from their whole tables streamed, units in doubt and the 100 largest's pages (HD-10)
+    from autora.domains.newsroom.institution_details import DETAILS_SCHEDULE, DetailsKeeper
+    from autora.domains.newsroom.settings import user_agent
     from autora.domains.newsroom.thirteenf_index import INDEX_SCHEDULE, IndexKeeper
+    from autora.domains.newsroom.thirteenf_tables import sec_chunks
 
     sec = HoldingsKeeper(fetcher).fetch if live else None
-    scheduler.register(INDEX_SCHEDULE, IndexKeeper(sec).schedule_handler())
+    tables = sec_chunks(user_agent(settings.fetch_contact_email)) if live and settings else None
+    scheduler.register(INDEX_SCHEDULE, IndexKeeper(sec, tables).schedule_handler())
+    scheduler.register(DETAILS_SCHEDULE, DetailsKeeper(sec, tables).schedule_handler())
     # every listed stock, to look one up (D-061); offline, nothing is asked of anybody
     finnhub = settings.finnhub_api_key if live and settings else None
     keeper = SecuritiesKeeper(

@@ -224,6 +224,23 @@ async def test_the_cover_pages_are_read_latest_filed_first_and_kept(db_session):
         NOW,
     )
     assert (await db_session.get(ThirteenFFiling, ARINI[1])).read_at is None  # the next run's
+    assert third.scale == 1  # US$109 million an entry: dollars, beyond doubt (HD-10)
+
+
+async def test_a_cover_page_whose_entries_average_little_is_in_doubt(db_session):
+    listed(db_session, THIRD_POINT)
+    await db_session.flush()
+    # the same 43 entries, said to be worth US$4.7 million: about US$109,000 each
+    pages = {
+        url: body.replace(b"4679571988", b"4679571") for url, body in covers(THIRD_POINT).items()
+    }
+
+    await read_summaries(db_session, sec(pages), rate=0, now=NOW)
+
+    assert (await db_session.get(ThirteenFFiling, THIRD_POINT[1])).scale is None
+    assert thirteenf_index.in_doubt(4722, 999_124_702)  # T. Rowe Price, 2026Q2
+    assert not thirteenf_index.in_doubt(49_968, 6_729_540_000_000)  # BlackRock
+    assert not thirteenf_index.in_doubt(5, 1000)  # too few entries to tell
 
 
 async def test_a_filing_that_cannot_be_read_is_tried_three_times(db_session):
@@ -293,6 +310,32 @@ async def test_sec_answering_slowly_stops_the_cover_pages_and_counts_no_attempt(
     assert datetime.now(UTC) - started < timedelta(seconds=0.4)
 
 
+async def test_a_run_ends_with_its_budget_not_with_the_last_turn(db_session):
+    listed(db_session, THIRD_POINT, ARTEMIS, ARINI, SUNFLOWER)
+    await db_session.flush()
+    started = datetime.now(UTC)
+
+    read = await read_summaries(
+        db_session, sec(covers(THIRD_POINT, ARTEMIS, ARINI, SUNFLOWER)), rate=2, budget=0.6, now=NOW
+    )
+
+    # turns at 0, 0.5, 1.0 and 1.5 seconds: two within the budget, and nobody waits for the rest
+    assert read == 2
+    assert datetime.now(UTC) - started < timedelta(seconds=0.9)
+
+
+async def test_four_at_a_time_are_all_counted(db_session):
+    listed(db_session, THIRD_POINT, ARTEMIS, ARINI, SUNFLOWER)
+    await db_session.flush()
+    pages = covers(THIRD_POINT, ARTEMIS, ARINI, SUNFLOWER)
+
+    async def slowish(url: str) -> bytes:
+        await asyncio.sleep(0.01)  # each read waits while the others start
+        return pages[url]
+
+    assert await read_summaries(db_session, slowish, concurrency=4, rate=0, now=NOW) == 4
+
+
 async def test_the_runs_keep_to_the_rate(db_session):
     listed(db_session, THIRD_POINT, ARTEMIS, ARINI)
     await db_session.flush()
@@ -332,7 +375,9 @@ async def test_a_quarter_restated_is_the_restatement_and_new_holdings_are_added(
     assert by_cik["1818759"].accession == SUNFLOWER[1]
 
 
-def filing(accession, *, form="13F-HR", amendment=None, filed, value, entries=1, kind=None):
+def filing(
+    accession, *, form="13F-HR", amendment=None, filed, value, entries=1, kind=None, scale=1
+):
     return ThirteenFFiling(
         accession=accession,
         cik="1",
@@ -347,7 +392,33 @@ def filing(accession, *, form="13F-HR", amendment=None, filed, value, entries=1,
         value_usd=value,
         read_at=NOW,
         attempts=0,
+        scale=scale,
     )
+
+
+def test_a_total_is_in_dollars_and_says_what_it_is_made_of():
+    a = "13F-HR/A"
+    (total,) = totals(
+        [
+            filing("1", filed=date(2026, 8, 1), value=1_000, scale=1000),  # T. Rowe's way
+            filing(
+                "2", form=a, amendment=NEW_HOLDINGS, filed=date(2026, 8, 2), value=7, scale=None
+            ),
+        ]
+    )
+
+    assert total.value_usd == 1_000_000 + 7
+    assert (total.accessions, total.in_thousands, total.in_doubt) == (("1", "2"), True, True)
+    assert [f.accession for f in thirteenf_index.composition([])] == []
+
+
+def test_the_ranked_quarter_is_the_latest_all_due():
+    assert thirteenf_index.quarter_end(date(2026, 10, 7)) == date(2026, 12, 31)
+    assert thirteenf_index.previous_period(date(2026, 3, 31)) == date(2025, 12, 31)
+    assert thirteenf_index.ranked_period(date(2026, 8, 14)) == date(2026, 3, 31)  # due today
+    assert thirteenf_index.ranked_period(date(2026, 8, 15)) == date(2026, 6, 30)
+    assert thirteenf_index.ranked_period(date(2026, 10, 7)) == date(2026, 6, 30)
+    assert thirteenf_index.ranked_period(date(2027, 2, 15)) == date(2026, 12, 31)
 
 
 def test_new_holdings_before_a_restatement_are_in_it_and_after_are_added():
@@ -380,3 +451,85 @@ def test_a_second_original_replaces_the_first_and_a_notice_or_lone_addition_is_n
     unread = filing("1", filed=date(2026, 8, 1), value=100)
     unread.read_at = None
     assert totals([unread]) == []
+
+
+# --- dollars or thousands (HD-10) ----------------------------------------------------------------
+
+
+async def test_filings_in_doubt_have_their_first_rows_read_largest_first(db_session):
+    from tests.newsroom.test_thirteenf_tables import chunked, row, table
+
+    def doubtful(cik, accession, value):
+        return ThirteenFFiling(
+            accession=accession, cik=cik, company="x", form="13F-HR", filed=date(2026, 8, 14),
+            period=Q2, entries=500, value_usd=value, read_at=NOW, attempts=0, scale=None,
+            scale_attempts=0,
+        )  # fmt: skip
+
+    db_session.add_all(
+        [
+            doubtful("80255", "0000080255-26-000001", 999_124_702),  # in thousands
+            doubtful("2", "0000000002-26-000001", 5_000_000),  # a small adviser, in dollars
+            doubtful("3", "0000000003-26-000001", 1_000),  # its table is not there
+        ]
+    )
+    await db_session.flush()
+    listings, bodies = {}, {}
+    rows = {
+        "80255": [row(f"CO {n}", f"{n:09d}", 150, 1000) for n in range(1, 400)],
+        "2": [row(f"CO {n}", f"{n:09d}", 150_000, 1000) for n in range(1, 30)],
+    }
+    for cik, accession in (("80255", "0000080255-26-000001"), ("2", "0000000002-26-000001"),
+                           ("3", "0000000003-26-000001")):  # fmt: skip
+        f = folder(cik, accession)
+        listings[f"{f}/index.json"] = (
+            b'{"directory": {"item": [{"name": "primary_doc.xml"}, {"name": "t.xml"}]}}'
+        )
+        if cik in rows:
+            bodies[f"{f}/t.xml"] = table(*rows[cik])
+    asked: list[str] = []
+
+    checked = await thirteenf_index.check_scales(
+        db_session, sec(listings, asked), chunked(bodies), concurrency=1, rate=0
+    )
+
+    assert checked == 2
+    assert [u.split("/")[-3] for u in asked] == ["80255", "2", "3"]  # largest first
+    trowe = await db_session.get(ThirteenFFiling, "0000080255-26-000001")
+    small = await db_session.get(ThirteenFFiling, "0000000002-26-000001")
+    missing = await db_session.get(ThirteenFFiling, "0000000003-26-000001")
+    assert (trowe.scale, small.scale) == (1000, 1)
+    assert (missing.scale, missing.scale_attempts) == (None, 1)
+    (total,) = totals([trowe])
+    assert total.value_usd == 999_124_702_000 and total.in_thousands
+
+
+async def test_sec_answering_slowly_stops_the_checks_and_counts_no_attempt(db_session):
+    db_session.add(
+        ThirteenFFiling(
+            accession="0000000009-26-000001",
+            cik="9",
+            company="x",
+            form="13F-HR",
+            filed=date(2026, 8, 14),
+            period=Q2,
+            entries=500,
+            value_usd=1000,
+            read_at=NOW,
+            attempts=0,
+            scale=None,
+            scale_attempts=0,
+        )  # fmt: skip
+    )
+    await db_session.flush()
+
+    async def slow(url: str) -> bytes:
+        raise FetchUnavailable(f"{url} answered 503")
+
+    async def no_chunks(url: str):
+        raise AssertionError("not asked")
+        yield b""
+
+    assert await thirteenf_index.check_scales(db_session, slow, no_chunks, rate=0) == 0
+    f = await db_session.get(ThirteenFFiling, "0000000009-26-000001")
+    assert (f.scale, f.scale_attempts) == (None, 0)

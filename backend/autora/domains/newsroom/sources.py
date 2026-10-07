@@ -319,6 +319,7 @@ async def ensure_newsroom_schedules(
     the first prices of one just asked about (D-061); the news headlines' tone (D-091); and the
     hourly look at whether anything has been published in a day (D-131)."""
     from autora.domains.newsroom.holdings import HOLDINGS_CRON, HOLDINGS_SCHEDULE
+    from autora.domains.newsroom.institution_details import DETAILS_CRON, DETAILS_SCHEDULE
     from autora.domains.newsroom.official_trades import OFFICIAL_CRON, OFFICIAL_SCHEDULE
     from autora.domains.newsroom.portfolios import STATS_CRON, STATS_SCHEDULE
     from autora.domains.newsroom.price_history import (
@@ -340,6 +341,7 @@ async def ensure_newsroom_schedules(
         (HOLDINGS_SCHEDULE, HOLDINGS_CRON),
         (STATS_SCHEDULE, STATS_CRON),  # the holdings dashboard's cards (HD-04)
         (INDEX_SCHEDULE, INDEX_CRON),  # every 13F filer's quarter, for 機構排行 (HD-08)
+        (DETAILS_SCHEDULE, DETAILS_CRON),  # the 100 largest's pages, and those asked (HD-10)
         (OFFICIAL_SCHEDULE, OFFICIAL_CRON),
         (PRICES_SCHEDULE, PRICES_CRON),
         (FILL_SCHEDULE, FILL_CRON),

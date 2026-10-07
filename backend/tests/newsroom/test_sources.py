@@ -195,6 +195,11 @@ async def test_add_source_validates_and_creates_one_schedule(db_session):
             ),  # HD-04
             ("newsroom.refresh_13f_index", "newsroom.refresh_13f_index", "*/10 * * * *"),  # HD-08
             (
+                "newsroom.refresh_institution_details",
+                "newsroom.refresh_institution_details",
+                "5-59/10 * * * *",
+            ),  # HD-10
+            (
                 "newsroom.refresh_official_trades",
                 "newsroom.refresh_official_trades",
                 "20 */6 * * *",

@@ -373,6 +373,14 @@ class PriceAsk(Base):
     asked_at: Mapped[datetime]
 
 
+class InstitutionDetailStatus(StrEnum):
+    QUEUED = "queued"
+    """Asked for by a reader, not worked out yet."""
+    READY = "ready"
+    FAILED = "failed"
+    """Could not be worked out ``institution_details.MAX_ATTEMPTS`` times."""
+
+
 class ThirteenFFiling(Base):
     """A 13F-HR or its amendment, from SEC's daily index (HD-08): every filer's, for 機構排行.
     Listed first (who, which form, when filed); its cover page read after, a few hundred a run
@@ -415,6 +423,59 @@ class ThirteenFFiling(Base):
     """Why the cover page could not be read, the last time."""
     attempts: Mapped[int] = mapped_column(server_default="0")
     """Failed reads; at ``thirteenf_index.MAX_ATTEMPTS`` it is not tried again."""
+    scale: Mapped[int | None]
+    """What its values are multiplied by to be dollars (HD-10): 1, or 1000 for a filing in
+    thousands; None while in doubt and not yet checked (``thirteenf_index.check_scales``)."""
+    scale_attempts: Mapped[int] = mapped_column(server_default="0")
+    """Failed reads of its table for ``scale``."""
+
+
+class InstitutionDetail(Base):
+    """One 13F filer's quarter worked out from its whole information tables (HD-10): its
+    largest holdings, its biggest buys and sells against the quarter before, and an estimate of
+    what it bought and sold — what an institution's page shows. Only the results are kept, not
+    the tables (BlackRock's has 50,000 rows a quarter).
+
+    Worked out for the ranking's 100 largest, and for any other a reader opens (``queued``
+    until then). Market data, not the company's: no ``company_id``."""
+
+    __tablename__ = "institution_details"
+    __table_args__ = (
+        check_in("status", InstitutionDetailStatus),
+        Index("ix_institution_details_queue", "status", "requested_at"),
+    )
+
+    cik: Mapped[str] = mapped_column(primary_key=True)
+    period: Mapped[date] = mapped_column(Date, primary_key=True)
+    status: Mapped[str]
+    requested_at: Mapped[datetime | None]
+    """When a reader asked for it (the queue's order); None for the 100 largest."""
+    computed_at: Mapped[datetime | None]
+    attempts: Mapped[int] = mapped_column(server_default="0")
+    error: Mapped[str | None]
+    accessions: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default=text("'{}'::text[]"))
+    """The quarter's filings it was worked out from: a new one (an amendment) means again."""
+    previous_period: Mapped[date | None] = mapped_column(Date)
+    """The quarter compared with; None when that one is not known."""
+    in_thousands: Mapped[bool] = mapped_column(server_default="false")
+    value_usd: Mapped[int | None] = mapped_column(Numeric(20, 0))
+    """All of the quarter's positions, in dollars (options at their underlying's value)."""
+    stock_value_usd: Mapped[int | None] = mapped_column(Numeric(20, 0))
+    """Shares held long (no options, no principal amounts): what the rest is about."""
+    stocks: Mapped[int | None]
+    previous_stock_value_usd: Mapped[int | None] = mapped_column(Numeric(20, 0))
+    net_bought_usd: Mapped[int | None] = mapped_column(Numeric(20, 0))
+    """The estimate: each holding's change in shares at its quarter-end price, added up —
+    bought less sold. None without the quarter before."""
+    counts: Mapped[dict[str, Any]] = mapped_column(server_default=text("'{}'::jsonb"))
+    """``new``, ``increased``, ``decreased``, ``sold_out``, ``unchanged``; ``uncertain`` — held
+    both quarters at a price so different (a split, most likely) that no trade is estimated."""
+    top: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    """The ``institution_details.TOP`` largest stock holdings."""
+    bought: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    """The ``institution_details.MOVES`` largest estimated buys (new positions included)."""
+    sold: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    """The ``institution_details.MOVES`` largest estimated sales (sold out included)."""
 
 
 class ThirteenFIndexDay(Base):
