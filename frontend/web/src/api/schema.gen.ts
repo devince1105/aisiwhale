@@ -465,7 +465,8 @@ export interface paths {
         /**
          * Set Article Access
          * @description Put an article behind the paywall, or take it out. A person's decision for now: what is
-         *     worth paying for is a judgement about the reader, and no rule here would be honest.
+         *     worth paying for is a judgement about the reader, and no rule here would be honest. COIN
+         *     (D-249) is only ever set here; readers who already unlocked it keep it, whatever it becomes.
          */
         post: operations["set_article_access_api_articles__article_id__access_post"];
         delete?: never;
@@ -1512,6 +1513,44 @@ export interface paths {
         get: operations["get_coins_api_me_coins_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/unlocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unlocked
+         * @description What the reader unlocked: the site marks those 已解鎖 on its lists. A reader's own few, so
+         *     all of them at once.
+         */
+        get: operations["unlocked_api_me_unlocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/unlocks/{article_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unlock */
+        post: operations["unlock_api_me_unlocks__article_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2642,13 +2681,28 @@ export interface components {
         ApprovalState: "PENDING" | "APPROVED" | "REJECTED" | "RETURNED" | "EXPIRED";
         /**
          * ArticleAccess
-         * @description Who may read the whole thing (D-025). Most articles are FREE; some are for members.
+         * @description Who may read the whole thing (D-025). Most articles are FREE; some are for members; and
+         *     some are read for Whale Coins, each reader paying once (COIN, P4, D-249).
          * @enum {string}
          */
-        ArticleAccess: "free" | "members";
+        ArticleAccess: "free" | "members" | "coin";
         /** ArticleAccessBody */
         ArticleAccessBody: {
             access: components["schemas"]["ArticleAccess"];
+            /** Coin Price */
+            coin_price?: number | null;
+        };
+        /** ArticleAccessView */
+        ArticleAccessView: {
+            /** Access */
+            access: string;
+            /**
+             * Article Id
+             * Format: uuid
+             */
+            article_id: string;
+            /** Coin Price */
+            coin_price: number | null;
         };
         /** ArticleDetail */
         ArticleDetail: {
@@ -2661,6 +2715,8 @@ export interface components {
             analytics: components["schemas"]["DailyView"][];
             /** Claims */
             claims: components["schemas"]["ClaimView"][];
+            /** Coin Price */
+            coin_price?: number | null;
             /**
              * Company Id
              * Format: uuid
@@ -2791,6 +2847,8 @@ export interface components {
              * @default free
              */
             access: string;
+            /** Coin Price */
+            coin_price?: number | null;
             /**
              * Id
              * Format: uuid
@@ -3075,10 +3133,18 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** CoinArticle */
+        CoinArticle: {
+            /** Path */
+            path: string | null;
+            /** Title */
+            title: string;
+        };
         /** CoinMovement */
         CoinMovement: {
             /** Amount */
             amount: number;
+            article?: components["schemas"]["CoinArticle"] | null;
             /** Balance After */
             balance_after: number;
             /**
@@ -4402,6 +4468,8 @@ export interface components {
             article_id: string;
             /** Blocks */
             blocks: components["schemas"]["PublicBlock"][];
+            /** Coin Price */
+            coin_price?: number | null;
             /** Company */
             company: string;
             /**
@@ -4419,7 +4487,7 @@ export interface components {
                 [key: string]: string;
             };
             /** Lock */
-            lock?: ("members" | "sign_in") | null;
+            lock?: ("members" | "sign_in" | "coin") | null;
             /**
              * Locked
              * @default false
@@ -4451,6 +4519,11 @@ export interface components {
             summary: string | null;
             /** Title */
             title: string;
+            /**
+             * Unlocked
+             * @default false
+             */
+            unlocked: boolean;
         };
         /** PublicArticleSummary */
         PublicArticleSummary: {
@@ -4464,6 +4537,8 @@ export interface components {
              * Format: uuid
              */
             article_id: string;
+            /** Coin Price */
+            coin_price?: number | null;
             cover?: components["schemas"]["PublicCover"] | null;
             /** Lang */
             lang: string;
@@ -6032,6 +6107,40 @@ export interface components {
             seq: number;
             step: components["schemas"]["StepView"] | null;
         };
+        /** UnlockResult */
+        UnlockResult: {
+            /** Already */
+            already: boolean;
+            /**
+             * Article Id
+             * Format: uuid
+             */
+            article_id: string;
+            /** Balance */
+            balance: number;
+            /** Price */
+            price: number;
+            /**
+             * Unlocked
+             * @default true
+             */
+            unlocked: boolean;
+        };
+        /** UnlockedArticle */
+        UnlockedArticle: {
+            /**
+             * Article Id
+             * Format: uuid
+             */
+            article_id: string;
+            /** Price Paid */
+            price_paid: number;
+            /**
+             * Unlocked At
+             * Format: date-time
+             */
+            unlocked_at: string;
+        };
         /** UnpublishBody */
         UnpublishBody: {
             /** Reason */
@@ -7260,9 +7369,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["ArticleAccessView"];
                 };
             };
             /** @description Validation Error */
@@ -9252,6 +9359,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoinWallet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlocked_api_me_unlocks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnlockedArticle"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlock_api_me_unlocks__article_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: {
+                autora_reader?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnlockResult"];
                 };
             };
             /** @description Validation Error */

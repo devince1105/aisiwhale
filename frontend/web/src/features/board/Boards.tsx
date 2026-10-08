@@ -71,7 +71,7 @@ export function ArticleBoard({ companyId, onOpen }: { companyId: string; onOpen?
         column: a.state,
         title: a.title,
         href: `/admin/newsroom/articles/${a.id}`,
-        meta: `v${a.version ?? "—"}・${a.access === "members" ? "VIP" : "免費"}・${formatTime(a.updated_at)}`,
+        meta: `v${a.version ?? "—"}・${a.access === "members" ? "VIP" : a.access === "coin" ? `鯨幣 ${a.coin_price}` : "免費"}・${formatTime(a.updated_at)}`,
       })),
     ]),
   );

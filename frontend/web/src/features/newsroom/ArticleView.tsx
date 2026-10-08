@@ -24,8 +24,9 @@ export interface OnSite {
   unpublish: (reason: string) => void;
   republish: () => void;
   revise: (reason: string) => void;
-  /** VIP or free (D-159): the editor-in-chief's choice, which a person may change. */
-  setAccess?: (access: "free" | "members") => void;
+  /** VIP or free (D-159): the editor-in-chief's choice, which a person may change; or COIN at a
+   * price (D-249), which only a person sets. */
+  setAccess?: (access: ArticleAccess, coinPrice?: number) => void;
   /** Where it goes on the site (D-208); null: what its story's sources say. */
   setSection?: (section: SiteSection | null) => void;
   busy: boolean;
@@ -101,9 +102,20 @@ function SiteControls({ article, onSite }: { article: ArticleDetail; onSite: OnS
   );
 }
 
-/** Free or VIP (D-159): the editor-in-chief set it at her final review; a person may change it. */
+export type ArticleAccess = "free" | "members" | "coin";
+export const COIN_PRICE = { min: 1, max: 100, default: 5 };
+
+const ACCESS_NAMES: Record<ArticleAccess, string> = { free: "免費", members: "VIP", coin: "鯨幣" };
+
+/** Free or VIP (D-159): the editor-in-chief set it at her final review; a person may change it.
+ * Or COIN (D-249): read for coins at a price only a person sets — the chief leaves it alone. */
 function AccessControl({ article, onSite }: { article: ArticleDetail; onSite: OnSite }) {
-  const vip = article.access === "members";
+  const current = (article.access ?? "free") as ArticleAccess;
+  const [pricing, setPricing] = useState(current === "coin");
+  const [price, setPrice] = useState(String(article.coin_price ?? COIN_PRICE.default));
+  const n = Number(price);
+  const validPrice = Number.isInteger(n) && n >= COIN_PRICE.min && n <= COIN_PRICE.max;
+  const pressed = (value: ArticleAccess) => (value === "coin" ? pricing : !pricing && value === current);
   return (
     <section aria-label="閱讀權限" data-testid="access-control" className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-4 text-sm">
       <span className="text-muted">閱讀權限：</span>
@@ -112,21 +124,59 @@ function AccessControl({ article, onSite }: { article: ArticleDetail; onSite: On
           [
             ["free", "免費"],
             ["members", "VIP（會員看全文）"],
+            ["coin", "鯨幣解鎖"],
           ] as const
         ).map(([value, name]) => (
           <button
             key={value}
             type="button"
-            aria-pressed={(value === "members") === vip}
+            aria-pressed={pressed(value)}
             disabled={onSite.busy}
-            onClick={() => onSite.setAccess!(value)}
-            className={`rounded-md px-3 py-1 ${(value === "members") === vip ? "bg-accent text-canvas" : "text-muted"} disabled:opacity-50`}
+            onClick={() => {
+              if (value === "coin") {
+                setPricing(true); // a price first: COIN is set with it
+              } else {
+                setPricing(false);
+                onSite.setAccess!(value);
+              }
+            }}
+            className={`rounded-md px-3 py-1 ${pressed(value) ? "bg-accent text-canvas" : "text-muted"} disabled:opacity-50`}
           >
             {name}
           </button>
         ))}
       </div>
-      <span className="text-muted">總編在終審時依 VIP 原則決定，可在這裡改。</span>
+      {pricing ? (
+        <span className="flex items-center gap-2">
+          <label className="flex items-center gap-1">
+            <span className="text-muted">價格</span>
+            <input
+              type="number"
+              step={1}
+              min={COIN_PRICE.min}
+              max={COIN_PRICE.max}
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              aria-label="鯨幣價格（1～100）"
+              className="w-20 rounded border border-line bg-canvas px-2 py-1"
+            />
+            <span className="text-muted">幣</span>
+          </label>
+          <button
+            type="button"
+            disabled={onSite.busy || !validPrice || (current === "coin" && n === article.coin_price)}
+            onClick={() => onSite.setAccess!("coin", n)}
+            className="rounded-md bg-accent px-3 py-1 text-canvas disabled:opacity-50"
+          >
+            {current === "coin" ? "更新價格" : "設為鯨幣解鎖"}
+          </button>
+        </span>
+      ) : null}
+      <span className="text-muted">
+        {current === "coin"
+          ? `目前是鯨幣解鎖，${article.coin_price} 幣；總編不會改動。已解鎖的讀者在改價或改回免費後仍可閱讀。`
+          : "總編在終審時依 VIP 原則決定，可在這裡改；鯨幣解鎖只能由人設定。"}
+      </span>
     </section>
   );
 }
@@ -180,7 +230,12 @@ export function ArticleProperties({ article }: { article: ArticleSummaryLike }) 
             {article.story_title}
           </Link>,
         ],
-        ["閱讀權限", article.access === "members" ? "VIP" : "免費"],
+        [
+          "閱讀權限",
+          article.access === "coin"
+            ? `${ACCESS_NAMES.coin} ${article.coin_price} 幣`
+            : ACCESS_NAMES[(article.access ?? "free") as ArticleAccess],
+        ],
         ["修訂", article.revision_count ? `${article.revision_count} 次` : "—"],
         ["發布", article.published_at ? formatTime(article.published_at) : "尚未發布"],
         [
@@ -204,7 +259,7 @@ export function ArticleProperties({ article }: { article: ArticleSummaryLike }) 
 
 type ArticleSummaryLike = Pick<
   ArticleDetail,
-  "state" | "story_id" | "story_title" | "access" | "revision_count" | "published_at" | "public_urls"
+  "state" | "story_id" | "story_title" | "access" | "coin_price" | "revision_count" | "published_at" | "public_urls"
 >;
 
 export function ArticleView({
@@ -239,7 +294,10 @@ export function ArticleView({
   const side = (
     <>
       <ArticleProperties article={article} />
-      {onSite?.setAccess ? <AccessControl article={article} onSite={onSite} /> : null}
+      {onSite?.setAccess ? (
+        // a new access or price from the server starts the control afresh
+        <AccessControl key={`${article.access}:${article.coin_price ?? ""}`} article={article} onSite={onSite} />
+      ) : null}
       {onSite?.setSection ? <SectionControl article={article} onSite={onSite} /> : null}
       {onSite ? <SiteControls article={article} onSite={onSite} /> : null}
       {activity}

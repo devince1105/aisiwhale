@@ -1151,10 +1151,11 @@
     "type": "string"
    },
    "ArticleAccess": {
-    "description": "Who may read the whole thing (D-025). Most articles are FREE; some are for members.",
+    "description": "Who may read the whole thing (D-025). Most articles are FREE; some are for members; and\nsome are read for Whale Coins, each reader paying once (COIN, P4, D-249).",
     "enum": [
      "free",
-     "members"
+     "members",
+     "coin"
     ],
     "title": "ArticleAccess",
     "type": "string"
@@ -1163,12 +1164,56 @@
     "properties": {
      "access": {
       "$ref": "#/components/schemas/ArticleAccess"
+     },
+     "coin_price": {
+      "anyOf": [
+       {
+        "maximum": 100.0,
+        "minimum": 1.0,
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
      }
     },
     "required": [
      "access"
     ],
     "title": "ArticleAccessBody",
+    "type": "object"
+   },
+   "ArticleAccessView": {
+    "properties": {
+     "access": {
+      "title": "Access",
+      "type": "string"
+     },
+     "article_id": {
+      "format": "uuid",
+      "title": "Article Id",
+      "type": "string"
+     },
+     "coin_price": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
+     }
+    },
+    "required": [
+     "article_id",
+     "access",
+     "coin_price"
+    ],
+    "title": "ArticleAccessView",
     "type": "object"
    },
    "ArticleDetail": {
@@ -1191,6 +1236,17 @@
       },
       "title": "Claims",
       "type": "array"
+     },
+     "coin_price": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
      },
      "company_id": {
       "format": "uuid",
@@ -1537,6 +1593,17 @@
       "default": "free",
       "title": "Access",
       "type": "string"
+     },
+     "coin_price": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
      },
      "id": {
       "format": "uuid",
@@ -2291,11 +2358,46 @@
     "title": "ClaimView",
     "type": "object"
    },
+   "CoinArticle": {
+    "properties": {
+     "path": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Path"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title",
+     "path"
+    ],
+    "title": "CoinArticle",
+    "type": "object"
+   },
    "CoinMovement": {
     "properties": {
      "amount": {
       "title": "Amount",
       "type": "integer"
+     },
+     "article": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CoinArticle"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "balance_after": {
       "title": "Balance After",
@@ -5599,6 +5701,17 @@
       "title": "Blocks",
       "type": "array"
      },
+     "coin_price": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
+     },
      "company": {
       "title": "Company",
       "type": "string"
@@ -5638,7 +5751,8 @@
        {
         "enum": [
          "members",
-         "sign_in"
+         "sign_in",
+         "coin"
         ],
         "type": "string"
        },
@@ -5738,6 +5852,11 @@
      "title": {
       "title": "Title",
       "type": "string"
+     },
+     "unlocked": {
+      "default": false,
+      "title": "Unlocked",
+      "type": "boolean"
      }
     },
     "required": [
@@ -5769,6 +5888,17 @@
       "format": "uuid",
       "title": "Article Id",
       "type": "string"
+     },
+     "coin_price": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Coin Price"
      },
      "cover": {
       "anyOf": [
@@ -10273,6 +10403,65 @@
     "title": "TraceEntry",
     "type": "object"
    },
+   "UnlockResult": {
+    "properties": {
+     "already": {
+      "title": "Already",
+      "type": "boolean"
+     },
+     "article_id": {
+      "format": "uuid",
+      "title": "Article Id",
+      "type": "string"
+     },
+     "balance": {
+      "title": "Balance",
+      "type": "integer"
+     },
+     "price": {
+      "title": "Price",
+      "type": "integer"
+     },
+     "unlocked": {
+      "default": true,
+      "title": "Unlocked",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "article_id",
+     "already",
+     "price",
+     "balance"
+    ],
+    "title": "UnlockResult",
+    "type": "object"
+   },
+   "UnlockedArticle": {
+    "properties": {
+     "article_id": {
+      "format": "uuid",
+      "title": "Article Id",
+      "type": "string"
+     },
+     "price_paid": {
+      "title": "Price Paid",
+      "type": "integer"
+     },
+     "unlocked_at": {
+      "format": "date-time",
+      "title": "Unlocked At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "article_id",
+     "price_paid",
+     "unlocked_at"
+    ],
+    "title": "UnlockedArticle",
+    "type": "object"
+   },
    "UnpublishBody": {
     "properties": {
      "reason": {
@@ -13218,7 +13407,7 @@
   },
   "/api/articles/{article_id}/access": {
    "post": {
-    "description": "Put an article behind the paywall, or take it out. A person's decision for now: what is\nworth paying for is a judgement about the reader, and no rule here would be honest.",
+    "description": "Put an article behind the paywall, or take it out. A person's decision for now: what is\nworth paying for is a judgement about the reader, and no rule here would be honest. COIN\n(D-249) is only ever set here; readers who already unlocked it keep it, whatever it becomes.",
     "operationId": "set_article_access_api_articles__article_id__access_post",
     "parameters": [
      {
@@ -13263,11 +13452,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "additionalProperties": {
-          "type": "string"
-         },
-         "title": "Response Set Article Access Api Articles  Article Id  Access Post",
-         "type": "object"
+         "$ref": "#/components/schemas/ArticleAccessView"
         }
        }
       },
@@ -17757,6 +17942,119 @@
      }
     },
     "summary": "Get Coins",
+    "tags": [
+     "coins"
+    ]
+   }
+  },
+  "/api/me/unlocks": {
+   "get": {
+    "description": "What the reader unlocked: the site marks those 已解鎖 on its lists. A reader's own few, so\nall of them at once.",
+    "operationId": "unlocked_api_me_unlocks_get",
+    "parameters": [
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/UnlockedArticle"
+         },
+         "title": "Response Unlocked Api Me Unlocks Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Unlocked",
+    "tags": [
+     "coins"
+    ]
+   }
+  },
+  "/api/me/unlocks/{article_id}": {
+   "post": {
+    "operationId": "unlock_api_me_unlocks__article_id__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "article_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Article Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "cookie",
+      "name": "autora_reader",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Autora Reader"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UnlockResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Unlock",
     "tags": [
      "coins"
     ]

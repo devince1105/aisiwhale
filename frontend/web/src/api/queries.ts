@@ -419,12 +419,18 @@ export async function reviseArticle(articleId: string, reason: string, api: ApiC
   );
 }
 
-/** Make an article VIP (members read all of it) or free again (D-025, D-159). */
-export async function setArticleAccess(articleId: string, access: "free" | "members", api: ApiClient = defaultApi) {
+/** Make an article VIP (members read all of it), free again (D-025, D-159), or COIN at a price
+ * (D-249; the server's 5 when none is given). */
+export async function setArticleAccess(
+  articleId: string,
+  access: "free" | "members" | "coin",
+  coinPrice?: number,
+  api: ApiClient = defaultApi,
+) {
   return unwrap(
     await api.POST("/api/articles/{article_id}/access", {
       params: { path: { article_id: articleId } },
-      body: { access },
+      body: access === "coin" && coinPrice !== undefined ? { access, coin_price: coinPrice } : { access },
     }),
   );
 }

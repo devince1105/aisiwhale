@@ -10,7 +10,7 @@ import { eventToQueryKeys } from "@/api/invalidation";
 import { articleQuery, queryKeys, storiesQuery, workflowEventsQuery } from "@/api/queries";
 
 import { ArticlesView } from "./ArticlesView";
-import { ArticleView } from "./ArticleView";
+import { ArticleProperties, ArticleView } from "./ArticleView";
 import { claimNumbers, orderedClaims, problems, type ArticleDetail, type ClaimView, type StoryDetail } from "./model";
 import { AddSourceForm, SourcesView, sourceConfig } from "./SourcesView";
 import { StoriesView } from "./StoriesView";
@@ -151,6 +151,41 @@ describe("taking an article off the site (D-044)", () => {
     expect(controls.setAccess).toHaveBeenCalledWith("members");
     rerender(<ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED", access: "members" }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />);
     expect(within(screen.getByTestId("access-control")).getByRole("button", { name: "VIP（會員看全文）" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("COIN at a price only a person sets: 5 unless changed, 1 to 100 (D-249)", () => {
+    const controls = { ...onSite(), setAccess: vi.fn() };
+    const view = (patch: Partial<ArticleDetail>) => (
+      <ArticleView article={{ ...ARTICLE_DETAIL, state: "PUBLISHED", ...patch }} lang="zh-TW" onLang={vi.fn()} events={[]} onSite={controls} />
+    );
+    const { rerender } = render(view({}));
+    let box = within(screen.getByTestId("access-control"));
+    expect(box.queryByLabelText("鯨幣價格（1～100）")).toBeNull();
+    fireEvent.click(box.getByRole("button", { name: "鯨幣解鎖" }));
+    expect(controls.setAccess).not.toHaveBeenCalled(); // a price first
+    const price = box.getByLabelText("鯨幣價格（1～100）") as HTMLInputElement;
+    expect(price.value).toBe("5");
+    const set = box.getByRole("button", { name: "設為鯨幣解鎖" }) as HTMLButtonElement;
+    for (const bad of ["0", "101", "2.5", ""]) {
+      fireEvent.change(price, { target: { value: bad } });
+      expect(set.disabled).toBe(true);
+    }
+    fireEvent.change(price, { target: { value: "12" } });
+    fireEvent.click(set);
+    expect(controls.setAccess).toHaveBeenCalledWith("coin", 12);
+
+    rerender(view({ access: "coin", coin_price: 12 }));
+    box = within(screen.getByTestId("access-control"));
+    expect(box.getByRole("button", { name: "鯨幣解鎖" }).getAttribute("aria-pressed")).toBe("true");
+    expect((box.getByRole("button", { name: "更新價格" }) as HTMLButtonElement).disabled).toBe(true); // unchanged
+    expect(screen.getByTestId("access-control").textContent).toContain("總編不會改動");
+    fireEvent.click(box.getByRole("button", { name: "免費" }));
+    expect(controls.setAccess).toHaveBeenLastCalledWith("free");
+  });
+
+  it("the properties say COIN and its price", () => {
+    render(<ArticleProperties article={{ ...ARTICLE_DETAIL, access: "coin", coin_price: 7 }} />);
+    expect(screen.getByText("鯨幣 7 幣")).toBeTruthy();
   });
 
   it("a section a person chooses; a brief with no sources is on the front page only (D-208)", () => {

@@ -25,6 +25,7 @@ const ARTICLE: PublicArticle = {
   company_slug: "lumen-daily",
   access: "free",
   locked: false,
+  unlocked: false,
   blocks: [
     { type: "heading", text: "重點" },
     { type: "paragraph", text: "微電網串連 1,200 組屋頂太陽能板。" },

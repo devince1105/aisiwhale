@@ -3,13 +3,15 @@
 - GET /api/me/coins?company=&cursor=&limit= -> the balance, the month's terms for their tier,
   and their movements, newest first, a page at a time
 
-Read only: it grants nothing (``/api/auth/me`` does, when grants are on), spends nothing (P4),
+Read only: it grants nothing (``/api/auth/me`` does, when grants are on), spends nothing
+(``/api/me/unlocks`` does, P4),
 and does not touch ``last_seen_at``. The reader is whoever the cookie says. The tier, the
 month, its terms and whether it was given are the grant's own answers (``coins.this_month``,
 ``policy``), worked out for the company ``/me`` would use — so this page and the header agree.
 
 What a reader sees of a movement is its kind, amount, balance after and when; not who made it,
-why an admin did, its key or its notes.
+why an admin did, its key or its notes. A spend on an article (P4, D-249) names the article:
+its title, and its page while it is on the site.
 """
 
 from __future__ import annotations
@@ -24,7 +26,10 @@ from sqlalchemy import select
 
 from autora.accounts import SESSION_COOKIE, coins, reader_for
 from autora.accounts.coins import CoinTxn, policy
+from autora.accounts.coins.unlocks import REF_TYPE as ARTICLE
 from autora.accounts.entitlement import Capability, entitlement_for
+from autora.domains.newsroom.models import Article
+from autora.domains.newsroom.publisher import article_path
 from autora_api.deps import Session
 from autora_api.pagination import Listing, Page, page_rows, sort_by
 from autora_api.routers.auth import company_id_for
@@ -50,6 +55,12 @@ class Monthly(BaseModel):
     """Whether monthly grants are on yet (D-238); off, the page says they are coming."""
 
 
+class CoinArticle(BaseModel):
+    title: str
+    path: str | None
+    """Its page, while it is on the site; None once taken down."""
+
+
 class CoinMovement(BaseModel):
     id: uuid.UUID
     kind: str
@@ -62,6 +73,8 @@ class CoinMovement(BaseModel):
     """For a monthly grant: the month it was for."""
     ref_type: str | None = None
     ref_id: str | None = None
+    article: CoinArticle | None = None
+    """What a spend on an article was for (P4)."""
 
 
 class CoinWallet(BaseModel):
@@ -71,7 +84,7 @@ class CoinWallet(BaseModel):
     history: Page[CoinMovement]
 
 
-def _movement(txn: CoinTxn) -> CoinMovement:
+def _movement(txn: CoinTxn, articles: dict[str, CoinArticle]) -> CoinMovement:
     return CoinMovement(
         id=txn.id,
         kind=txn.kind,
@@ -81,7 +94,25 @@ def _movement(txn: CoinTxn) -> CoinMovement:
         month=txn.meta.get("month") if txn.kind == coins.TxnKind.MONTHLY_GRANT.value else None,
         ref_type=txn.ref_type,
         ref_id=txn.ref_id,
+        article=articles.get(txn.ref_id or "") if txn.ref_type == ARTICLE else None,
     )
+
+
+async def _articles(session, txns: list[CoinTxn]) -> dict[str, CoinArticle]:
+    """The articles a page of movements spent coins on, by id: title in its first language."""
+    ids = {uuid.UUID(t.ref_id) for t in txns if t.ref_type == ARTICLE and t.ref_id}
+    if not ids:
+        return {}
+    rows = await session.scalars(select(Article).where(Article.id.in_(ids)))
+    return {
+        str(a.id): CoinArticle(
+            title=a.title,
+            path=article_path(a.primary_lang, a.slug)
+            if a.published_group_id is not None and a.listed and a.primary_lang in a.published_langs
+            else None,
+        )
+        for a in rows
+    }
 
 
 @router.get("")
@@ -107,6 +138,8 @@ async def get_coins(
         id_column=CoinTxn.id,
         listing=listing,
     )
+    txns = [row[0] for row in rows]
+    articles = await _articles(session, txns)
     wallet = CoinWallet(
         balance=await coins.balance(session, reader.id),
         tier=granted.tier.value,
@@ -118,7 +151,7 @@ async def get_coins(
             grants_on=policy.MONTHLY_GRANTS_ON,
         ),
         history=Page(
-            items=[_movement(row[0]) for row in rows], next_cursor=next_cursor, total=total
+            items=[_movement(txn, articles) for txn in txns], next_cursor=next_cursor, total=total
         ),
     )
     # read only: nothing is committed, so last_seen_at stays /me's to write

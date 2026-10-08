@@ -8,26 +8,33 @@
 // somebody.
 //
 // A 持股觀察 story (``sign_in``): free, for a reader who signs in — so the button signs in.
+//
+// A COIN story (``coin``, P4, D-249): read for Whale Coins — CoinUnlock.
 "use client";
 
 import Link from "next/link";
 import { useState } from "react";
 
+import { CoinUnlock } from "./CoinUnlock";
 import { PlanPicker } from "./PlanPicker";
 import { words, type Lang } from "./i18n";
 
-type Lock = "members" | "sign_in";
+type Lock = "members" | "sign_in" | "coin";
 
 export function MembersOnly({
   lang,
   path,
   company,
   lock = "members",
+  articleId,
+  coinPrice,
 }: {
   lang: Lang;
   path: string;
   company?: string;
   lock?: Lock;
+  articleId?: string;
+  coinPrice?: number | null;
 }) {
   const w = words(lang);
   const loginHref = `/news/${lang}/login?next=${encodeURIComponent(path)}`;
@@ -39,7 +46,9 @@ export function MembersOnly({
     <div className="relative">
       {/* the opening fades into the notice, as on a paper's site: there is more, and here is how */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-24 h-24 bg-gradient-to-b from-transparent to-canvas" />
-      {lock === "sign_in" ? (
+      {lock === "coin" && articleId && coinPrice ? (
+        <CoinUnlock lang={lang} path={path} articleId={articleId} price={coinPrice} company={company} />
+      ) : lock === "sign_in" ? (
         <aside data-testid="sign-in-to-read" className="mt-8 rounded-lg border border-line bg-surface p-6 text-center">
           <h2 className="text-lg font-semibold">{w.signInToRead}</h2>
           <p className="mt-2 text-muted">{w.signInToReadWhy}</p>

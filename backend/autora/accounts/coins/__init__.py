@@ -21,6 +21,7 @@ from autora.accounts.coins.ledger import (
     spend,
 )
 from autora.accounts.coins.models import (
+    ArticleUnlock,
     CoinAccount,
     CoinEntry,
     CoinTxn,
@@ -30,8 +31,10 @@ from autora.accounts.coins.models import (
     TxnKind,
 )
 from autora.accounts.coins.reconcile import Reconciliation, reconcile
+from autora.accounts.coins.unlocks import Unlocked, unlock_article, unlock_of, unlocks_of
 
 __all__ = [
+    "ArticleUnlock",
     "CapExceeded",
     "CoinAccount",
     "CoinEntry",
@@ -47,6 +50,7 @@ __all__ = [
     "SystemAccount",
     "ThisMonth",
     "TxnKind",
+    "Unlocked",
     "adjust",
     "balance",
     "grant",
@@ -55,4 +59,7 @@ __all__ = [
     "refund",
     "spend",
     "this_month",
+    "unlock_article",
+    "unlock_of",
+    "unlocks_of",
 ]

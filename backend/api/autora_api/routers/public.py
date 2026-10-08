@@ -2,8 +2,9 @@
 
 Most articles are free and need no sign-in. A members-only one comes back as its opening and
 ``locked`` unless the reader's cookie belongs to somebody whose membership is still running —
-the rest of the text is never sent to a browser that may not read it. The beacon carries
-nothing about the reader either way.
+the rest of the text is never sent to a browser that may not read it. A COIN article (D-249)
+is read in full by a reader who unlocked it (``/api/me/unlocks``), whoever they are. The
+beacon carries nothing about the reader either way.
 
 - GET  /api/public/articles?lang=zh-TW[&company=<slug>][&section=ai…][&limit=20][&offset=0]:
   newest published first (``section`` may be given more than once: any of them)
@@ -37,7 +38,7 @@ from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from autora.accounts import SESSION_COOKIE, reader_for
+from autora.accounts import SESSION_COOKIE, coins, reader_for
 from autora.accounts.entitlement import Capability, entitlement_for
 from autora.company.office_theme import DEFAULT_OFFICE_THEME, OfficeTheme, office_theme
 from autora.db.models import Company
@@ -111,8 +112,8 @@ from autora.domains.newsroom.site import (
 from autora.domains.newsroom.tw_flows import PublicFlowRanking, PublicTwFlows, for_stock
 from autora.domains.newsroom.tw_flows import ranking as flow_ranking
 from autora.infra.blobstore import BlobNotFound, InvalidBlobKey, build_blob_store
-from autora.infra.settings import get_settings
-from autora_api.deps import Session
+from autora.infra.settings import Settings, get_settings
+from autora_api.deps import Session, settings_dep
 
 router = APIRouter(tags=["public"])
 
@@ -246,7 +247,11 @@ async def article_calendar(
 
 @router.get("/api/public/articles/{lang}/{slug}")
 async def get_article(
-    lang: str, slug: str, session: Session, autora_reader: SessionCookie = None
+    lang: str,
+    slug: str,
+    session: Session,
+    settings: Annotated[Settings, Depends(settings_dep)],
+    autora_reader: SessionCookie = None,
 ) -> PublicArticle:
     article = await published_article(session, lang, slug)
     if article is None:
@@ -254,6 +259,18 @@ async def get_article(
     if not article.locked:
         return article
     reader = await reader_for(session, autora_reader)
+    if article.lock == "coin":
+        # COIN (D-249): read once paid for, by anybody, VIP or not; an admin reads it unpaid
+        if reader is None:
+            return article
+        if await coins.unlock_of(session, reader.id, article.article_id) is not None:
+            return await published_article(session, lang, slug, reader="paid") or article
+        granted = await entitlement_for(
+            session, reader, company_id=article.company_id, admin_emails=settings.admin_emails
+        )
+        if granted.can(Capability.ADMIN):
+            return await published_article(session, lang, slug, reader="staff") or article
+        return article
     granted = await entitlement_for(session, reader, company_id=article.company_id)
     if granted.can(Capability.READ_VIP_ARTICLES):
         return await published_article(session, lang, slug, reader="member") or article

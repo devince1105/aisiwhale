@@ -226,7 +226,7 @@ reader_credentials (reader_id, password_hash)   ← 只有開放密碼登入時�
 | MONTHLY_GRANT | ISSUANCE → reader | ✅ | `grant:{tier}:{reader}:{YYYY-MM}` |
 | PROMOTION_GRANT | ISSUANCE → reader | ✅ | `promo:{campaign}:{reader}` |
 | ADMIN_ADJUSTMENT | ADJUSTMENT ↔ reader | ✅（可明確 override） | `adj:{request_id}` |
-| SPEND | reader → BURN | — | `unlock:{reader}:{article}`／`gacha:{request_id}` |
+| SPEND | reader → BURN | — | `spend:article:{reader}:{article}`（D-249）／`gacha:{request_id}` |
 | HOLD／CAPTURE／RELEASE | reader ↔ ESCROW → BURN | — | `job:{request_id}:hold｜capture｜release` |
 | REFUND | BURN → reader（帶 `reverses_txn_id`） | ❌ | `refund:{original_txn_id}` |
 | ~~PURCHASE／TRANSFER／WITHDRAW~~ | **不定義**（D-223、D-227） | | |
@@ -278,10 +278,12 @@ reader_credentials (reader_id, password_hash)   ← 只有開放密碼登入時�
 
 ## 10. 文章存取
 
-- `articles.access ∈ { free, members(VIP), coin }` ＋ `coin_price`；`SIGN_IN_SECTIONS`（holdings、figures）維持區塊規則。
-- 解鎖（同一交易）：鎖錢包 → 若 `article_unlocks` 已有就直接回成功、不扣款 → 寫 SPEND（`unlock:{reader}:{article}`）→ 寫 unlock。唯一索引是最後防線。
+- `articles.access ∈ { free, members(VIP), coin }` ＋ `coin_price`（1～100，預設 5）；`SIGN_IN_SECTIONS`（holdings、figures、institutions）維持區塊規則，但設成 COIN 的文章要付幣（COIN 優先，D-249）。
+- 解鎖（同一交易）：若 `article_unlocks` 已有就直接回成功、不扣款 → 鎖錢包、寫 SPEND（`spend:article:{reader}:{article}`；帳務規定 SPEND 的鍵以 `spend:` 開頭，原寫的 `unlock:` 不合，D-249 更正）→ 寫 unlock。冪等鍵與唯一索引是最後防線。
 - COIN 文章對所有人都要用幣（不因 VIP 自動解鎖）；改價不影響已解鎖者；解鎖後永久可讀。
-- MVP 只有 Admin 能設定 COIN 與價格（AI 總編可設 VIP 的現行規則不變）。
+- MVP 只有 Admin 能設定 COIN 與價格（AI 總編可設 VIP 的現行規則不變；總編終審不改動 COIN 文章）。
+- 下架不自動退幣；改價或改回免費，已解鎖者照樣可讀。
+- **P4 已實作（D-249，遷移 0082）**：`POST /api/me/unlocks/{article_id}`（201 解鎖、200 已解鎖不扣款、402 餘額不足附 `need`／`held`）、`GET /api/me/unlocks`；錢包明細的文章消費附標題與網址；後台閱讀權限三選一。
 
 ---
 

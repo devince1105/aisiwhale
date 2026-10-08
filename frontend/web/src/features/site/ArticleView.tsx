@@ -84,6 +84,13 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
             </>
           ) : null}
         </p>
+        {article.unlocked ? (
+          <p data-testid="unlocked" className="mt-3">
+            <span className="rounded-full border border-accent/40 px-2 py-px text-xs font-semibold text-accent">
+              {w.unlock.unlocked}
+            </span>
+          </p>
+        ) : null}
         <StocksNamed stocks={article.stocks} lang={lang} />
       </header>
       {article.cover ? <CoverFigure cover={article.cover} lang={lang} /> : null}
@@ -115,6 +122,8 @@ export function ArticleView({ article, lang }: { article: PublicArticle; lang: L
           path={article.path}
           company={article.company_slug}
           lock={article.lock ?? "members"}
+          articleId={article.article_id}
+          coinPrice={article.coin_price}
         />
       ) : null}
 

@@ -28,7 +28,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 
 from autora.app import build_cover_store, build_embedder, build_image_library
@@ -36,6 +36,9 @@ from autora.company.workflows import StartWorkflowError, WorkflowNotAllowed
 from autora.db.models import Company, Project, ProjectState, WorkflowRun
 from autora.domains.newsroom import admin, covers
 from autora.domains.newsroom.models import (
+    COIN_PRICE_DEFAULT,
+    COIN_PRICE_MAX,
+    COIN_PRICE_MIN,
     Article,
     ArticleAccess,
     ArticleState,
@@ -269,6 +272,7 @@ ARTICLE_COLUMNS: list[export.Column] = [
     ("語言", lambda a: " / ".join(a.langs)),
     ("瀏覽", lambda a: a.views),
     ("權限", lambda a: a.access),
+    ("鯨幣價格", lambda a: a.coin_price),
     ("列在網站上", lambda a: a.listed),
     ("發布", lambda a: a.published_at),
     ("更新", lambda a: a.updated_at),
@@ -426,21 +430,41 @@ async def delete_cover(article_id: uuid.UUID, session: Session, _: Operator) -> 
 
 class ArticleAccessBody(BaseModel):
     access: ArticleAccess
-    """``free`` or ``members``: who may read the whole thing (D-025)."""
+    """``free``, ``members`` (D-025) or ``coin`` (D-249): who may read the whole thing."""
+    coin_price: int | None = Field(default=None, ge=COIN_PRICE_MIN, le=COIN_PRICE_MAX)
+    """COIN's price in coins, 5 when not given; only for ``coin``."""
+
+    @model_validator(mode="after")
+    def _price_only_for_coin(self) -> ArticleAccessBody:
+        if self.coin_price is not None and self.access != ArticleAccess.COIN:
+            raise ValueError("coin_price is only for access coin")
+        return self
+
+
+class ArticleAccessView(BaseModel):
+    article_id: uuid.UUID
+    access: str
+    coin_price: int | None
 
 
 @router.post("/api/articles/{article_id}/access")
 async def set_article_access(
     article_id: uuid.UUID, body: ArticleAccessBody, session: Session, _: Operator
-) -> dict[str, str]:
+) -> ArticleAccessView:
     """Put an article behind the paywall, or take it out. A person's decision for now: what is
-    worth paying for is a judgement about the reader, and no rule here would be honest."""
+    worth paying for is a judgement about the reader, and no rule here would be honest. COIN
+    (D-249) is only ever set here; readers who already unlocked it keep it, whatever it becomes."""
     article = await session.get(Article, article_id)
     if article is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"article {article_id} not found")
     article.access = body.access.value
+    article.coin_price = (
+        (body.coin_price or COIN_PRICE_DEFAULT) if body.access == ArticleAccess.COIN else None
+    )
     await session.commit()
-    return {"article_id": str(article.id), "access": article.access}
+    return ArticleAccessView(
+        article_id=article.id, access=article.access, coin_price=article.coin_price
+    )
 
 
 class ArticleSectionBody(BaseModel):

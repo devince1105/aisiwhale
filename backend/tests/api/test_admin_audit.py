@@ -37,6 +37,7 @@ PUBLIC_WRITES = {
     ("PUT", "/api/me/watchlist"),
     ("POST", "/api/me/watchlist/{symbol}"),
     ("DELETE", "/api/me/watchlist/{symbol}"),
+    ("POST", "/api/me/unlocks/{article_id}"),  # a reader spends their own coins (P4, D-249)
 }
 
 

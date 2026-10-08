@@ -146,12 +146,17 @@ async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
         refs=_refs(ctx),
     )
     vip = None
+    kept = False
     if args.verdict == "accept" and not decided.dropped:
         # D-159: the chief says whether it is VIP; an operator can change it in the back office
         article = await ctx.session.get(Article, args.article_id)
         if article is not None and article.company_id == ctx.company_id:
-            article.access = (ArticleAccess.MEMBERS if args.vip else ArticleAccess.FREE).value
-            vip = args.vip
+            if article.access == ArticleAccess.COIN.value:
+                # D-249: COIN and its price are a person's; the chief leaves them as they are
+                kept = True
+            else:
+                article.access = (ArticleAccess.MEMBERS if args.vip else ArticleAccess.FREE).value
+                vip = args.vip
     if decided.dropped:
         next_step = "the article is turned down and its story dropped"
     elif args.verdict == "accept":
@@ -161,7 +166,8 @@ async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
     return ToolResult(
         output=_output(decided)
         | {"issues": [i.model_dump(exclude_none=True) for i in args.issues], "next": next_step}
-        | ({"vip": vip} if vip is not None else {}),
+        | ({"vip": vip} if vip is not None else {})
+        | ({"access": "coin, kept: a person set it"} if kept else {}),
         summary=f"final review of article {args.article_id}: {args.verdict}"
         + (" (VIP)" if vip else ""),
     )

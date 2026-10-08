@@ -48,6 +48,7 @@ const ARTICLE: PublicArticle = {
   company_id: "c",
   company_slug: "aisiwhale",
   locked: false,
+  unlocked: false,
   blocks: [{ type: "paragraph", text: "段永平第二季出清台積電。" }],
   sources: [],
   stocks: [],

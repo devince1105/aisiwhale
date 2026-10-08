@@ -191,3 +191,22 @@ class CoinEntry(IdMixin, CreatedAtMixin, Base):
     account_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coin_accounts.id"))
     amount: Mapped[int] = mapped_column(BigInteger)
     """Signed: positive raises the account's balance, negative lowers it."""
+
+
+class ArticleUnlock(IdMixin, CreatedAtMixin, Base):
+    """A COIN article a reader paid for (P4, D-249): theirs to read for good — a later price, or
+    the article going free or back to coins, does not take it back. One per reader and article;
+    written with the spend that paid for it, in the same transaction, and never changed."""
+
+    __tablename__ = "article_unlocks"
+    __table_args__ = (
+        CheckConstraint("price_paid >= 1", name="price_paid_positive"),
+        UniqueConstraint("reader_id", "article_id"),
+        UniqueConstraint("coin_txn_id"),
+        Index("ix_article_unlocks_article_id", "article_id"),
+    )
+
+    reader_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("readers.id", ondelete="RESTRICT"))
+    article_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articles.id", ondelete="RESTRICT"))
+    coin_txn_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("coin_txns.id"))
+    price_paid: Mapped[int] = mapped_column(BigInteger)

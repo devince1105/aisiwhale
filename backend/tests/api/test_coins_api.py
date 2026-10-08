@@ -40,6 +40,7 @@ MOVEMENT_FIELDS = {
     "month",
     "ref_type",
     "ref_id",
+    "article",
 }
 
 

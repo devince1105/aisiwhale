@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 import type { PublicArticleSummary, PublicDay, PublicEvent, PublicQuote, PublicSentiment } from "./api";
 import { ArticleCalendar } from "./ArticleCalendar";
+import { CoinBadge } from "./CoinBadge";
 import {
   filterName,
   formatDate,
@@ -49,6 +50,9 @@ function Meta({ article, lang }: { article: PublicArticleSummary; lang: Lang }) 
       ) : null}
       {article.access === "members" ? (
         <span className="rounded-full border border-line px-1.5 py-px text-[0.7rem]">{w.member}</span>
+      ) : null}
+      {article.access === "coin" && article.coin_price ? (
+        <CoinBadge articleId={article.article_id} price={article.coin_price} lang={lang} />
       ) : null}
     </p>
   );

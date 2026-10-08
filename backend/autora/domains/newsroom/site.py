@@ -10,8 +10,12 @@ signed-in readers, free (D-159). The paywall lives here, in what is returned: a 
 read it gets the whole article, anybody else gets the opening (``PREVIEW_BLOCKS``), ``locked``
 and which lock (``lock``: ``members`` or ``sign_in``). The site never receives the rest of the
 text and then hides it — a reader with the developer tools open would find it there. Who the
-reader is is decided above this module: this one is handed ``anyone``, ``signed_in`` or
-``member``.
+reader is is decided above this module: this one is handed ``anyone``, ``signed_in``,
+``member``, ``paid`` (has unlocked this COIN article) or ``staff`` (an admin).
+
+A COIN article (P4, D-249) is read for Whale Coins, each reader paying once: being VIP does not
+open it, and in a 持股觀察 section neither does signing in — its price, ``coin_price``, is on
+every list, so the site can say what it costs before anybody opens it.
 
 Beacons (``record_beacon``) count readers without knowing who they are: the browser sends a
 random id it makes each day (``session_hash``); no IP address or anything else about the reader is
@@ -72,12 +76,15 @@ SIGN_IN_SECTIONS = frozenset({"holdings", "figures", "institutions"})
 under it (10/06, the site's operator's decision) — the asset managers' published views are read
 in full once signed in: free, but an account; the reader's email is what the section is for."""
 
-Reader = Literal["anyone", "signed_in", "member"]
-Lock = Literal["members", "sign_in"]
+Reader = Literal["anyone", "signed_in", "member", "paid", "staff"]
+Lock = Literal["members", "sign_in", "coin"]
 
 
 def lock_for(access: str, section: str | None) -> Lock | None:
-    """What it takes to read the whole article: a membership, signing in, or nothing."""
+    """What it takes to read the whole article: coins, a membership, signing in, or nothing.
+    COIN comes first: a 持股觀察 article set to COIN is paid for, not just signed in to."""
+    if access == ArticleAccess.COIN.value:
+        return "coin"
     if access == ArticleAccess.MEMBERS.value:
         return "members"
     if section in SIGN_IN_SECTIONS:
@@ -86,7 +93,11 @@ def lock_for(access: str, section: str | None) -> Lock | None:
 
 
 def may_read(lock: Lock | None, reader: Reader) -> bool:
-    if lock is None or reader == "member":
+    if lock is None or reader == "staff":
+        return True
+    if lock == "coin":
+        return reader == "paid"  # a membership does not open it (D-249)
+    if reader == "member":
         return True
     return lock == "sign_in" and reader == "signed_in"
 
@@ -169,7 +180,9 @@ class PublicArticleSummary(BaseModel):
     revised_at: datetime | None = None
     """When a changed version went up (D-045); the page says so, as a correction should."""
     access: str = ArticleAccess.FREE.value
-    """``free`` or ``members`` (D-025). On a list, this is what draws the badge."""
+    """``free``, ``members`` (D-025) or ``coin`` (D-249). On a list, this draws the badge."""
+    coin_price: int | None = None
+    """A COIN article's price in coins; None for any other."""
     section: str | None = None
     """One of ``SECTIONS`` (D-047), or None when none of its story's sources names one."""
     cover: PublicCover | None = None
@@ -189,7 +202,10 @@ class PublicArticle(PublicArticleSummary):
     locked: bool = False
     """True when ``blocks`` is only the opening, because of ``lock``."""
     lock: Lock | None = None
-    """What reading all of it takes (D-159): ``members`` (VIP) or ``sign_in``; None when free."""
+    """What reading all of it takes (D-159): ``members`` (VIP), ``sign_in`` or ``coin``
+    (D-249); None when free."""
+    unlocked: bool = False
+    """A COIN article this reader paid for: the whole of it, because they did."""
     blocks: list[PublicBlock]
     sources: list[PublicSource]
     """The evidence the article's claims quote, once per page, in order of first use."""
@@ -213,6 +229,7 @@ def _summary(
     assert article.published_at is not None
     return PublicArticleSummary(
         access=article.access,
+        coin_price=article.coin_price,
         article_id=article.id,
         lang=version.lang,
         slug=article.slug,
@@ -368,6 +385,7 @@ async def published_article(
         ).model_dump(),
         locked=locked,
         lock=lock,
+        unlocked=lock == "coin" and reader == "paid",
         blocks=[PublicBlock(type=b["type"], text=b["text"]) for b in body],
         sources=[] if locked else list(sources.values()),
         langs={lang_: article_path(lang_, article.slug) for lang_ in article.published_langs},

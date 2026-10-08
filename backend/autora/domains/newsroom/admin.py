@@ -129,7 +129,9 @@ class ArticleSummary(BaseModel):
     listed: bool = True
     """On the site (D-045): a published version shows unless it was taken down."""
     access: str = "free"
-    """``free`` or ``members``, VIP (D-025, D-159): the chief decides, an operator may change it."""
+    """``free`` or ``members``, VIP (D-025, D-159): the chief decides, an operator may change it;
+    or ``coin`` (D-249), which only an operator sets, at ``coin_price``."""
+    coin_price: int | None = None
     revised_at: datetime | None = None
     """When a changed version of the published article went up (D-045)."""
 
@@ -503,6 +505,7 @@ async def article_summaries(
                 published_at=a.published_at,
                 listed=a.listed,
                 access=a.access,
+                coin_price=a.coin_price,
                 revised_at=a.revised_at,
                 updated_at=a.updated_at,
                 views=int(views.get(a.id) or 0),
@@ -585,6 +588,7 @@ async def article_detail(
         updated_at=article.updated_at,
         listed=article.listed,
         access=article.access,
+        coin_price=article.coin_price,
         revised_at=article.revised_at,
         views=sum(d.views for d in daily),
         story_title=story.title if story else "",

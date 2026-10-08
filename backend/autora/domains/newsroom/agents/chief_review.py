@@ -171,7 +171,8 @@ async def decided_here(session: AsyncSession, ctx: RunContext, note: BaseModel) 
     if note.verdict == "veto" and not (note.reason or "").strip():
         return ["a veto says why (reason)"]
     is_vip = article.access == ArticleAccess.MEMBERS.value
-    if note.verdict == "accept" and note.vip != is_vip:
+    is_coin = article.access == ArticleAccess.COIN.value  # a person's; final_review left it
+    if note.verdict == "accept" and not is_coin and note.vip != is_vip:
         return [f"vip is {str(is_vip).lower()}: report what you set with final_review"]
     turned_down = article.state == ArticleState.REJECTED or (
         article.published_group_id is not None and note.verdict != "accept"

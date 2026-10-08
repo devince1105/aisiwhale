@@ -46,7 +46,7 @@ import { CompanyScope, type Company } from "@/features/company/CompanyScope";
 import { useCompanyStream } from "@/features/company/useCompanyStream";
 
 import { ArticlesView } from "./ArticlesView";
-import { ArticleProperties, ArticleView } from "./ArticleView";
+import { ArticleProperties, ArticleView, type ArticleAccess } from "./ArticleView";
 import type { ArticleDetail, StoryDetail } from "./model";
 import { Empty } from "./parts";
 import { AddSourceForm, SourcesView } from "./SourcesView";
@@ -278,7 +278,10 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
   const unpublish = useMutation({ mutationFn: (reason: string) => unpublishArticle(article.id, reason), onSettled });
   const republish = useMutation({ mutationFn: () => republishArticle(article.id), onSettled });
   const revise = useMutation({ mutationFn: (reason: string) => reviseArticle(article.id, reason), onSettled });
-  const access = useMutation({ mutationFn: (to: "free" | "members") => setArticleAccess(article.id, to), onSettled });
+  const access = useMutation({
+    mutationFn: ({ to, price }: { to: ArticleAccess; price?: number }) => setArticleAccess(article.id, to, price),
+    onSettled,
+  });
   const section = useMutation({ mutationFn: (to: Section | null) => setArticleSection(article.id, to), onSettled });
   return (
     <ArticleView
@@ -290,7 +293,7 @@ function LoadedArticle({ article }: { article: ArticleDetail }) {
         unpublish: (reason) => unpublish.mutate(reason),
         republish: () => republish.mutate(),
         revise: (reason) => revise.mutate(reason),
-        setAccess: (to) => access.mutate(to),
+        setAccess: (to, price) => access.mutate({ to, price }),
         setSection: (to) => section.mutate(to),
         busy: unpublish.isPending || republish.isPending || revise.isPending || access.isPending || section.isPending,
         error: (unpublish.error ?? republish.error ?? revise.error ?? access.error ?? section.error)?.message ?? null,

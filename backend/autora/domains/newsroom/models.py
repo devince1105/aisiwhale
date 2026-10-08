@@ -729,10 +729,18 @@ class ClaimEvidence(IdMixin, CreatedAtMixin, Base):
 
 
 class ArticleAccess(StrEnum):
-    """Who may read the whole thing (D-025). Most articles are FREE; some are for members."""
+    """Who may read the whole thing (D-025). Most articles are FREE; some are for members; and
+    some are read for Whale Coins, each reader paying once (COIN, P4, D-249)."""
 
     FREE = "free"
     MEMBERS = "members"
+    COIN = "coin"
+
+
+COIN_PRICE_MIN = 1
+COIN_PRICE_MAX = 100
+COIN_PRICE_DEFAULT = 5
+"""What a COIN article may cost, in coins (D-249): set by a person, 5 unless they say."""
 
 
 class ArticleState(StrEnum):
@@ -758,6 +766,11 @@ class Article(IdMixin, TimestampMixin, Base):
         UniqueConstraint("slug"),
         CheckConstraint("revision_count >= 0", name="revision_count_non_negative"),
         check_in("access", ArticleAccess),
+        CheckConstraint(
+            f"(access = 'coin') = (coin_price IS NOT NULL) AND (coin_price IS NULL"
+            f" OR coin_price BETWEEN {COIN_PRICE_MIN} AND {COIN_PRICE_MAX})",
+            name="coin_price_iff_coin",
+        ),
     )
 
     company_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("companies.id"))
@@ -783,7 +796,10 @@ class Article(IdMixin, TimestampMixin, Base):
     keeps the first publication, so a correction does not jump to the top of the front page."""
     """The draft group that was published: what the public site shows (T-512)."""
     access: Mapped[str] = mapped_column(server_default=ArticleAccess.FREE.value)
-    """FREE, or MEMBERS: the paywall is per article, and free is the default (D-025)."""
+    """FREE, MEMBERS or COIN: the paywall is per article, and free is the default (D-025)."""
+    coin_price: Mapped[int | None]
+    """A COIN article's price in coins (D-249); None for any other. What a reader already paid
+    is theirs (``article_unlocks``), whatever this becomes."""
 
 
 class ArticleVersion(IdMixin, CreatedAtMixin, Base):

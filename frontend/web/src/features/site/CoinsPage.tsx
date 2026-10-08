@@ -1,8 +1,10 @@
 // A reader's Whale Coins (P3-C): what they hold, what their tier gives a month, and every
-// movement, newest first. Read only — spending comes with P4. Filled in the browser from the
+// movement, newest first — a spend on a story names it, with a link while it is on the site
+// (P4). Read only: unlocking is on the story's page. Filled in the browser from the
 // reader's cookie; a visitor who is not signed in is sent to sign in and brought back.
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { SITE_COMPANY } from "@/config";
@@ -94,6 +96,17 @@ export function CoinsPage({ lang }: { lang: Lang }) {
                   <span className="font-medium">{w.kinds[m.kind] ?? m.kind}</span>
                   {m.kind === "MONTHLY_GRANT" && m.amount === 0 ? (
                     <span className="ml-2 text-muted">{w.capped}</span>
+                  ) : null}
+                  {m.article ? (
+                    m.article.path ? (
+                      <Link href={m.article.path} className="ml-2 text-accent underline" data-testid="coin-article">
+                        {m.article.title}
+                      </Link>
+                    ) : (
+                      <span className="ml-2" data-testid="coin-article">
+                        {m.article.title}
+                      </span>
+                    )
                   ) : null}
                   <span className="ml-2 text-muted">{formatDate(lang, m.occurred_at)}</span>
                 </span>

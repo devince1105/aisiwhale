@@ -44,6 +44,7 @@ from autora_api.routers import (
     runs,
     tasks,
     team,
+    unlocks,
     watchlist,
     workflows,
     ws,
@@ -118,6 +119,7 @@ def create_app() -> FastAPI:
     app.include_router(payments.router)
     app.include_router(watchlist.router)
     app.include_router(coins.router)
+    app.include_router(unlocks.router)
     app.include_router(newsroom.router)
     app.include_router(team.router)
     app.include_router(meta.router)
