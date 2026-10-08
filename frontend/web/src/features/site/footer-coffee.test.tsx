@@ -12,7 +12,7 @@ describe("the footer's coffee", () => {
   it("links to the operator's page in a new tab, and says so", () => {
     render(<SiteFooter lang="zh-TW" />);
     const coffee = screen.getByTestId("site-coffee");
-    expect(coffee.textContent).toContain("覺得有幫助，請我喝咖啡");
+    expect(coffee.textContent).toContain("小額贊助，請我喝咖啡");
     const link = within(coffee).getByRole("link", { name: /Buy me a coffee/ });
     expect(link.getAttribute("href")).toBe(COFFEE_URL);
     expect(COFFEE_URL).toBe("https://buymeacoffee.com/vince115");

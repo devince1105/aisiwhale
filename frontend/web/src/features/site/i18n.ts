@@ -316,7 +316,7 @@ const WORDS = {
     },
     contactLink: "聯絡我們",
     coffee: {
-      lead: "覺得有幫助，請我喝咖啡",
+      lead: "小額贊助，請我喝咖啡",
       button: "Buy me a coffee",
       newTab: "（另開新分頁）",
     },
