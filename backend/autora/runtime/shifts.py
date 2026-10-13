@@ -77,6 +77,16 @@ class Roster:
         windows = self.by_day.get(local.weekday(), ())
         return any(begins <= local.time() < ends for begins, ends in windows)
 
+    def shift_end(self, now: datetime) -> datetime | None:
+        """When the shift ``now`` is in ends; None when off duty."""
+        local = now.astimezone(self.zone)
+        ends = [
+            datetime.combine(local.date(), e, tzinfo=self.zone)
+            for b, e in self.by_day.get(local.weekday(), ())
+            if b <= local.time() < e
+        ]
+        return max(ends) if ends else None
+
     def next_start(self, now: datetime) -> datetime | None:
         local = now.astimezone(self.zone)
         for ahead in range(8):
@@ -128,6 +138,13 @@ class Shifts:
 
     def on_duty(self, now: datetime) -> bool:
         return any(roster.on_duty(now) for roster in self.rosters)
+
+    def shift_end(self, now: datetime) -> datetime | None:
+        """When the shift ``now`` is in ends (the latest, where rosters overlap), in ``now``'s
+        zone; None when off duty. An approval that must be decided by someone at work is due
+        before this (D-252)."""
+        ends = [e for e in (r.shift_end(now) for r in self.rosters) if e is not None]
+        return max(ends).astimezone(now.tzinfo) if ends else None
 
     def next_start(self, now: datetime) -> datetime:
         """The next clock-in after ``now`` (in ``now``'s zone)."""

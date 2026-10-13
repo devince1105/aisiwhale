@@ -4,10 +4,16 @@ D-001: publishing needs a human approval by default. ``approve_article`` by the 
 approval after a passed fact-check) is only allowed when the company policy
 ``newsroom.auto_approve_if_fact_check_passed`` is true; otherwise it needs a human.
 
-D-157: an article's approval nobody answered in 24 hours goes to the CEO, who approves or rejects
-it (``approve_article`` by the ``ceo`` role, only for an approval delegated to her, only with a
+D-157: an article's approval nobody answered goes to the CEO, who approves or rejects it
+(``approve_article`` by the ``ceo`` role, only for an approval delegated to her, only with a
 passed fact-check), while the company policy ``newsroom.ceo_decides_when_unanswered`` is on (the
 default; false brings back "expire and ask a person again").
+
+D-252: it goes to her within ``newsroom.ceo_after_hours`` (8) — and while she is at work, so the
+same day — not after 24 hours; and she publishes it unless it breaks the advisory law or has an
+error she can name. How long news stays worth running is per section
+(``newsroom.shelf_life_hours``): timeliness alone turns down only a piece that was already past
+``HARD_LIMIT_FACTOR`` times its shelf life when the desk asked for approval.
 """
 
 from __future__ import annotations
@@ -40,6 +46,48 @@ def vip_guidelines(policies: Mapping[str, Any]) -> str:
 def ceo_decides_when_unanswered(policies: Mapping[str, Any]) -> bool:
     """D-157: on unless the company has turned it off."""
     return policies.get(CEO_DECIDES_WHEN_UNANSWERED_KEY, True) is not False
+
+
+CEO_AFTER_HOURS_KEY = "newsroom.ceo_after_hours"
+DEFAULT_CEO_AFTER_HOURS = 8.0
+"""D-252: at most how long an article's approval waits for a person before the CEO decides."""
+
+
+def ceo_after_hours(policies: Mapping[str, Any]) -> float:
+    value = policies.get(CEO_AFTER_HOURS_KEY)
+    if isinstance(value, bool) or not isinstance(value, int | float) or not 0 < value <= 24:
+        return DEFAULT_CEO_AFTER_HOURS
+    return float(value)
+
+
+SHELF_LIFE_KEY = "newsroom.shelf_life_hours"
+DEFAULT_SHELF_LIFE = 72
+DEFAULT_SHELF_LIVES: dict[str, int] = {
+    "crypto": 48,
+    "fx": 48,
+    "gold": 48,
+    "commodities": 48,
+    "tw": 72,
+    "us": 72,
+    "ai": 120,
+    "holdings": 336,
+    "figures": 336,
+    "institutions": 336,
+}
+"""D-252: how many hours after its story was found news in each section is still timely. A piece
+about one day's price move or level is a day's, whatever its section (the CEO is told so)."""
+HARD_LIMIT_FACTOR = 3
+"""Past this many shelf lives when the desk asked for approval, it is stale: turned down."""
+
+
+def shelf_life_hours(policies: Mapping[str, Any], section: str | None) -> int:
+    """The section's shelf life, the company's if it set one (a mapping, by section)."""
+    given = policies.get(SHELF_LIFE_KEY)
+    if isinstance(given, Mapping):
+        value = given.get(section or "")
+        if isinstance(value, int | float) and not isinstance(value, bool) and value > 0:
+            return int(value)
+    return DEFAULT_SHELF_LIVES.get(section or "", DEFAULT_SHELF_LIFE)
 
 
 # D-002: which languages articles are written and published in (company policy, not code)

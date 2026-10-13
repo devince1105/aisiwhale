@@ -29,7 +29,11 @@ from autora.domains.newsroom.models import (
     Story,
     StoryCover,
 )
-from autora.domains.newsroom.policy import AUTO_APPROVE_KEY, CEO_DECIDES_WHEN_UNANSWERED_KEY
+from autora.domains.newsroom.policy import (
+    AUTO_APPROVE_KEY,
+    CEO_AFTER_HOURS_KEY,
+    CEO_DECIDES_WHEN_UNANSWERED_KEY,
+)
 from autora.domains.newsroom.workflow import (
     COVER_TEMPLATE_NAME,
     TEMPLATE_NAME,
@@ -313,14 +317,30 @@ async def test_a_ceo_who_cannot_decide_hands_it_back_to_a_person(committed, e2e_
     room = await Newsroom().start(committed, e2e_settings, ceo=True, demo={"ceo_fail": True})
     await room.worker.run_until_idle()
     approval = await _past_its_deadline(room)
-    ceo_task = await _ceo_task(room)
-    for _ in range(ceo_task.max_attempts):  # each failed attempt waits for its retry: skip ahead
-        async with committed() as session:
-            row = await session.get(Task, ceo_task.id)
-            row.available_at = datetime.now(UTC)
-            await session.commit()
-        await room.worker.run_until_idle()
-    assert (await room.get(Task, ceo_task.id)).state == "FAILED"
+
+    async def run_out(task: Task) -> None:
+        for _ in range(task.max_attempts):  # each failed attempt waits for its retry: skip ahead
+            async with committed() as session:
+                row = await session.get(Task, task.id)
+                row.available_at = datetime.now(UTC)
+                await session.commit()
+            await room.worker.run_until_idle()
+        assert (await room.get(Task, task.id)).state == "FAILED"
+
+    first = await _ceo_task(room)
+    await run_out(first)
+    # D-252: she is asked once more before a person is
+    async with committed() as session:
+        assert await room.runtime.approvals.expire_due(session) == []
+        await session.commit()
+    second = await room.get_where(
+        Task,
+        Task.company_id == room.company.id,
+        Task.name == "decide_unanswered",
+        Task.id != first.id,
+    )
+    assert second is not None
+    await run_out(second)
     async with committed() as session:
         assert await room.runtime.approvals.expire_due(session) == [approval.id]
         await session.commit()
@@ -339,6 +359,48 @@ async def test_without_a_ceo_a_person_is_asked_again(committed, e2e_settings):
     approval = await _past_its_deadline(room)
     assert (await room.get(Approval, approval.id)).state == "EXPIRED"
     assert await _ceo_task(room) is None
+
+
+async def _first_approval(room) -> Approval:
+    await room.worker.run_until_idle()
+    approve = (await room.tasks())["approve"][0]
+    return await room.get_where(Approval, Approval.task_id == approve.id)
+
+
+async def test_an_article_goes_to_the_ceo_within_eight_hours(committed, e2e_settings):
+    # D-252: not after a day — within 8 hours (the tests' worker has no shifts: the clock alone)
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
+    approval = await _first_approval(room)
+    assert abs(approval.expires_at - approval.created_at - timedelta(hours=8)) < timedelta(
+        seconds=5
+    )
+
+
+async def test_the_company_may_set_a_shorter_wait(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
+    async with committed() as session:
+        await upsert_policy(
+            session, room.company.id, CEO_AFTER_HOURS_KEY, 2, updated_by=OPERATOR.as_json()
+        )
+        await session.commit()
+    approval = await _first_approval(room)
+    assert abs(approval.expires_at - approval.created_at - timedelta(hours=2)) < timedelta(
+        seconds=5
+    )
+
+
+async def test_with_the_ceo_kept_out_a_person_has_the_day(committed, e2e_settings):
+    room = await Newsroom().start(committed, e2e_settings, ceo=True)
+    async with committed() as session:
+        await upsert_policy(
+            session, room.company.id, CEO_DECIDES_WHEN_UNANSWERED_KEY, False,
+            updated_by=OPERATOR.as_json(),
+        )  # fmt: skip
+        await session.commit()
+    approval = await _first_approval(room)
+    assert abs(approval.expires_at - approval.created_at - timedelta(hours=24)) < timedelta(
+        seconds=5
+    )
 
 
 async def test_with_the_ceo_kept_out_it_is_asked_again(committed, e2e_settings):

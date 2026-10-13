@@ -13,7 +13,8 @@
 - ``approve`` is a service step (role ``human``): the system approves the article itself when the
   company allows it after a passed fact-check (D-001, off by default); otherwise a person decides
   through an approval (``approve_article``), whose decision approves or rejects the article in the
-  same transaction (``on_article_decided``).
+  same transaction (``on_article_decided``). Nobody deciding, it goes to the CEO (D-157) within
+  ``newsroom.ceo_after_hours`` and before the shift ends (D-252, ``handover_at``).
 - ``publish`` is a service step (role ``system``): the publisher (T-512).
 - The measurement schedule after publication (+1h, +24h, +7d) arrives with analytics (T-516).
 
@@ -28,7 +29,9 @@ Starting the template some other way (the generic API) needs ``story_id`` and ``
 
 from __future__ import annotations
 
+import logging
 import uuid
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
@@ -42,7 +45,7 @@ from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom import organization, personas
 from autora.domains.newsroom.covers import cover_at_work, cover_of
 from autora.domains.newsroom.models import Article, ArticleState, CoverState, Story, StoryState
-from autora.domains.newsroom.policy import ceo_decides_when_unanswered
+from autora.domains.newsroom.policy import ceo_after_hours, ceo_decides_when_unanswered
 from autora.domains.newsroom.publisher import (
     NotAllowed,
     PublishError,
@@ -53,6 +56,8 @@ from autora.domains.newsroom.publisher import (
     start_revision,
 )
 from autora.domains.newsroom.stories import STORY_FSM
+from autora.infra.settings import get_settings
+from autora.runtime import live_settings
 from autora.runtime.actor import Actor
 from autora.runtime.approvals import ApprovalError
 from autora.runtime.dag import (
@@ -65,6 +70,9 @@ from autora.runtime.dag import (
 )
 from autora.runtime.policy import PolicyEngine
 from autora.runtime.services import ServiceContext
+from autora.runtime.shifts import Shifts, ShiftsError
+
+log = logging.getLogger(__name__)
 
 TEMPLATE_NAME = "newsroom.story_to_article_v2"
 APPROVE = "newsroom.approve"
@@ -230,7 +238,37 @@ UNANSWERED_TEMPLATE = WorkflowTemplate(
     name=UNANSWERED_TEMPLATE_NAME,
     nodes=(NodeSpec(UNANSWERED_TASK, "代為終審：{title}", "ceo", max_attempts=2),),
 )
-"""D-157: the CEO decides an article nobody approved in 24 hours."""
+"""D-157: the CEO decides an article nobody approved in time (D-252: within 8 hours)."""
+
+HANDOVER_MARGIN = timedelta(minutes=30)
+"""D-252: the CEO is handed an article this long before the shift ends at the latest — she works
+only on shift (D-205), and an approval due after it would wait for the next day's."""
+
+
+def handover_at(now: datetime, after: timedelta, shifts: Shifts | None) -> datetime:
+    """When an article's approval asked for ``now`` goes to the CEO (D-252): ``after`` from now,
+    but while she is at work — before this shift ends, or early in the next one when it is
+    asked off shift or in the shift's last minutes. No shifts: always at work."""
+    if shifts is None:
+        return now + after
+    end = shifts.shift_end(now)
+    if end is not None and end - HANDOVER_MARGIN > now:
+        return min(now + after, end - HANDOVER_MARGIN)
+    return shifts.next_start(now) + HANDOVER_MARGIN
+
+
+async def office_shifts(session: AsyncSession) -> Shifts | None:
+    """The AI staff's shifts as the back office set them, else the environment's (D-205)."""
+    settings = get_settings()
+    values = live_settings.effective(settings, await live_settings.stored(session))
+    try:
+        return Shifts.parse(values["worker.shifts"], settings.worker_days, settings.worker_timezone)
+    except ShiftsError:
+        log.warning(
+            "the shifts %r do not parse: approvals are handed over by the clock alone",
+            values["worker.shifts"],
+        )
+        return None
 
 
 COVER_TEMPLATE_NAME = "newsroom.cover_asked_v1"
@@ -476,9 +514,17 @@ async def approve_step(ctx: ServiceContext) -> None:
         if refused.outcome != "needs_approval":
             await ctx.fail("NotAllowed", refused.reason)
             return
+        # the CEO's turn comes within hours and on her shift (D-252); kept out, a person's 24
+        policies = await get_policies(ctx.session, article.company_id)
+        wait = None
+        if ceo_decides_when_unanswered(policies):
+            now = ctx.approvals.clock()
+            after = timedelta(hours=ceo_after_hours(policies))
+            wait = handover_at(now, after, await office_shifts(ctx.session)) - now
         await ctx.request_approval(
             kind=ARTICLE_APPROVAL,
             action=APPROVE_ACTION,
+            expires_after=wait,
             summary=f"申請發布：{article.title}"[:300],
             payload={
                 "article_id": str(article.id),

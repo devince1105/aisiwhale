@@ -496,8 +496,18 @@ async def test_a_delegate_that_declines_fails_or_runs_out_gives_it_back_once(db_
     world["clock"].now += timedelta(hours=25)
     await approvals.expire_due(db_session)
 
-    # the delegate's task ends without deciding: expired at once, a person asked again
+    # the delegate's task ends without deciding: it is asked once more (D-252) ...
     await world["tm"].cancel(db_session, started[0], reason="the run failed")
+    assert await approvals.expire_due(db_session) == []
+    retried = await _reload(db_session, Approval, approval.id)
+    assert retried.state == "PENDING" and len(started) == 2
+    assert retried.payload["delegated"] == {
+        "task_id": str(started[1].id),
+        "at": world["clock"].now.isoformat(),
+        "tries": 2,
+    }
+    # ... and when that one ends undecided too: expired at once, a person asked again
+    await world["tm"].cancel(db_session, started[1], reason="the run failed again")
     assert await approvals.expire_due(db_session) == [approval.id]
     assert (await _reload(db_session, Approval, approval.id)).state == "EXPIRED"
     again = await db_session.scalar(
@@ -505,10 +515,10 @@ async def test_a_delegate_that_declines_fails_or_runs_out_gives_it_back_once(db_
     )
     assert "delegated" not in again.payload and again.payload["delegated_before"] is True
 
-    # ... and the renewed one is not delegated a second time
+    # ... and the renewed one is not delegated again
     world["clock"].now += timedelta(hours=25)
     assert await approvals.expire_due(db_session) == [again.id]
-    assert len(started) == 1
+    assert len(started) == 2
 
 
 async def test_a_delegate_that_declines_leaves_it_to_a_person(db_session, world):

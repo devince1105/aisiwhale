@@ -22,6 +22,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -69,6 +70,7 @@ class ServiceContext:
         summary: str,
         action: str | None = None,
         payload: dict[str, Any] | None = None,
+        expires_after: timedelta | None = None,
     ) -> Approval:
         self._decide()
         return await self.approvals.request_for_task(
@@ -79,6 +81,7 @@ class ServiceContext:
             action=action,
             payload=payload,
             requested_by=self.actor,
+            expires_after=expires_after,
         )
 
     async def fail(self, error_class: str, message: str) -> None:

@@ -29,8 +29,9 @@ picks whom — and returns its id, or declines). The approval stays PENDING mean
 short window more: a person may still decide, and whoever decides first wins (the delegate's
 task is cancelled, or its tool told the approval was already decided). The delegate decides
 through ``decide_delegated`` — approve or reject, with a reason, recorded as that agent. If it
-declines, fails, or does not decide in the window, the approval expires and is asked again
-(D-131), and is not delegated again.
+declines, or does not decide in the window, the approval expires and is asked again (D-131), and
+is not delegated again. A delegate whose task ended without deciding (its run failed) is asked
+once more first (``DELEGATE_TRIES``, D-252): an agent's error should not leave the work undone.
 
 Only humans decide — or, past the deadline, the agent a domain named for it.
 Automatic approval (policy flag) is a PolicyEngine decision, not an approval.
@@ -73,6 +74,9 @@ DelegateHook = Callable[[AsyncSession, Approval], Awaitable[uuid.UUID | None]]
 
 DELEGATE_WINDOW = timedelta(hours=6)
 """How long the delegate has, before the approval expires and a person is asked again."""
+
+DELEGATE_TRIES = 2
+"""D-252: how many times a delegate is started for one approval when its task ends undecided."""
 
 _TASK_DONE = {TaskState.SUCCEEDED, TaskState.FAILED, TaskState.CANCELLED}
 
@@ -332,7 +336,9 @@ class ApprovalService:
             if await self._delegate(session, approval):
                 continue
             expired.append(approval)
-        expired += await self._failed_delegations(session, skip={a.id for a in due})
+        for approval in await self._failed_delegations(session, skip={a.id for a in due}):
+            if not await self._delegate(session, approval, again=True):
+                expired.append(approval)
         for approval in expired:
             await self._release_delegate(session, approval, decided_by=None)
             await APPROVAL_FSM.transition(
@@ -349,12 +355,19 @@ class ApprovalService:
         await self.renew_waiting(session)
         return [a.id for a in expired]
 
-    async def _delegate(self, session: AsyncSession, approval: Approval) -> bool:
-        """Hand an unanswered approval to its action's delegate (D-157), once per approval chain.
+    async def _delegate(
+        self, session: AsyncSession, approval: Approval, *, again: bool = False
+    ) -> bool:
+        """Hand an unanswered approval to its action's delegate (D-157), once per approval chain
+        — or ``again``, after its task ended without deciding, while tries are left (D-252).
         In a savepoint: a delegate that declines or fails leaves it to expire."""
         delegate = self.delegates.get(approval.action or "")
         payload = approval.payload or {}
-        if delegate is None or "delegated" in payload or payload.get("delegated_before"):
+        marker = payload.get("delegated")
+        tries = int(marker.get("tries", 1)) if isinstance(marker, dict) else 0
+        if delegate is None or payload.get("delegated_before"):
+            return False
+        if (marker is not None) != again or tries >= DELEGATE_TRIES:
             return False
         approval_id = approval.id  # a rollback below expires the row's attributes
         try:
@@ -364,7 +377,11 @@ class ApprovalService:
                     return False
                 approval.payload = {
                     **payload,
-                    "delegated": {"task_id": str(task_id), "at": self.clock().isoformat()},
+                    "delegated": {
+                        "task_id": str(task_id),
+                        "at": self.clock().isoformat(),
+                        "tries": tries + 1,
+                    },
                 }
                 approval.expires_at = self.clock() + DELEGATE_WINDOW
                 await self._emit(
