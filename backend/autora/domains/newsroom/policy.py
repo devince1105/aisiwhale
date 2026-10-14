@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from autora.company import policy as company_policy
 from autora.runtime.policy import Limit, PolicyEngine, Rule, allow
@@ -88,6 +88,68 @@ def shelf_life_hours(policies: Mapping[str, Any], section: str | None) -> int:
         if isinstance(value, int | float) and not isinstance(value, bool) and value > 0:
             return int(value)
     return DEFAULT_SHELF_LIVES.get(section or "", DEFAULT_SHELF_LIFE)
+
+
+TOPIC_MIX_KEY = "newsroom.topic_mix"
+"""D-253: what the desk covers, in shares of the stories it commissions — ``{"focus_terms":
+[...], "crypto": 0.01, "other": 0.09}``. A story is *focus* when its title or summary names one
+of the terms, *crypto* when it is in the crypto section, *other* otherwise. Not set: no mix, the
+desk chooses from everything as before."""
+
+DEFAULT_FOCUS_TERMS = (
+    *("NVIDIA", "Nvidia", "輝達", "黃仁勳", "TSMC", "台積電", "AI 伺服器", "AI伺服器", "GPU"),
+    *("HBM", "CoWoS", "先進封裝", "資料中心", "data center", "鴻海", "Foxconn", "廣達", "緯創"),
+    *("緯穎", "世芯", "創意電子", "日月光", "SK hynix", "SK 海力士", "Micron", "美光", "AMD"),
+    *("Broadcom", "博通", "ASML", "AI chip", "AI 晶片"),
+)
+"""D-253's draft: NVIDIA, TSMC and the AI supply chain around them."""
+
+Bucket = Literal["focus", "crypto", "other"]
+
+
+@dataclass(frozen=True)
+class TopicMix:
+    focus_terms: tuple[str, ...]
+    crypto: float
+    """The most of the commissioned stories crypto may be (0.01: one in a hundred)."""
+    other: float
+    """The most that is neither focus nor crypto may be."""
+
+    def bucket(self, *, section: str | None, text: str) -> Bucket:
+        if section == "crypto":
+            return "crypto"
+        lowered = text.lower()
+        if any(term.lower() in lowered for term in self.focus_terms):
+            return "focus"
+        return "other"
+
+    def may_add(self, counts: Mapping[str, int], bucket: Bucket) -> bool:
+        """Whether one more ``bucket`` story keeps its share within the mix, counted over the
+        stories commissioned lately (``counts``, by bucket). Focus always may."""
+        if bucket == "focus":
+            return True
+        total = sum(counts.values()) + 1
+        return (counts.get(bucket, 0) + 1) / total <= getattr(self, bucket)
+
+
+def topic_mix(policies: Mapping[str, Any]) -> TopicMix | None:
+    value = policies.get(TOPIC_MIX_KEY)
+    if not isinstance(value, Mapping):
+        return None
+    terms = value.get("focus_terms")
+    terms = (
+        tuple(t for t in terms if isinstance(t, str) and t.strip())
+        if isinstance(terms, list)
+        else DEFAULT_FOCUS_TERMS
+    )
+
+    def share(key: str, default: float) -> float:
+        given = value.get(key)
+        if isinstance(given, bool) or not isinstance(given, int | float) or not 0 <= given <= 1:
+            return default
+        return float(given)
+
+    return TopicMix(terms or DEFAULT_FOCUS_TERMS, share("crypto", 0.01), share("other", 0.09))
 
 
 # D-002: which languages articles are written and published in (company policy, not code)

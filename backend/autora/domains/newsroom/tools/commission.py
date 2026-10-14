@@ -18,7 +18,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from autora.company.verbs import InstantiateWorkflow, workflows_this_cycle
+from autora.db.repositories.companies import get_policies
+from autora.domains.newsroom import topics
 from autora.domains.newsroom.models import Story, StoryState
+from autora.domains.newsroom.policy import topic_mix
 from autora.domains.newsroom.stories import STORY_FSM
 from autora.domains.newsroom.workflow import TEMPLATE_NAME, StartWorkflowError, start_story
 from autora.runtime.dag import WorkflowEngine
@@ -50,6 +53,20 @@ def register(registry: ToolRegistry, policy: PolicyEngine, workflows: WorkflowEn
                 output={"ok": False, "reason": f"{story.title!r} is already {story.state}"},
                 summary=f"{story.title[:60]} is already {story.state}",
             )
+        if (mix := topic_mix(await get_policies(ctx.session, ctx.company_id))) is not None:
+            # D-253: the desk's mix — focus always, another kind only while it has room
+            kind = (await topics.buckets(ctx.session, mix, [story]))[story.id]
+            if not mix.may_add(await topics.recent_mix(ctx.session, mix, ctx.company_id), kind):
+                share = mix.crypto if kind == "crypto" else mix.other
+                return ToolResult(
+                    output={
+                        "ok": False,
+                        "reason": f"{story.title!r} is {kind}: at most {share:.0%} of what the"
+                        " desk commissions may be, and that is used up for the last 30 days."
+                        " Commission a focus story (NVIDIA, TSMC, the AI supply chain) instead.",
+                    },
+                    summary=f"{story.title[:60]} is {kind}: no room in the mix",
+                )
         if story.state != StoryState.SELECTED.value:
             await STORY_FSM.transition(ctx.session, story, StoryState.SELECTED, actor=ctx.actor)
         if args.angle:

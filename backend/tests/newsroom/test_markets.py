@@ -4,10 +4,11 @@ import uuid
 
 from sqlalchemy import select
 
-from autora.db.repositories.companies import get_policies
+from autora.db.repositories.companies import get_policies, upsert_policy
 from autora.domains.newsroom import holdings, markets
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source
+from autora.domains.newsroom.policy import TOPIC_MIX_KEY
 from autora.domains.newsroom.sources import SECTIONS, SourceConfigError, add_source
 from autora.runtime.actor import Actor
 
@@ -116,52 +117,65 @@ async def test_the_holdings_dashboard_follows_thirteen_13f_filers(db_session):
 
 
 def test_searches_stay_inside_the_free_plan():
-    """D-038: 6 searches x 2 a day x 30 days = 360 of Tavily's 1,000 free credits a month; the
-    institutions' outlooks (D-057) are weekly, so their 2 run once a day: 60 more. Gold, the
-    other commodities and foreign exchange (D-067): 3 twice a day, 6 once, 360 more — 780."""
+    """D-253: nine searches — the four kept (台股 AI 伺服器, 台積電, 美股 twice a day; crypto once)
+    and the focus's five, twice a day: 510 of Tavily's 1,000 free credits a month (780 before)."""
     searches = [s for s in markets.SOURCES if s.kind == "search_query"]
-    daily = [s for s in searches if s.config["section"] == "institutions"]
-    assert len(searches) == 17 and len(daily) == 2
-    assert {s.poll_interval_seconds for s in daily} == {24 * 3600}
-    assert {s.config["recency_days"] for s in daily} == {7}
-    # only on the firms' own sites: an open query for ten names found no outlook at all
-    assert all(s.config["domains"] for s in daily)
-    assert "blackrock.com" in daily[0].config["domains"]
+    assert len(searches) == 9
     monthly = sum(30 * 24 * 3600 // s.poll_interval_seconds for s in searches)
-    assert monthly == 780
+    assert monthly == 510
 
 
-def test_gold_commodities_and_foreign_exchange_have_their_searches():
-    """D-067: gold on its own; metals (with the AI data centres' demand), energy and farm
-    futures; and the currencies Bank of Taiwan posts rates for."""
-    by_section: dict[str, list[str]] = {}
-    for s in markets.SOURCES:
-        if s.kind == "search_query":
-            by_section.setdefault(s.config["section"], []).append(s.config["query"])
-    assert len(by_section["gold"]) == 1 and "黃金" in by_section["gold"][0]
-    commodities = " ".join(by_section["commodities"])
-    for word in ("銅價", "鋁價", "原油", "黃豆", "玉米", "小麥", "copper", "data centers"):
-        assert word in commodities
-    fx = " ".join(by_section["fx"])
-    names = {
-        "USD": "美元", "HKD": "港幣", "GBP": "英鎊", "AUD": "澳幣", "CAD": "加幣",
-        "SGD": "新加坡幣", "CHF": "瑞士法郎", "JPY": "日圓", "ZAR": "南非幣", "SEK": "瑞典幣",
-        "NZD": "紐幣", "THB": "泰銖", "PHP": "菲律賓披索", "IDR": "印尼盾", "EUR": "歐元",
-        "KRW": "韓元", "VND": "越南盾", "MYR": "馬來幣", "CNY": "人民幣",
-    }  # fmt: skip
-    assert set(names) == set(markets.FX_CURRENCIES)
-    assert [code for code, name in names.items() if name not in fx] == []
-    # only on news sites: an open query found quote pages, converters and Instagram
-    ours = [s for s in markets.SOURCES if s.config.get("section") in ("gold", "commodities", "fx")]
-    assert all(s.config.get("domains") for s in ours)
-    assert "cna.com.tw" in ours[0].config["domains"]
-    # each day's price is its own story, not one taking in a month of closes
-    assert {s.config.get("match_hours") for s in ours} == {12}
+def test_the_focus_has_its_sources_and_crypto_one_search_a_day():
+    """D-253: NVIDIA, TSMC and the AI supply chain; crypto only for the rare big story."""
+    names = {s.name for s in markets.SOURCES}
+    for name in (
+        "NVIDIA Blog",
+        "NVIDIA Newsroom",
+        "搜尋：輝達",
+        "搜尋：台積電：製程與產能",
+        "搜尋：AI 伺服器供應鏈",
+        "搜尋：HBM 記憶體",
+        "搜尋：AI 資料中心：電力與散熱",
+    ):
+        assert name in names
+    crypto = [s for s in markets.SOURCES if s.config.get("section") == "crypto"]
+    assert [(s.kind, s.poll_interval_seconds) for s in crypto] == [("search_query", 24 * 3600)]
+    assert (
+        "2330" in next(s for s in markets.SOURCES if s.kind == "twse_announcements").config["codes"]
+    ), "TSMC's own announcements, as its newsroom refuses programs"
+
+
+def test_what_d253_stopped_covering_is_no_source_of_the_code_s():
+    names = {s.name for s in markets.SOURCES}
+    stopped = set(markets.RETIRED[2:])
+    assert "CoinDesk" in stopped and "搜尋：黃金" in stopped and len(stopped) == 14
+    assert not names & stopped
+
+
+async def test_seeding_pauses_what_d253_stopped_and_sets_the_mix_once(db_session):
+    slug = f"focus-{uuid.uuid4().hex[:8]}"
+    company = (await markets.seed_markets(db_session, actor=ACTOR, slug=slug)).company
+    old = await add_source(
+        db_session, company_id=company.id, name="CoinDesk", kind="rss",
+        url="https://www.coindesk.com/arc/outboundfeeds/rss/", config={"section": "crypto"},
+    )  # fmt: skip
+    policies = await get_policies(db_session, company.id)
+    assert policies[TOPIC_MIX_KEY] == markets.TOPIC_MIX
+    mine = {"focus_terms": ["NVIDIA"], "crypto": 0.0, "other": 0.2}
+    await upsert_policy(db_session, company.id, TOPIC_MIX_KEY, mine, updated_by=ACTOR.as_json())
+
+    await markets.seed_markets(db_session, actor=ACTOR, slug=slug)
+    await db_session.refresh(old)
+    assert old.status == "paused", "its items stay; it is polled no more"
+    assert (await get_policies(db_session, company.id))[TOPIC_MIX_KEY] == mine, "the company's"
 
 
 def test_every_source_says_which_section_of_the_site_it_feeds():
-    """D-047: the site's sections come from the sources; one without would feed only the front."""
-    assert {s.config["section"] for s in markets.SOURCES} == set(SECTIONS)
+    """D-047: the site's sections come from the sources; one without would feed only the front.
+    Since D-253 gold, commodities, FX and institutions' views have no news search: their pages
+    are prices and data, refreshed by their own schedules."""
+    covered = {s.config["section"] for s in markets.SOURCES}
+    assert covered == set(SECTIONS) - {"gold", "commodities", "fx", "institutions"}
 
 
 async def test_a_section_the_site_does_not_have_is_refused(db_session):
@@ -179,3 +193,32 @@ async def test_a_section_the_site_does_not_have_is_refused(db_session):
         assert "config.section" in str(error)
     else:
         raise AssertionError("an unknown section was accepted")
+
+
+def _migration_0083():
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(markets.__file__).parents[2] / "db/migrations/versions/0083_ai_focus.py"
+    spec = importlib.util.spec_from_file_location("m0083", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_migration_0083_says_what_the_code_says_today():
+    """0083 brings D-253 to production as seeding would; its values are written out, and are
+    the code's: the mission, the mix, the six added sources, the fourteen paused."""
+    m = _migration_0083()
+    assert m.MISSION == markets.MISSION
+    assert m.TOPIC_MIX == markets.TOPIC_MIX
+    assert m.PAUSED == list(markets.RETIRED[2:])
+    ours = {s.name: s for s in markets.SOURCES}
+    for name, spec in m.ADDED.items():
+        source = ours[name]
+        assert (source.kind, source.url, str(source.trust_level), source.language) == (
+            spec["kind"], spec["url"], spec["trust_level"], spec["language"],
+        )  # fmt: skip
+        assert source.poll_interval_seconds == spec["poll_interval_seconds"]
+        assert source.config == spec["config"]
+    assert ours[m.CRYPTO_SEARCH].poll_interval_seconds == 24 * 3600

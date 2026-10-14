@@ -55,6 +55,7 @@ from autora.domains.newsroom import forex, institutions, personas
 from autora.domains.newsroom import organization as newsroom_org
 from autora.domains.newsroom.advice import NO_ADVICE_KEY
 from autora.domains.newsroom.models import Source, SourceStatus
+from autora.domains.newsroom.policy import DEFAULT_FOCUS_TERMS, TOPIC_MIX_KEY
 from autora.domains.newsroom.sources import (
     MATCH_HOURS,
     MAX_AGE_DAYS,
@@ -74,12 +75,15 @@ NAME = "艾矽鯨"
 """AiSiWhale (D-043): 艾 (ài, as in AI), 矽 = silicon, 鯨 = the whales whose holdings it follows."""
 PROJECT = "持股動態與科技產業"
 MISSION = (
-    "用附原始出處的中英雙語報導，追蹤 AI 與半導體產業的動向、大型投資人的持股變化，"
-    "台股、美股裡的 AI 科技公司，名人（如美國總統、國會議員）依法申報的持股與交易，"
-    "加密貨幣的監管、ETF 與市場動態，"
-    "以及黃金、期貨（金屬、能源、農產品）與外匯（臺灣銀行掛牌的外幣）的價格與供需；"
+    "用附原始出處的中英雙語報導，聚焦輝達（NVIDIA）、台積電與它們周邊的 AI 供應鏈"
+    "（AI 伺服器、GPU、HBM、先進封裝、資料中心）；台股、美股與大型投資人的持股，"
+    "以和 AI 相關的為主；加密貨幣只報導重大的監管與市場事件。"
     "只報導事實與別人說的話，不提供投資建議。"
 )
+"""D-253: NVIDIA, TSMC and the AI around them, nine stories in ten; crypto one in a hundred. The
+desk's mix is the company policy ``newsroom.topic_mix`` (``TOPIC_MIX``)."""
+
+TOPIC_MIX = {"focus_terms": list(DEFAULT_FOCUS_TERMS), "crypto": 0.01, "other": 0.09}
 
 HALF_DAY = 12 * 3600
 DAY = 24 * 3600
@@ -281,8 +285,6 @@ SOURCES: tuple[MarketSource, ...] = (
     # as neither the President's OGE transaction reports nor Congress's STOCK Act reports have a
     # feed — searches for news of new ones, which the newsroom follows to the filing itself
     _figure("川普（Donald J. Trump）", "0000947033"),
-    _search("Trump OGE 278-T periodic transaction report stocks bonds", "figures", "en"),
-    _search("Pelosi periodic transaction report stock trades disclosure", "figures", "en"),
     MarketSource(
         name="證交所重大訊息",
         kind="twse_announcements",
@@ -317,82 +319,23 @@ SOURCES: tuple[MarketSource, ...] = (
     _search("台股 AI 伺服器 供應鏈", "tw"),
     _search("台積電 營收 法說會", "tw"),
     _search("美股 科技股 財報", "us"),
-    _press("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/", "crypto"),
-    _search("比特幣 以太幣 ETF 監管", "crypto"),
-    # 機構觀點 (D-057): the ten largest asset managers' own published outlooks — a weekly
-    # commentary is news for a week, so a day's search over seven days of results is enough.
-    # Only on the firms' own sites: ten names in one open query found Quora, Instagram and a
-    # regulator's PDF, not one outlook
+    # crypto (D-253): one story in a hundred — a search a day is plenty to find the rare one
+    _search("比特幣 以太幣 ETF 監管", "crypto", every=DAY),
+    # the focus (D-253): NVIDIA, TSMC and the AI supply chain. TSMC's newsroom and NVIDIA's
+    # investor feed refuse programs (403); NVIDIA's blog answers. TSMC's own announcements come
+    # from 證交所重大訊息 (2330 is watched)
+    _press("NVIDIA Blog", "https://blogs.nvidia.com/feed/"),
+    _search("輝達 NVIDIA 黃仁勳 財報 GPU 供應鏈", "ai", domains=TW_NEWS, name="輝達"),
+    _search("台積電 先進製程 CoWoS 產能 2奈米", "tw", domains=TW_NEWS, name="台積電：製程與產能"),
+    _search("AI 伺服器 鴻海 廣達 緯創 緯穎 出貨", "tw", domains=TW_NEWS, name="AI 伺服器供應鏈"),
     _search(
-        "market outlook weekly commentary",
-        "institutions",
+        "HBM high bandwidth memory SK hynix Micron Samsung AI demand",
+        "ai",
         "en",
-        recency_days=7,
-        every=DAY,
-        domains=INSTITUTIONS_A,
-        name="機構觀點（貝萊德、先鋒、富達、瑞銀、道富）",
+        domains=("reuters.com", "cnbc.com", "tomshardware.com", "theregister.com"),
+        name="HBM 記憶體",
     ),
-    _search(
-        "market outlook weekly commentary",
-        "institutions",
-        "en",
-        recency_days=7,
-        every=DAY,
-        domains=INSTITUTIONS_B,
-        name="機構觀點（摩根大通、高盛、資本集團、Amundi、紐約梅隆）",
-    ),
-    # 黃金、原物料、外匯 (D-067). Gold twice a day, as the one most asked about; the rest once
-    # a day — a price moves every day, but a day's news of it is enough. Only on news sites: an
-    # open query for a price found quote pages, currency converters, Instagram and app listings
-    _search("黃金 金價 國際金價 央行購金 黃金ETF", "gold", domains=TW_NEWS, name="黃金"),
-    _search(
-        "銅價 鋁價 白銀 鎳 金屬 價格 供需", "commodities", domains=TW_NEWS, name="原物料：金屬"
-    ),
-    _search(
-        "copper aluminum demand AI data centers power grid",
-        "commodities",
-        "en",
-        every=DAY,
-        domains=COMMODITY_NEWS,
-        name="原物料：AI 資料中心帶動的金屬需求",
-    ),
-    _search(
-        "國際油價 原油 天然氣 OPEC",
-        "commodities",
-        every=DAY,
-        domains=TW_NEWS,
-        name="原物料：能源",
-    ),
-    _search(
-        "黃豆 玉米 小麥 農產品 期貨 價格",
-        "commodities",
-        every=DAY,
-        domains=TW_NEWS,
-        name="原物料：農產品",
-    ),
-    # the currencies Bank of Taiwan posts rates for (FX_CURRENCIES), in four searches
-    _search("新台幣 匯率 美元 央行", "fx", domains=TW_NEWS, name="外匯：新台幣與美元"),
-    _search(
-        "日圓 韓元 人民幣 港幣 匯率",
-        "fx",
-        every=DAY,
-        domains=TW_NEWS,
-        name="外匯：亞洲主要貨幣",
-    ),
-    _search(
-        "歐元 英鎊 瑞士法郎 澳幣 紐幣 加幣 南非幣 瑞典幣 匯率",
-        "fx",
-        every=DAY,
-        domains=TW_NEWS,
-        name="外匯：歐美與大洋洲貨幣",
-    ),
-    _search(
-        "新加坡幣 泰銖 馬來幣 印尼盾 越南盾 菲律賓披索 匯率",
-        "fx",
-        every=DAY,
-        domains=TW_NEWS,
-        name="外匯：東南亞貨幣",
-    ),
+    _search("AI 資料中心 電力 散熱 液冷", "ai", domains=TW_NEWS, name="AI 資料中心：電力與散熱"),
 )
 
 FX_CURRENCIES = tuple(code for code, _, _ in forex.CURRENCIES)
@@ -401,8 +344,26 @@ FX_CURRENCIES = tuple(code for code, _, _ in forex.CURRENCIES)
 RETIRED = (
     "搜尋：BlackRock Vanguard Fidelity UBS State Street market outlook commentary",
     "搜尋：J.P. Morgan Asset Management Goldman Sachs Capital Group Amundi BNY investment outlook",
+    # D-253: the desk covers NVIDIA, TSMC and AI; these found stories it no longer writes (in the
+    # 14 days before, 186 stories from them and not one article). Prices, charts and the 13F
+    # data are their own schedules and go on
+    "CoinDesk",
+    "搜尋：Trump OGE 278-T periodic transaction report stocks bonds",
+    "搜尋：Pelosi periodic transaction report stock trades disclosure",
+    "搜尋：機構觀點（貝萊德、先鋒、富達、瑞銀、道富）",
+    "搜尋：機構觀點（摩根大通、高盛、資本集團、Amundi、紐約梅隆）",
+    "搜尋：黃金",
+    "搜尋：原物料：金屬",
+    "搜尋：原物料：AI 資料中心帶動的金屬需求",
+    "搜尋：原物料：能源",
+    "搜尋：原物料：農產品",
+    "搜尋：外匯：新台幣與美元",
+    "搜尋：外匯：亞洲主要貨幣",
+    "搜尋：外匯：歐美與大洋洲貨幣",
+    "搜尋：外匯：東南亞貨幣",
 )
-"""Sources the code no longer defines: D-057's first two searches, which found no outlooks."""
+"""Sources the code no longer defines, paused (their items stay): D-057's first two searches,
+which found no outlooks; and what D-253 stopped covering."""
 
 
 @dataclass
@@ -428,8 +389,13 @@ async def seed_markets(
         # a name given later renames it; the mission is the code's, which the desk chooses by
         company.name = name
         company.mission = MISSION
-    if not (await get_policies(session, company.id)).get(NO_ADVICE_KEY):
+    policies = await get_policies(session, company.id)
+    if not policies.get(NO_ADVICE_KEY):
         await upsert_policy(session, company.id, NO_ADVICE_KEY, True, updated_by=actor.as_json())
+    if TOPIC_MIX_KEY not in policies:  # D-253; a mix the company set since is left as it is
+        await upsert_policy(
+            session, company.id, TOPIC_MIX_KEY, TOPIC_MIX, updated_by=actor.as_json()
+        )
 
     _, ceo_role = await bootstrap_executive(session, company.id, actor=actor)
     if (

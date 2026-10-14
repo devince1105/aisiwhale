@@ -20,6 +20,7 @@ believes it has three articles coming and no one writing them.
 from __future__ import annotations
 
 import uuid
+from collections import Counter
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -28,7 +29,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.company.ledger import Ledger
 from autora.db.models import Budget, BusinessUnit, Company, Project, Task
+from autora.db.repositories.companies import get_policies
+from autora.domains.newsroom import topics
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
+from autora.domains.newsroom.policy import TopicMix, topic_mix
 from autora.infra.money import format_money
 from autora.runtime.behaviors import AgentBehavior, RunContext
 
@@ -40,6 +44,8 @@ MAX_STORIES = 5
 and is the one that actually refuses — this is the chief's own judgement, stated up front."""
 
 CANDIDATES = 8
+POOL = 80
+"""With a topic mix (D-253), the candidates are chosen from this many of the best, by kind."""
 
 
 class Commission(BaseModel):
@@ -150,9 +156,43 @@ async def the_count_matches(session: AsyncSession, ctx: RunContext, output: Base
 # --- what it is given ---------------------------------------------------------------------------
 
 
+def choose(
+    pool: list[Story], kinds: dict[uuid.UUID, str], mix: TopicMix, counts: Counter[str]
+) -> list[Story]:
+    """The candidates under a topic mix (D-253), best first within each kind: focus stories,
+    and one of another kind only while the mix has room for it. No focus story at all: none."""
+    focus = [s for s in pool if kinds[s.id] == "focus"]
+    if not focus:
+        return []  # no focus story: an empty day, not filler
+    extras = [
+        story
+        for kind in ("other", "crypto")
+        if mix.may_add(counts, kind)  # type: ignore[arg-type]
+        for story in [s for s in pool if kinds[s.id] == kind][:1]
+    ]
+    return focus[: CANDIDATES - len(extras)] + extras
+
+
+def mix_brief(mix: TopicMix, counts: Counter[str]) -> list[str]:
+    total = sum(counts.values())
+    other_ok, crypto_ok = mix.may_add(counts, "other"), mix.may_add(counts, "crypto")
+    return [
+        "What the desk covers (company policy, D-253): "
+        f"focus — NVIDIA, TSMC and the AI supply chain — at least {1 - mix.other - mix.crypto:.0%};"
+        f" other at most {mix.other:.0%}; crypto at most {mix.crypto:.0%}.",
+        f"Commissioned in the last 30 days: {counts.get('focus', 0)} focus,"
+        f" {counts.get('other', 0)} other, {counts.get('crypto', 0)} crypto ({total} in all).",
+        "Today you may commission focus stories"
+        + (", one other" if other_ok else "")
+        + (", one crypto" if crypto_ok else "")
+        + "; anything else would be refused. No focus story worth it: commission nothing.",
+    ]
+
+
 async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
     """OBSERVE: the candidates, the desk's recent record, and what it may spend."""
-    candidates = (
+    mix = topic_mix(await get_policies(session, ctx.company_id))
+    pool = (
         await session.scalars(
             select(Story)
             .where(
@@ -160,9 +200,18 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
                 Story.state.in_([StoryState.DISCOVERED.value, StoryState.SELECTED.value]),
             )
             .order_by(Story.score.desc(), Story.updated_at.desc())
-            .limit(CANDIDATES)
+            .limit(POOL if mix else CANDIDATES)
         )
     ).all()
+    kinds: dict[uuid.UUID, str] = {}
+    mix_lines: list[str] = []
+    if mix is None:
+        candidates = list(pool)
+    else:
+        kinds = await topics.buckets(session, mix, list(pool))
+        counts = await topics.recent_mix(session, mix, ctx.company_id)
+        candidates = choose(list(pool), kinds, mix, counts)
+        mix_lines = mix_brief(mix, counts)
     in_production = (
         await session.scalars(
             select(Story.title).where(
@@ -185,13 +234,18 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
     lines.append("Candidate stories (best first):")
     if candidates:
         for story in candidates:
+            kind = f"[{kinds[story.id]}] " if story.id in kinds else ""
             lines.append(
-                f"- {story.id} · {story.title} · score {float(story.score or 0):.2f} · "
+                f"- {kind}{story.id} · {story.title} · score {float(story.score or 0):.2f} · "
                 f"{story.sources_count} source(s)"
                 + (f" · {story.summary[:160]}" if story.summary else "")
             )
     else:
         lines.append("- none: nothing has been gathered that is worth covering")
+
+    if mix_lines:
+        lines.append("")
+        lines += mix_lines
 
     brief = await _market_brief(session, ctx)
     if brief:
