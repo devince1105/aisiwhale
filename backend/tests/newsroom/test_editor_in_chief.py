@@ -108,8 +108,13 @@ def _ctx(company, project, chief):
 def test_the_chief_commissions_and_nothing_else():
     """The whole v2 point: the desk head chooses, the desk writes."""
     assert (BEHAVIOR.role, BEHAVIOR.task_name) == (ROLE, TASK)
-    assert BEHAVIOR.tools == ("commission_story",)
-    assert "You do not write,\nedit or fact-check" in BEHAVIOR.system_prompt
+    # D-256: and the pieces no news item starts, commissioned the same way
+    assert BEHAVIOR.tools == (
+        "commission_story",
+        "commission_company_report",
+        "commission_strategy_study",
+    )
+    assert "You do not write, edit or fact-check" in BEHAVIOR.system_prompt
     assert "an empty day is a decision, not a failure" in BEHAVIOR.system_prompt
 
 

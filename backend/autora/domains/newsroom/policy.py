@@ -73,6 +73,8 @@ DEFAULT_SHELF_LIVES: dict[str, int] = {
     "holdings": 336,
     "figures": 336,
     "institutions": 336,
+    "research": 720,  # D-256: a company report holds for a month
+    "strategy": 2160,  # and a strategy study, being history, for a quarter
 }
 """D-252: how many hours after its story was found news in each section is still timely. A piece
 about one day's price move or level is a day's, whatever its section (the CEO is told so)."""
@@ -247,6 +249,8 @@ ACTIONS = {
     "web_search": "read",
     "fetch_url": "write",  # stores an evidence snapshot
     "compare_13f": "write",  # stores a 13F comparison as evidence (D-037)
+    "market_snapshot": "write",  # stores a stock's price record as evidence (D-256)
+    "run_backtest": "write",  # stores a strategy's backtest as evidence (D-256)
     "read_evidence": "read",
     "search_evidence": "read",
     "create_claim": "write",
@@ -267,12 +271,16 @@ ACTIONS = {
     "generate_cover": "write",
     "spend_ad_budget": "write",
     "commission_story": "write",
+    "commission_company_report": "write",  # D-256
+    "commission_strategy_study": "write",  # D-256
 }
 
 RULES: list[Rule] = [
     *allow("web_search", "researcher", "marketing"),
     *allow("fetch_url", "researcher", "marketing"),
     *allow("compare_13f", "researcher"),
+    *allow("market_snapshot", "researcher"),
+    *allow("run_backtest", "researcher"),
     *allow("read_evidence", *WRITERS_AND_READERS),
     *allow("search_evidence", *WRITERS_AND_READERS),
     *allow("create_claim", "analyst"),
@@ -313,6 +321,8 @@ RULES: list[Rule] = [
     # how much work that is belongs to the company, not to the newsroom: this rule points at
     # the company's own limit so a newsroom cannot give itself a bigger day (T-605b).
     *allow("commission_story", "editor_in_chief"),
+    *allow("commission_company_report", "editor_in_chief"),
+    *allow("commission_strategy_study", "editor_in_chief"),
     *allow(
         "instantiate_workflow",
         "editor_in_chief",

@@ -138,10 +138,13 @@ SECTIONS = (
     "gold",
     "commodities",
     "fx",
+    "research",
+    "strategy",
 )
 """The site's sections: big investors' filings, public figures' holdings and trades (D-050), AI
 and tech, Taiwan stocks, US stocks, crypto, institutions' views (D-057); gold, the other
-commodities (metals, energy, farm futures) and foreign exchange (D-067)."""
+commodities (metals, energy, farm futures) and foreign exchange (D-067); the research desk's
+company reports and strategy studies (D-256), which no source names — the desk gives them."""
 
 
 SECTION_GUESS = "section_guess"

@@ -10,6 +10,11 @@ so what reaches the writer can pass: a claim that would fail must be fixed (anot
 quote, a trusted source) or left out, and a contested point must be written as who said what
 (an attribution claim). Also: the claims were made in this task for this story, there are enough
 of them (``params.min_claims``, default 3), and key numbers point at number claims.
+
+D-256: for a research piece the note also sorts the claims into the case for, the case against
+and the risks (``research.stance_problems`` holds each format to its minimum), lists the desk's
+own inferences — each built on claims, never a forecast or a call — and what the evidence could
+not tell (``data_gaps``).
 """
 
 from __future__ import annotations
@@ -22,7 +27,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import Task
 from autora.db.repositories.companies import get_policies
-from autora.domains.newsroom.advice import NO_ADVICE_BRIEF, no_advice
+from autora.domains.newsroom import research
+from autora.domains.newsroom.advice import (
+    ADVICE,
+    MOTIVE,
+    NO_ADVICE_BRIEF,
+    OUR_VIEW,
+    PREDICTION,
+    no_advice,
+)
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.factcheck import check_claim
 from autora.domains.newsroom.models import Claim, ClaimStatus, ClaimType, Evidence, Story
@@ -62,6 +75,10 @@ When done, reply with only a JSON object (no other text):
  "angle": "<the angle the article should take>",
  "key_numbers": [{"claim_id": "...", "value": "<the number, e.g. 3,000 戶>"}],
  "contradictions": [{"note": "<what disagrees>", "evidence_ids": ["..."], "claim_ids": ["..."]}]}
+For a research piece (the context says its format) add:
+ "bull_claim_ids": [...], "bear_claim_ids": [...], "risk_claim_ids": [...],
+ "inferences": [{"text": "<a link between facts>", "based_on": ["<claim_id>", ...]}],
+ "data_gaps": ["<what the evidence could not tell>", ...]
 Write the angle and notes in Traditional Chinese (zh-TW); never Simplified Chinese.
 """
 
@@ -77,12 +94,23 @@ class Contradiction(BaseModel):
     claim_ids: list[uuid.UUID] = Field(default=[], max_length=5)
 
 
+class Inference(BaseModel):
+    text: str = Field(min_length=5, max_length=300)
+    based_on: list[uuid.UUID] = Field(default=[], max_length=6)
+
+
 class AnalysisNote(BaseModel):
     story_id: uuid.UUID
     claim_ids: list[uuid.UUID] = Field(min_length=1, max_length=40)
     angle: str = Field(min_length=5, max_length=300)
     key_numbers: list[KeyNumber] = Field(default=[], max_length=10)
     contradictions: list[Contradiction] = Field(default=[], max_length=10)
+    # D-256: a research piece's sides, the desk's own links between facts, and its gaps
+    bull_claim_ids: list[uuid.UUID] = Field(default=[], max_length=12)
+    bear_claim_ids: list[uuid.UUID] = Field(default=[], max_length=12)
+    risk_claim_ids: list[uuid.UUID] = Field(default=[], max_length=12)
+    inferences: list[Inference] = Field(default=[], max_length=5)
+    data_gaps: list[str] = Field(default=[], max_length=6)
 
 
 def sent_back(ctx: RunContext) -> list[dict]:
@@ -133,6 +161,8 @@ async def analysis_context(session: AsyncSession, ctx: RunContext) -> str | None
     lines = [f"Story: {story.title}", f"Story id: {story.id}"]
     if no_advice(await get_policies(session, ctx.company_id)):
         lines.append(NO_ADVICE_BRIEF)
+    if text := research.brief(research.story_format(story.seed), ROLE):
+        lines.append(text)
     upstream = (
         (await session.scalars(select(Task).where(Task.id.in_(ctx.task.depends_on)))).all()
         if ctx.task.depends_on
@@ -255,6 +285,32 @@ async def claims_would_pass(session: AsyncSession, ctx: RunContext, note: BaseMo
     return issues
 
 
+async def research_sides(session: AsyncSession, ctx: RunContext, note: BaseModel) -> list[str]:
+    """D-256: a research piece shows both sides and the risks, and its inferences link facts
+    without calling a price or a trade — the desk has no view of its own (D-035)."""
+    assert isinstance(note, AnalysisNote)
+    story_id = task_story_id(ctx)
+    story = await session.get(Story, story_id) if story_id else None
+    fmt = research.story_format(story.seed if story else None)
+    issues = research.stance_problems(
+        fmt,
+        claim_ids={str(c) for c in note.claim_ids},
+        bull=[str(c) for c in note.bull_claim_ids],
+        bear=[str(c) for c in note.bear_claim_ids],
+        risk=[str(c) for c in note.risk_claim_ids],
+        inferences=[(i.text, [str(c) for c in i.based_on]) for i in note.inferences],
+    )
+    for inference in note.inferences:
+        for pattern in (OUR_VIEW, ADVICE, PREDICTION, MOTIVE):
+            if match := pattern.search(inference.text):
+                issues.append(
+                    f"inference {inference.text[:40]!r}: {match.group(0)!r} is a call or a "
+                    "forecast; an inference only links facts the claims state"
+                )
+                break
+    return issues
+
+
 def _summary(note: BaseModel) -> str:
     assert isinstance(note, AnalysisNote)
     return f"{len(set(note.claim_ids))} claims; {note.angle[:120]}"
@@ -267,7 +323,7 @@ BEHAVIOR = AgentBehavior(
     system_prompt=SYSTEM_PROMPT,
     output_model=AnalysisNote,
     tools=("read_evidence", "search_evidence", "create_claim", "link_evidence", "list_claims"),
-    validators=(claims_made_here, claims_would_pass),
+    validators=(claims_made_here, claims_would_pass, research_sides),
     max_steps=14,
     repair_limit=2,
     # the note carries every claim and key number, and a reasoning model spends part of this

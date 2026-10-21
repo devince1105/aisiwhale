@@ -11,6 +11,10 @@ The validators hold the note to what really happened in the run, not to what the
   a model cannot cite pages it never captured or invent ids;
 - enough sources, from more than one site (``params.min_sources``, default 2);
 - exactly one summary per listed evidence.
+
+D-256: a research piece is told its format (``research.brief``). A company report must include
+the stock's price record (``market_snapshot``) and a strategy study its backtest
+(``run_backtest``) — records this newsroom computes, which a study needs no second site for.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import EventRecord
+from autora.domains.newsroom import research
 from autora.domains.newsroom.models import Evidence, Source, SourceItem, Story, StoryItem
 from autora.domains.newsroom.sources import PRIMARY
 from autora.runtime.behaviors import AgentBehavior, RunContext
@@ -112,9 +117,13 @@ async def produced_evidence(session: AsyncSession, ctx: RunContext) -> set[uuid.
 
 async def from_a_record(session: AsyncSession, story_id: uuid.UUID | None) -> bool:
     """Did this story come from a primary source — a filing, which is the record itself? Then one
-    source is enough and it may come from one site (D-036/D-037)."""
+    source is enough and it may come from one site (D-036/D-037). A strategy study is the same:
+    its record is the backtest this newsroom computed (D-256)."""
     if story_id is None:
         return False
+    story = await session.get(Story, story_id)
+    if story is not None and research.story_format(story.seed) == "strategy_study":
+        return True
     found = await session.scalar(
         select(Source.id)
         .join(SourceItem, SourceItem.source_id == Source.id)
@@ -153,13 +162,24 @@ async def research_context(session: AsyncSession, ctx: RunContext) -> str | None
         lines.append("Leads:")
         lines += [f"- {url}" for url in urls]
         lines += [f"- {title} — {url}" for title, url in leads]
-    if await from_a_record(session, story.id):
+    fmt = research.story_format(seed)
+    if seed.get(research.SYMBOL):
+        lines.append(f"Tracked stock: {seed[research.SYMBOL]}")
+    if seed.get(research.STRATEGY):
+        lines.append(f"Strategy: {seed[research.STRATEGY]}")
+    if fmt == "strategy_study":
+        lines.append(
+            "The backtest is the record: run_backtest is enough; other pages are optional."
+        )
+    elif await from_a_record(session, story.id):
         lines.append(
             "This story comes from a primary record (a filing): the filing itself is enough. "
             "Capture it (compare_13f for a 13F-HR); other coverage is optional context."
         )
     else:
         lines.append(f"Capture at least {min_sources(ctx)} sources, from more than one site.")
+    if text := research.brief(fmt, ROLE):
+        lines.append(text)
     return "\n".join(lines)
 
 
@@ -218,6 +238,32 @@ async def one_summary_per_source(
     return issues
 
 
+COMPUTED_BY = {"company_report": "snapshot", "strategy_study": None}
+"""The record a format must include, by the ``research=`` its page address carries: a company
+report the price record; a strategy study a backtest (any rule's: its own, ``seed.strategy``)."""
+
+
+async def computed_record_included(
+    session: AsyncSession, ctx: RunContext, note: BaseModel
+) -> list[str]:
+    """D-256: a company report rests on the stock's price record, a strategy study on its
+    backtest — records the tools compute, which the article's numbers are checked against."""
+    assert isinstance(note, ResearchNote)
+    story_id = task_story_id(ctx)
+    story = await session.get(Story, story_id) if story_id else None
+    fmt = research.story_format(story.seed if story else None)
+    if fmt not in COMPUTED_BY:
+        return []
+    want = COMPUTED_BY[fmt] or (story.seed or {}).get(research.STRATEGY) or ""
+    urls = (
+        await session.scalars(select(Evidence.url).where(Evidence.id.in_(set(note.evidence_ids))))
+    ).all()
+    if any(f"research={want}&" in url for url in urls):
+        return []
+    tool = "market_snapshot" if fmt == "company_report" else f"run_backtest (strategy {want})"
+    return [f"a {fmt} rests on the stock's computed record: call {tool} and list its evidence"]
+
+
 def _summary(note: BaseModel) -> str:
     assert isinstance(note, ResearchNote)
     return f"{len(set(note.evidence_ids))} sources; {note.suggested_angles[0][:120]}"
@@ -229,8 +275,21 @@ BEHAVIOR = AgentBehavior(
     capability="research_extraction",
     system_prompt=SYSTEM_PROMPT,
     output_model=ResearchNote,
-    tools=("web_search", "fetch_url", "compare_13f", "read_evidence", "search_evidence"),
-    validators=(about_the_task_story, evidence_captured_here, one_summary_per_source),
+    tools=(
+        "web_search",
+        "fetch_url",
+        "compare_13f",
+        "market_snapshot",
+        "run_backtest",
+        "read_evidence",
+        "search_evidence",
+    ),
+    validators=(
+        about_the_task_story,
+        evidence_captured_here,
+        one_summary_per_source,
+        computed_record_included,
+    ),
     max_steps=12,
     repair_limit=2,
     max_output_tokens=4096,

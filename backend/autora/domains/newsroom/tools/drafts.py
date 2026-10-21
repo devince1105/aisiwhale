@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 
 from autora.db.repositories.companies import get_policies
-from autora.domains.newsroom import institutions
+from autora.domains.newsroom import institutions, research
 from autora.domains.newsroom.advice import advice_problems, no_advice
 from autora.domains.newsroom.articles import (
     ArticleState,
@@ -177,6 +177,8 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
         issues += institutions.attribution_problems(
             args.versions, await _evidence_urls(session, cited)
         )
+    # D-256: a research piece has its parts in every language, and never says a rule fires now
+    issues += research.draft_problems(research.story_format(story.seed), args.versions)
     if issues:
         raise DraftError("the draft was not saved:\n- " + "\n- ".join(issues))
 

@@ -118,7 +118,18 @@ from autora_api.deps import Session, settings_dep
 router = APIRouter(tags=["public"])
 
 Section = Literal[
-    "holdings", "figures", "ai", "tw", "us", "crypto", "institutions", "gold", "commodities", "fx"
+    "holdings",
+    "figures",
+    "ai",
+    "tw",
+    "us",
+    "crypto",
+    "institutions",
+    "gold",
+    "commodities",
+    "fx",
+    "research",
+    "strategy",
 ]
 """The site's sections (``newsroom.sources.SECTIONS``), spelled out for the OpenAPI document."""
 

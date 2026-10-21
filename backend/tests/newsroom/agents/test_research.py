@@ -204,6 +204,8 @@ def test_the_worker_knows_the_researcher():
         "web_search",
         "fetch_url",
         "compare_13f",  # D-037: a story from a 13F filing
+        "market_snapshot",  # D-256: a stock's price record, computed here
+        "run_backtest",  # D-256: a strategy study's backtest
         "read_evidence",
         "search_evidence",
     }

@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.db.models import EventRecord, Task
 from autora.db.repositories.companies import get_policies
+from autora.domains.newsroom import research
 from autora.domains.newsroom.advice import NO_ADVICE_BRIEF, no_advice
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.models import Article, ArticleVersion, Claim, ClaimStatus, Story
@@ -189,6 +190,7 @@ async def draft_context(session: AsyncSession, ctx: RunContext) -> str | None:
     if contradictions:
         lines.append("Contested (write as who says what):")
         lines += [f"- {c['note']}" for c in contradictions]
+    lines += research_lines(research.story_format(story.seed), notes)
 
     issues = revision_issues(ctx)
     if issues:
@@ -205,6 +207,38 @@ async def draft_context(session: AsyncSession, ctx: RunContext) -> str | None:
         # D-233: a person sending it back for another picture had the text rewritten for it
         lines.append(COVER_IS_NOT_YOURS)
     return "\n".join(lines)
+
+
+def research_lines(fmt: str, notes: list[dict[str, Any]]) -> list[str]:
+    """D-256: a research piece's outline, and the analyst's sides, inferences and gaps."""
+    if fmt not in research.RESEARCH_FORMATS:
+        return []
+    lines = [research.brief(fmt, ROLE) or ""]
+    for key, label in (
+        ("bull_claim_ids", "The case for (cite under its heading)"),
+        ("bear_claim_ids", "The case against"),
+        ("risk_claim_ids", "Risks"),
+    ):
+        ids = [c for n in notes for c in n.get(key) or []]
+        if ids:
+            lines.append(f"{label}: {', '.join(ids)}")
+    inferences = [i for n in notes for i in n.get("inferences") or []]
+    if inferences:
+        lines.append(
+            "Inferences (write each as 推論：… / Inference: …, citing exactly its claims; never "
+            "turn one into a fact, a forecast or advice):"
+        )
+        lines += [
+            f"- {i.get('text')} — based on {', '.join(i.get('based_on') or [])}" for i in inferences
+        ]
+    gaps = [g for n in notes for g in n.get("data_gaps") or []]
+    if gaps:
+        lines.append(
+            "What the evidence could not tell (say so under the data heading, citing the claim "
+            "that records it — never fill a gap with a number of your own):"
+        )
+        lines += [f"- {g}" for g in gaps]
+    return lines
 
 
 # --- validators (EVALUATE) --------------------------------------------------------------------

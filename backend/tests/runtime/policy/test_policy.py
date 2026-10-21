@@ -32,6 +32,8 @@ MATRIX = {
     "web_search":           (A, D, D, D, A, D, D, D, D, A),
     "fetch_url":            (A, D, D, D, A, D, D, D, D, A),
     "compare_13f":          (A, D, D, D, D, D, D, D, D, D),  # D-037
+    "market_snapshot":      (A, D, D, D, D, D, D, D, D, D),  # D-256: a computed price record
+    "run_backtest":         (A, D, D, D, D, D, D, D, D, D),  # D-256: a computed backtest
     "read_evidence":        (A, A, A, A, A, A, A, D, D, A),
     "search_evidence":      (A, A, A, A, A, A, A, D, D, D),
     "create_claim":         (D, A, D, D, D, D, D, D, D, D),
@@ -66,6 +68,8 @@ MATRIX = {
     # The desk head (T-605b): it commissions stories and starts the work it commissions, under
     # the company's own cap on workflows per cycle.
     "commission_story":     (D, D, D, D, D, A, D, D, D, D),
+    "commission_company_report": (D, D, D, D, D, A, D, D, D, D),  # D-256
+    "commission_strategy_study": (D, D, D, D, D, A, D, D, D, D),  # D-256
     # The executive's one tool. Allowing it is not allowing what it asks for: every command is
     # decided again on its own action (T-605a). The finance officer's too (T-705): what it asks
     # for is an allocation, and that goes to a person (allocate_budget, finance: H above). The

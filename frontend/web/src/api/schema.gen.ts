@@ -2831,7 +2831,7 @@ export interface components {
         /** ArticleSectionBody */
         ArticleSectionBody: {
             /** Section */
-            section: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx") | null;
+            section: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx" | "research" | "strategy") | null;
         };
         /**
          * ArticleState
@@ -6040,7 +6040,7 @@ export interface components {
              */
             kind: "note" | "brief";
             /** Section */
-            section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx") | null;
+            section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx" | "research" | "strategy") | null;
             /** Text */
             text: string;
         };
@@ -9620,7 +9620,7 @@ export interface operations {
             query: {
                 lang: string;
                 company?: string | null;
-                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx")[] | null;
+                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx" | "research" | "strategy")[] | null;
                 limit?: number;
                 offset?: number;
                 /** @description Only that day's, in Taipei (D-084) */
@@ -9659,7 +9659,7 @@ export interface operations {
                 /** @description 2026-09 */
                 month: string;
                 company?: string | null;
-                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx")[] | null;
+                section?: ("holdings" | "figures" | "ai" | "tw" | "us" | "crypto" | "institutions" | "gold" | "commodities" | "fx" | "research" | "strategy")[] | null;
             };
             header?: never;
             path?: never;

@@ -1557,7 +1557,9 @@
          "institutions",
          "gold",
          "commodities",
-         "fx"
+         "fx",
+         "research",
+         "strategy"
         ],
         "type": "string"
        },
@@ -10225,7 +10227,9 @@
          "institutions",
          "gold",
          "commodities",
-         "fx"
+         "fx",
+         "research",
+         "strategy"
         ],
         "type": "string"
        },
@@ -18402,7 +18406,9 @@
            "institutions",
            "gold",
            "commodities",
-           "fx"
+           "fx",
+           "research",
+           "strategy"
           ],
           "type": "string"
          },
@@ -18554,7 +18560,9 @@
            "institutions",
            "gold",
            "commodities",
-           "fx"
+           "fx",
+           "research",
+           "strategy"
           ],
           "type": "string"
          },

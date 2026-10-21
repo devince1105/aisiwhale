@@ -173,9 +173,17 @@ async def test_seeding_pauses_what_d253_stopped_and_sets_the_mix_once(db_session
 def test_every_source_says_which_section_of_the_site_it_feeds():
     """D-047: the site's sections come from the sources; one without would feed only the front.
     Since D-253 gold, commodities, FX and institutions' views have no news search: their pages
-    are prices and data, refreshed by their own schedules."""
+    are prices and data, refreshed by their own schedules. The research desk's sections (D-256)
+    are given by the desk to the pieces it commissions, never by a source."""
     covered = {s.config["section"] for s in markets.SOURCES}
-    assert covered == set(SECTIONS) - {"gold", "commodities", "fx", "institutions"}
+    assert covered == set(SECTIONS) - {
+        "gold",
+        "commodities",
+        "fx",
+        "institutions",
+        "research",
+        "strategy",
+    }
 
 
 async def test_a_section_the_site_does_not_have_is_refused(db_session):

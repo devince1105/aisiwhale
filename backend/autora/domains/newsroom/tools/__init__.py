@@ -20,6 +20,7 @@ from autora.domains.newsroom.tools import (
     evidence,
     factcheck,
     filings,
+    research,
     review,
     search,
 )
@@ -52,6 +53,8 @@ def register_tools(
     search.register(registry, search_provider)
     evidence.register(registry, fetcher, blobs, embedder)
     filings.register(registry, fetcher, blobs, embedder)
+    # the records the research desk computes itself: a price record and a backtest (D-256)
+    research.register(registry, blobs, embedder)
     claims.register(registry)
     drafts.register(registry)
     factcheck.register(registry, embedder)
@@ -71,6 +74,8 @@ def register_tools(
     if policy is not None and workflows is not None:
         # what the editor-in-chief does: commission a story and put the desk to work (T-605b)
         commission.register(registry, policy, workflows)
+        # and the pieces no news item starts: a company report, a strategy study (D-256)
+        research.register_commissions(registry, policy, workflows)
 
 
 __all__ = ["register_tools"]

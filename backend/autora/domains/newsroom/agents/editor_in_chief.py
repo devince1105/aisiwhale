@@ -15,6 +15,12 @@ the writers' and editors' business, and the chief sees it again only in tomorrow
 actually did: a story listed in the plan has to be one the newsroom is genuinely working on.
 Saying "we are covering the microgrid story" without commissioning it would leave a company that
 believes it has three articles coming and no one writing them.
+
+**An investment-research desk (D-256).** Candidates are ranked by research value
+(``research.research_value``): the story desk's score, a tracked listed company named, a material
+event. Each is shown with its tags, and the chief chooses a format — a research brief for news
+about a listed company, plain news otherwise — and may commission a company report or a strategy
+study on a tracked stock, from the overview of what each had lately.
 """
 
 from __future__ import annotations
@@ -30,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from autora.company.ledger import Ledger
 from autora.db.models import Budget, BusinessUnit, Company, Project, Task
 from autora.db.repositories.companies import get_policies
-from autora.domains.newsroom import topics
+from autora.domains.newsroom import research, topics
 from autora.domains.newsroom.models import Article, ArticleState, Story, StoryState
 from autora.domains.newsroom.policy import TopicMix, topic_mix
 from autora.infra.money import format_money
@@ -63,26 +69,41 @@ class EditorialPlan(BaseModel):
     rationale: str = Field(min_length=1, max_length=2000)
 
 
-SYSTEM_PROMPT = f"""You are the editor-in-chief of a small bilingual newsroom.
+SYSTEM_PROMPT = f"""You are the editor-in-chief of a small bilingual investment-research desk.
 
 Once a day you decide what the desk covers. You are given the candidate stories, what the desk
-published recently, what is still in production, and the budget the company allocated to this
-newsroom for the cycle.
+published recently, what is still in production, the tracked stocks and what each had lately,
+and the budget the company allocated to this newsroom for the cycle.
 
-Choose the stories worth the day. Judge them on what this company's readers would want to know
-— its mission says who they are — and on whether the sources can carry a checkable article, not
-on how interesting the topic sounds. A story with one weak source is not a story; a story whose
-one source is the record itself (a filing) is.
+Judge the candidates on what this company's readers would want to know —
+its mission says who they are. Readers who invest do not lack news; they lack what it means for
+the companies they hold. So choose by research value, shown on each candidate: a listed company it
+names, a material event (results, guidance, orders and capital spending, a product or process,
+policy, a corporate action, a lawsuit), and sources that can carry a checkable piece — a story
+with one weak source is not a story; a story whose one source is the record itself (a filing) is.
 
-Commission each one with commission_story. That puts the whole desk to work on it: research,
-analysis, a bilingual draft, review, and publication after a person approves. You do not write,
-edit or fact-check — the desk does that, and you see the result in tomorrow's numbers.
+Commission each story with commission_story and choose its format:
+- research_brief (the default for a story naming a tracked company): what happened, which
+  companies it reaches and through what, the case for and against side by side, the risks and
+  what to watch;
+- news: only for a market-wide or non-company event.
+You may also commission, from the tracked stocks:
+- commission_company_report: a long-term report on a company whose last report is old or which
+  has fresh results or news — at most one a day;
+- commission_strategy_study: one fixed rule (breakout_20, trend_pullback, range_reversion) tested
+  on a stock's stored history — teaching how a rule behaved, never today's signal — at most one
+  a day, and not on a stock and rule studied in the last 90 days.
 
-At most {MAX_STORIES} stories, and fewer is usually right: two well-sourced articles beat five
-thin ones, and the company pays for every one of them. If nothing is worth covering, commission
-nothing and say so — an empty day is a decision, not a failure.
+The desk gives no advice and makes no forecasts of its own: every piece lays out evidence and
+others' views, never what to buy. You do not write, edit or fact-check — the desk does that, and
+you see the result in tomorrow's numbers.
 
-Then write your plan. It must list exactly the stories you commissioned."""
+At most {MAX_STORIES} pieces, and fewer is usually right: two well-sourced pieces beat five thin
+ones, and the company pays for every one of them. If nothing is worth covering, commission nothing
+and say so — an empty day is a decision, not a failure.
+
+Then write your plan. It must list exactly the stories you commissioned (a company report or a
+strategy study is listed by the story_id its tool returned)."""
 
 
 # --- what it must not get wrong ---------------------------------------------------------------
@@ -203,6 +224,10 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
             .limit(POOL if mix else CANDIDATES)
         )
     ).all()
+    # D-256: best first by research value, not by the story desk's score alone
+    tags = {s.id: research.tags_of(topics.story_text(s)) for s in pool}
+    value = {s.id: research.research_value(float(s.score or 0), tags[s.id]) for s in pool}
+    pool = sorted(pool, key=lambda s: value[s.id], reverse=True)
     kinds: dict[uuid.UUID, str] = {}
     mix_lines: list[str] = []
     if mix is None:
@@ -235,9 +260,12 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
     if candidates:
         for story in candidates:
             kind = f"[{kinds[story.id]}] " if story.id in kinds else ""
+            tag = tags[story.id]
             lines.append(
-                f"- {kind}{story.id} · {story.title} · score {float(story.score or 0):.2f} · "
-                f"{story.sources_count} source(s)"
+                f"- {kind}{story.id} · {story.title} · research value {value[story.id]:.2f}"
+                f" (score {float(story.score or 0):.2f}) · {story.sources_count} source(s)"
+                + (f" · companies: {tag.names}" if tag.stocks else " · no tracked company")
+                + (f" · events: {', '.join(tag.events)}" if tag.events else "")
                 + (f" · {story.summary[:160]}" if story.summary else "")
             )
     else:
@@ -246,6 +274,12 @@ async def desk_context(session: AsyncSession, ctx: RunContext) -> str | None:
     if mix_lines:
         lines.append("")
         lines += mix_lines
+
+    from autora.domains.newsroom.tools.research import tracked_overview  # the tools import agents
+
+    lines.append("")
+    lines.append("Tracked stocks (for a company report or a strategy study):")
+    lines += await tracked_overview(session, ctx.company_id)
 
     brief = await _market_brief(session, ctx)
     if brief:
@@ -326,7 +360,7 @@ BEHAVIOR = AgentBehavior(
     capability="reasoning",
     system_prompt=SYSTEM_PROMPT,
     output_model=EditorialPlan,
-    tools=("commission_story",),
+    tools=("commission_story", "commission_company_report", "commission_strategy_study"),
     validators=(
         stories_are_the_company_s_candidates,
         commissioned_what_it_listed,
