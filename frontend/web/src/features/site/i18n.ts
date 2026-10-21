@@ -33,6 +33,8 @@ const WORDS = {
       gold: "黃金",
       commodities: "期貨",
       fx: "外匯",
+      research: "個股研究",
+      strategy: "策略研究",
     },
     sectionsLabel: "報導分類",
     topics: { watch: "持股觀察" } as Record<string, string>,
@@ -679,6 +681,8 @@ const WORDS = {
       gold: "Gold",
       commodities: "Futures",
       fx: "Currencies",
+      research: "Stock research",
+      strategy: "Strategy studies",
     },
     sectionsLabel: "Sections",
     topics: { watch: "Holdings watch" } as Record<string, string>,
@@ -1297,6 +1301,8 @@ export const SECTIONS = [
   "gold",
   "commodities",
   "fx",
+  "research",
+  "strategy",
 ] as const;
 export type Section = (typeof SECTIONS)[number];
 
@@ -1307,14 +1313,28 @@ export function isSection(value: unknown): value is Section {
 /** The site's tabs (D-050). Most are one section — 黃金, 期貨 and 外匯 each a tab of their own
  * (D-067); 持股觀察 (``watch``) is three — the public figures' filings (名人持股), the
  * institutions' (機構持股) and the asset managers' published views (機構觀點, a tab of its own
- * until 10/06) — told apart inside it by tags. */
-export const TOPICS = ["ai", "tw", "us", "crypto", "gold", "commodities", "fx", "watch"] as const;
+ * until 10/06) — told apart inside it by tags. 個股研究 and 策略研究 are the research desk's
+ * (D-256), right after AI. */
+export const TOPICS = [
+  "ai",
+  "research",
+  "strategy",
+  "tw",
+  "us",
+  "crypto",
+  "gold",
+  "commodities",
+  "fx",
+  "watch",
+] as const;
 export type Topic = (typeof TOPICS)[number];
 
 const TOPIC_SECTIONS: Record<Topic, readonly Section[]> = {
   // as its tabs above: the people first (the site's operator, 10/06)
   watch: ["figures", "holdings", "institutions"],
   ai: ["ai"],
+  research: ["research"],
+  strategy: ["strategy"],
   tw: ["tw"],
   us: ["us"],
   crypto: ["crypto"],

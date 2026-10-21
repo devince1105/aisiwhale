@@ -74,6 +74,9 @@ describe("the front page", () => {
     expect(tabs.map((t) => [t.textContent, t.getAttribute("href")])).toEqual([
       ["全部", "/news/zh-TW"],
       ["AI 科技", "/news/zh-TW?section=ai"],
+      // the research desk's (D-256)
+      ["個股研究", "/news/zh-TW?section=research"],
+      ["策略研究", "/news/zh-TW?section=strategy"],
       ["台股", "/news/zh-TW?section=tw"],
       ["美股", "/news/zh-TW?section=us"],
       ["加密貨幣", "/news/zh-TW?section=crypto"],
