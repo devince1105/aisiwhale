@@ -10,8 +10,10 @@ Three of them, in the order they run:
 1. **Kill criteria.** A project or a business whose own stated criteria are breached is paused.
    Its criteria were fixed when it was approved, which is what makes this fair: the number to
    beat was chosen before anyone knew whether it would be met.
-2. **An agent that keeps failing is paused.** Three final failures in a row and it stops being
-   given work. An agent that cannot do its job is cheaper stopped than retried.
+2. **An agent that keeps failing is paused.** Three pieces of work in a row that it failed —
+   three different stories or tasks, not three tries at one — and it stops being given work. An
+   agent that cannot do its job is cheaper stopped than retried; an agent that could not do one
+   story is not an agent that cannot do its job (D-257).
 3. **Spending near a cap is announced.** The cost guard refuses at 100%; this says so at 80%,
    so the approach is visible before the wall.
 
@@ -50,6 +52,7 @@ from autora.db.models import (
     KpiScope,
     Project,
     ProjectState,
+    Task,
 )
 from autora.runtime.actor import Actor
 from autora.runtime.events.outbox import emit
@@ -58,7 +61,12 @@ from autora.runtime.events.schema import new_event
 log = logging.getLogger(__name__)
 
 FAILURES_BEFORE_PAUSE = 3
-"""Final failures in a row. Three, because two can be one bad input twice."""
+"""Pieces of work failed in a row. Three, because two can be one bad input twice.
+
+A piece of work is a workflow run (a story, for the newsroom) or, outside one, a task: its tries
+and its rounds are one verdict, its latest run's. Counted by runs, one story the writer could not
+get past fact-check — three tries of one revision, on 2026-10-18 — paused the writer, and every
+story after it waited three days (D-257)."""
 
 NOT_THE_AGENT_S_FAULT = ("ProviderError", "LeaseExpired", "BudgetExhausted", "Aborted:")
 """Failures that say nothing about whether the agent can do its job (D-020).
@@ -325,7 +333,7 @@ class Governance:
                 "PauseAgent",
                 {
                     "agent_id": str(agent.id),
-                    "reason": f"{FAILURES_BEFORE_PAUSE} runs in a row failed",
+                    "reason": f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed",
                 },
                 company_id=cycle.company_id,
                 actor=self.actor,
@@ -335,23 +343,31 @@ class Governance:
                 done.paused_agents.append(agent.id)
 
     async def _runs_that_judge(self, session: AsyncSession, agent: Agent) -> list[str]:
-        """The agent's most recent runs, with the ones that judge nothing left out.
+        """The verdicts on the agent's most recent pieces of work, newest first: one per workflow
+        run (or task, outside one), its latest run's, with the runs that judge nothing left out.
 
-        Reads a few more than it needs and drops the outages, so a streak of the agent's own
-        failures is still found underneath them (D-020).
+        Reads well more than it needs: a story can take a few rounds and tries, and the outages
+        are dropped, so a streak of the agent's own failures is still found underneath them
+        (D-020, D-257).
         """
         rows = (
             await session.execute(
-                select(AgentRun.state, AgentRun.error)
+                select(AgentRun.state, AgentRun.error, AgentRun.task_id, Task.workflow_run_id)
+                .join(Task, Task.id == AgentRun.task_id)
                 .where(AgentRun.agent_id == agent.id)
                 .order_by(AgentRun.created_at.desc())
-                .limit(FAILURES_BEFORE_PAUSE * 4)
+                .limit(FAILURES_BEFORE_PAUSE * 12)
             )
         ).all()
-        judged = []
-        for state, error in rows:
+        judged: list[str] = []
+        seen: set[uuid.UUID] = set()
+        for state, error, task_id, workflow_run_id in rows:
             if state == AgentRunState.FAILED.value and _is_infrastructure(error):
                 continue
+            work = workflow_run_id or task_id
+            if work in seen:
+                continue  # an earlier try or round of a piece already judged by its latest
+            seen.add(work)
             judged.append(state)
             if len(judged) == FAILURES_BEFORE_PAUSE:
                 break

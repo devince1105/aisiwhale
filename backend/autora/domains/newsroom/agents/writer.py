@@ -335,7 +335,9 @@ BEHAVIOR = AgentBehavior(
     output_model=ArticleDraft,
     tools=("write_draft", "read_draft", "list_claims", "read_evidence"),
     validators=(draft_written_here, cites_key_numbers, revision_says_what_changed),
-    max_steps=8,
+    # D-257: 8 until 2026-10-21. Over 21 days, finished drafts took at most 7 model calls (p90
+    # 6); D-256's research formats add a refusal a draft may need one more turn to fix
+    max_steps=10,
     repair_limit=2,
     max_output_tokens=8192,
     context=draft_context,

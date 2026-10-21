@@ -37,6 +37,7 @@ from autora.db.models import (
     Project,
     ProjectState,
     Task,
+    WorkflowRun,
 )
 from autora.runtime.actor import Actor
 from autora.runtime.approvals import ApprovalService
@@ -357,7 +358,10 @@ async def test_an_agent_that_keeps_failing_stops_being_given_work(db_session):
         )
     )
     assert record.outcome == "done"
-    assert f"{FAILURES_BEFORE_PAUSE} runs in a row failed" in record.payload["reason"]
+    assert (
+        f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed"
+        in record.payload["reason"]
+    )
 
 
 async def test_a_failure_streak_broken_by_a_success_does_not_count(db_session):
@@ -491,6 +495,108 @@ async def test_reporting_and_governance_agree_on_the_numbers(db_session):
 
     assert done.paused_projects == [project.id]
     assert done.breaches[0].observed == 80  # the meter's $2.50, reported in TWD at 32
+
+
+# --- what one failure is: a piece of work, not a run (D-257) -------------------------------------
+
+
+async def _agent_with_work(db_session, company, project, *pieces):
+    """``pieces`` oldest first, each the states of its runs in order: one workflow run per piece
+    (a story), each run on its own task in it — as a story's rounds and tries are."""
+    position = await role_by_key(db_session, company.id, "ceo")
+    agent = await hire_agent(
+        db_session, company_id=company.id, role="ceo", display_name=f"W{uuid.uuid4().hex[:6]}",
+        actor=HUMAN, position=position,
+    )  # fmt: skip
+    minute = 0
+    for states in pieces:
+        run = WorkflowRun(
+            company_id=company.id,
+            project_id=project.id,
+            template_name="newsroom.story_to_article_v2",
+        )
+        db_session.add(run)
+        await db_session.flush()
+        for state in states:
+            task = Task(
+                company_id=company.id, project_id=project.id, workflow_run_id=run.id, name="draft",
+                display_name="Draft", required_role="ceo", state="READY",
+            )  # fmt: skip
+            db_session.add(task)
+            await db_session.flush()
+            db_session.add(
+                AgentRun(
+                    company_id=company.id, agent_id=agent.id, task_id=task.id, attempt=1,
+                    state=state,
+                    error={"error_class": "MaxStepsExceeded", "message": "x"}
+                    if state == "FAILED" else None,
+                    created_at=START + timedelta(minutes=minute),
+                    started_at=START + timedelta(minutes=minute),
+                    finished_at=START + timedelta(minutes=minute, seconds=30),
+                )
+            )  # fmt: skip
+            minute += 1
+    await db_session.flush()
+    return agent
+
+
+async def test_one_story_the_agent_cannot_get_past_does_not_pause_it(db_session):
+    """2026-10-18: two rounds of one story's draft, three tries each, all failed — after two
+    stories written. Counted by runs it paused the writer for three days."""
+    company, unit, project, cycle = await _company(db_session)
+    await bootstrap_executive(db_session, company.id, actor=HUMAN)
+    agent = await _agent_with_work(
+        db_session, company, project, ["COMPLETED"], ["COMPLETED"], ["FAILED"] * 6
+    )
+
+    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
+
+
+async def test_three_tries_at_one_task_are_one_failure(db_session):
+    company, unit, project, cycle = await _company(db_session)
+    await bootstrap_executive(db_session, company.id, actor=HUMAN)
+    agent = await _agent_with_runs(db_session, company, project, "COMPLETED", "COMPLETED")
+    task = Task(
+        company_id=company.id, project_id=project.id, name="plan", display_name="Plan",
+        required_role="ceo", state="READY",
+    )  # fmt: skip
+    db_session.add(task)
+    await db_session.flush()
+    for n in range(3):
+        db_session.add(
+            AgentRun(
+                company_id=company.id, agent_id=agent.id, task_id=task.id, attempt=n + 1,
+                state="FAILED", error={"error_class": "EvaluationFailed", "message": "x"},
+                created_at=START + timedelta(hours=1, minutes=n),
+                started_at=START + timedelta(hours=1, minutes=n),
+                finished_at=START + timedelta(hours=1, minutes=n, seconds=30),
+            )
+        )  # fmt: skip
+    await db_session.flush()
+
+    assert (await _governance().review(db_session, cycle)).paused_agents == []
+
+
+async def test_three_stories_failed_in_a_row_still_pause_it(db_session):
+    """An agent that cannot do its job is still stopped: three different stories, each failed."""
+    company, unit, project, cycle = await _company(db_session)
+    await bootstrap_executive(db_session, company.id, actor=HUMAN)
+    agent = await _agent_with_work(
+        db_session, company, project, ["COMPLETED"], ["FAILED"], ["FAILED", "FAILED"], ["FAILED"]
+    )
+
+    assert (await _governance().review(db_session, cycle)).paused_agents == [agent.id]
+
+
+async def test_a_story_whose_last_try_succeeded_is_not_a_failure(db_session):
+    company, unit, project, cycle = await _company(db_session)
+    await bootstrap_executive(db_session, company.id, actor=HUMAN)
+    await _agent_with_work(
+        db_session, company, project, ["FAILED"], ["FAILED"], ["FAILED", "FAILED", "COMPLETED"]
+    )
+
+    assert (await _governance().review(db_session, cycle)).paused_agents == []
 
 
 # --- whose failure was it? (D-020, found by the first real-model soak) ------------------------
