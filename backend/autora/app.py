@@ -603,6 +603,7 @@ def build_worker(
 
     from autora.company import orders
     from autora.company.cycle import maintenance_job as cycle_maintenance_job
+    from autora.company.governance import maintenance_job as governance_maintenance_job
     from autora.db.session import get_sessionmaker
     from autora.infra.blobstore import build_blob_store
     from autora.runtime.agent_runner import AgentRunner
@@ -699,5 +700,7 @@ def build_worker(
             ("advance_cycles", cycle_maintenance_job(runtime.cycles, companies)),
             ("forget_stale_memories", runner.memory.maintenance_job()),
             ("expire_unpaid_orders", orders.maintenance_job()),
+            # D-258: the system stops nobody; a pause it made before is lifted
+            ("lift_system_pauses", governance_maintenance_job()),
         ],
     )

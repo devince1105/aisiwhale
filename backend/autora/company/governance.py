@@ -7,23 +7,21 @@ hold when the CEO is slow, wrong, absent, or arguing.
 
 Three of them, in the order they run:
 
-1. **Kill criteria.** A project or a business whose own stated criteria are breached is paused.
+1. **Kill criteria.** A project or a business whose own stated criteria are breached is reported.
    Its criteria were fixed when it was approved, which is what makes this fair: the number to
    beat was chosen before anyone knew whether it would be met.
-2. **An agent that keeps failing is paused.** Three pieces of work in a row that it failed —
-   three different stories or tasks, not three tries at one — and it stops being given work. An
-   agent that cannot do its job is cheaper stopped than retried; an agent that could not do one
-   story is not an agent that cannot do its job (D-257).
+2. **An agent that keeps failing is reported.** Three pieces of work in a row that it failed —
+   three different stories or tasks, not three tries at one (D-257).
 3. **Spending near a cap is announced.** The cost guard refuses at 100%; this says so at 80%,
    so the approach is visible before the wall.
 
-**Pausing is not killing.** Governance can stop work; only a person can end a project or a
-business, and the CEO can only propose it (platform/02 §4). That asymmetry is deliberate: a
-rule that fires on a bad week should be able to stop the bleeding, and should not be able to
-close a business.
-
-Everything it does goes through the command pipeline like anything else, so a pause a rule
-decided is recorded next to a pause a person decided, with the rule as its reason.
+**Governance stops nobody (D-258).** It used to pause what it found: the CEO for a week after
+three provider timeouts (2026-09-21), the writer for four days after one story it could not get
+past (2026-10-18), each time with the whole newsroom stopped and nobody told. In an office nobody
+is sent home by a rule; a person decides, from the back office, in one click. So the findings are
+written down — in the cycle's ``governance`` record, which the CEO reads before her review, and
+as warnings — and the only thing that still refuses work by itself is the cost guard's money cap.
+A pause the system made before D-258 is lifted by ``lift_system_pauses``.
 """
 
 from __future__ import annotations
@@ -49,6 +47,7 @@ from autora.db.models import (
     BusinessUnit,
     BusinessUnitState,
     Cycle,
+    EventRecord,
     KpiScope,
     Project,
     ProjectState,
@@ -61,7 +60,8 @@ from autora.runtime.events.schema import new_event
 log = logging.getLogger(__name__)
 
 FAILURES_BEFORE_PAUSE = 3
-"""Pieces of work failed in a row. Three, because two can be one bad input twice.
+"""Pieces of work failed in a row before an agent is reported (no longer paused: D-258). Three,
+because two can be one bad input twice.
 
 A piece of work is a workflow run (a story, for the newsroom) or, outside one, a task: its tries
 and its rounds are one verdict, its latest run's. Counted by runs, one story the writer could not
@@ -119,6 +119,10 @@ class Governed:
     paused_projects: list[uuid.UUID] = field(default_factory=list)
     paused_units: list[uuid.UUID] = field(default_factory=list)
     paused_agents: list[uuid.UUID] = field(default_factory=list)
+    """Always empty since D-258: governance pauses nothing. Kept so a cycle's record reads the
+    same before and after."""
+    failing_agents: list[uuid.UUID] = field(default_factory=list)
+    """Agents that failed three different pieces of work in a row: reported, not paused."""
     warnings: list[str] = field(default_factory=list)
     breaches: list[Breach] = field(default_factory=list)
     checked: dict[str, int] = field(default_factory=dict)
@@ -136,6 +140,7 @@ class Governed:
             "paused_projects": [str(i) for i in self.paused_projects],
             "paused_business_units": [str(i) for i in self.paused_units],
             "paused_agents": [str(i) for i in self.paused_agents],
+            "failing_agents": [str(i) for i in self.failing_agents],
             "warnings": list(self.warnings),
             "breaches": [str(breach) for breach in self.breaches],
         }
@@ -195,9 +200,9 @@ class Governance:
             )
             if breach is None:
                 continue
+            # reported, not paused (D-258): a person decides whether it stops
             done.breaches.append(breach)
-            if await self._pause_project(session, cycle, project, breach):
-                done.paused_projects.append(project.id)
+            done.warnings.append(f"project {project.name}: kill criteria met — {breach}")
 
         units = (
             await session.scalars(
@@ -220,31 +225,10 @@ class Governance:
             )
             if breach is None:
                 continue
+            # reported, not paused (D-258): AI Media's "cost per published article" is exactly
+            # what a stuck desk breaks, and stopping the business would only make it worse
             done.breaches.append(breach)
-            unit.state = BusinessUnitState.PAUSED.value
-            await session.flush()
-            await emit(
-                session,
-                new_event(
-                    company_events.BusinessUnitPaused(
-                        key=unit.key,
-                        name=unit.name,
-                        reason=f"kill criteria: {breach}",
-                        trigger="kill_criteria",
-                    ),
-                    company_id=cycle.company_id,
-                    actor=self.actor,
-                    aggregate_type="business_unit",
-                    aggregate_id=unit.id,
-                    cycle_id=cycle.id,
-                ),
-            )
-            done.paused_units.append(unit.id)
-            # its projects stop with it: a paused business is not one that keeps spending
-            for project in projects:
-                if project.business_unit_id == unit.id and project.id not in done.paused_projects:
-                    if await self._pause_project(session, cycle, project, breach):
-                        done.paused_projects.append(project.id)
+            done.warnings.append(f"business {unit.name}: kill criteria met — {breach}")
 
     async def _breached(
         self,
@@ -295,21 +279,6 @@ class Governance:
             cycles=needed,
         )
 
-    async def _pause_project(
-        self, session: AsyncSession, cycle: Cycle, project: Project, breach: Breach
-    ) -> bool:
-        if project.state != ProjectState.ACTIVE.value:
-            return False
-        result = await self.commands.submit(
-            session,
-            "PauseProject",
-            {"project_id": str(project.id), "reason": f"kill criteria: {breach}"},
-            company_id=cycle.company_id,
-            actor=self.actor,
-            idempotency_key=f"cycle:{cycle.id}:autopause:project:{project.id}",
-        )
-        return result.done
-
     # --- 2. an agent that keeps failing --------------------------------------------------------
 
     async def _failing_agents(self, session: AsyncSession, cycle: Cycle, done: Governed) -> None:
@@ -328,19 +297,12 @@ class Governance:
                 continue
             if any(state != AgentRunState.FAILED.value for state in judged):
                 continue
-            result = await self.commands.submit(
-                session,
-                "PauseAgent",
-                {
-                    "agent_id": str(agent.id),
-                    "reason": f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed",
-                },
-                company_id=cycle.company_id,
-                actor=self.actor,
-                idempotency_key=f"cycle:{cycle.id}:autopause:agent:{agent.id}",
+            # reported, not paused (D-258): it keeps working, and a person decides
+            done.failing_agents.append(agent.id)
+            done.warnings.append(
+                f"{agent.display_name} ({agent.role}): "
+                f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed"
             )
-            if result.done:
-                done.paused_agents.append(agent.id)
 
     async def _runs_that_judge(self, session: AsyncSession, agent: Agent) -> list[str]:
         """The verdicts on the agent's most recent pieces of work, newest first: one per workflow
@@ -437,6 +399,44 @@ class Governance:
             project_id=budget.project_id,
             since=since,
         )
+
+
+LIFTED_REASON = "D-258: the system no longer stops anyone; a person pauses from the back office"
+
+
+async def lift_system_pauses(session: AsyncSession) -> list[uuid.UUID]:
+    """Resume every agent whose last pause was the system's, not a person's (D-258).
+
+    Governance used to pause agents by rule; it no longer does, so a pause the system made is one
+    nobody chose. A person's pause — the back office's button — is theirs, and stays."""
+    from autora.company.agents.roster import resume_agent
+
+    lifted = []
+    for agent in (
+        await session.scalars(select(Agent).where(Agent.status == AgentStatus.PAUSED.value))
+    ).all():
+        actor = await session.scalar(
+            select(EventRecord.actor)
+            .where(EventRecord.agent_id == agent.id, EventRecord.event_type == "AGENT_PAUSED")
+            .order_by(EventRecord.occurred_at.desc())
+            .limit(1)
+        )
+        if not actor or actor.get("kind") != "system":
+            continue
+        await resume_agent(session, agent, actor=Actor.system("governance"), reason=LIFTED_REASON)
+        lifted.append(agent.id)
+    return lifted
+
+
+def maintenance_job():
+    """The worker's periodic job (``Worker.maintenance_jobs``): lift the system's old pauses."""
+
+    async def lift(session: AsyncSession) -> None:
+        lifted = await lift_system_pauses(session)
+        if lifted:
+            log.info("lifted %d pause(s) the system had made (D-258)", len(lifted))
+
+    return lift
 
 
 def _is_infrastructure(error: dict[str, Any] | None) -> bool:

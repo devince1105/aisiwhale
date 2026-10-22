@@ -99,6 +99,69 @@ async def test_what_it_says(db_session):
     assert "關掉「每日 email 摘要」" in message.text
 
 
+async def _published(session, company) -> datetime:
+    """An article published in ``company`` now; when, as the event says."""
+    from autora.domains.newsroom.events import ArticlePublished
+    from autora.runtime.actor import Actor
+    from autora.runtime.events.outbox import emit
+    from autora.runtime.events.schema import new_event
+
+    article_id = uuid.uuid4()
+    envelope = new_event(
+        ArticlePublished(article_id=article_id, slug="s", langs=["zh-TW"], url="/news/zh-TW/a"),
+        company_id=company.id,
+        actor=Actor.system("publisher"),
+        aggregate_type="article",
+        aggregate_id=article_id,
+    )
+    await emit(session, envelope)
+    await session.flush()
+    return envelope.occurred_at
+
+
+async def test_a_stalled_newsroom_is_told_with_who_is_paused(db_session):
+    """D-258: from 2026-10-18 the writer was paused for four days, said only in the office's
+    team chat. A day without an article is in the email, with whoever is paused."""
+    from autora.accounts.admin_digest import quiet
+    from autora.company.agents.roster import hire_agent
+    from autora.company.organization import bootstrap_executive, role_by_key
+    from autora.runtime.actor import Actor
+
+    company = await unique_company(db_session, "stalled")
+    published = await _published(db_session, company)
+    await bootstrap_executive(db_session, company.id, actor=Actor.human("t"))
+    writer = await hire_agent(
+        db_session, company_id=company.id, role="ceo", display_name="胡蝶忍",
+        actor=Actor.human("t"), position=await role_by_key(db_session, company.id, "ceo"),
+    )  # fmt: skip
+    writer.status = "paused"
+    await db_session.flush()
+    later = published + timedelta(hours=40)
+
+    (stalled,) = [q for q in await quiet(db_session, later) if q.company.id == company.id]
+    assert stalled.hours == 40 and stalled.paused == ["胡蝶忍"]
+    message = compose("owner@digest.test", [], "https://aisiwhale.com", later, [stalled])
+    assert message.subject == "【艾矽鯨後台】編輯部已 40 小時沒有發文"
+    assert "暫停中的員工：胡蝶忍" in message.text
+    assert f"https://aisiwhale.com/admin/agents?company={company.id}" in message.text
+
+
+async def test_a_desk_publishing_today_or_gone_for_a_month_is_not_told(db_session):
+    from autora.accounts.admin_digest import quiet
+
+    company = await unique_company(db_session, "busy")
+    published = await _published(db_session, company)
+
+    def told(at):
+        return any(q.company.id == company.id for q in at)
+
+    assert not told(await quiet(db_session, published + timedelta(hours=3)))
+    assert told(await quiet(db_session, published + timedelta(days=2)))
+    assert not told(await quiet(db_session, published + timedelta(days=31))), (
+        "a demo, a closed desk"
+    )
+
+
 async def test_nothing_waiting_sends_nothing_and_a_bounce_stops_no_one(db_session):
     sender = ConsoleSender(echo=False)
     await _reader(db_session, "ed2@digest.test", role="editor")

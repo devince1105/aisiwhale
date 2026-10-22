@@ -100,8 +100,32 @@ async def _measured(db_session, company, cycle, *, project=None, unit=None, **me
 # --- 1. kill criteria ----------------------------------------------------------------------------
 
 
-async def test_a_project_that_breaks_its_own_criteria_is_paused(db_session):
-    """The number to beat was chosen before anyone knew whether it would be met."""
+async def _stopped(db_session, company) -> list[str]:
+    """Every pause and kill commanded or recorded in the company: none, since D-258."""
+    commands = (
+        await db_session.scalars(
+            select(CommandRecord.command).where(
+                CommandRecord.company_id == company.id,
+                CommandRecord.command.in_(["PauseProject", "PauseAgent", "KillProject"]),
+            )
+        )
+    ).all()
+    events = (
+        await db_session.scalars(
+            select(EventRecord.event_type).where(
+                EventRecord.company_id == company.id,
+                EventRecord.event_type.in_(
+                    ["PROJECT_PAUSED", "BUSINESS_UNIT_PAUSED", "AGENT_PAUSED"]
+                ),
+            )
+        )
+    ).all()
+    return [*commands, *events]
+
+
+async def test_a_project_that_breaks_its_own_criteria_is_reported_not_paused(db_session):
+    """The number to beat was chosen before anyone knew whether it would be met — and since
+    D-258 a breach is told, not acted on: a person decides whether the project stops."""
     company, unit, project, cycle = await _company(
         db_session, project_criteria={"auto_pause_if": PAUSE_IF}
     )
@@ -112,24 +136,13 @@ async def test_a_project_that_breaks_its_own_criteria_is_paused(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_projects == [project.id]
-    assert (await db_session.get(Project, project.id)).state == ProjectState.PAUSED.value
     (breach,) = done.breaches
     assert "4.5" in str(breach) and "> 3" in str(breach)
-    # and it is recorded like any other pause, with the rule as its reason
-    record = await db_session.scalar(
-        select(CommandRecord).where(
-            CommandRecord.company_id == company.id, CommandRecord.command == "PauseProject"
-        )
-    )
-    assert record.outcome == "done" and record.actor["id"] == "governance"
-    event = await db_session.scalar(
-        select(EventRecord).where(
-            EventRecord.company_id == company.id, EventRecord.event_type == "PROJECT_PAUSED"
-        )
-    )
-    assert event.payload["trigger"] == "kill_criteria"
-    assert "cost_per_published_article" in event.payload["reason"]
+    assert any("kill criteria met" in w for w in done.warnings)
+    assert done.paused_projects == []
+    assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
+    assert await _stopped(db_session, company) == []
+    assert cycle.governance["breaches"] == [str(breach)]
 
 
 async def test_a_project_inside_its_criteria_is_left_alone(db_session):
@@ -143,7 +156,7 @@ async def test_a_project_inside_its_criteria_is_left_alone(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert not done.paused_projects
+    assert not done.breaches
     assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
 
 
@@ -173,7 +186,7 @@ async def test_a_project_is_given_the_cycles_it_was_promised(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert not done.paused_projects  # cycle 3 of the 7 it was given
+    assert not done.breaches  # cycle 3 of the 7 it was given
 
 
 async def test_a_criterion_that_needs_several_cycles_needs_all_of_them(db_session):
@@ -203,7 +216,7 @@ async def test_a_criterion_that_needs_several_cycles_needs_all_of_them(db_sessio
         **{"newsroom.cost_per_published_article": "5.00"},
     )  # fmt: skip
 
-    assert not (await _governance().review(db_session, cycle)).paused_projects
+    assert not (await _governance().review(db_session, cycle)).breaches
 
     # now both are
     snapshot = await db_session.scalar(
@@ -214,8 +227,8 @@ async def test_a_criterion_that_needs_several_cycles_needs_all_of_them(db_sessio
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_projects == [project.id]
     assert done.breaches[0].cycles == 2
+    assert done.paused_projects == []
 
 
 async def test_an_unreadable_criterion_stops_nothing(db_session):
@@ -227,11 +240,12 @@ async def test_an_unreadable_criterion_stops_nothing(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert not done.paused_projects
+    assert not done.breaches
 
 
-async def test_a_business_that_breaks_its_criteria_takes_its_projects_with_it(db_session):
-    """A paused business is not one that keeps spending."""
+async def test_a_business_that_breaks_its_criteria_is_reported_and_keeps_working(db_session):
+    """AI Media's cost per published article is exactly what a stuck desk breaks: stopping the
+    business then would only stop it more (D-258)."""
     company, unit, project, cycle = await _company(
         db_session, unit_criteria={"auto_pause_if": PAUSE_IF}
     )
@@ -242,20 +256,15 @@ async def test_a_business_that_breaks_its_criteria_takes_its_projects_with_it(db
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_units == [unit.id]
-    assert done.paused_projects == [project.id]
-    assert (await db_session.get(BusinessUnit, unit.id)).state == BusinessUnitState.PAUSED.value
-    event = await db_session.scalar(
-        select(EventRecord).where(
-            EventRecord.company_id == company.id,
-            EventRecord.event_type == "BUSINESS_UNIT_PAUSED",
-        )
-    )
-    assert event.payload["trigger"] == "kill_criteria"
+    assert len(done.breaches) == 1 and any("business" in w for w in done.warnings)
+    assert done.paused_units == [] and done.paused_projects == []
+    assert (await db_session.get(BusinessUnit, unit.id)).state == BusinessUnitState.ACTIVE.value
+    assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
+    assert await _stopped(db_session, company) == []
 
 
-async def test_governance_pauses_but_never_kills(db_session):
-    """Only a person ends a project; a rule that fires on a bad week must not close one."""
+async def test_governance_stops_nothing_and_kills_nothing(db_session):
+    """Only a person pauses or ends a project, from the back office (D-258)."""
     company, unit, project, cycle = await _company(
         db_session, project_criteria={"auto_pause_if": PAUSE_IF}
     )
@@ -266,16 +275,11 @@ async def test_governance_pauses_but_never_kills(db_session):
 
     await _governance().review(db_session, cycle)
 
-    assert (await db_session.get(Project, project.id)).state == ProjectState.PAUSED.value
-    killed = await db_session.scalar(
-        select(CommandRecord).where(
-            CommandRecord.company_id == company.id, CommandRecord.command == "KillProject"
-        )
-    )
-    assert killed is None
+    assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
+    assert await _stopped(db_session, company) == []
 
 
-async def test_running_the_rules_twice_pauses_once(db_session):
+async def test_running_the_rules_twice_reports_twice_and_changes_nothing(db_session):
     """MEASURING and REVIEWING can both be entered again after a restart."""
     company, unit, project, cycle = await _company(
         db_session, project_criteria={"auto_pause_if": PAUSE_IF}
@@ -289,17 +293,8 @@ async def test_running_the_rules_twice_pauses_once(db_session):
     first = await governance.review(db_session, cycle)
     again = await governance.review(db_session, cycle)
 
-    assert first.paused_projects == [project.id]
-    assert not again.paused_projects  # already paused; nothing left to do
-    records = (
-        await db_session.scalars(
-            select(CommandRecord).where(
-                CommandRecord.company_id == company.id,
-                CommandRecord.command == "PauseProject",
-            )
-        )
-    ).all()
-    assert len(records) == 1
+    assert len(first.breaches) == len(again.breaches) == 1
+    assert await _stopped(db_session, company) == []
 
 
 # --- 2. an agent that keeps failing -----------------------------------------------------------
@@ -343,25 +338,23 @@ async def _agent_with_runs(db_session, company, project, *states, errors=None):
     return agent
 
 
-async def test_an_agent_that_keeps_failing_stops_being_given_work(db_session):
+async def test_an_agent_that_keeps_failing_is_reported_and_keeps_working(db_session):
+    """In an office nobody is sent home by a rule: the findings are told, a person decides
+    (D-258)."""
     company, unit, project, cycle = await _company(db_session)
     await bootstrap_executive(db_session, company.id, actor=HUMAN)
     agent = await _agent_with_runs(db_session, company, project, *(["FAILED"] * 3))
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_agents == [agent.id]
-    assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.PAUSED.value
-    record = await db_session.scalar(
-        select(CommandRecord).where(
-            CommandRecord.company_id == company.id, CommandRecord.command == "PauseAgent"
-        )
+    assert done.failing_agents == [agent.id] and done.paused_agents == []
+    assert any(
+        f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed" in w
+        for w in done.warnings
     )
-    assert record.outcome == "done"
-    assert (
-        f"{FAILURES_BEFORE_PAUSE} different pieces of work in a row failed"
-        in record.payload["reason"]
-    )
+    assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
+    assert await _stopped(db_session, company) == []
+    assert cycle.governance["failing_agents"] == [str(agent.id)]
 
 
 async def test_a_failure_streak_broken_by_a_success_does_not_count(db_session):
@@ -371,7 +364,7 @@ async def test_a_failure_streak_broken_by_a_success_does_not_count(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert not done.paused_agents
+    assert not done.failing_agents
     assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
 
 
@@ -380,7 +373,7 @@ async def test_a_new_agent_with_too_few_runs_is_not_judged(db_session):
     await bootstrap_executive(db_session, company.id, actor=HUMAN)
     await _agent_with_runs(db_session, company, project, "FAILED", "FAILED")
 
-    assert not (await _governance().review(db_session, cycle)).paused_agents
+    assert not (await _governance().review(db_session, cycle)).failing_agents
 
 
 # --- 3. spending near a cap -------------------------------------------------------------------
@@ -449,7 +442,8 @@ async def test_the_stage_hook_runs_the_rules(db_session):
 
     await _governance().stage_hook()(db_session, cycle)
 
-    assert (await db_session.get(Project, project.id)).state == ProjectState.PAUSED.value
+    assert len(cycle.governance["breaches"]) == 1
+    assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
 
 
 async def test_the_rules_never_call_a_model(db_session):
@@ -493,8 +487,38 @@ async def test_reporting_and_governance_agree_on_the_numbers(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_projects == [project.id]
+    assert [b.scope_id for b in done.breaches] == [project.id]
     assert done.breaches[0].observed == 80  # the meter's $2.50, reported in TWD at 32
+
+
+# --- the system's old pauses are lifted, a person's stay (D-258) --------------------------------
+
+
+async def test_a_pause_the_system_made_is_lifted_and_a_person_s_stays(db_session):
+    from autora.company.agents.roster import pause_agent
+    from autora.company.governance import LIFTED_REASON, lift_system_pauses
+
+    company, unit, project, cycle = await _company(db_session)
+    await bootstrap_executive(db_session, company.id, actor=HUMAN)
+    by_rule = await _agent_with_runs(db_session, company, project, "COMPLETED")
+    by_hand = await _agent_with_runs(db_session, company, project, "COMPLETED")
+    await pause_agent(
+        db_session, by_rule, actor=Actor.system("governance"), reason="3 runs in a row failed"
+    )
+    await pause_agent(db_session, by_hand, actor=HUMAN, reason="taking a break")
+
+    lifted = await lift_system_pauses(db_session)
+
+    assert by_rule.id in lifted and by_hand.id not in lifted
+    assert (await db_session.get(type(by_rule), by_rule.id)).status == AgentStatus.ACTIVE.value
+    assert (await db_session.get(type(by_hand), by_hand.id)).status == AgentStatus.PAUSED.value
+    resumed = await db_session.scalar(
+        select(EventRecord).where(
+            EventRecord.agent_id == by_rule.id, EventRecord.event_type == "AGENT_RESUMED"
+        )
+    )
+    assert resumed.payload["reason"] == LIFTED_REASON
+    assert by_rule.id not in await lift_system_pauses(db_session), "lifted once"
 
 
 # --- what one failure is: a piece of work, not a run (D-257) -------------------------------------
@@ -549,7 +573,7 @@ async def test_one_story_the_agent_cannot_get_past_does_not_pause_it(db_session)
         db_session, company, project, ["COMPLETED"], ["COMPLETED"], ["FAILED"] * 6
     )
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await _governance().review(db_session, cycle)).failing_agents == []
     assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
 
 
@@ -575,18 +599,18 @@ async def test_three_tries_at_one_task_are_one_failure(db_session):
         )  # fmt: skip
     await db_session.flush()
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await _governance().review(db_session, cycle)).failing_agents == []
 
 
-async def test_three_stories_failed_in_a_row_still_pause_it(db_session):
-    """An agent that cannot do its job is still stopped: three different stories, each failed."""
+async def test_three_stories_failed_in_a_row_are_reported(db_session):
+    """An agent that cannot do its job is still found: three different stories, each failed."""
     company, unit, project, cycle = await _company(db_session)
     await bootstrap_executive(db_session, company.id, actor=HUMAN)
     agent = await _agent_with_work(
         db_session, company, project, ["COMPLETED"], ["FAILED"], ["FAILED", "FAILED"], ["FAILED"]
     )
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == [agent.id]
+    assert (await _governance().review(db_session, cycle)).failing_agents == [agent.id]
 
 
 async def test_a_story_whose_last_try_succeeded_is_not_a_failure(db_session):
@@ -596,7 +620,7 @@ async def test_a_story_whose_last_try_succeeded_is_not_a_failure(db_session):
         db_session, company, project, ["FAILED"], ["FAILED"], ["FAILED", "FAILED", "COMPLETED"]
     )
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await _governance().review(db_session, cycle)).failing_agents == []
 
 
 # --- whose failure was it? (D-020, found by the first real-model soak) ------------------------
@@ -620,7 +644,7 @@ async def test_an_outage_is_not_the_agent_failing(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_agents == []
+    assert done.failing_agents == []
     assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
 
 
@@ -635,12 +659,12 @@ async def test_the_other_things_that_are_not_the_agent_s_fault(db_session):
         errors={0: "LeaseExpired", 1: "BudgetExhausted", 2: "Aborted:timeout"},
     )
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await _governance().review(db_session, cycle)).failing_agents == []
     assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
 
 
 async def test_outages_do_not_hide_the_agent_s_own_failures(db_session):
-    """Skipped, not counted as successes: three of its own in a row still pause it."""
+    """Skipped, not counted as successes: three of its own in a row are still reported."""
     company, unit, project, cycle = await _company(db_session)
     await bootstrap_executive(db_session, company.id, actor=HUMAN)
     agent = await _agent_with_runs(
@@ -656,8 +680,8 @@ async def test_outages_do_not_hide_the_agent_s_own_failures(db_session):
 
     done = await _governance().review(db_session, cycle)
 
-    assert done.paused_agents == [agent.id]
-    assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.PAUSED.value
+    assert done.failing_agents == [agent.id]
+    assert (await db_session.get(type(agent), agent.id)).status == AgentStatus.ACTIVE.value
 
 
 async def test_a_success_under_the_outages_still_breaks_the_streak(db_session):
@@ -674,4 +698,4 @@ async def test_a_success_under_the_outages_still_breaks_the_streak(db_session):
         errors={2: "ProviderError"},
     )
 
-    assert (await _governance().review(db_session, cycle)).paused_agents == []
+    assert (await _governance().review(db_session, cycle)).failing_agents == []
