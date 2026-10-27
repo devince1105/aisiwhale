@@ -79,8 +79,17 @@ def build_policy_engine() -> PolicyEngine:
     return engine
 
 
+def meeting_attendees() -> tuple[str, ...]:
+    """Who has a seat at the weekly meeting (D-260): every business's staff, then the company's
+    own officers. The CEO chairs it and is not among them."""
+    from autora.company.agents import business, finance, strategist
+    from autora.domains import newsroom
+
+    return (*newsroom.MEETING_ROLES, finance.ROLE, strategist.ROLE, business.ROLE)
+
+
 def build_templates() -> TemplateRegistry:
-    from autora.company import executive, exploration, finance, market_watch
+    from autora.company import executive, exploration, finance, market_watch, meeting
     from autora.domains import echo, newsroom
     from autora.runtime.dag import TemplateRegistry
 
@@ -89,6 +98,7 @@ def build_templates() -> TemplateRegistry:
     finance.register_templates(templates)  # reading the books once a cycle is measured (T-705)
     exploration.register_templates(templates)  # and finding out what else it might do
     market_watch.register_templates(templates)  # and looking for it in the first place (T-706)
+    meeting.register_templates(templates, meeting_attendees())  # the week, talked over (D-260)
     echo.register_templates(templates)
     newsroom.register_templates(templates)
     return templates
@@ -97,13 +107,19 @@ def build_templates() -> TemplateRegistry:
 def build_behaviors(snapshots: SnapshotBuilder | None = None) -> BehaviorRegistry:
     """Every agent the runtime can run. The company's own come first: they must still work when
     every domain is deleted (ARCHITECTURE_V2_1 §9)."""
+    from autora.company import meeting
     from autora.company.agents import business, ceo, finance, strategist
+    from autora.company.reporting import Reporting
+    from autora.company.snapshot import SnapshotBuilder
     from autora.domains import echo
     from autora.domains.newsroom import agents as newsroom_agents
     from autora.runtime.behaviors import BehaviorRegistry
 
     behaviors = BehaviorRegistry()
     ceo.register_behaviors(behaviors, snapshots)
+    meeting.register_behaviors(
+        behaviors, snapshots or SnapshotBuilder(Reporting()), meeting_attendees()
+    )
     strategist.register_behaviors(behaviors, snapshots)
     finance.register_behaviors(behaviors, snapshots)
     business.register_behaviors(behaviors, snapshots, research_tools=RESEARCH_TOOLS)
@@ -508,6 +524,7 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     from autora.company import exploration as company_exploration
     from autora.company import finance as company_finance
     from autora.company import market_watch as company_market_watch
+    from autora.company import meeting as company_meeting
     from autora.company import memberships as company_memberships
     from autora.company import opportunities as company_opportunities
     from autora.company import summary as daily_summary
@@ -566,6 +583,8 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
     company_exploration.Exploration(workflows).install(cycles)
     # and once a week the business agent looks for what to explore next (T-706)
     company_market_watch.MarketWatchDesk(workflows).install(cycles)
+    # and once a week the staff meet: the strategy, and what to stop, are settled there (D-260)
+    company_meeting.WeeklyMeeting(workflows, meeting_attendees()).install(cycles)
     # last, so the day it describes is fully settled: the review is recorded by then (T-607)
     cycles.when_entering(CycleStage.DONE, daily_summary.stage_hook())
     runtime = Runtime(
@@ -582,6 +601,7 @@ def build_runtime(settings: Settings | None = None) -> Runtime:
         commands=commands,
         executive=executive,
     )
+    runtime.services.register(company_meeting.APPLY, company_meeting.apply_step(commands))
     newsroom.register(runtime)
     return runtime
 

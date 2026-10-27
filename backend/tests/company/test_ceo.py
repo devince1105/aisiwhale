@@ -9,7 +9,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from autora.app import build_policy_engine, build_runtime
 from autora.company import verbs, verbs_business
@@ -47,6 +47,7 @@ from autora.company.tools import register_tools
 from autora.db.models import (
     Agent,
     AgentStatus,
+    Approval,
     BusinessUnitState,
     CommandRecord,
     Cycle,
@@ -698,7 +699,9 @@ async def test_an_agent_pausing_work_must_say_why(committed, world):
     assert bare.ok and bare.output["decision"] == "refused"
     assert "needs a reason" in bare.output["reason"]
 
-    # the call's own reason is the one the approval shows, when the payload has none
+    # the call's own reason fills the payload's, when it has none; and the company still says
+    # no to the agent itself (D-260): a pause is the weekly meeting's to decide, never a request
+    # to a person between meetings
     said = await tools.invoke(
         "submit_command",
         {
@@ -709,8 +712,14 @@ async def test_an_agent_pausing_work_must_say_why(committed, world):
         company_id=company.id, actor=Actor.agent(agent.id), tool_call_id="call_2",
         agent_id=agent.id,
     )  # fmt: skip
-    assert said.ok and said.output["decision"] != "refused"
+    assert said.ok and said.output["decision"] == "refused"
     async with committed() as session:
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(Approval).where(Approval.company_id == company.id)
+            )
+            == 0
+        )
         record = await session.scalar(
             select(CommandRecord).where(
                 CommandRecord.company_id == company.id, CommandRecord.command == "PauseProject"

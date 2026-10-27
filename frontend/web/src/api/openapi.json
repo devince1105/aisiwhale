@@ -2772,6 +2772,16 @@
      "last_cycle": {
       "$ref": "#/components/schemas/LastCycle"
      },
+     "meeting": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/MeetingLine"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "opportunities": {
       "default": [],
       "items": {
@@ -4775,6 +4785,57 @@
      "email"
     ],
     "title": "Me",
+    "type": "object"
+   },
+   "MeetingLine": {
+    "description": "The weekly meeting (D-260): what already waits for it — so the CEO does not ask again —\nand what the last one decided.",
+    "properties": {
+     "agenda": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Agenda",
+      "type": "array"
+     },
+     "last_decisions": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Last Decisions",
+      "type": "array"
+     },
+     "last_held": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Held"
+     },
+     "last_summary": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Summary"
+     },
+     "when": {
+      "default": "the first cycle of each week (Monday, Taipei time)",
+      "title": "When",
+      "type": "string"
+     }
+    },
+    "title": "MeetingLine",
     "type": "object"
    },
    "Member": {

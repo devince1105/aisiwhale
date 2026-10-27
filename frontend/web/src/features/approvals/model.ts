@@ -126,6 +126,21 @@ export function commandChoice(
         approve: "核准：終止專案",
         reject: "駁回：繼續運作",
       };
+    case "ApplyMeetingDecisions": {
+      // the weekly meeting's one card (D-260): every pause and end it decided, decided together
+      const items = Array.isArray(args.items) ? (args.items as Record<string, unknown>[]) : [];
+      const lines = items.map(
+        (item) => `${item.action === "kill" ? "終止" : "暫停"}${named(projects, item.project_id)}：${String(item.reason ?? "")}`,
+      );
+      const summary = typeof args.summary === "string" && args.summary.trim() ? args.summary.trim() : null;
+      return {
+        title: `週會決議：暫停或終止 ${items.length} 個專案`,
+        body: [summary, ...lines].filter(Boolean).join("\n"),
+        effect: "核准後照週會決議執行：暫停的專案停工，終止的永久結束。駁回就全部照常運作。沒有決定的話，下次週會前一天自動失效。",
+        approve: "核准：照週會決議",
+        reject: "駁回：全部照常運作",
+      };
+    }
     case "UpdateStrategy":
       return {
         title: "更新公司策略",

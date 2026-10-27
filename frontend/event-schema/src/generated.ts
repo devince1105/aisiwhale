@@ -906,6 +906,38 @@ export const KpiSnapshotCreatedV1Event = z.object({
   payload: KpiSnapshotCreatedV1Payload,
 });
 
+export const MeetingHeldV1Payload = z.object({
+  workflow_run_id: z.uuid(),
+  agenda_until: z.iso.datetime({ offset: true }),
+  attendees: z.array(z.string()).optional(),
+  summary: z.string(),
+  decisions: z.array(z.string()).optional(),
+  action_items: z.array(z.string()).optional(),
+  strategy: z.string().nullable().default(null),
+  stop_requests: z.number().int().default(0),
+});
+export type MeetingHeldV1Payload = z.infer<typeof MeetingHeldV1Payload>;
+export const MeetingHeldV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("MEETING_HELD"),
+  schema_version: z.literal(1),
+  payload: MeetingHeldV1Payload,
+});
+
+export const MeetingItemProposedV1Payload = z.object({
+  kind: z.enum(["strategy", "pause", "kill", "other"]),
+  proposal: z.string(),
+  project_id: z.uuid().nullable().default(null),
+  project_name: z.string().nullable().default(null),
+});
+export type MeetingItemProposedV1Payload = z.infer<typeof MeetingItemProposedV1Payload>;
+export const MeetingItemProposedV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("MEETING_ITEM_PROPOSED"),
+  schema_version: z.literal(1),
+  payload: MeetingItemProposedV1Payload,
+});
+
 export const MembershipExpiredV1Payload = z.object({
   customer_id: z.uuid(),
   business_unit_id: z.uuid(),
@@ -1664,6 +1696,8 @@ export const EventEnvelope = z.discriminatedUnion("event_type", [
   GoalCreatedV1Event,
   GoalUpdatedV1Event,
   KpiSnapshotCreatedV1Event,
+  MeetingHeldV1Event,
+  MeetingItemProposedV1Event,
   MembershipExpiredV1Event,
   MembershipGrantedV1Event,
   NewsroomQuietV1Event,
@@ -1783,6 +1817,8 @@ export const EVENT_TYPES = [
   "GOAL_CREATED",
   "GOAL_UPDATED",
   "KPI_SNAPSHOT_CREATED",
+  "MEETING_HELD",
+  "MEETING_ITEM_PROPOSED",
   "MEMBERSHIP_EXPIRED",
   "MEMBERSHIP_GRANTED",
   "NEWSROOM_QUIET",

@@ -16,6 +16,7 @@ company's state says no — which is recorded as an outcome, not thrown at the c
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -27,6 +28,7 @@ from autora.company.commands import CommandBus, CommandSpec, Context, Refused
 from autora.company.events import (
     BudgetAllocated,
     GoalCreated,
+    MeetingItemProposed,
     ProjectKilled,
     ProjectPaused,
     ProjectProposed,
@@ -54,6 +56,10 @@ from autora.runtime.events.schema import new_event
 from autora.runtime.lifecycles import WORKFLOW_RUN_FSM
 
 MONEY = Decimal("0.01")
+MEETING_CARD_LIFETIME = timedelta(days=6)
+"""The weekly meeting's card waits until the day before the next meeting (D-260): unanswered, it
+lapses and every project carries on, and the next meeting may ask again with that week's
+numbers."""
 
 
 # --- payloads ---------------------------------------------------------------------------------
@@ -112,6 +118,31 @@ class KillProject(BaseModel):
 
 class UpdateStrategy(BaseModel):
     summary: str = Field(min_length=1, max_length=4000)
+
+
+class ProposeForMeeting(BaseModel):
+    """Put something on the weekly meeting's agenda (D-260). Between meetings this is how the CEO
+    asks for a new strategy, or for a project to be paused or ended: the meeting decides the
+    strategy, and a pause or an end goes to a person once a week, on one card."""
+
+    kind: Literal["strategy", "pause", "kill", "other"]
+    proposal: str = Field(min_length=1, max_length=1500)
+    project_id: uuid.UUID | None = None
+
+
+class StopRequest(BaseModel):
+    project_id: uuid.UUID
+    action: Literal["pause", "kill"]
+    reason: str = Field(min_length=1, max_length=600)
+
+
+class ApplyMeetingDecisions(BaseModel):
+    """What the weekly meeting asks a person to stop (D-260): every pause and end it decided, on
+    one card. Approved, each runs; a project that changed state since is skipped, not refused."""
+
+    summary: str = Field(min_length=1, max_length=2000)
+    """The minutes' summary, so the card says why without opening anything."""
+    items: list[StopRequest] = Field(min_length=1, max_length=5)
 
 
 class PauseAgent(BaseModel):
@@ -381,6 +412,46 @@ async def update_strategy(ctx: Context, command: UpdateStrategy) -> dict[str, An
     return {"summary": command.summary}
 
 
+async def propose_for_meeting(ctx: Context, command: ProposeForMeeting) -> dict[str, Any]:
+    if command.kind in ("pause", "kill") and command.project_id is None:
+        raise Refused(f"a {command.kind} proposal names the project (project_id)")
+    project = await _project(ctx, command.project_id) if command.project_id else None
+    await emit(
+        ctx.session,
+        new_event(
+            MeetingItemProposed(
+                kind=command.kind,
+                proposal=command.proposal,
+                project_id=project.id if project else None,
+                project_name=project.name if project else None,
+            ),
+            company_id=ctx.company_id,
+            actor=ctx.actor,
+            aggregate_type="company",
+            aggregate_id=ctx.company_id,
+        ),
+    )
+    return {"agenda": "on the weekly meeting's agenda", "kind": command.kind}
+
+
+async def apply_meeting_decisions(ctx: Context, command: ApplyMeetingDecisions) -> dict[str, Any]:
+    """Runs once a person approved the card. One item that no longer applies (the project was
+    resumed, paused or ended meanwhile) does not cost the others."""
+    done, skipped = [], []
+    for item in command.items:
+        target, reason = item.project_id, item.reason
+        try:
+            if item.action == "pause":
+                await pause_project(ctx, PauseProject(project_id=target, reason=reason))
+            else:
+                await kill_project(ctx, KillProject(project_id=target, reason=reason))
+        except Refused as refusal:
+            skipped.append({"project_id": str(item.project_id), "why": str(refusal)})
+            continue
+        done.append({"project_id": str(item.project_id), "action": item.action})
+    return {"done": done, "skipped": skipped}
+
+
 async def instantiate_workflow(ctx: Context, command: InstantiateWorkflow) -> dict[str, Any]:
     """Start the day's work. The cap on how much of it there may be is the policy's
     (``max_workflows_per_cycle``), and it is applied before this runs."""
@@ -550,6 +621,21 @@ def register(bus: CommandBus) -> None:
             "update_strategy",
             update_strategy,
             summary=lambda c: f"New strategy: {c.summary[:120]}",
+        ),
+        CommandSpec(
+            "ProposeForMeeting",
+            ProposeForMeeting,
+            "propose_for_meeting",
+            propose_for_meeting,
+            summary=lambda c: f"For the weekly meeting ({c.kind}): {c.proposal[:120]}",
+        ),
+        CommandSpec(
+            "ApplyMeetingDecisions",
+            ApplyMeetingDecisions,
+            "apply_meeting_decisions",
+            apply_meeting_decisions,
+            summary=lambda c: f"The weekly meeting asks to stop {len(c.items)} project(s)",
+            approval_expires_after=MEETING_CARD_LIFETIME,
         ),
         CommandSpec(
             "PauseAgent",

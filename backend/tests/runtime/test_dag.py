@@ -191,6 +191,38 @@ async def test_instantiate_creates_run_and_tasks(db_session, world):
     assert analyst.state == ActivityState.WAITING
 
 
+async def test_a_run_may_do_without_a_node_and_nothing_waits_for_it(db_session, world):
+    """D-260: a meeting seat nobody holds. The node gets no task, and what depended on it waits
+    only for the rest."""
+    run, tasks = await world["engine"].instantiate(
+        db_session,
+        "test.diamond",
+        company_id=world["company"].id,
+        project_id=world["project"].id,
+        omit=frozenset({"draft"}),
+    )
+    assert set(tasks) == {"research", "analysis", "review"}
+    assert tasks["review"].depends_on == [tasks["analysis"].id]
+    await _run_task(world, db_session, "researcher")
+    await _run_task(world, db_session, "analyst")
+    assert await _state(db_session, tasks["review"]) == "READY"
+
+    with pytest.raises(WorkflowError, match="unknown nodes"):
+        await _start_omitting(world, db_session, {"ghost"})
+    with pytest.raises(WorkflowError, match="leaves nothing"):
+        await _start_omitting(world, db_session, {"research", "analysis", "draft", "review"})
+
+
+async def _start_omitting(world, session, omit):
+    return await world["engine"].instantiate(
+        session,
+        "test.diamond",
+        company_id=world["company"].id,
+        project_id=world["project"].id,
+        omit=frozenset(omit),
+    )
+
+
 async def test_missing_display_param_is_an_error(db_session, world):
     with pytest.raises(WorkflowError, match="needs parameter 'topic'"):
         await _start(world, db_session, "test.linear")

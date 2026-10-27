@@ -237,10 +237,22 @@ class WorkflowEngine:
         project_id: uuid.UUID,
         params: dict[str, Any] | None = None,
         cycle_id: uuid.UUID | None = None,
+        omit: frozenset[str] = frozenset(),
     ) -> tuple[WorkflowRun, dict[str, Task]]:
+        """``omit``: nodes this run does without (D-260: a meeting seat nobody holds). They get no
+        task, and nothing waits for them. A node a loop or a halt turns on cannot be left out."""
         template = self.templates.get(template_name)
         params = params or {}
-        order = template.topological_order()
+        unknown = omit - {node.name for node in template.nodes}
+        if unknown:
+            raise WorkflowError(f"{template.name}: cannot omit unknown nodes {sorted(unknown)}")
+        steered = {n for loop in template.loops for n in (loop.check, loop.back_to)}
+        steered |= {halt.check for halt in template.halts}
+        if omit & steered:
+            raise WorkflowError(f"{template.name}: cannot omit {sorted(omit & steered)}")
+        order = [node for node in template.topological_order() if node.name not in omit]
+        if not order:
+            raise WorkflowError(f"{template.name}: omitting every node leaves nothing to run")
         ids = {node.name: uuid7() for node in order}
         display = {node.name: _render(template, node, params) for node in order}
 
@@ -278,7 +290,7 @@ class WorkflowEngine:
                 name=node.name,
                 display_name=display[node.name],
                 required_role=node.required_role,
-                depends_on=[ids[dep] for dep in node.depends_on],
+                depends_on=[ids[dep] for dep in node.depends_on if dep not in omit],
                 input=_input(node, params),
                 output_schema_ref=node.output_schema_ref,
                 budget_usd=node.budget_usd,

@@ -126,6 +126,29 @@ describe("the group's messages (D-109)", () => {
     expect(rejected.type === "message" && [rejected.text, rejected.tone]).toEqual(["這篇我決定不發：已過時效。", "danger"]);
   });
 
+  it("the weekly meeting's minutes, in the chair's voice; a stop asks the operator (D-260)", () => {
+    const withCeo = { ...AGENTS, k1: agent("k1", "ceo", "Tifa｜蒂法") };
+    const minutes = {
+      summary: "這週發了九篇。",
+      attendees: ["艾達", "胡蝶忍"],
+      decisions: ["策略不變"],
+      action_items: ["艾達：補兩篇台股"],
+      strategy: null,
+      stop_requests: 0,
+    };
+    const quiet = chatItem(event("MEETING_HELD", minutes), withCeo)!;
+    expect(quiet.type === "message" && [quiet.speaker, quiet.text, quiet.tone, quiet.link]).toEqual([
+      expect.objectContaining({ kind: "agent", role: "ceo", name: "蒂法" }),
+      "週會紀錄（2 位同事發言）：這週發了九篇。\n決議：策略不變\n待辦：艾達：補兩篇台股",
+      "neutral",
+      undefined,
+    ]);
+    const stopping = chatItem(event("MEETING_HELD", { ...minutes, strategy: "專注台股", stop_requests: 1 }), withCeo)!;
+    expect(stopping.type === "message" && stopping.text).toContain("新策略（已採用）：專注台股");
+    expect(stopping.type === "message" && stopping.text).toContain("要暫停或終止 1 個專案，等您在一張卡上決定。");
+    expect(stopping.type === "message" && [stopping.tone, stopping.link?.href]).toEqual(["warn", "/admin/approvals"]);
+  });
+
   it("days and times in Taipei", () => {
     const now = new Date("2026-09-29T03:00:00Z");
     expect(dayLabel("2026-09-29T01:00:00Z", now)).toBe("今天");

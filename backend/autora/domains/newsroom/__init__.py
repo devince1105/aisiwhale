@@ -33,6 +33,18 @@ team_chat.hear(
 )
 
 
+MEETING_ROLES = (
+    "editor_in_chief",
+    "news_intelligence",
+    "researcher",
+    "analyst",
+    "writer",
+    "editor",
+    "marketing",
+)
+"""Who of the newsroom has a seat at the company's weekly meeting (D-260), in speaking order."""
+
+
 class RuntimeParts(Protocol):
     task_manager: TaskManager
     approvals: ApprovalService

@@ -28,16 +28,22 @@ FINANCE = "finance"
 BUSINESS = "business"
 DEFAULT_ALLOCATION = Decimal("160")
 """In the base currency (D-023): the USD 5 of before, at 32."""
+STATEMENT = "statement_"
+CHAIR = "chair_meeting"
 
 
 def respond(request: ModelRequest) -> FakeTurn | None:
     """A reply for the company's own agents; None for anything else."""
     role, task = request.context.role, request.context.task_name
+    if task and task.startswith(STATEMENT):
+        return _statement()
     if role == ROLE:
         if task == "plan":
             return _plan(request)
         if task == "review":
             return _review(request)
+        if task == CHAIR:
+            return _chair()
     if role == STRATEGIST and task == "propose":
         return _propose(request)
     if role == FINANCE and task == "review_budgets":
@@ -67,6 +73,30 @@ def _review_budgets(request: ModelRequest) -> FakeTurn:
                     "changes: that is a person's judgement, not a script's."
                 ),
             }
+        )
+    )
+
+
+def _statement() -> FakeTurn:
+    """A scripted member at the weekly meeting (D-260): **nothing to report, no view.** A script
+    that claimed work or took sides would put invented testimony in front of the chair."""
+    return FakeTurn(text=json.dumps({"done": [], "blockers": [], "asks": [], "on_agenda": []}))
+
+
+def _chair() -> FakeTurn:
+    """The scripted chair (D-260): **minutes that change nothing.** No new strategy and nothing to
+    stop: those are the meeting's real decisions, and a script is not the one to make them."""
+    return FakeTurn(
+        text=json.dumps(
+            {
+                "summary": "模擬週會：照常運作，策略不變，沒有要暫停或終止的專案。",
+                "discussion": [],
+                "decisions": ["照常運作"],
+                "action_items": [],
+                "strategy": None,
+                "stop": [],
+            },
+            ensure_ascii=False,
         )
     )
 

@@ -3034,6 +3034,132 @@
         }
       }
     },
+    "MEETING_HELD": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "The weekly meeting's minutes, as the team group reads them.",
+          "properties": {
+            "workflow_run_id": {
+              "format": "uuid",
+              "title": "Workflow Run Id",
+              "type": "string"
+            },
+            "agenda_until": {
+              "format": "date-time",
+              "title": "Agenda Until",
+              "type": "string"
+            },
+            "attendees": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Attendees",
+              "type": "array"
+            },
+            "summary": {
+              "title": "Summary",
+              "type": "string"
+            },
+            "decisions": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Decisions",
+              "type": "array"
+            },
+            "action_items": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Action Items",
+              "type": "array"
+            },
+            "strategy": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Strategy"
+            },
+            "stop_requests": {
+              "default": 0,
+              "title": "Stop Requests",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "workflow_run_id",
+            "agenda_until",
+            "summary"
+          ],
+          "title": "MeetingHeld",
+          "type": "object"
+        }
+      }
+    },
+    "MEETING_ITEM_PROPOSED": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "Something the CEO wants the weekly meeting to decide: a new strategy, a project to pause\nor end, or anything else. Between meetings this is where those go instead of to a person.",
+          "properties": {
+            "kind": {
+              "enum": [
+                "strategy",
+                "pause",
+                "kill",
+                "other"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "proposal": {
+              "title": "Proposal",
+              "type": "string"
+            },
+            "project_id": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Project Id"
+            },
+            "project_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Project Name"
+            }
+          },
+          "required": [
+            "kind",
+            "proposal"
+          ],
+          "title": "MeetingItemProposed",
+          "type": "object"
+        }
+      }
+    },
     "MEMBERSHIP_EXPIRED": {
       "1": {
         "persistence": "persisted",

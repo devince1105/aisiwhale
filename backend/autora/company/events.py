@@ -61,6 +61,37 @@ class StrategyUpdated(EventPayload):
     approval_id: uuid.UUID | None = None
 
 
+# --- The weekly meeting (D-260) --------------------------------------------------------------
+
+
+@event("MEETING_ITEM_PROPOSED")
+class MeetingItemProposed(EventPayload):
+    """Something the CEO wants the weekly meeting to decide: a new strategy, a project to pause
+    or end, or anything else. Between meetings this is where those go instead of to a person."""
+
+    kind: Literal["strategy", "pause", "kill", "other"]
+    proposal: str
+    project_id: uuid.UUID | None = None
+    project_name: str | None = None
+
+
+@event("MEETING_HELD")
+class MeetingHeld(EventPayload):
+    """The weekly meeting's minutes, as the team group reads them."""
+
+    workflow_run_id: uuid.UUID
+    agenda_until: datetime
+    """Items proposed before this were the meeting's to discuss; later ones wait for the next."""
+    attendees: list[str] = Field(default_factory=list)
+    summary: str
+    decisions: list[str] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+    strategy: str | None = None
+    """The strategy the meeting adopted; None when it kept the one it had."""
+    stop_requests: int = 0
+    """How many pauses or ends it asked a person for, on one card."""
+
+
 # --- Projects ------------------------------------------------------------------------------
 
 

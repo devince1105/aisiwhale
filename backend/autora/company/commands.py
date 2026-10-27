@@ -27,6 +27,7 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -105,6 +106,8 @@ class CommandSpec:
     facts: FactsFor | None = None
     summary: Callable[[BaseModel], str] | None = None
     """One line for the person who has to approve it. They should not have to read JSON."""
+    approval_expires_after: timedelta | None = None
+    """How long its approval waits for a person; None keeps the approvals' own default."""
 
 
 class Invalid(CommandError):
@@ -273,6 +276,7 @@ class CommandBus:
                     "role": role,
                     "idempotency_key": idempotency_key,
                 },
+                expires_after=spec.approval_expires_after,
             )
             record.approval_id = approval.id
             await session.flush()

@@ -207,6 +207,17 @@ class LastCycle(BaseModel):
     left to assume the silence means everything went well (platform/02 §2)."""
 
 
+class MeetingLine(BaseModel):
+    """The weekly meeting (D-260): what already waits for it — so the CEO does not ask again —
+    and what the last one decided."""
+
+    when: str = "the first cycle of each week (Monday, Taipei time)"
+    agenda: list[str] = []
+    last_held: datetime | None = None
+    last_summary: str | None = None
+    last_decisions: list[str] = []
+
+
 class CompanySnapshot(BaseModel):
     """What the CEO sees. The same document the operator can read on the page."""
 
@@ -226,6 +237,8 @@ class CompanySnapshot(BaseModel):
     domains: dict[str, Any] = {}
     """What each domain put in front of the decision, under its own name."""
     strategy_summary: str | None = None
+    meeting: MeetingLine | None = None
+    """Where a new strategy, a pause or an end is decided (D-260)."""
     human_notes: str | None = None
     """What a person told the company to do, left in the UI. Read, never invented."""
     trimmed: list[str] = []
@@ -277,6 +290,7 @@ class SnapshotBuilder:
             last_cycle=await self._last_cycle(session, company_id, cycle),
             domains=await self._domains(session, company_id),
             strategy_summary=_text(policies.get(STRATEGY_POLICY)) or company.mission,
+            meeting=await _meeting(session, company_id),
             human_notes=_text(policies.get(HUMAN_NOTES_POLICY)),
         )
         return _fit(snapshot, budget)
@@ -531,6 +545,32 @@ class SnapshotBuilder:
                     reason=_reason(approval.reason),
                 )
             )
+        # the weekly meeting's card (D-260): one no answers every project on it
+        carded = await session.scalars(
+            select(Approval).where(
+                Approval.company_id == company_id,
+                Approval.state == ApprovalState.REJECTED.value,
+                Approval.payload["command"].astext == "ApplyMeetingDecisions",
+                Approval.payload["args"]["items"].contains([{"project_id": str(project_id)}]),
+                Approval.decided_by["kind"].astext == human,
+                Approval.decided_at >= since,
+                Approval.decided_at <= now,
+            )
+        )
+        for approval in carded:
+            if approval.decided_at is None:
+                continue
+            for item in approval.payload["args"]["items"]:
+                if item.get("project_id") == str(project_id):
+                    decisions.append(
+                        OperatorDecision(
+                            at=approval.decided_at,
+                            decision="rejected_pause"
+                            if item.get("action") == "pause"
+                            else "rejected_kill",
+                            reason=_reason(approval.reason),
+                        )
+                    )
         decisions.sort(key=lambda d: d.at, reverse=True)
         return decisions[:OPERATOR_DECISIONS_SHOWN]
 
@@ -680,6 +720,12 @@ def _drop_all_projects(snapshot: CompanySnapshot) -> None:
     for line in snapshot.portfolio:
         line.projects = []
     snapshot.company_work = []
+
+
+async def _meeting(session: AsyncSession, company_id: uuid.UUID) -> MeetingLine:
+    from autora.company.meeting import snapshot_line  # the meeting reads the snapshot too
+
+    return await snapshot_line(session, company_id)
 
 
 def _fit(snapshot: CompanySnapshot, budget: int) -> CompanySnapshot:

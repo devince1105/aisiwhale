@@ -42,8 +42,8 @@ class SubmitCommandArgs(BaseModel):
     command: str = Field(
         description=(
             "What to ask the company to do: CreateCycleGoal, AllocateBudget, "
-            "InstantiateWorkflow, CreateProject, PauseProject, ResumeProject, KillProject, "
-            "UpdateStrategy, RestartWorkflow."
+            "InstantiateWorkflow, CreateProject, ProposeForMeeting, ResumeProject, "
+            "RestartWorkflow."
         )
     )
     payload: dict[str, Any] = Field(
@@ -109,8 +109,9 @@ def register_tools(registry: ToolRegistry, bus: CommandBus) -> None:
         TOOL,
         description=(
             "Ask the company to do something: set a goal, allocate a budget, start work, "
-            "pause or stop a project, change the strategy. The company decides — you may be "
-            "refused, or told a person has to approve it. Check the decision in the result."
+            "put a pause, an end or a new strategy on the weekly meeting's agenda. The company "
+            "decides — you may be refused, or told a person has to approve it. Check the "
+            "decision in the result."
         ),
         side_effect="write",
         retryable=False,

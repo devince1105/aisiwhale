@@ -3290,6 +3290,7 @@ export interface components {
             /** Human Notes */
             human_notes?: string | null;
             last_cycle?: components["schemas"]["LastCycle"];
+            meeting?: components["schemas"]["MeetingLine"] | null;
             /**
              * Opportunities
              * @default []
@@ -4094,6 +4095,32 @@ export interface components {
              * @enum {string}
              */
             tier: "public" | "free" | "vip";
+        };
+        /**
+         * MeetingLine
+         * @description The weekly meeting (D-260): what already waits for it — so the CEO does not ask again —
+         *     and what the last one decided.
+         */
+        MeetingLine: {
+            /**
+             * Agenda
+             * @default []
+             */
+            agenda: string[];
+            /**
+             * Last Decisions
+             * @default []
+             */
+            last_decisions: string[];
+            /** Last Held */
+            last_held?: string | null;
+            /** Last Summary */
+            last_summary?: string | null;
+            /**
+             * When
+             * @default the first cycle of each week (Monday, Taipei time)
+             */
+            when: string;
         };
         /** Member */
         Member: {

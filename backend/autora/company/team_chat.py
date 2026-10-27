@@ -42,6 +42,7 @@ CORE_TYPES: tuple[str, ...] = (
     # a project stopped or started again (D-131): stopping the product is news to the operator
     "PROJECT_PAUSED",
     "PROJECT_RESUMED",
+    "MEETING_HELD",  # the weekly meeting's minutes (D-260)
 )
 """What the group hears about from the company itself. The web decides how each reads (and
 skips a failure that will be retried); the list only keeps the steps between out of the feed."""

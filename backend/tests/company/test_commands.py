@@ -38,6 +38,8 @@ from tests.conftest import unique_company
 
 CEO = Actor.agent(uuid.uuid4())
 HUMAN = Actor.human("founder")
+MEETING = Actor.system("weekly-meeting")
+"""What asks a person to stop a project since D-260: the weekly meeting's apply step, one card."""
 
 
 @pytest.fixture
@@ -70,6 +72,21 @@ async def _world(session, *, with_unit: bool = False):
 
 
 TOPIC = {"topic": "microgrids"}
+
+
+def _stop(project, action="kill", reason="too costly") -> dict:
+    """The weekly meeting's card (D-260), with one project on it."""
+    return {
+        "summary": "the week's numbers",
+        "items": [{"project_id": str(project.id), "action": action, "reason": reason}],
+    }
+
+
+async def _ask(session, bus, company, project, *, action="kill", reason="too costly", key=None):
+    return await bus.submit(
+        session, "ApplyMeetingDecisions", _stop(project, action, reason),
+        company_id=company.id, actor=MEETING, role="system", idempotency_key=key or _key(),
+    )  # fmt: skip
 
 
 def _key() -> str:
@@ -236,29 +253,18 @@ async def test_a_refusal_is_remembered_too(db_session, bus):
 async def test_a_command_a_person_must_approve_waits(db_session, bus):
     company, _, project = await _world(db_session)
 
-    result = await bus.submit(
-        db_session,
-        "KillProject",
-        {"project_id": str(project.id), "reason": "cost per article too high"},
-        company_id=company.id,
-        actor=CEO,
-        role="ceo",
-        idempotency_key=_key(),
-    )
+    result = await _ask(db_session, bus, company, project, reason="cost per article too high")
 
     assert result.awaiting and result.approval is not None
-    assert result.approval.summary.startswith("Kill project")
-    assert result.approval.payload["command"] == "KillProject"
+    assert result.approval.summary == "The weekly meeting asks to stop 1 project(s)"
+    assert result.approval.payload["command"] == "ApplyMeetingDecisions"
     assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
 
 
 async def test_approving_runs_it_under_the_same_key(db_session, bus):
     company, _, project = await _world(db_session)
     key = _key()
-    result = await bus.submit(
-        db_session, "KillProject", {"project_id": str(project.id), "reason": "too costly"},
-        company_id=company.id, actor=CEO, role="ceo", idempotency_key=key,
-    )  # fmt: skip
+    result = await _ask(db_session, bus, company, project, key=key)
 
     await bus.approvals.decide(
         db_session, result.approval.id, outcome="approve", actor=HUMAN, reason="agreed"
@@ -267,22 +273,16 @@ async def test_approving_runs_it_under_the_same_key(db_session, bus):
     assert (await db_session.get(Project, project.id)).state == ProjectState.KILLED.value
     record = await db_session.get(CommandRecord, result.record.id)
     assert record.outcome == "done"
-    assert record.result["state"] == "KILLED"
+    assert record.result["done"] == [{"project_id": str(project.id), "action": "kill"}]
     assert record.event_ids  # the kill event is attributed to the command
     # and the key is still the key
-    again = await bus.submit(
-        db_session, "KillProject", {"project_id": str(project.id), "reason": "too costly"},
-        company_id=company.id, actor=CEO, role="ceo", idempotency_key=key,
-    )  # fmt: skip
+    again = await _ask(db_session, bus, company, project, key=key)
     assert again.record.id == record.id
 
 
 async def test_rejecting_leaves_the_company_as_it_was(db_session, bus):
     company, _, project = await _world(db_session)
-    result = await bus.submit(
-        db_session, "KillProject", {"project_id": str(project.id), "reason": "too costly"},
-        company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
-    )  # fmt: skip
+    result = await _ask(db_session, bus, company, project)
 
     await bus.approvals.decide(
         db_session, result.approval.id, outcome="reject", actor=HUMAN, reason="give it a week"
@@ -294,12 +294,21 @@ async def test_rejecting_leaves_the_company_as_it_was(db_session, bus):
     assert "give it a week" in record.reason
 
 
-async def test_a_command_approved_after_the_world_moved_on_is_refused(db_session, bus):
-    """Approval is not a promise that it is still possible."""
+async def test_a_command_approved_after_the_world_moved_on_does_not_do_it(db_session, bus):
+    """Approval is not a promise that it is still possible. On the meeting's card (D-260) the
+    project that moved on is skipped, with why, and the others on the card still run."""
     company, _, project = await _world(db_session)
+    other = Project(
+        company_id=company.id, name="other", state=ProjectState.ACTIVE.value,
+        kill_criteria={"max_cost_usd": 5},
+    )  # fmt: skip
+    db_session.add(other)
+    await db_session.flush()
+    card = _stop(project)
+    card["items"].append({"project_id": str(other.id), "action": "pause", "reason": "slow"})
     result = await bus.submit(
-        db_session, "KillProject", {"project_id": str(project.id), "reason": "too costly"},
-        company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
+        db_session, "ApplyMeetingDecisions", card,
+        company_id=company.id, actor=MEETING, role="system", idempotency_key=_key(),
     )  # fmt: skip
     project.state = ProjectState.COMPLETED.value  # it finished while the person was deciding
     await db_session.flush()
@@ -309,8 +318,10 @@ async def test_a_command_approved_after_the_world_moved_on_is_refused(db_session
     )
 
     record = await db_session.get(CommandRecord, result.record.id)
-    assert record.outcome == "refused" and "already COMPLETED" in record.reason
+    [skipped] = record.result["skipped"]
+    assert skipped["project_id"] == str(project.id) and "already COMPLETED" in skipped["why"]
     assert (await db_session.get(Project, project.id)).state == ProjectState.COMPLETED.value
+    assert (await db_session.get(Project, other.id)).state == ProjectState.PAUSED.value
 
 
 # --- money --------------------------------------------------------------------------------------
@@ -429,17 +440,20 @@ async def test_pausing_and_resuming_a_project(db_session, bus):
     assert list(events) == ["PROJECT_PAUSED", "PROJECT_RESUMED"]
 
 
-async def test_the_ceo_pausing_says_it_was_the_ceo(db_session, bus):
-    """The event's trigger is what tells auto-pause from a decision (T-606 will add the third).
-    The CEO's pause waits for a person (D-131): until then the project keeps working."""
+async def test_the_ceo_cannot_pause_and_the_meetings_pause_is_a_persons(db_session, bus):
+    """The event's trigger is what tells auto-pause from a decision. The CEO neither pauses nor
+    asks a person to (D-260: she proposes it for the weekly meeting); a pause the meeting asked
+    for waits for a person, and is theirs once they approve it."""
     company, _, project = await _world(db_session)
 
-    asked = await bus.submit(
+    hers = await bus.submit(
         db_session, "PauseProject", {"project_id": str(project.id), "reason": "cost per article"},
         company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
     )  # fmt: skip
+    assert hers.record.outcome == "refused" and hers.approval is None
+
+    asked = await _ask(db_session, bus, company, project, action="pause", reason="cost per article")
     assert asked.awaiting
-    assert asked.approval.summary.endswith(": cost per article")
     assert (await db_session.get(Project, project.id)).state == ProjectState.ACTIVE.value
     await bus.approvals.decide(
         db_session, asked.approval.id, outcome="approve", actor=HUMAN, reason="agreed"
@@ -452,7 +466,7 @@ async def test_the_ceo_pausing_says_it_was_the_ceo(db_session, bus):
             EventRecord.event_type == "PROJECT_PAUSED",
         )
     )
-    assert event.payload["trigger"] == "ceo"
+    assert (event.payload["trigger"], event.payload["reason"]) == ("human", "cost per article")
 
 
 async def test_creating_a_project_needs_a_person_and_kill_criteria(db_session, bus):
@@ -575,17 +589,20 @@ async def test_a_running_workflow_is_not_restarted(db_session):
 # --- strategy -------------------------------------------------------------------------------------
 
 
-async def test_the_strategy_a_person_approves_is_what_the_next_snapshot_reads(db_session, bus):
+async def test_the_strategy_the_meeting_adopts_is_what_the_next_snapshot_reads(db_session, bus):
+    """D-260: the CEO cannot change it alone; the weekly meeting adopts it without asking."""
     company, _, _ = await _world(db_session)
-    asked = await bus.submit(
-        db_session, "UpdateStrategy", {"summary": "Own bilingual local news."},
+    hers = await bus.submit(
+        db_session, "UpdateStrategy", {"summary": "Something else."},
         company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
     )  # fmt: skip
-    assert asked.awaiting
+    assert hers.record.outcome == "refused" and hers.approval is None
 
-    await bus.approvals.decide(
-        db_session, asked.approval.id, outcome="approve", actor=HUMAN, reason="yes"
-    )
+    adopted = await bus.submit(
+        db_session, "UpdateStrategy", {"summary": "Own bilingual local news."},
+        company_id=company.id, actor=MEETING, role="system", idempotency_key=_key(),
+    )  # fmt: skip
+    assert adopted.done
 
     from autora.company.reporting import Reporting
     from autora.company.snapshot import SnapshotBuilder
@@ -604,11 +621,8 @@ async def test_what_a_person_decided_about_a_project_is_what_the_next_snapshot_r
 
     company, _, project = await _world(db_session, with_unit=True)
 
-    async def ask():
-        return await bus.submit(
-            db_session, "PauseProject", {"project_id": str(project.id), "reason": "0 published"},
-            company_id=company.id, actor=CEO, role="ceo", idempotency_key=_key(),
-        )  # fmt: skip
+    async def ask():  # the weekly meeting's card (D-260); before it, the CEO's own request
+        return await _ask(db_session, bus, company, project, action="pause", reason="0 published")
 
     first = await ask()
     await bus.approvals.decide(
@@ -653,7 +667,7 @@ async def test_every_attempt_is_in_the_log_whatever_happened(db_session, bus):
     for name, args, actor, role in (
         ("CreateCycleGoal", {"title": "g", "metric": "m", "target": 1}, HUMAN, None),
         ("CreateCycleGoal", {"title": "g", "metric": "m", "target": 1}, CEO, "writer"),
-        ("KillProject", {"project_id": str(project.id), "reason": "r"}, CEO, "ceo"),
+        ("ApplyMeetingDecisions", _stop(project), MEETING, "system"),
     ):
         await bus.submit(
             db_session, name, args, company_id=company.id, actor=actor, role=role,
@@ -671,7 +685,7 @@ async def test_every_attempt_is_in_the_log_whatever_happened(db_session, bus):
     assert [r.command for r in records] == [
         "CreateCycleGoal",
         "CreateCycleGoal",
-        "KillProject",
+        "ApplyMeetingDecisions",
     ]
     pending = await db_session.scalar(
         select(Approval).where(

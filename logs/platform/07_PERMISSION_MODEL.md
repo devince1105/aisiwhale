@@ -33,9 +33,11 @@
 | instantiate_workflow | DENY | DENY | DENY | DENY | DENY | LIMITED(cycle 預算, ≤max_workflows) | DENY | ALLOW |
 | create_project | DENY | DENY | DENY | DENY | DENY | HUMAN | DENY | ALLOW |
 | allocate_budget | DENY | DENY | DENY | DENY | DENY | LIMITED(≤門檻) → HUMAN | HUMAN(提案) | ALLOW |
-| pause_project | DENY | DENY | DENY | DENY | DENY | ALLOW | DENY | ALLOW |
-| kill_project | DENY | DENY | DENY | DENY | DENY | HUMAN | DENY | ALLOW |
-| update_strategy | DENY | DENY | DENY | DENY | DENY | HUMAN | DENY | ALLOW |
+| pause_project | DENY | DENY | DENY | DENY | DENY | DENY（D-260：提到週會） | DENY | ALLOW |
+| kill_project | DENY | DENY | DENY | DENY | DENY | DENY（D-260：提到週會） | DENY | ALLOW |
+| update_strategy | DENY | DENY | DENY | DENY | DENY | DENY（D-260：提到週會；週會的套用步驟以 system ALLOW） | DENY | ALLOW |
+| propose_for_meeting（D-260） | DENY | DENY | DENY | DENY | DENY | ALLOW | DENY | ALLOW |
+| apply_meeting_decisions（D-260：週會要暫停／終止的專案，一張卡） | DENY | DENY | DENY | DENY | DENY | DENY | DENY | ALLOW（週會的套用步驟以 system 送出，為 HUMAN） |
 | record_transaction (manual) | DENY | DENY | DENY | DENY | DENY | DENY | DENY | ALLOW |
 | payment / transfer / sign contract | DENY | DENY | DENY | DENY | DENY | HUMAN | HUMAN | ALLOW |
 | delete / irreversible | DENY | DENY | DENY | DENY | DENY | DENY | DENY | ALLOW |

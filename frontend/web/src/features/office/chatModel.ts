@@ -35,6 +35,7 @@ export const CHAT_TYPES = new Set([
   "PROJECT_PAUSED",
   "PROJECT_RESUMED",
   "NEWSROOM_QUIET",
+  "MEETING_HELD", // the weekly meeting's minutes (D-260)
 ]);
 
 /** Why a quiet newsroom may be quiet, as the watch found it (D-131). */
@@ -61,8 +62,13 @@ export const ROLE_NAME: Record<string, string> = {
 };
 
 /** Whose work an event is, when no agent is on it: the approval is the editor-in-chief's to ask;
- * one nobody answered is the CEO's to take (D-157). */
-const VOICE: Record<string, string> = { APPROVAL_REQUESTED: "editor_in_chief", APPROVAL_DELEGATED: "ceo" };
+ * one nobody answered is the CEO's to take (D-157); the weekly meeting's minutes are its chair's
+ * (D-260). */
+const VOICE: Record<string, string> = {
+  APPROVAL_REQUESTED: "editor_in_chief",
+  APPROVAL_DELEGATED: "ceo",
+  MEETING_HELD: "ceo",
+};
 
 export type Speaker =
   | { kind: "agent"; id: string | null; name: string; role: string; avatarKey?: string }
@@ -212,6 +218,18 @@ export function chatItem(
       const waiting = n(p.waiting_approvals);
       const why = causes.length ? `可能的原因：${causes.join("、")}${waiting ? `（${waiting} 篇）` : ""}。` : "";
       return notice(`已經 ${n(p.hours) ?? 24} 小時沒有新文章。${why}`, "danger", waiting ? { href: "/admin/approvals", label: "去核准" } : undefined);
+    }
+    case "MEETING_HELD": {
+      const spoke = Array.isArray(p.attendees) ? p.attendees.length : 0;
+      const decided = Array.isArray(p.decisions) ? p.decisions.map((d) => clip(String(d), 60)) : [];
+      const todo = Array.isArray(p.action_items) ? p.action_items.map((a) => clip(String(a), 60)) : [];
+      const stops = n(p.stop_requests);
+      const lines = [`週會紀錄${spoke ? `（${spoke} 位同事發言）` : ""}：${clip(s(p.summary) ?? "", 200)}`];
+      if (decided.length) lines.push(`決議：${decided.join("；")}`);
+      if (todo.length) lines.push(`待辦：${todo.join("；")}`);
+      if (s(p.strategy)) lines.push(`新策略（已採用）：${clip(s(p.strategy)!, 160)}`);
+      if (stops) lines.push(`要暫停或終止 ${stops} 個專案，等您在一張卡上決定。`);
+      return say(lines.join("\n"), stops ? "warn" : "neutral", stops ? { link: { href: "/admin/approvals", label: "去決定" } } : {});
     }
     default:
       return null;

@@ -102,6 +102,8 @@ ACTIONS = {
     "pause_project": "write",
     "kill_project": "write",
     "update_strategy": "write",
+    "propose_for_meeting": "write",
+    "apply_meeting_decisions": "write",
     "record_transaction": "write",
     "payment": "irreversible",
     "delete": "irreversible",
@@ -144,14 +146,17 @@ RULES: list[Rule] = [
         ),
     ),
     *needs_approval("allocate_budget", "finance"),
-    # system: kill-criteria auto-pause (governance), a rule fixed in advance. The CEO's own pause
-    # goes to a person (D-131): three pauses of the newsroom in four days, each a day without an
-    # article and none with a reason, were all hers — stopping the product is not an executive's
-    # call to make alone while a person is there to ask
+    # system: kill-criteria auto-pause (governance), a rule fixed in advance. The CEO stops no
+    # project alone (D-131: three pauses of the newsroom in four days, none with a reason), and
+    # since D-260 she does not ask a person for it either, nor for a new strategy: thirteen such
+    # requests in two weeks, eleven of them left to lapse. She puts them on the weekly meeting's
+    # agenda; the meeting settles the strategy, and asks a person once, on one card, for what it
+    # wants stopped
     *allow("pause_project", "system"),
-    *needs_approval("pause_project", "ceo"),
-    *needs_approval("kill_project", "ceo"),
-    *needs_approval("update_strategy", "ceo"),
+    *allow("propose_for_meeting", "ceo"),
+    # the meeting's apply step is the only code that submits these two (company/meeting.py)
+    *allow("update_strategy", "system"),
+    *needs_approval("apply_meeting_decisions", "system"),
     *needs_approval("payment", "ceo", "finance"),
     *allow("pause_agent", "system"),  # governance pauses an agent that keeps failing
     # --- the business loop (ARCHITECTURE_V2_1 §5-§6) ------------------------------------------

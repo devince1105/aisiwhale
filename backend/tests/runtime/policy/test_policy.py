@@ -57,9 +57,12 @@ MATRIX = {
     "instantiate_workflow": (D, D, D, D, D, A, A, D, D, D),
     "create_project":       (D, D, D, D, D, D, H, D, D, D),
     "allocate_budget":      (D, D, D, D, D, D, A, H, D, D),
-    "pause_project":        (D, D, D, D, D, D, H, D, D, D),  # a person decides (D-131)
-    "kill_project":         (D, D, D, D, D, D, H, D, D, D),
-    "update_strategy":      (D, D, D, D, D, D, H, D, D, D),
+    # the CEO asks the weekly meeting, not a person (D-260); the meeting's own rules are below
+    "pause_project":        (D, D, D, D, D, D, D, D, D, D),
+    "kill_project":         (D, D, D, D, D, D, D, D, D, D),
+    "update_strategy":      (D, D, D, D, D, D, D, D, D, D),
+    "propose_for_meeting":  (D, D, D, D, D, D, A, D, D, D),
+    "apply_meeting_decisions": (D, D, D, D, D, D, D, D, D, D),
     "record_transaction":   (D, D, D, D, D, D, D, D, D, D),
     "payment":              (D, D, D, D, D, D, H, H, D, D),
     "delete":               (D, D, D, D, D, D, D, D, D, D),
@@ -133,6 +136,17 @@ def test_permission_matrix(engine, action, role, expected):
 def test_humans_may_do_anything(engine, action):
     decision = engine.decide(Actor.human("operator"), action)
     assert (decision.outcome, decision.rule_id) == ("allow", "human_operator")
+
+
+def test_the_weekly_meeting_settles_strategy_and_asks_a_person_to_stop_anything(engine):
+    """D-260: the meeting's apply step is code, so it acts as the system. It adopts a strategy
+    alone; every pause or end it wants goes to a person, together, on one card."""
+    meeting = Actor.system("weekly-meeting")
+    decide = lambda action: engine.decide(meeting, action).outcome  # noqa: E731
+    assert decide("update_strategy") == A
+    assert decide("apply_meeting_decisions") == H
+    assert decide("kill_project") == D
+    assert decide("allocate_budget") == D
 
 
 def test_unknown_action_and_unknown_role_are_denied(engine):

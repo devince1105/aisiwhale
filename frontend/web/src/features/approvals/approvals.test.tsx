@@ -101,6 +101,26 @@ describe("model", () => {
       reject: "駁回：維持原策略",
     });
     expect(commandChoice({ command: "KillProject", args: { project_id: "p1", reason: "r" } })!.effect).toContain("不能再恢復");
+    // the weekly meeting's one card (D-260): every stop it decided, with the minutes' summary
+    const meeting = commandChoice(
+      {
+        command: "ApplyMeetingDecisions",
+        args: {
+          summary: "七天零篇。",
+          items: [
+            { project_id: "p1", action: "pause", reason: "零產出" },
+            { project_id: "p2", action: "kill", reason: "三週沒動" },
+          ],
+        },
+      },
+      { p1: "持股動態", p2: "實驗室" },
+    )!;
+    expect(meeting).toMatchObject({
+      title: "週會決議：暫停或終止 2 個專案",
+      body: "七天零篇。\n暫停「持股動態」：零產出\n終止「實驗室」：三週沒動",
+      approve: "核准：照週會決議",
+      reject: "駁回：全部照常運作",
+    });
     // not a command, or one this page has no words for: the plain 核准 / 駁回
     expect(approvalCard(pending, agents, NOW).command).toBeNull();
     expect(commandChoice({ command: "SomethingNew", args: {} })).toBeNull();
