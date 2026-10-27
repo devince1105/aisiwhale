@@ -97,11 +97,10 @@ export const MEASURE_AGAIN_MS = [0, 250, 1000] as const;
 
 /**
  * The canvas draws nothing until it knows its size, and it learns its size from a
- * ResizeObserver's first report (D-173). That report comes with the browser's next rendering
- * step — and opening the AI 編輯部 after the watchlist, it did not come: the canvas stayed at the
- * browser's default 300×150, the scene never mounted, and the loading bar stayed at 5% until a
- * reload. This observer asks to be measured again a few times on timers too; a measurement
- * that finds the same box changes nothing.
+ * ResizeObserver's first report (D-173). The 5% stall blamed on that report never coming was
+ * the page's scrolls drowning it out (D-259, CANVAS_RESIZE); this observer, which asks to be
+ * measured again a few times on timers too, stays as a fallback: a measurement that finds the
+ * same box changes nothing.
  */
 export function measuringObserver(Base: typeof ResizeObserver | undefined = globalThis.ResizeObserver) {
   if (!Base) return undefined;
@@ -126,6 +125,16 @@ export function measuringObserver(Base: typeof ResizeObserver | undefined = glob
 
 const MeasuringObserver = measuringObserver();
 
+/**
+ * How the canvas measures itself (D-259): on its own box's resize reports, not on the page's
+ * scrolls. The measuring waits for 50 ms without a report, and with every scroll on the page
+ * counted as one, the price strip at the top — which scrolls itself about 30 times a second —
+ * never left it those 50 ms: the canvas stayed at 300×150 and the loading bar at 5%, on most
+ * loads in a fresh browser. Its place on the page is never needed: a click is placed by its
+ * offset inside the canvas.
+ */
+export const CANVAS_RESIZE = { scroll: false, polyfill: MeasuringObserver } as const;
+
 const EMPTY_READY_MS = 1500;
 const MAX_LOADING_MS = 12_000;
 
@@ -133,7 +142,7 @@ export default function Canvas3D({ frameloop, insetRight, theme, onContextLost, 
   return (
     <Canvas
       dpr={CANVAS_DPR}
-      resize={MeasuringObserver ? { polyfill: MeasuringObserver } : undefined}
+      resize={CANVAS_RESIZE}
       orthographic
       // PCF (three removed the soft variant and warned on every shader compile)
       shadows="percentage"
