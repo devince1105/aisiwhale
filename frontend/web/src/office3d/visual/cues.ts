@@ -11,7 +11,13 @@
  * by whichever colleague is free — walking to a particular desk would draw a hand-over to
  * somebody who may never touch it.
  */
-export type WalkTarget = { role: string } | { place: "approval" } | { door: string } | { life: LifeKind; peer?: string; slot?: number };
+export type WalkTarget =
+  | { role: string }
+  | { place: "approval" }
+  | { door: string }
+  | { life: LifeKind; peer?: string; slot?: number }
+  /** A chair at the meeting table while the weekly meeting runs (D-260): 0 is the chair's. */
+  | { meeting: number };
 
 /**
  * An idle moment (D-136): what somebody with no work does between tasks — a coffee in the pantry,
@@ -44,5 +50,8 @@ export const sameTarget = (a: WalkTarget, b: WalkTarget): boolean => {
   if ("role" in a) return "role" in b && a.role === b.role;
   if ("door" in a) return "door" in b && a.door === b.door;
   if ("life" in a) return "life" in b && a.life === b.life && a.peer === b.peer;
-  return "place" in b && a.place === b.place;
+  if ("meeting" in a) return "meeting" in b && a.meeting === b.meeting;
+  return "place" in b && "place" in a && a.place === b.place;
 };
+
+export const isMeetingWalk = (cue: WalkCue | undefined): boolean => Boolean(cue && "meeting" in cue.target);

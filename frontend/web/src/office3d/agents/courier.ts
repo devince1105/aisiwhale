@@ -32,10 +32,13 @@ export function along(path: readonly Vec2[], distance: number): { position: Vec2
   return { position: path[0], heading: 0 };
 }
 
-export function courierState(route: Route, elapsedMs: number): CourierState {
+/** ``releasedAfterMs``: when the stay was cut short (D-260, ``CueQueue.release``), from the start. */
+export function courierState(route: Route, elapsedMs: number, releasedAfterMs?: number): CourierState {
   const oneWayMs = (route.length / WALK_SPEED) * 1000;
   const end = route.path[route.path.length - 1];
-  const dwell = route.dwellMs;
+  const dwell =
+    releasedAfterMs === undefined ? route.dwellMs : Math.max(0, Math.min(route.dwellMs, releasedAfterMs - oneWayMs));
+  const durationMs = releasedAfterMs === undefined ? route.durationMs : oneWayMs * 2 + dwell;
   if (elapsedMs < oneWayMs) {
     const { position, heading } = along(route.path, (elapsedMs / 1000) * WALK_SPEED);
     return { phase: "going", position, heading, carrying: route.carrying };
@@ -44,7 +47,7 @@ export function courierState(route: Route, elapsedMs: number): CourierState {
     return { phase: "handover", position: end, heading: headingOf(end, route.lookAt), carrying: route.carrying && elapsedMs < oneWayMs + dwell / 2 };
   }
   // the walk ends when the queue ends it (route.durationMs), so both agree to the millisecond
-  if (route.returnAfter && elapsedMs < route.durationMs) {
+  if (route.returnAfter && elapsedMs < durationMs) {
     const back = [...route.path].reverse();
     const { position, heading } = along(back, ((elapsedMs - oneWayMs - dwell) / 1000) * WALK_SPEED);
     return { phase: "returning", position, heading, carrying: false };

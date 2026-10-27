@@ -35,6 +35,15 @@ export interface AvatarModel {
   animations: AnimationClip[];
 }
 
+/** Whether the company has her on a run right now (thinking, working, reviewing). */
+function isBusy(agentId: string): boolean {
+  const state = realtimeStore.getState();
+  const activity = state.company?.agents[agentId]?.activity;
+  if (!activity) return false;
+  const now = effectiveState(activity, serverNow(state));
+  return now === "THINKING" || now === "WORKING" || now === "REVIEWING";
+}
+
 export function placeFor(seat: Seat, pose: Pose, forward = 0): [number, number, number] {
   // standing up is a step back from the desk: toward +z, or -z at a turned desk (D-119); sitting,
   // ``forward`` nearer the desk (an own figure, D-201)
@@ -115,11 +124,14 @@ export function AgentAvatar({
     if (active && (walk.current?.seq !== active.cue.seq || walk.current.startedAt !== active.startedAt)) {
       walk.current = { seq: active.cue.seq, startedAt: active.startedAt, route: routeFor(active.cue, latestRoster.current) };
     }
-    const step = active && walk.current?.route ? courierState(walk.current.route, now - active.startedAt) : null;
+    const released = active?.releasedAt === undefined ? undefined : active.releasedAt - active.startedAt;
+    const step = active && walk.current?.route ? courierState(walk.current.route, now - active.startedAt, released) : null;
     if (step && step.phase !== "done") {
-      // at the far end: standing (a hand-over, a coffee), or sitting down (a lounge seat, D-136)
+      // at the far end: standing (a hand-over, a coffee), or sitting down (a lounge seat, D-136;
+      // the meeting table, D-260 — where whoever is speaking, a run of hers, thinks it over)
       const seated = step.phase === "handover" && walk.current?.route?.sitting === true;
-      controller.setPose(seated ? "sit_idle" : step.phase === "handover" ? "stand" : "walk");
+      const speaking = seated && walk.current?.route?.meeting === true && isBusy(agentId);
+      controller.setPose(speaking ? "sit_think" : seated ? "sit_idle" : step.phase === "handover" ? "stand" : "walk");
       g?.position.set(step.position[0], seated ? SEAT_LIFT : 0, step.position[1]);
       // stepped out of the office (D-136): out of sight until the walk back begins
       if (g) g.visible = !(step.phase === "handover" && walk.current?.route?.outside === true);

@@ -33,6 +33,9 @@ import { useRoster, type Member } from "./roster";
 
 const SEATS = allSeats();
 const APPROVAL = "approval";
+/** At the weekly meeting's table (D-260): her tag over her desk says where she is. */
+const MEETING_ICON = "🗣️";
+const MEETING_BADGE = { text: "開會中", tone: "info" } as const;
 
 function instanced(geometry: ConstructorParameters<typeof InstancedMesh>[0], material: MeshBasicMaterial, placements: { pos: readonly number[]; rot?: [number, number, number] }[]) {
   const mesh = new InstancedMesh(geometry, material, placements.length);
@@ -157,17 +160,21 @@ function HeadTag({ member, seat }: { member: Member; seat: Seat }) {
   const badge = useRef<HTMLSpanElement>(null);
   const doing = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLSpanElement>(null);
-  const seen = useRef<{ version: number; el: HTMLElement | null }>({ version: -1, el: null });
+  const seen = useRef<{ version: number; el: HTMLElement | null; meeting: boolean }>({ version: -1, el: null, meeting: false });
   useFrame(() => {
-    // an idle moment's icon (D-136): what she is up to, beside a tag that still says 閒置
-    const target = cues?.queue.walk(member.id)?.cue.target;
-    const icon = target && "life" in target ? LIFE_ICON[target.life] : "";
+    // an idle moment's icon (D-136): what she is up to, beside a tag that still says 閒置; at the
+    // weekly meeting's table (D-260), the tag says so until she has walked back
+    const walk = cues?.queue.walk(member.id);
+    const target = walk?.cue.target;
+    const meeting = Boolean(target && "meeting" in target && walk?.releasedAt === undefined);
+    const icon = meeting ? MEETING_ICON : target && "life" in target ? LIFE_ICON[target.life] : "";
     if (doing.current && doing.current.textContent !== icon) doing.current.textContent = icon;
     const el = badge.current;
     // write when the state moved, or when <Html> rebuilt its DOM (a fresh, empty tag)
-    if (!el || (tracker.version === seen.current.version && el === seen.current.el)) return;
-    seen.current = { version: tracker.version, el };
-    applyTag({ badge: el, bubble: bubble.current }, tracker.get(member.id));
+    if (!el || (tracker.version === seen.current.version && el === seen.current.el && meeting === seen.current.meeting)) return;
+    seen.current = { version: tracker.version, el, meeting };
+    const visual = tracker.get(member.id);
+    applyTag({ badge: el, bubble: bubble.current }, meeting && visual ? { ...visual, badge: MEETING_BADGE } : visual);
   });
   return (
     <Html position={[seat.chair[0], TAG_Y, seat.chair[1]]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>

@@ -616,6 +616,57 @@ export function loungeSeat(slot = 0): { target: WalkTarget; lookAt: Vec2 } {
 }
 export const LOUNGE_SEATS = 5;
 
+/** The meeting table's middle, where everybody at it looks (furniture ``meeting_set``, D-239: the
+ * set is centred on [-0.55, -5.9] with the chair's at one end, so the table itself is a little
+ * east of that). */
+export const MEETING_TABLE_AT: Vec2 = [-0.275, -5.9];
+/** Where its chairs are on the floor (D-260): the set is built along its own x and turned half
+ * round (furniture.ts ``meetingSet``), so its side chairs stand at these x in two rows, the north
+ * row by the back wall and the south row by the glass, and the chair's at the north-west corner by
+ * the whiteboard. */
+const MEETING_ROWS = { north: -6.95, south: -4.85 } as const;
+const MEETING_CHAIR: Vec2 = [-3.025, MEETING_ROWS.north];
+/** The side chairs sat in, nearest the chair's first, the rows taking turns. The north row's chair
+ * beside the chair's (x -2.15) is left empty: 0.875 m from it, two seated figures would sit in each
+ * other (at AVATAR_SCALE one is about 1.3 m across, D-240). */
+const MEETING_SIDE: readonly Vec2[] = [
+  [-2.15, MEETING_ROWS.south],
+  [-0.9, MEETING_ROWS.north],
+  [-0.9, MEETING_ROWS.south],
+  [0.35, MEETING_ROWS.north],
+  [0.35, MEETING_ROWS.south],
+  [1.6, MEETING_ROWS.north],
+  [1.6, MEETING_ROWS.south],
+];
+/** The chair's and seven side chairs: the CEO and the newsroom's seven. */
+export const MEETING_SEATS = 1 + MEETING_SIDE.length;
+/** Walked inside the meeting room. Through the door, either down past the table's open east end
+ * (clear of the plant in the corner) to behind the north row, by the back wall; or round the end of
+ * the open door's leaf, which stands into the room along its hinge side, to behind the south row,
+ * by the glass, between the leaf and the row's last chair. */
+const MEETING_WAY = { door: BACK_ROOMS_Z - 0.5, east: 2.7, north: -7.5, south: -4.1, leafEnd: -4.75, gap: 2.05 } as const;
+
+/**
+ * A chair at the meeting table while the weekly meeting runs (D-260): 0 is the chair's, the CEO's;
+ * then the side chairs, nearest the chair's first. Sat in, facing the table.
+ */
+export function meetingSeat(slot = 0): { target: WalkTarget; lookAt: Vec2 } {
+  const door: Vec2 = [MEETING_ROOM.doorX, MEETING_WAY.door];
+  const seat = slot % MEETING_SEATS === 0 ? MEETING_CHAIR : MEETING_SIDE[(slot % MEETING_SEATS) - 1];
+  const via: Vec2[] =
+    seat[1] === MEETING_ROWS.north
+      ? [door, [MEETING_WAY.east, MEETING_WAY.door], [MEETING_WAY.east, MEETING_WAY.north], [seat[0], MEETING_WAY.north]]
+      : [
+          door,
+          [MEETING_ROOM.doorX, MEETING_WAY.leafEnd],
+          [MEETING_WAY.gap, MEETING_WAY.leafEnd],
+          [MEETING_WAY.gap, MEETING_WAY.south],
+          [seat[0], MEETING_WAY.south],
+        ];
+  const lookAt: Vec2 = seat === MEETING_CHAIR ? MEETING_TABLE_AT : [seat[0], MEETING_TABLE_AT[1]];
+  return { target: { spot: seat, lane: "back", via, sit: true }, lookAt };
+}
+
 /** Out of the office (D-136): along the front walkway and through the entrance, to the building's
  * corridor outside — the restrooms are the building's, by the lifts, as in most office towers. */
 export function outsideSpot(): { target: WalkTarget; lookAt: Vec2 } {

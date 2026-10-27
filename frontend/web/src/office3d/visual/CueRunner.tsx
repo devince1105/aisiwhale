@@ -13,6 +13,7 @@ import {
   APPROVAL_DESK,
   doorOf,
   loungeSeat,
+  meetingSeat,
   outsideSpot,
   pantrySpot,
   seatsForRole,
@@ -25,6 +26,7 @@ import type { WalkCue } from "./cues";
 import { cuesFor, CueQueue } from "./director";
 import { LifeDirector } from "./life";
 import { ROLE_LABEL } from "./mapping";
+import { MeetingDirector, meetingNow } from "./meeting";
 import { officeLog } from "./officeLog";
 
 /** Walking speed (m/s) and how long the courier stays at the other desk. */
@@ -117,6 +119,8 @@ export interface Route {
   carrying: boolean;
   /** Whether it sits down at the far end (a lounge seat, D-136) rather than standing. */
   sitting?: boolean;
+  /** Whether the far end is a chair at the weekly meeting (D-260). */
+  meeting?: boolean;
   /** Whether the far end is out of the office (D-136): gone from view while there. */
   outside?: boolean;
 }
@@ -146,6 +150,14 @@ export function routeFor(cue: WalkCue, roster: Pick<Roster, "members" | "seats">
   if (!from) return null;
   const dwellMs = cue.dwellMs ?? HANDOVER_MS;
   const carrying = cue.carry === "document";
+  if ("meeting" in cue.target) {
+    // a chair at the meeting table (D-260): sat in until the meeting releases it
+    const seat = meetingSeat(cue.target.meeting);
+    const path = walkPath(from, seat.target);
+    const length = pathLength(path);
+    const walking = (length / WALK_SPEED) * 1000 * 2;
+    return { path, length, durationMs: Math.round(walking + dwellMs), lookAt: seat.lookAt, returnAfter: true, dwellMs, carrying, sitting: true, meeting: true };
+  }
   if ("life" in cue.target) {
     const life = lifeRoute(cue, from, roster);
     if (!life) return null;
@@ -209,6 +221,7 @@ function Runner({ director }: { director: CueDirector }) {
   latest.current = roster;
   const probe = useRef("");
   const life = useMemo(() => new LifeDirector(), []);
+  const meeting = useMemo(() => new MeetingDirector(), []);
   const lastLife = useRef(0);
   useFrame(() => {
     const now = performance.now();
@@ -219,6 +232,18 @@ function Runner({ director }: { director: CueDirector }) {
       const agents = state.company?.agents ?? {};
       const at = serverNow(state);
       const members = latest.current.members.filter((m) => latest.current.seats.has(m.id));
+      // the weekly meeting first (D-260): its people are at the table, not up for a coffee
+      const meet = meeting.tick(meetingNow(state.company?.tasks ?? {}, agents, at), members, {
+        walk: (id) => director.queue.walk(id),
+        seated: (id) => latest.current.seats.has(id),
+      });
+      if (meet.cues.length) director.queue.apply(meet.cues, now);
+      for (const id of meet.release) {
+        const active = director.queue.walk(id);
+        const route = active ? routeFor(active.cue, latest.current) : null;
+        if (route) director.queue.release(id, now, (route.length / WALK_SPEED) * 1000);
+      }
+      for (const e of meet.events) officeLog.getState().add({ at: Date.now(), agentId: e.agentId, text: e.text, kind: "work" });
       const walkingNow = (id: string) => Boolean(director.queue.walk(id)) || director.queue.queued(id).length > 0;
       const away = members.filter((m) => {
         const target = director.queue.walk(m.id)?.cue.target;

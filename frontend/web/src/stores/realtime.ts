@@ -22,7 +22,7 @@ import { RealtimeSnapshot } from "@/realtime/snapshot";
 // state types and the projection's one time-based rule.
 export { effectiveState } from "@/realtime/reducer";
 export type { AgentState, LiveProgress, RealtimeState } from "@/realtime/reducer";
-export { ACTIVITY_STATES, type ActivityState, type ActivityView } from "@/realtime/snapshot";
+export { ACTIVITY_STATES, type ActivityState, type ActivityView, type TaskView } from "@/realtime/snapshot";
 
 /**
  * idle: not started; connecting: loading the snapshot or replaying the backlog; live: up to

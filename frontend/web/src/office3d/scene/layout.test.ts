@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { MEETING_TABLE } from "./furniture";
 import {
   allSeats,
   APPROVAL_DESK,
@@ -7,7 +8,12 @@ import {
   DESK,
   DIVIDER_X,
   APPROVAL_FOOTPRINT,
+  BACK_ROOMS_Z,
   CEO_OFFICE,
+  MEETING_ROOM,
+  MEETING_SEATS,
+  MEETING_TABLE_AT,
+  meetingSeat,
   CORRIDORS,
   doorOf,
   DECOR,
@@ -200,6 +206,56 @@ describe("courier paths", () => {
       }
     }
     expect([...new Set(problems)].slice(0, 10)).toEqual([]);
+  });
+
+  it("to every chair at the meeting table (D-260): through its door, around everything, never across the table", () => {
+    const problems: string[] = [];
+    const chairs = Array.from({ length: MEETING_SEATS }, (_, slot) => ({ slot, ...meetingSeat(slot) }));
+    // the set's footprint is one rectangle round its table and chairs, and walking among the chairs
+    // is how a chair is reached: inside the room it is checked against the table itself instead
+    const table: Rect = {
+      name: "meeting table",
+      minX: MEETING_TABLE_AT[0] - MEETING_TABLE.length / 2,
+      maxX: MEETING_TABLE_AT[0] + MEETING_TABLE.length / 2,
+      minZ: MEETING_TABLE_AT[1] - MEETING_TABLE.width / 2,
+      maxZ: MEETING_TABLE_AT[1] + MEETING_TABLE.width / 2,
+    };
+    for (const from of seats) {
+      for (const chair of chairs) {
+        const path = walkPath(from, chair.target);
+        for (const { point, segment } of samples(path)) {
+          if (!inRoom(point)) problems.push(`${from.key} -> chair ${chair.slot} leaves the room at ${point}`);
+          for (const rect of [...rects, table]) {
+            if (segment === 0 && rect.name === `chair ${from.key}`) continue;
+            if (rect.name.startsWith("meeting_set")) continue;
+            if (inside(point, rect, WALKER)) problems.push(`${from.key} -> chair ${chair.slot} hits ${rect.name} at ${point}`);
+          }
+        }
+        // the door is the way in: the path crosses the glass front only there
+        const crossing = path.find((p, i) => i > 0 && path[i - 1][1] > BACK_ROOMS_Z && p[1] < BACK_ROOMS_Z);
+        expect(crossing?.[0], `${from.key} -> chair ${chair.slot}`).toBe(MEETING_ROOM.doorX);
+      }
+    }
+    expect([...new Set(problems)].slice(0, 10)).toEqual([]);
+  });
+
+  it("the meeting table's chairs (D-260): eight, apart, in the meeting room, each facing the table", () => {
+    const spots = Array.from({ length: MEETING_SEATS }, (_, slot) => {
+      const { target, lookAt } = meetingSeat(slot);
+      if (typeof target !== "object" || !("spot" in target)) throw new Error("a meeting chair is a spot");
+      return { spot: target.spot, lookAt, sit: target.sit };
+    });
+    expect(spots).toHaveLength(8);
+    for (const [i, a] of spots.entries()) {
+      expect(a.sit).toBe(true);
+      expect(inside(a.spot, { name: "meeting room", ...MEETING_ROOM })).toBe(true);
+      // facing the table: the far side of the table's middle line from the chair
+      expect(Math.sign(a.lookAt[1] - a.spot[1])).toBe(Math.sign(MEETING_TABLE_AT[1] - a.spot[1]));
+      for (const b of spots.slice(i + 1)) expect(Math.hypot(a.spot[0] - b.spot[0], a.spot[1] - b.spot[1])).toBeGreaterThanOrEqual(1.2);
+    }
+    // the chair's is the one at the end by the whiteboard
+    expect(spots[0].spot[0]).toBeLessThan(Math.min(...spots.slice(1).map((s) => s.spot[0])));
+    expect(meetingSeat(MEETING_SEATS)).toEqual(meetingSeat(0));
   });
 
   it("out of the office through the entrance (D-136): along the front walkway, around everything", () => {

@@ -1,7 +1,9 @@
 // The animation director (T-407, 04 §4): events -> cues (a pure function), and the per-agent cue
 // queue with the rules that keep an event flood from turning into animation noise:
 //   - a walk to a target already queued (or being walked) is not added again;
-//   - a new run for an agent aborts its walks at once (it snaps back to its desk: state wins);
+//   - a new run for an agent aborts its walks at once (it snaps back to its desk: state wins) —
+//     except a seat at the weekly meeting (D-260): speaking there is a run, and the meeting is
+//     the state; it is ended by ``release``, and the walk back is walked;
 //   - events older than CUE_TTL_MS make no cue (a reconnect replaying history only updates state);
 //   - at most MAX_WALKS_QUEUED walks wait per agent.
 // Poses are not cues: the mapping derives them from state.
@@ -9,7 +11,7 @@ import type { EventEnvelope } from "@autora/event-schema";
 
 import type { AgentState } from "@/stores/realtime";
 
-import { sameTarget, type EffectCue, type VisualCue, type WalkCue } from "./cues";
+import { isMeetingWalk, sameTarget, type EffectCue, type VisualCue, type WalkCue } from "./cues";
 
 export const CUE_TTL_MS = 10_000;
 export const MAX_WALKS_QUEUED = 4;
@@ -87,6 +89,8 @@ export interface ActiveWalk {
   cue: WalkCue;
   startedAt: number;
   durationMs: number;
+  /** When its stay at the far end was cut short (``release``): the walk back starts then. */
+  releasedAt?: number;
 }
 
 export interface ActiveEffect {
@@ -107,7 +111,7 @@ export class CueQueue {
     for (const cue of cues) {
       if (cue.kind === "abort_walks") {
         this.waiting.delete(cue.agentId);
-        this.walking.delete(cue.agentId);
+        if (!isMeetingWalk(this.walking.get(cue.agentId)?.cue)) this.walking.delete(cue.agentId);
       } else if (cue.kind === "walk") {
         const queue = this.waiting.get(cue.agentId) ?? [];
         const current = this.walking.get(cue.agentId)?.cue;
@@ -137,6 +141,19 @@ export class CueQueue {
       }
       if (!queue.length) this.waiting.delete(agentId);
     }
+  }
+
+  /**
+   * End a stay at the far end now (D-260: the meeting is over): the walk back starts at once, or
+   * as soon as the walker gets there. ``oneWayMs`` is the walk's one-way time. False when there
+   * is nothing to release.
+   */
+  release(agentId: string, now: number, oneWayMs: number): boolean {
+    const walk = this.walking.get(agentId);
+    if (!walk || walk.releasedAt !== undefined) return false;
+    walk.releasedAt = now;
+    walk.durationMs = Math.round(Math.max(now - walk.startedAt, oneWayMs) + oneWayMs);
+    return true;
   }
 
   walk(agentId: string): ActiveWalk | undefined {
