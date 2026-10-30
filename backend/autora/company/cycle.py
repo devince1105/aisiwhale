@@ -12,6 +12,15 @@ anyway and what was still unfinished is recorded in ``CYCLE_STAGE_TIMEOUT`` (gat
 is also left early, before its deadline, once its work is done — EXECUTING ends when the last
 workflow the plan started is finished.
 
+**A deadline nobody was there to meet is not missed** (D-262). The worker only ticks while it is at
+work, so a cycle opened just before the shift ended has its PLANNING deadline pass overnight; at
+the next clock-in the first tick would find the stage overdue and move on a second before the
+CEO, whose task nobody had claimed, was even asked — and the day's plan was the fallback while the
+CEO's real one, made seconds later, was thrown away. So a stage whose work has *not begun*, and
+whose deadline lapsed long before any tick saw it, gets its time again, once: the next lapse ends
+the stage as before. A stage whose work began, or one that lapses under a worker that was ticking,
+is not given any.
+
 **It cannot be pushed.** Advancing is not triggered by an event a handler could emit at will:
 the runner is polled (by the worker's maintenance loop and by the daily schedule), reads the
 state of the world, and decides. There is no event dispatcher in the runtime yet, so this is
@@ -40,6 +49,7 @@ from autora.db.models import (
     CompanyStatus,
     Cycle,
     CycleStage,
+    EventRecord,
     Schedule,
     Task,
     WorkflowRun,
@@ -98,6 +108,10 @@ CYCLE_START_CRON = "0 6 * * *"
 """06:00 in the company's timezone (platform/02 §2). A company may run it at another hour by
 editing its schedule row; the runner does not care when it is called."""
 
+UNSEEN_LAPSE = timedelta(minutes=5)
+"""How late a tick may find a deadline already gone before it counts as one nobody was there to
+see. The worker ticks every 15 seconds while at work, so a lapse this old happened off duty."""
+
 Clock = Callable[[], datetime]
 StageHook = Callable[[AsyncSession, Cycle], Awaitable[None]]
 """Runs when a stage is entered, inside the advancing transaction. Raising leaves the cycle in
@@ -109,6 +123,11 @@ A stage with no check registered is finished the moment it is entered, because e
 had to do ran in its ``on_enter`` hooks, inside that transaction. A stage whose work is a task
 some agent has to pick up (PLANNING waiting for the CEO, EXECUTING waiting for the day's
 workflows) registers a check and is held there until every check passes or the deadline does."""
+StageBegun = StageCheck
+"""Has anyone picked this stage's work up? False means it is still waiting for its first worker.
+
+Only for a stage whose work is one agent's task that nobody may have been at work to claim yet
+(PLANNING and REVIEWING wait for the CEO). A stage with none registered counts as begun."""
 
 
 class CycleError(Exception):
@@ -162,6 +181,7 @@ class CycleRunner:
     clock: Clock = field(default=lambda: datetime.now(UTC))
     on_enter: dict[CycleStage, list[StageHook]] = field(default_factory=dict)
     is_done: dict[CycleStage, list[StageCheck]] = field(default_factory=dict)
+    has_begun: dict[CycleStage, list[StageBegun]] = field(default_factory=dict)
 
     @property
     def actor(self) -> Actor:
@@ -180,6 +200,11 @@ class CycleRunner:
         answer end a stage another was still working in.
         """
         self.is_done.setdefault(stage, []).append(check)
+
+    def begins_when(self, stage: CycleStage, check: StageBegun) -> None:
+        """Say how to tell that ``stage``'s work was picked up. While any check says it was not,
+        a deadline that lapsed unseen is given back (once) instead of ending the stage."""
+        self.has_begun.setdefault(stage, []).append(check)
 
     # --- starting ---------------------------------------------------------------------------
 
@@ -252,6 +277,8 @@ class CycleRunner:
         moved = False
         while cycle.stage != S.DONE:
             overdue = await self._overdue(session, cycle)
+            if overdue and await self._give_the_time_back(session, cycle):
+                break
             if not overdue and not await self._finished(session, cycle):
                 break
             await self._advance(session, cycle, timed_out=overdue)
@@ -303,6 +330,55 @@ class CycleRunner:
                 ),
             )
         await self._enter(session, cycle)
+
+    async def _give_the_time_back(self, session: AsyncSession, cycle: Cycle) -> bool:
+        """The deadline lapsed while nobody was at work and the stage's work never began: start
+        the stage's clock again. True when it did (the stage is not left this tick).
+
+        Both halves matter. Not begun alone would hold a cycle for good behind a CEO who is
+        paused; the lapse alone would give more time to work that has had its chance. And it is
+        once a stage, however it lapses: the log says whether it was already given, so a clock
+        that jumps (a long stall, a test) cannot hold a cycle in a stage by lapsing again."""
+        stage = CycleStage(cycle.stage)
+        was_due = cycle.stage_deadline
+        now = self.clock()
+        if was_due is None or now - was_due <= UNSEEN_LAPSE:
+            return False
+        for check in self.has_begun.get(stage, ()):
+            if not await check(session, cycle):
+                break
+        else:
+            return False
+        already = await session.scalar(
+            select(func.count())
+            .select_from(EventRecord)
+            .where(
+                EventRecord.cycle_id == cycle.id,
+                EventRecord.event_type == "CYCLE_STAGE_EXTENDED",
+                EventRecord.payload["stage"].as_string() == stage.value,
+            )
+        )
+        if already:
+            return False
+        minutes = (await self._stage_minutes(session, cycle.company_id))[stage]
+        cycle.stage_deadline = now + timedelta(minutes=minutes)
+        await emit(
+            session,
+            new_event(
+                company_events.CycleStageExtended(
+                    stage=stage,
+                    was_due=was_due,
+                    deadline=cycle.stage_deadline,
+                    reason="the deadline passed while nobody was at work; the work had not begun",
+                ),
+                company_id=cycle.company_id,
+                actor=self.actor,
+                aggregate_type="cycle",
+                aggregate_id=cycle.id,
+                cycle_id=cycle.id,
+            ),
+        )
+        return True
 
     async def _record_timeout(self, session: AsyncSession, cycle: Cycle, stage: CycleStage) -> None:
         """Say what was left behind. The tasks are not cancelled: work already running keeps

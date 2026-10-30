@@ -110,6 +110,33 @@ async def test_the_ceo_s_plan_is_recorded_on_the_cycle(db_session):
     assert cycle.plan["goals"][0]["metric"] == "published"
 
 
+async def test_a_plan_the_ceo_makes_after_a_night_off_duty_is_the_day_s_plan(db_session):
+    """Cycle 38 (D-262): opened after the shift ended, planning due while nobody was at work. At
+    clock-in the tick used to find the stage overdue a second before the CEO was asked, so the
+    fallback was kept and her real plan, made 18 seconds later, was thrown away."""
+    company, unit, project = await _company(db_session)
+    now = [START]
+    cycles = CycleRunner(clock=lambda: now[0])
+    cycles.finishes_when(CycleStage.EXECUTING, work_is_finished)
+    Executive(build_runtime().workflows).install(cycles)
+    cycle = await cycles.start(db_session, company.id)
+    now[0] += timedelta(hours=18)
+
+    assert await cycles.tick(db_session, company.id) is None  # her task has not been claimed
+    assert cycle.stage == CycleStage.PLANNING and cycle.plan is None
+
+    task = await _plan_task(db_session, cycle)
+    task.attempt = 1  # the worker claims it now...
+    await _answer(
+        db_session, cycle, "SUCCEEDED",
+        {"goals": [{"metric": "published", "target": 3}], "rationale": "because"},
+    )  # fmt: skip
+    await cycles.tick(db_session, company.id)  # ...and she answers
+
+    assert cycle.plan["by"] == "ceo"
+    assert cycle.plan["goals"][0]["metric"] == "published"
+
+
 async def test_a_failed_plan_falls_back_to_what_the_company_was_doing(db_session):
     """A day nobody planned is a day to hold position, not to improvise."""
     company, unit, project = await _company(db_session)

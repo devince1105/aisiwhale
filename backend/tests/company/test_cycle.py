@@ -321,6 +321,132 @@ def _plans_one_workflow(runner: CycleRunner, project: Project) -> _Started:
     return started
 
 
+# --- a deadline nobody was there to meet (D-262) --------------------------------------------
+
+
+class _Waiting:
+    """The CEO's task as the runner sees it: whether anyone picked it up, and whether it ended."""
+
+    def __init__(self, runner: CycleRunner):
+        self.begun = False
+        self.done = False
+
+        async def has_begun(session, cycle) -> bool:
+            return self.begun
+
+        async def is_done(session, cycle) -> bool:
+            return self.done
+
+        runner.begins_when(S.PLANNING, has_begun)
+        runner.finishes_when(S.PLANNING, is_done)
+
+
+async def test_a_deadline_that_passed_off_duty_is_given_back_when_the_work_had_not_begun(
+    db_session,
+):
+    """Cycle 38: opened at 21:09, planning due at 22:09, the worker back at 15:00 the next day. The
+    CEO's task had never been claimed, so the stage gets its hour again instead of falling back."""
+    company = await unique_company(db_session, "cycle")
+    clock = FakeClock()
+    runner = await _runner(clock)
+    ceo = _Waiting(runner)
+    cycle = await runner.start(db_session, company.id)
+
+    clock.advance(hours=18)
+
+    assert await runner.tick(db_session, company.id) is None
+    assert cycle.stage == S.PLANNING
+    assert cycle.stage_deadline == clock.now + timedelta(minutes=DEFAULT_STAGE_MINUTES[S.PLANNING])
+    events = await _events(db_session, company.id)
+    assert "CYCLE_STAGE_EXTENDED" in events and "CYCLE_STAGE_TIMEOUT" not in events
+    extended = await db_session.scalar(
+        select(EventRecord).where(
+            EventRecord.company_id == company.id, EventRecord.event_type == "CYCLE_STAGE_EXTENDED"
+        )
+    )
+    assert extended.payload["stage"] == "PLANNING"
+
+    ceo.begun = ceo.done = True  # the CEO is asked a second later and answers
+    moved = await runner.tick(db_session, company.id)
+
+    assert moved is not None and moved.stage == S.DONE
+    assert "CYCLE_STAGE_TIMEOUT" not in await _events(db_session, company.id)
+
+
+async def test_the_time_is_given_back_once_and_the_next_lapse_ends_the_stage(db_session):
+    company = await unique_company(db_session, "cycle")
+    clock = FakeClock()
+    runner = await _runner(clock)
+    _Waiting(runner)  # the CEO is never asked: paused, or gone
+    cycle = await runner.start(db_session, company.id)
+    clock.advance(hours=18)
+    await runner.tick(db_session, company.id)
+    assert cycle.stage == S.PLANNING
+
+    clock.advance(minutes=DEFAULT_STAGE_MINUTES[S.PLANNING], seconds=15)  # a ticking worker
+    moved = await runner.tick(db_session, company.id)
+
+    assert moved is not None and moved.stage == S.DONE  # the cycle cannot hang on her
+    events = await _events(db_session, company.id)
+    assert events.count("CYCLE_STAGE_EXTENDED") == 1
+    assert "CYCLE_STAGE_TIMEOUT" in events
+
+
+async def test_a_clock_that_keeps_jumping_cannot_hold_a_stage_open(db_session):
+    """Once a stage, not once a night: a worker stalled for hours twice, or a test that moves the
+    clock in big steps, lapses the second deadline unseen too — and the stage still ends."""
+    company = await unique_company(db_session, "cycle")
+    clock = FakeClock()
+    runner = await _runner(clock)
+    _Waiting(runner)
+    cycle = await runner.start(db_session, company.id)
+    clock.advance(hours=18)
+    await runner.tick(db_session, company.id)
+    assert cycle.stage == S.PLANNING
+
+    clock.advance(hours=18)  # unseen again
+    moved = await runner.tick(db_session, company.id)
+
+    assert moved is not None and moved.stage == S.DONE
+    events = await _events(db_session, company.id)
+    assert events.count("CYCLE_STAGE_EXTENDED") == 1
+    assert "CYCLE_STAGE_TIMEOUT" in events
+
+
+async def test_a_stage_whose_work_began_is_not_given_time_back(db_session):
+    company = await unique_company(db_session, "cycle")
+    clock = FakeClock()
+    runner = await _runner(clock)
+    ceo = _Waiting(runner)
+    cycle = await runner.start(db_session, company.id)
+    ceo.begun = True  # claimed, then the worker went home with the answer still to come
+
+    clock.advance(hours=18)
+    moved = await runner.tick(db_session, company.id)
+
+    assert moved is not None and moved.stage == S.DONE
+    events = await _events(db_session, company.id)
+    assert "CYCLE_STAGE_TIMEOUT" in events and "CYCLE_STAGE_EXTENDED" not in events
+    assert cycle.stage == S.DONE
+
+
+async def test_a_lapse_a_ticking_worker_sees_ends_the_stage_even_if_the_work_never_began(
+    db_session,
+):
+    company = await unique_company(db_session, "cycle")
+    clock = FakeClock()
+    runner = await _runner(clock)
+    _Waiting(runner)
+    await runner.start(db_session, company.id)
+
+    clock.advance(minutes=DEFAULT_STAGE_MINUTES[S.PLANNING], seconds=15)
+    moved = await runner.tick(db_session, company.id)
+
+    assert moved is not None and moved.stage == S.DONE
+    events = await _events(db_session, company.id)
+    assert "CYCLE_STAGE_TIMEOUT" in events and "CYCLE_STAGE_EXTENDED" not in events
+
+
 # --- the worker's job -------------------------------------------------------------------
 
 

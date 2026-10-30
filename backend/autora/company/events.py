@@ -163,6 +163,17 @@ class CycleStageTimeout(EventPayload):
     cancelled_task_ids: list[uuid.UUID] = []
 
 
+@event("CYCLE_STAGE_EXTENDED")
+class CycleStageExtended(EventPayload):
+    """A deadline that passed while nobody was at work, given back (D-262): the stage's work had
+    not begun, so running out of time was not the work's fault."""
+
+    stage: CycleStage
+    was_due: datetime
+    deadline: datetime
+    reason: str
+
+
 @event("CYCLE_PLAN_FALLBACK")
 class CyclePlanFallback(EventPayload):
     reason: str

@@ -8,7 +8,7 @@ Envelope（含 `seq`、關聯鍵、actor、schema_version）以 `3d-office/03_EV
 |---|---|---|---|---|
 | Company | COMPANY_CREATED, GOAL_CREATED, GOAL_UPDATED, POLICY_UPDATED, STRATEGY_UPDATED | 是 | 審計 | Command |
 | Meeting（D-260） | MEETING_ITEM_PROPOSED, MEETING_HELD | 是 | 週會議程與紀錄、團隊群組 | Command（執行長提案）／週會的套用步驟 |
-| Cycle | CYCLE_STARTED, CYCLE_STAGE_CHANGED, CYCLE_STAGE_TIMEOUT, CYCLE_PLAN_FALLBACK, CYCLE_REVIEWED, CYCLE_COMPLETED | 是 | cycle 時間線 | Cycle runner |
+| Cycle | CYCLE_STARTED, CYCLE_STAGE_CHANGED, CYCLE_STAGE_TIMEOUT, CYCLE_STAGE_EXTENDED, CYCLE_PLAN_FALLBACK, CYCLE_REVIEWED, CYCLE_COMPLETED | 是 | cycle 時間線 | Cycle runner |
 | Project | PROJECT_PROPOSED, APPROVED, REJECTED, PAUSED, RESUMED, KILL_PROPOSED, KILLED, COMPLETED | 是 | 審計 | Command / Governance |
 | Finance | BUDGET_ALLOCATED, BUDGET_EXHAUSTED, EXPENSE_RECORDED, REVENUE_RECORDED | 是 | 財務投影 | Ledger |
 | Revenue（T-701、D-024） | CUSTOMER_ACQUIRED, CUSTOMER_CHURNED, CUSTOMER_RETURNED, MEMBERSHIP_GRANTED, MEMBERSHIP_EXPIRED, PAYMENT_RECEIVED | 是 | 營收投影、客戶價值 | `company/customers`、`company/memberships`（由金流的付款通知呼叫；到期由每日 cycle 處理） |

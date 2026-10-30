@@ -36,7 +36,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from autora.company import events as company_events
@@ -141,6 +141,21 @@ class Executive:
 
         return done
 
+    def planning_has_begun(self):
+        """Whether the CEO has picked the plan up (D-262). Not while her task still waits for the
+        worker's first shift: a deadline that passed meanwhile is given back, not the day's plan."""
+
+        async def begun(session: AsyncSession, cycle: Cycle) -> bool:
+            return await self._begun(session, cycle, PLAN_TEMPLATE)
+
+        return begun
+
+    def reviewing_has_begun(self):
+        async def begun(session: AsyncSession, cycle: Cycle) -> bool:
+            return await self._begun(session, cycle, REVIEW_TEMPLATE)
+
+        return begun
+
     def install(self, cycles) -> None:
         """Wire both stages.
 
@@ -154,6 +169,8 @@ class Executive:
         cycles.when_entering(CycleStage.DONE, self.settle_review_hook())
         cycles.finishes_when(CycleStage.PLANNING, self.planning_is_done())
         cycles.finishes_when(CycleStage.REVIEWING, self.reviewing_is_done())
+        cycles.begins_when(CycleStage.PLANNING, self.planning_has_begun())
+        cycles.begins_when(CycleStage.REVIEWING, self.reviewing_has_begun())
 
     # --- what the CEO decided, kept ----------------------------------------------------------
 
@@ -289,6 +306,22 @@ class Executive:
         ).all()
         terminal = {state.value for state in TASK_FSM.terminal_states()}
         return all(state in terminal for state in states)
+
+    async def _begun(self, session: AsyncSession, cycle: Cycle, template: str) -> bool:
+        """Has any task of the CEO's run been claimed (or ended)? No run: nothing to wait for."""
+        run = await self._run_for(session, cycle, template)
+        if run is None:
+            return True
+        terminal = [state.value for state in TASK_FSM.terminal_states()]
+        claimed = await session.scalar(
+            select(func.count())
+            .select_from(Task)
+            .where(
+                Task.workflow_run_id == run.id,
+                or_(Task.attempt > 0, Task.state.in_(terminal)),
+            )
+        )
+        return bool(claimed)
 
     async def _run_for(
         self, session: AsyncSession, cycle: Cycle, template: str

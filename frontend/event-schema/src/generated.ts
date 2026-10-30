@@ -780,6 +780,20 @@ export const CycleStageChangedV1Event = z.object({
   payload: CycleStageChangedV1Payload,
 });
 
+export const CycleStageExtendedV1Payload = z.object({
+  stage: z.enum(["PLANNING", "EXECUTING", "MEASURING", "REVIEWING", "DONE"]),
+  was_due: z.iso.datetime({ offset: true }),
+  deadline: z.iso.datetime({ offset: true }),
+  reason: z.string(),
+});
+export type CycleStageExtendedV1Payload = z.infer<typeof CycleStageExtendedV1Payload>;
+export const CycleStageExtendedV1Event = z.object({
+  ...envelopeFields,
+  event_type: z.literal("CYCLE_STAGE_EXTENDED"),
+  schema_version: z.literal(1),
+  payload: CycleStageExtendedV1Payload,
+});
+
 export const CycleStageTimeoutV1Payload = z.object({
   stage: z.enum(["PLANNING", "EXECUTING", "MEASURING", "REVIEWING", "DONE"]),
   cancelled_task_ids: z.array(z.uuid()).default(() => ([])),
@@ -1687,6 +1701,7 @@ export const EventEnvelope = z.discriminatedUnion("event_type", [
   CyclePlanFallbackV1Event,
   CycleReviewedV1Event,
   CycleStageChangedV1Event,
+  CycleStageExtendedV1Event,
   CycleStageTimeoutV1Event,
   CycleStartedV1Event,
   DepartmentCreatedV1Event,
@@ -1808,6 +1823,7 @@ export const EVENT_TYPES = [
   "CYCLE_PLAN_FALLBACK",
   "CYCLE_REVIEWED",
   "CYCLE_STAGE_CHANGED",
+  "CYCLE_STAGE_EXTENDED",
   "CYCLE_STAGE_TIMEOUT",
   "CYCLE_STARTED",
   "DEPARTMENT_CREATED",

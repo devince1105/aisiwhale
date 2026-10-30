@@ -2581,6 +2581,50 @@
         }
       }
     },
+    "CYCLE_STAGE_EXTENDED": {
+      "1": {
+        "persistence": "persisted",
+        "payload": {
+          "additionalProperties": false,
+          "description": "A deadline that passed while nobody was at work, given back (D-262): the stage's work had\nnot begun, so running out of time was not the work's fault.",
+          "properties": {
+            "stage": {
+              "enum": [
+                "PLANNING",
+                "EXECUTING",
+                "MEASURING",
+                "REVIEWING",
+                "DONE"
+              ],
+              "title": "Stage",
+              "type": "string"
+            },
+            "was_due": {
+              "format": "date-time",
+              "title": "Was Due",
+              "type": "string"
+            },
+            "deadline": {
+              "format": "date-time",
+              "title": "Deadline",
+              "type": "string"
+            },
+            "reason": {
+              "title": "Reason",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stage",
+            "was_due",
+            "deadline",
+            "reason"
+          ],
+          "title": "CycleStageExtended",
+          "type": "object"
+        }
+      }
+    },
     "CYCLE_STAGE_TIMEOUT": {
       "1": {
         "persistence": "persisted",

@@ -90,7 +90,7 @@ Project 在 APPROVED 時必須帶結構化 kill criteria：
 3. `max_attempts`（task）× `repair_limit`（run 內）有上限（預設 3×2）。
 4. 預算三層：company daily cap → project cap → task cap；耗盡 → `BLOCKED_BUDGET` + BUDGET_EXHAUSTED。
 5. `max_workflows_per_cycle`；CEO 提案超過即截斷。
-6. Stage deadline 強制推進。
+6. Stage deadline 強制推進。例外（D-262）：期限在無人上班時過去（tick 看到時已過 5 分鐘以上）、而該階段的工作還沒被領，期限重設一次並發 `CYCLE_STAGE_EXTENDED`；及時看到的逾時照舊。
 7. Idempotency key 在每個 tool call 與 command。
 8. Circuit breaker：同一 tool / provider 連續失敗 N 次 → 熔斷。
 9. Article revise ≤ 2 次，超過 → story DROPPED。
