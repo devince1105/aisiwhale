@@ -429,6 +429,8 @@ export const ArticleRejectedV1Payload = z.object({
   article_id: z.uuid(),
   by: z.string(),
   reason: z.string(),
+  issue_kinds: z.array(z.string()).default(() => ([])),
+  basis: z.string().default(""),
 });
 export type ArticleRejectedV1Payload = z.infer<typeof ArticleRejectedV1Payload>;
 export const ArticleRejectedV1Event = z.object({

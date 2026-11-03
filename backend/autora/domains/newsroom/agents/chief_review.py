@@ -37,7 +37,7 @@ from autora.domains.newsroom.models import (
     Story,
 )
 from autora.domains.newsroom.policy import vip_guidelines
-from autora.domains.newsroom.review import MAX_REVISIONS
+from autora.domains.newsroom.review import BLOCKING_KINDS, MAX_REVISIONS
 from autora.domains.newsroom.tools.review import Issue
 from autora.runtime.behaviors import AgentBehavior, RunContext
 
@@ -63,7 +63,10 @@ Then decide with final_review(article_id, verdict, issues, reason, vip):
   all of it, everybody else only its opening — following the company's VIP guidelines below;
   most articles are free;
 - revise: something must change first — each issue says what and why (language and block when it
-  is about one). This uses one of the article's revisions; with none left it drops the story;
+  is about one). This uses one of the article's revisions; with none left it drops the story,
+  and is refused unless an issue's kind is fact, unsupported, attribution or translation (a
+  wrong fact, a claim without support, a view in the wrong mouth, a changed meaning): accept
+  the piece instead;
 - veto: the piece must not run at all — give the reason. Keep this for a piece that cannot be
   fixed (not worth covering, or against policy), not for wording.
 Most drafts that reach you are sound: accept them.
@@ -71,7 +74,8 @@ Most drafts that reach you are sound: accept them.
 When done, reply with only a JSON object (no other text):
 {"article_id": "<the article id>",
  "verdict": "accept" | "revise" | "veto",
- "issues": [{"message": "...", "kind": "fact|unsupported|missing_context|translation|style|other",
+ "issues": [{"message": "...",
+             "kind": "fact|unsupported|attribution|missing_context|translation|style|other",
              "lang": "zh-TW|en (optional)", "block_ref": "3 (optional)"}],
  "reason": "<for veto: why>",
  "vip": <for accept: true if you made it VIP>,
@@ -123,6 +127,10 @@ async def final_review_context(session: AsyncSession, ctx: RunContext) -> str | 
     ]
     if article.revision_count >= MAX_REVISIONS:
         lines.append("No revisions left: sending it back drops the story.")
+        lines.append(
+            "It is refused unless an issue is of kind "
+            f"{', '.join(sorted(BLOCKING_KINDS))}: otherwise accept the piece."
+        )
     asked = await person_sent_back(session, ctx)
     if asked:
         lines.append(PERSON_SENT_BACK.format(reason=asked))

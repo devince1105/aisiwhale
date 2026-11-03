@@ -158,6 +158,12 @@ class ArticleRejected(EventPayload):
     article_id: uuid.UUID
     by: str
     reason: str
+    issue_kinds: list[str] = []
+    """The kinds of the issues in the last review that turned it down (D-263); none for a person's
+    rejection or a veto."""
+    basis: str = ""
+    """What let a draft with no revisions left be turned down (D-263): the fact-check failed, or
+    which major kinds of issue were raised."""
 
 
 @event("ARTICLE_RETURNED")

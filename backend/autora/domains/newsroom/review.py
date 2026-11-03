@@ -9,7 +9,8 @@ records ARTICLE_REVIEWED (the verdict and whether the fact-check passed):
   passed.
 - ``request_revision`` (stays DRAFT): the writer gets the editor's issues and
   writes the next version (ARTICLE_REVISION_REQUESTED). A story gets at most ``MAX_REVISIONS``
-  revisions; asking for one more rejects the article and drops the story.
+  revisions; asking for one more rejects the article and drops the story — but only on the
+  grounds of ``last_round_basis`` (D-263); anything else is refused and the draft is accepted.
 
 A draft is reviewed once by each reviewer: deciding again on the same draft returns the first
 decision when it is the same verdict (a retried call) and refuses a different one.
@@ -23,6 +24,7 @@ dropped; a revision of a published article is dropped instead, the published one
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -54,11 +56,43 @@ REVISE = "revise"
 VETO = "veto"
 CHIEF = "editor_in_chief"
 
+# D-263: what can still turn a draft down when no revisions are left — an error a person reading
+# it before publication cannot be expected to catch: a wrong fact or number, a claim the evidence
+# does not support, a view put in the wrong mouth, a translation that changes the meaning.
+# Wording, context and style are not here: cycle 39's only article was dropped in its last round
+# over a missing publication date, although the fact-check had passed 8 of 8. The editor's prompt
+# already said so (rule 4); this makes it a rule. ``tools.review.IssueKind`` lists them all.
+BLOCKING_KINDS = frozenset({"fact", "unsupported", "attribution", "translation"})
+
 
 class ReviewError(Exception):
     """The draft cannot be decided this way (wrong state, fact-check missing or failed)."""
 
     retryable = False
+
+
+def last_round_basis(*, fact_check_passed: bool, issue_kinds: Sequence[str]) -> str | None:
+    """Why a draft with no revisions left may be turned down, said for the record: its fact-check
+    did not pass, or an issue is of a blocking kind. ``None``: nothing in this review is grounds
+    to drop the story, so the draft is accepted (a person still reads it before it runs)."""
+    parts = []
+    if not fact_check_passed:
+        parts.append("the fact-check did not pass")
+    major = sorted(set(issue_kinds) & BLOCKING_KINDS)
+    if major:
+        parts.append("major issues: " + ", ".join(major))
+    return "; ".join(parts) or None
+
+
+def _no_grounds(issue_kinds: Sequence[str], *, instead: str) -> ReviewError:
+    return ReviewError(
+        "no revisions are left and nothing here is grounds to drop the story: the fact-check "
+        f"passed and the issues are only {', '.join(sorted(set(issue_kinds)))} (a story is "
+        f"dropped here only for {', '.join(sorted(BLOCKING_KINDS))}). Wording, context and style "
+        f"do not drop a story a person still reads before it is published: {instead}. If a claim "
+        "is wrong, unsupported, put in the wrong mouth or mistranslated, send it back with that "
+        "kind."
+    )
 
 
 @dataclass(frozen=True)
@@ -228,13 +262,15 @@ async def request_revision(
     *,
     company_id: uuid.UUID,
     article_id: uuid.UUID,
-    issues_count: int,
+    issue_kinds: Sequence[str],
     actor: Actor,
     by_role: str,
     refs: EventRefs = NO_REFS,
     back_to: str = "writer",
 ) -> Review:
-    if issues_count < 1:
+    """``issue_kinds``: the kind of each issue sent back (``tools.review.IssueKind``). With no
+    revisions left they decide whether the draft may still be turned down (D-263)."""
+    if not issue_kinds:
         raise ReviewError("a revision needs at least one issue")
     article, version = await _draft(session, company_id, article_id)
     earlier = await _earlier(session, article, version, REVISE)
@@ -244,6 +280,11 @@ async def request_revision(
         raise ReviewError(f"the article is {article.state}: only a draft is sent back")
     latest = await _latest_report(session, article)
     passed = bool(latest and latest.passed)
+    basis = ""
+    if article.revision_count >= MAX_REVISIONS:
+        basis = last_round_basis(fact_check_passed=passed, issue_kinds=issue_kinds) or ""
+        if not basis:
+            raise _no_grounds(issue_kinds, instead="accept the draft (accept_draft)")
     await _emit(
         session,
         article,
@@ -263,7 +304,7 @@ async def request_revision(
             session,
             article,
             actor=actor,
-            reason=f"revision still not ready after {MAX_REVISIONS} rounds",
+            reason=f"revision still not ready after {MAX_REVISIONS} rounds ({basis})",
         )
         return Review(
             article_id=article.id,
@@ -275,7 +316,7 @@ async def request_revision(
             reused=False,
         )
     if article.revision_count >= MAX_REVISIONS:
-        reason = f"still not ready after {MAX_REVISIONS} revisions"
+        reason = f"still not ready after {MAX_REVISIONS} revisions ({basis})"
         await ARTICLE_FSM.transition_via(
             session, article, ArticleState.REJECTED, actor=actor, reason=reason
         )
@@ -287,7 +328,13 @@ async def request_revision(
             article,
             actor,
             refs,
-            ArticleRejected(article_id=article.id, by=actor.kind, reason=reason),
+            ArticleRejected(
+                article_id=article.id,
+                by=actor.kind,
+                reason=reason,
+                issue_kinds=sorted(set(issue_kinds)),
+                basis=basis,
+            ),
         )
         return Review(
             article_id=article.id,
@@ -307,7 +354,7 @@ async def request_revision(
         ArticleRevisionRequested(
             article_id=article.id,
             version_id=version.id,
-            issues_count=issues_count,
+            issues_count=len(issue_kinds),
             by_role=by_role,
             revision=article.revision_count,
             back_to=back_to,
@@ -325,7 +372,14 @@ async def request_revision(
 
 
 async def _reject(
-    session: AsyncSession, article: Article, actor: Actor, refs: EventRefs, reason: str
+    session: AsyncSession,
+    article: Article,
+    actor: Actor,
+    refs: EventRefs,
+    reason: str,
+    *,
+    issue_kinds: Sequence[str] = (),
+    basis: str = "",
 ) -> None:
     """Turned down for good: a published article's revision is dropped (the published version
     stays); anything else is rejected and its story dropped."""
@@ -343,7 +397,13 @@ async def _reject(
         article,
         actor,
         refs,
-        ArticleRejected(article_id=article.id, by=actor.kind, reason=reason),
+        ArticleRejected(
+            article_id=article.id,
+            by=actor.kind,
+            reason=reason,
+            issue_kinds=sorted(set(issue_kinds)),
+            basis=basis,
+        ),
     )
 
 
@@ -354,14 +414,16 @@ async def chief_decide(
     article_id: uuid.UUID,
     verdict: str,
     actor: Actor,
-    issues_count: int = 0,
+    issue_kinds: Sequence[str] = (),
     reason: str | None = None,
     refs: EventRefs = NO_REFS,
 ) -> Review:
-    """The editor-in-chief's final review of the draft the editor accepted (D-110)."""
+    """The editor-in-chief's final review of the draft the editor accepted (D-110). Like the
+    editor's, a revision with none left turns the draft down only on ``last_round_basis`` (D-263);
+    a veto is the chief's own way to turn a piece down, and says why."""
     if verdict not in (ACCEPT, REVISE, VETO):
         raise ReviewError(f"the verdict is accept, revise or veto, not {verdict!r}")
-    if verdict == REVISE and issues_count < 1:
+    if verdict == REVISE and not issue_kinds:
         raise ReviewError("a revision needs at least one issue")
     if verdict == VETO and not (reason or "").strip():
         raise ReviewError("a veto says why")
@@ -375,6 +437,11 @@ async def chief_decide(
         )
     latest = await _latest_report(session, article)
     passed = bool(latest and latest.passed)
+    basis = ""
+    if verdict == REVISE and article.revision_count >= MAX_REVISIONS:
+        basis = last_round_basis(fact_check_passed=passed, issue_kinds=issue_kinds) or ""
+        if not basis:
+            raise _no_grounds(issue_kinds, instead="accept it, or veto it with a reason")
     await _emit(
         session,
         article,
@@ -403,11 +470,24 @@ async def chief_decide(
     if verdict == ACCEPT:
         return decided(dropped=False)
     if verdict == VETO:
-        await _reject(session, article, actor, refs, f"vetoed by the editor-in-chief: {reason}")
+        await _reject(
+            session,
+            article,
+            actor,
+            refs,
+            f"vetoed by the editor-in-chief: {reason}",
+            basis="the editor-in-chief's veto",
+        )
         return decided(dropped=True)
     if article.revision_count >= MAX_REVISIONS:
         await _reject(
-            session, article, actor, refs, f"still not ready after {MAX_REVISIONS} revisions"
+            session,
+            article,
+            actor,
+            refs,
+            f"still not ready after {MAX_REVISIONS} revisions ({basis})",
+            issue_kinds=issue_kinds,
+            basis=basis,
         )
         return decided(dropped=True)
     await ARTICLE_FSM.transition(
@@ -422,7 +502,7 @@ async def chief_decide(
         ArticleRevisionRequested(
             article_id=article.id,
             version_id=version.id,
-            issues_count=issues_count,
+            issues_count=len(issue_kinds),
             by_role=CHIEF,
             revision=article.revision_count,
         ),

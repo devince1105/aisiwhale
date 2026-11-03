@@ -1515,6 +1515,19 @@
             "reason": {
               "title": "Reason",
               "type": "string"
+            },
+            "issue_kinds": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Issue Kinds",
+              "type": "array"
+            },
+            "basis": {
+              "default": "",
+              "title": "Basis",
+              "type": "string"
             }
           },
           "required": [

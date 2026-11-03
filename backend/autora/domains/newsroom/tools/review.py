@@ -18,7 +18,9 @@ from autora.domains.newsroom.models import Article, ArticleAccess
 from autora.domains.newsroom.review import EventRefs, Review
 from autora.runtime.tools import ToolContext, ToolRegistry, ToolResult
 
-IssueKind = Literal["fact", "unsupported", "missing_context", "translation", "style", "other"]
+IssueKind = Literal[
+    "fact", "unsupported", "attribution", "missing_context", "translation", "style", "other"
+]
 
 
 class Issue(BaseModel):
@@ -96,7 +98,7 @@ async def request_revision(args: RequestRevisionArgs, ctx: ToolContext) -> ToolR
         ctx.session,
         company_id=ctx.company_id,
         article_id=args.article_id,
-        issues_count=len(args.issues),
+        issue_kinds=[i.kind for i in args.issues],
         actor=ctx.actor,
         by_role=await _role(ctx),
         refs=_refs(ctx),
@@ -140,7 +142,7 @@ async def final_review(args: FinalReviewArgs, ctx: ToolContext) -> ToolResult:
         company_id=ctx.company_id,
         article_id=args.article_id,
         verdict=args.verdict,
-        issues_count=len(args.issues),
+        issue_kinds=[i.kind for i in args.issues],
         reason=args.reason,
         actor=ctx.actor,
         refs=_refs(ctx),
@@ -190,7 +192,9 @@ def register(registry: ToolRegistry) -> None:
             "Send the current draft back with the issues to fix — to the writer (back_to "
             "'writer', the default: how the draft says things) or to the analyst (back_to "
             "'analyst': a claim itself is wrong or missing) (at most "
-            f"{review.MAX_REVISIONS} revisions per article; one more drops the story)."
+            f"{review.MAX_REVISIONS} revisions per article; one more drops the story, and is "
+            "refused unless the fact-check failed or an issue is of kind "
+            f"{', '.join(sorted(review.BLOCKING_KINDS))}: accept the draft then)."
         ),
         side_effect="write",
         timeout_s=10.0,
@@ -202,7 +206,9 @@ def register(registry: ToolRegistry) -> None:
             "The editor-in-chief's final review of a draft the editor accepted: accept (on to a "
             "person's approval; vip=true makes it VIP, for members), revise (back to the "
             "writer with issues; counts against the "
-            f"article's {review.MAX_REVISIONS} revisions) or veto (with a reason: the piece is "
+            f"article's {review.MAX_REVISIONS} revisions; with none left it drops the story, and "
+            "is refused unless the fact-check failed or an issue is of kind "
+            f"{', '.join(sorted(review.BLOCKING_KINDS))}) or veto (with a reason: the piece is "
             "turned down and its story dropped)."
         ),
         side_effect="write",

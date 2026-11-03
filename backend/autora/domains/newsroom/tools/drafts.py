@@ -34,6 +34,7 @@ from autora.domains.newsroom.models import (
     ArticleVersion,
     Claim,
     ClaimEvidence,
+    ClaimStatus,
     Evidence,
     Source,
     SourceItem,
@@ -154,6 +155,18 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
         )
     ).all()
     facts = {claim_id: ClaimFacts(story_id=sid, status=status) for claim_id, sid, status, _ in rows}
+    citable: list[uuid.UUID] = []
+    if any(c not in facts or facts[c].story_id != story.id for c in cited):
+        # a wrong id (D-263): the story's own claims it may have been meant for
+        citable = list(
+            await session.scalars(
+                select(Claim.id).where(
+                    Claim.story_id == story.id,
+                    Claim.company_id == ctx.company_id,
+                    Claim.status != ClaimStatus.REJECTED.value,
+                )
+            )
+        )
     issues = check_draft(
         args.versions,
         story_id=story.id,
@@ -161,6 +174,7 @@ async def write_draft(args: WriteDraftArgs, ctx: ToolContext) -> ToolResult:
         article_state=article.state if article else None,
         policy=policy,
         claims=facts,
+        citable=citable,
         revising=article is not None and article.published_group_id is not None,
     )
     if no_advice(policies):

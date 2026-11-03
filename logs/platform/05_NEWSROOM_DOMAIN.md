@@ -63,6 +63,8 @@ research(Researcher) → analysis(Analyst) → draft(Writer) → review(Editor) 
 
 未通過 → `request_revision` → Writer 新 task（同 draft_group 的下一 version）。超過 2 次 → story DROPPED。
 
+**最後一輪（修改次數用完，D-263）**：只有「事實查核沒通過」或「問題類型是 `fact`／`unsupported`／`attribution`／`translation`」才允許丟稿；`missing_context`／`style`／`other` 不構成丟稿理由，工具回錯誤，編輯改用 `accept_draft`（仍要過查核，之後仍有人審）。編輯與總編審（`final_review` 的 revise）同一條規則；總編審的 veto 另計。丟稿時 `ARTICLE_REJECTED` 記下 `issue_kinds`（本輪提出的全部類型）與 `basis`（依據：查核失敗、或哪些重大類型），`reason` 也帶同一段。
+
 ---
 
 ## 4. 雙語規則

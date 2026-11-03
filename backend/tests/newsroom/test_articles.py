@@ -57,7 +57,9 @@ def version(lang, *claims, heading_claims=()):
     )
 
 
-def check(versions, *, facts=FACTS, policy=DEFAULT, story_state="SELECTED", article_state=None):
+def check(
+    versions, *, facts=FACTS, policy=DEFAULT, story_state="SELECTED", article_state=None, citable=()
+):
     return check_draft(
         versions,
         story_id=STORY,
@@ -65,7 +67,14 @@ def check(versions, *, facts=FACTS, policy=DEFAULT, story_state="SELECTED", arti
         article_state=article_state,
         policy=policy,
         claims=facts,
+        citable=citable,
     )
+
+
+def one_character_off(claim_id: uuid.UUID) -> uuid.UUID:
+    """The id as a model that copies it by hand might write it: its last digit changed."""
+    text = str(claim_id)
+    return uuid.UUID(text[:-1] + ("0" if text[-1] != "0" else "1"))
 
 
 def test_a_good_bilingual_draft_passes():
@@ -130,6 +139,48 @@ def test_every_problem_is_reported_at_once_and_state_matters():
     ):
         assert expected in joined
     assert check([version("zh-TW", C1), version("en", C1)], article_state="DRAFT") == []
+
+
+CITABLE = [C1, C2]
+CLOSEST = "the closest claim of this story is"
+
+
+def test_a_valid_claim_id_needs_no_suggestion():  # D-263
+    assert check([version("zh-TW", C1, C2), version("en", C2, C1)], citable=CITABLE) == []
+
+
+def test_a_one_character_slip_is_refused_and_the_closest_claim_is_named():  # D-263
+    typo = one_character_off(C2)
+    issues = check([version("zh-TW", C1, typo), version("en", C1, typo)], citable=CITABLE)
+    [refused] = [i for i in issues if i.startswith(f"claim {typo} is not one of this story's")]
+    assert f"{CLOSEST} {C2}" in refused
+    # the strict check is unchanged: the slip is not replaced for the writer, so the draft fails
+    assert "nothing is replaced for you" in refused
+    assert issues == [refused]  # and the draft still fails on it
+
+
+def test_a_claim_id_that_is_nothing_like_any_of_the_story_s_gets_no_suggestion():  # D-263
+    issues = check([version("zh-TW", C1, C3), version("en", C1, C3)], citable=CITABLE)
+    [refused] = [i for i in issues if f"claim {C3} is not one of this story's claims" in i]
+    assert CLOSEST not in refused
+
+
+def test_only_the_claims_it_may_cite_are_suggested():  # D-263
+    typo = one_character_off(C2)
+    issues = check([version("zh-TW", C1, typo), version("en", C1, typo)], citable=[C1])
+    assert any(f"claim {typo} is not one of this story's claims" in i for i in issues)
+    assert not any(CLOSEST in i for i in issues)
+
+
+def test_another_story_s_claim_is_not_accepted_however_alike_its_id_looks():  # D-263
+    foreign = one_character_off(C2)
+    facts = {**FACTS, foreign: ClaimFacts(uuid.uuid4(), "VERIFIED")}
+    issues = check(
+        [version("zh-TW", C1, foreign), version("en", C1, foreign)], facts=facts, citable=CITABLE
+    )
+    [refused] = [i for i in issues if i.startswith(f"claim {foreign} is not one of this story's")]
+    assert f"{CLOSEST} {C2}" in refused  # offered to the writer to check, never taken
+    assert issues == [refused]
 
 
 def test_language_policy():
@@ -331,6 +382,36 @@ async def test_a_retry_returns_the_same_draft_and_a_bad_one_writes_nothing(newsr
             .where(ArticleVersion.company_id == d["company"].id)
         )
     assert count == 2  # only the first draft
+
+
+async def test_a_mistyped_claim_id_names_the_closest_one_and_writes_nothing(newsroom_desk):
+    """D-263: cycle 39's writer lost three tries to one wrong character in a copied claim id."""
+    d = newsroom_desk
+    first, second = d["claims"]
+    typo = str(one_character_off(uuid.UUID(second)))
+    bad = await d["call"]("write_draft", draft(d["story"].id, [first, typo]))
+    assert not bad.ok and bad.error_class == "DraftError"
+    assert f"claim {typo} is not one of this story's claims" in bad.message
+    assert f"{CLOSEST} {second}" in bad.message
+
+    # the same slip in only one language adds the bilingual rule's complaint; still nothing saved
+    one_language = await d["call"](
+        "write_draft", draft(d["story"].id, [first, second], en_claims=[first, typo])
+    )
+    assert not one_language.ok and f"{CLOSEST} {second}" in one_language.message
+    assert "must cite the same claims" in one_language.message
+
+    async with d["committed"]() as session:
+        count = await session.scalar(
+            select(func.count())
+            .select_from(ArticleVersion)
+            .where(ArticleVersion.company_id == d["company"].id)
+        )
+    assert count == 0
+
+    # the suggested id, written as it is, passes
+    fixed = await d["call"]("write_draft", draft(d["story"].id, [first, second]))
+    assert fixed.ok, fixed.message
 
 
 async def test_drafting_stops_once_the_editor_has_it(newsroom_desk):

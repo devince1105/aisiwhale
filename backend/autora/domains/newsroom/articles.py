@@ -8,7 +8,8 @@ problem at once, so a model can fix its draft in one go:
 - languages follow the company policy (D-002): the primary language is required, every language
   must be one of the policy's, and with ``require_all_langs`` all of them are required;
 - every paragraph and quote cites at least one claim, and headings cite none;
-- cited claims belong to the story and were not rejected by fact-check;
+- cited claims belong to the story and were not rejected by fact-check (a mistyped id is still
+  refused, but the error names the story's closest claim, ``nearest_claim_id``, D-263);
 - **every language cites the same set of claims** (the bilingual rule: the translations share
   one factual basis, so fact-check verifies the claims once);
 - quote blocks stay short (no long reproduction of others' work, platform/05 §8).
@@ -19,8 +20,10 @@ sent back for revision). Review, approval and publication move it on (T-511, T-5
 
 from __future__ import annotations
 
+import difflib
 import re
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Literal
 
@@ -94,6 +97,20 @@ class ClaimFacts:
     status: str
 
 
+CLOSE_ENOUGH = 0.9
+"""How alike two claim ids must be (difflib's ratio over their 36 characters) for one to be
+offered for the other: three characters off still counts, four does not."""
+
+
+def nearest_claim_id(claim_id: uuid.UUID, citable: Collection[uuid.UUID]) -> uuid.UUID | None:
+    """The story's citable claim a wrong id most likely meant (a few characters off), if any. It
+    is only ever a suggestion for the writer to check: nothing is substituted (D-263)."""
+    near = difflib.get_close_matches(
+        str(claim_id), sorted(map(str, citable)), n=1, cutoff=CLOSE_ENOUGH
+    )
+    return uuid.UUID(near[0]) if near else None
+
+
 def check_draft(
     versions: list[LanguageVersion],
     *,
@@ -102,10 +119,12 @@ def check_draft(
     article_state: str | None,
     policy: LanguagePolicy,
     claims: dict[uuid.UUID, ClaimFacts],
+    citable: Collection[uuid.UUID] = (),
     revising: bool = False,
 ) -> list[str]:
     """Every reason the draft cannot be written (empty: it can). ``claims``: the cited claims
-    that exist, with their story and status. ``revising``: a new version of an article already
+    that exist, with their story and status. ``citable``: this story's claims that may be cited,
+    for naming the closest one to a wrong id. ``revising``: a new version of an article already
     published (D-045), whose story is PUBLISHED and still open to that."""
     issues: list[str] = []
     published_and_revised = revising and StoryState(story_state) == StoryState.PUBLISHED
@@ -149,7 +168,13 @@ def check_draft(
     for claim_id in sorted(cited, key=str):
         facts = claims.get(claim_id)
         if facts is None or facts.story_id != story_id:
-            issues.append(f"claim {claim_id} is not one of this story's claims")
+            message = f"claim {claim_id} is not one of this story's claims"
+            if (near := nearest_claim_id(claim_id, citable)) is not None:
+                message += (
+                    f"; the closest claim of this story is {near}: cite that id, in every "
+                    "language, if it is the one you meant (nothing is replaced for you)"
+                )
+            issues.append(message)
         elif facts.status == ClaimStatus.REJECTED:
             issues.append(f"claim {claim_id} was rejected by fact-check and cannot be cited")
 

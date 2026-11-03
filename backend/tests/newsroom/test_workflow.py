@@ -496,10 +496,16 @@ async def test_too_many_revisions_drop_the_story(committed, e2e_settings):
     assert (await room.get(WorkflowRun, room.run.id)).state == "CANCELLED"
     assert (await room.article()).state == "REJECTED"
     assert (await room.get(Story, room.story.id)).state == "DROPPED"
-    # the decided card says why, and that nothing is at work on it any more (D-233)
+    # the decided card says why, and that nothing is at work on it any more (D-233); in the last
+    # round it also says what let the draft be turned down (D-263): here its fact-check failed
     detail = await _detail(room)
-    assert detail.state_reason == "still not ready after 2 revisions"
+    assert detail.state_reason == (
+        "still not ready after 2 revisions (the fact-check did not pass; major issues: unsupported)"
+    )
     assert not detail.in_production
+    [rejected] = await room.events("ARTICLE_REJECTED")
+    assert rejected.payload["basis"] == "the fact-check did not pass; major issues: unsupported"
+    assert rejected.payload["issue_kinds"] == ["unsupported"]
 
 
 async def test_a_person_rejects_the_article(committed, e2e_settings):
@@ -515,8 +521,9 @@ async def test_a_person_rejects_the_article(committed, e2e_settings):
     story = await room.get(Story, room.story.id)
     assert story.state == "DROPPED"
     [rejected] = await room.events("ARTICLE_REJECTED")
+    # a person's rejection names no issue kinds and no last-round basis (D-263: empty by default)
     assert rejected.payload == {"article_id": str(story_article_id(tasks)), "by": "human",
-                                "reason": "not for us"}  # fmt: skip
+                                "reason": "not for us", "issue_kinds": [], "basis": ""}  # fmt: skip
 
 
 def story_article_id(tasks):

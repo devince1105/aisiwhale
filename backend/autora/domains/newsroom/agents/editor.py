@@ -27,7 +27,7 @@ from autora.db.repositories.companies import get_policies
 from autora.domains.newsroom.agents.researcher import task_story_id
 from autora.domains.newsroom.models import Article, ArticleVersion, FactCheckReport, Story
 from autora.domains.newsroom.policy import language_policy
-from autora.domains.newsroom.review import MAX_REVISIONS
+from autora.domains.newsroom.review import BLOCKING_KINDS, MAX_REVISIONS
 from autora.domains.newsroom.tools.review import Issue
 from autora.runtime.behaviors import AgentBehavior, RunContext
 
@@ -53,7 +53,11 @@ How to review:
    only for a failed or unsupported claim, a wrong number, a view put in the wrong mouth, or a
    translation that changes the meaning. Wording, order, a heading's phrasing or a nicety of
    context is not a reason to drop a story a person will still read before it is published:
-   accept it.
+   accept it. The system holds you to this: with no revisions left, request_revision is refused
+   unless the fact-check failed or an issue's kind is fact (a wrong fact or number),
+   unsupported (a claim the evidence does not support), attribution (a view put in the wrong
+   mouth) or translation (a meaning changed). Give those kinds only to what they name; a period
+   or date that could be clearer is missing_context, and the draft is accepted.
 5. Decide:
    - accept_draft(article_id, fact_check_report_id) only when the fact-check passed and nothing
      needs fixing (or, with no revisions left, nothing of the kind in 4);
@@ -71,7 +75,8 @@ When done, reply with only a JSON object (no other text):
  "verdict": "accept" | "revise",
  "back_to": "writer" | "analyst",
  "fact_check_report_id": "<report_id from run_fact_check>",
- "issues": [{"message": "...", "kind": "fact|unsupported|missing_context|translation|style|other",
+ "issues": [{"message": "...",
+             "kind": "fact|unsupported|attribution|missing_context|translation|style|other",
              "lang": "zh-TW|en (optional)", "block_ref": "3 (optional)"}]}
 For accept, issues is [] and back_to "writer". For revise, the issues and back_to you sent with
 request_revision.
@@ -140,6 +145,10 @@ async def review_context(session: AsyncSession, ctx: RunContext) -> str | None:
     ]
     if article.revision_count >= MAX_REVISIONS:
         lines.append("No revisions left: asking for another one drops the story.")
+        lines.append(
+            "It is refused unless the fact-check failed or an issue is of kind "
+            f"{', '.join(sorted(BLOCKING_KINDS))}: otherwise accept the draft."
+        )
     asked = await person_sent_back(session, ctx)
     if asked:
         lines.append(PERSON_SENT_BACK.format(reason=asked))
