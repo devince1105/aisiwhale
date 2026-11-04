@@ -353,12 +353,21 @@ async def request(
 
 async def due(session: AsyncSession, period: date, *, ranked: int = RANKED) -> list[str]:
     """Whose quarter to work out next: those readers asked for, the longest waiting first; then
-    the ``ranked`` largest without it, or whose quarter has had a filing since."""
+    the ``ranked`` largest without it, or whose quarter has had a filing since.
+
+    Only the four columns this decides on, never the rows: a worked-out row carries its ``top``,
+    ``bought`` and ``sold`` (about 14K characters of JSON), and loading all ~8,900 of the quarter
+    took the worker's 512 MB once ~7,000 were done (D-264)."""
     rows = {
         d.cik: d
         for d in (
-            await session.scalars(
-                select(InstitutionDetail).where(InstitutionDetail.period == period)
+            await session.execute(
+                select(
+                    InstitutionDetail.cik,
+                    InstitutionDetail.status,
+                    InstitutionDetail.requested_at,
+                    InstitutionDetail.accessions,
+                ).where(InstitutionDetail.period == period)
             )
         ).all()
     }

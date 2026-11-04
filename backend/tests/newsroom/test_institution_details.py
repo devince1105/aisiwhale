@@ -5,7 +5,7 @@ import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from autora.domains.newsroom import institution_details
 from autora.domains.newsroom.institution_details import (
@@ -245,6 +245,40 @@ async def test_asked_for_first_then_the_largest_without_one(db_session):
     await db_session.flush()
 
     assert await due(db_session, Q2, ranked=3) == ["3", "4", "2"]
+
+
+async def test_what_is_due_is_decided_without_loading_the_worked_out_rows(db_session):
+    """D-264: a worked-out row holds about 14K characters of JSON, and due() read every row of the
+    quarter (~8,900) whole: about 500 MB once ~7,000 were done, over the worker's 512 MB, killed on
+    every start. It decides on four columns and holds no row."""
+    top = [{"cusip": f"{i:09d}", "name": "X" * 40, "shares": i} for i in range(50)]
+    db_session.add_all(
+        [
+            InstitutionDetail(
+                cik=str(c),
+                period=Q2,
+                status="ready",
+                accessions=[f"a{c}"],
+                top=top,
+                bought=top[:10],
+                sold=top[:10],
+                counts={"new": 1},
+            )  # fmt: skip
+            for c in range(1, 6)
+        ]
+    )
+    await request(db_session, "9", Q2, now=NOW)
+    await db_session.flush()
+    db_session.expunge_all()  # the handler's session starts without any of them
+
+    loaded = []  # counted as they load: the session lets go of them as soon as due() returns
+    on_load = lambda target, context: loaded.append(target.cik)  # noqa: E731
+    event.listen(InstitutionDetail, "load", on_load)
+    try:
+        assert await due(db_session, Q2, ranked=3) == ["9"]  # asked for; the five are worked out
+    finally:
+        event.remove(InstitutionDetail, "load", on_load)
+    assert loaded == []
 
 
 async def test_a_request_is_kept_once(db_session):
