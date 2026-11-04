@@ -345,7 +345,7 @@ Phase 0 盤點（2026-10-21）的結論：Agent 執行層與查證層都可以�
 | 改掉原有三項斷言（都是有意的行為變更）：`test_revisions_are_limited_then_the_story_is_dropped` 的第 3 次原本用 `missing_context` 就丟稿，正是這次要改的行為，改成用 `fact`；`test_too_many_revisions_drop_the_story` 的 `state_reason` 現在帶依據（查核失敗、`unsupported`），並多斷言 `basis`、`issue_kinds`；`test_a_person_rejects_the_article` 的 `ARTICLE_REJECTED` 事件多了兩個預設值欄位（`issue_kinds: []`、`basis: ""`） | 有意的行為變更 |
 | ruff、`lint-imports`、`gen-schema-check`、`gen-api-check` | ✅ |
 | 完整後端測試（`pytest backend`，同 CI 的整套一起跑） | 第一次：2711 通過、2 失敗；2 項失敗就是上一列說的 `test_workflow.py` 兩項斷言（我先前只跑了部分檔案，所以當時沒看到）。更新斷言後重跑 `test_workflow.py`、`test_review.py`、`test_articles.py`：91 項全過。**更新斷言後沒有把整套再跑一次**（原始碼自第一次完整測試後沒再改，只有這兩處測試） |
-| 正式環境 | ⬜ 未推送、未部署（使用者要求先提交不推送） |
+| 正式環境 | 🔶 11/04 16:16 與 D-264 一起推送，CI 41798265681 全綠後 16:26～16:27 部署；實際行為（最後一輪不再丟稿、claim ID 建議）要等下一個週期的審稿才看得到 |
 
 ### 沒做的與剩餘風險
 
@@ -375,7 +375,8 @@ Phase 0 盤點（2026-10-21）的結論：Agent 執行層與查證層都可以�
 1. **正式庫（使用者批准，15:54:06）**：`UPDATE schedules SET enabled=false WHERE handler='newsroom.refresh_institution_details'`，先確認剛好 1 列、送出後讀回；排程全表現為 15 啟用、2 停用（另一個是原本就停用的 `refresh_official_trades`）。還原只要改回 `true`。
 2. **判別結果**：15:57 起新行程只認領 15 個排程；15:59:25 起排程恢復完成（自 10/31 18:52:39 以來第一次）、新事件出現（序號 61144 → 61160）；行程撐過了之前最長的 1.7 分鐘。
 3. **程式**：`institution_details.due()` 只選 `cik`、`status`、`requested_at`、`accessions` 四個欄位，不再載入實體；加回歸測試 `test_what_is_due_is_decided_without_loading_the_worked_out_rows`（在載入當下用 `load` 事件計數；舊程式載入 6 列→失敗，新程式 0 列→通過）。第一版測試用身分對照表檢查，但它是弱參照、`due()` 一結束物件就被回收，舊程式也會通過，所以改掉了。
-4. 同一次推送帶上本機的 D-263（編輯最後一輪規則、claim ID 建議）。
+4. 同一次推送帶上本機的 D-263（編輯最後一輪規則、claim ID 建議）。推送 16:16，CI 41798265681 全綠後 Render worker 16:26、api 16:27、Vercel 16:17 部署（台北時間）。
+5. **正式庫（使用者批准，16:39:05）**：把同一列 `enabled` 改回 `true`，一樣先確認剛好 1 列、送出後讀回；排程全表現為 16 啟用、1 停用（只剩原本就停用的 `refresh_official_trades`）。
 
 ### 驗證
 
@@ -384,14 +385,16 @@ Phase 0 盤點（2026-10-21）的結論：Agent 執行層與查證層都可以�
 | 相關測試（`test_institution_details`、`test_institutions`、`test_thirteenf_index`、`test_thirteenf_tables`、`test_holdings`）58 項 | ✅ |
 | 暫時換回舊的 `due()` 再跑新測試 | ✅ 失敗（載入 `['1','2','3','4','5','9']`），原始碼已還原（逐位元組比對） |
 | ruff、`lint-imports`、`gen-schema-check`、`gen-api-check` | ✅ |
-| 本機整套 `pytest backend`、前端、e2e | ⬜ **沒有在本機跑**，交給 CI；Render 只在 CI 全綠後才部署（`autoDeployTrigger: checksPass`） |
-| 停用排程後的判別 | ⬜ 觀察中，見提交紀錄 |
-| 正式環境 | ⬜ 待部署 |
+| 本機整套 `pytest backend`、前端、e2e | ⬜ 沒有在本機跑；CI 41798265681 python、web、e2e 全綠，Render 才部署（`autoDeployTrigger: checksPass`） |
+| 停用排程後的判別 | ✅ 15:57 起新行程只認領 15 個排程，15:59:25 排程恢復完成、事件序號繼續走；行程撐過了之前最長的 1.7 分鐘 |
+| 部署後重新啟用（16:39） | 🔶 至 16:49：處理器跑了 2 次（12 家、40 家，排隊 944 → 892），排程完成 13 次、任務失敗 0、Render 自 15:53 之後沒有新的記憶體不足事件。**只是 10 分鐘，不等於撐過整個上班時段** |
+| 正式環境 | 🔶 已部署；是否真的修好要看 11/04 21:00 下班前與之後幾天沒有再出現 `Instance failed … Ran out of memory` |
 
 ### 沒做的與剩餘風險
 
 - **記憶體峰值是估計**（約 518 MB；含「載入時原始文字與解析後物件同時存在」的推論，沒量測），誤差約 ±30%；10/29 20:57 與 10/31 18:10 這處理器各處理過 35 家而沒被殺，也說明它只是「卡在上限附近」。要等部署後，看 Render 在這個排程重新啟用後還有沒有記憶體不足，才能說修好。
-- **排程仍停用**，要部署並確認後再重新啟用（會先問使用者）。
+- **排程已重新啟用**（16:39）。若記憶體不足再出現，立刻再停用同一列（`enabled=false`），不要等；那表示 `due()` 不是（唯一的）原因，要回頭量真正的記憶體峰值。
+- 這次三天多沒有發文，**「根因」是記憶體不足被殺這件事已確認（Render 事件 397 次），但「就是這個處理器」是推論**：依據是停用它之後立刻恢復、行程撐過了先前最長的 1.7 分鐘；改成只選四個欄位後 10 分鐘內沒再被殺。尚未直接量測記憶體。
 - **失敗次數在工作前先加一**沒做：證據顯示不是某個毒檔案；而且在處理器的交易中途提交會放掉排程列的鎖。另案。
 - `quarter_totals` 仍會載入這一季約 1 萬筆申報檔摘要，每筆很小，沒動；程式裡 `select(InstitutionDetail)` 整張表載入只有 `due()` 這一處。
 - 正式環境安裝的套件比本機 `.venv` 新（SQLAlchemy 2.1.6 對 2.1.1、asyncpg 0.32.0 對 0.31.0 等），依賴未鎖版本，仍是風險（10/13 `f180c1e` 就因 pydantic 鎖過一次）。
@@ -415,4 +418,5 @@ Phase 0 盤點（2026-10-21）的結論：Agent 執行層與查證層都可以�
 | `1ae3879` | devlog：D-260 部署紀錄 | 只改文件 |
 | `9625b17` | D-261 週會時 3D 辦公室的與會者走進會議室坐下開會 | 40496403093 ✅（python、web、e2e）；Vercel 10/27 19:29 部署（台北時間）；正式站辦公室 2 次都正常畫出 |
 | `8c75c3b` | D-262 階段期限在無人上班時過去、工作還沒開始，就重設一次（`CYCLE_STAGE_EXTENDED`）；第 38 輪的計畫不再被 fallback 蓋掉 | 41080918690 ✅（python、web、e2e）；Vercel 10/30 23:28、Render worker 23:37、api 23:38 部署（台北時間） |
-| （本次提交） | D-263 審稿最後一輪只有重大錯誤才丟稿（編輯與總編審）；`ARTICLE_REJECTED` 記 `issue_kinds`、`basis`；寫手 claim ID 抄錯時指出最接近的合法 ID | 本機通過（見上）；**尚未推送、尚未部署**（使用者要求先提交不推送） |
+| `55052bb` | D-263 審稿最後一輪只有重大錯誤才丟稿（編輯與總編審）；`ARTICLE_REJECTED` 記 `issue_kinds`、`basis`；寫手 claim ID 抄錯時指出最接近的合法 ID | 與 D-264 一起推送；41798265681 ✅（python、web、e2e） |
+| `16eca7f` | D-264 `institution_details.due()` 只選四個欄位，不再把這一季全部列連同 JSONB 載入（worker 每個上班時段被記憶體不足殺掉的最可能原因） | 41798265681 ✅（python、web、e2e）；Vercel 11/04 16:17、Render worker 16:26、api 16:27 部署（台北時間）；排程 16:39 重新啟用 |
