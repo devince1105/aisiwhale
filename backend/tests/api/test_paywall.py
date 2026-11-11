@@ -11,13 +11,14 @@ import httpx
 import pytest
 from sqlalchemy import select
 
-from autora.accounts import customer_ref
+from autora.accounts import credentials, customer_ref
 from autora.company import memberships
 from autora.company.organization import add_business_unit, add_product
 from autora.db.models import BusinessUnitState, Company, Customer, ProductState
 from autora.domains.newsroom.models import Article, ArticleAccess
 from autora.runtime.actor import Actor
-from tests.api.readers import sign_in_id
+from tests.api.conftest import ADMIN
+from tests.api.readers import PASSWORD, sign_in_id
 
 OPERATOR = Actor.human("operator")
 PAYUNI = Actor.system("payments:payuni")
@@ -106,6 +107,24 @@ async def test_a_member_reads_the_whole_thing(site, mailbox, article, newsroom_r
     company = await db_session.get(Company, article.company_id)
     me = (await site.get("/api/auth/me", params={"company": company.slug})).json()
     assert me["member_until"] is not None
+
+
+async def test_an_admin_is_not_a_member(site, article, newsroom_room, db_session):
+    """An admin opens the back office; a members-only article takes a membership like anybody's
+    (and is not opened for them the way a COIN one is)."""
+    await _members_only(newsroom_room, article)
+    outcome = await credentials.register(db_session, ADMIN, PASSWORD)
+    await credentials.verify_email(db_session, outcome.verify_token)
+    await db_session.flush()
+    login = await site.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD})
+    assert login.status_code == 200, login.text
+    company = await db_session.get(Company, article.company_id)
+    me = (await site.get("/api/auth/me", params={"company": company.slug})).json()
+    assert me["tier"] == "free" and "admin" in me["capabilities"], me
+
+    body = (await site.get(f"/api/public/articles/zh-TW/{article.slug}")).json()
+
+    assert body["locked"] is True
 
 
 async def test_the_list_says_which_ones_need_a_membership(site, article, newsroom_room):

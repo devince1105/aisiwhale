@@ -29,6 +29,9 @@
     "NEXT_PUBLIC_SITE_URL": "https://aisiwhale.com",
     "SITE_BASE_URL": "https://aisiwhale.com",
     "SITE_OPERATOR": "Nanguado",
-    "SITE_CONTACT_EMAIL": "service@aisiwhale.com"
+    "SITE_CONTACT_EMAIL": "service@aisiwhale.com",
+    // the 聯絡我們 form's Turnstile widget (aisiwhale-contact): public by design; the widget
+    // allows aisiwhale.com, www and cf. Its secret is the API's (TURNSTILE_SECRET_KEY on Render).
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAFMBUHfVO9boUIGG"
   }
 }

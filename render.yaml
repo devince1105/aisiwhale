@@ -51,7 +51,7 @@ services:
       - key: COOKIE_DOMAIN
         value: .aisiwhale.com
       - key: CORS_ORIGINS
-        value: '["https://aisiwhale.com","https://www.aisiwhale.com"]'
+        value: '["https://aisiwhale.com","https://www.aisiwhale.com","https://cf.aisiwhale.com"]'
       - key: PAYUNI_RETURN_URL
         value: https://aisiwhale.com/news/zh-TW/membership/return
       - key: PAYUNI_NOTIFY_URL

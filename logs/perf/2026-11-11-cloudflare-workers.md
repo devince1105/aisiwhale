@@ -124,3 +124,151 @@
 切換後：
 - 在 Cloudflare WAF 加 `/news/*` 每 IP 速率限制（取代 D-265 原本規劃的 Vercel Firewall）。
 - 一週後依實際 Metrics 更新第 5 節費用。
+
+## 8. 正式切換前最後檢查（2026-11-11，唯讀，未改 DNS）
+
+### 8.1 VIP 權限與會員等級
+
+- 等級只由 `autora/accounts/entitlement.py` 決定：`public`／`free`／`vip`；`vip` 只看「這家公司有沒有進行中的會員資格」（買的或贈送的）。`admin` 與等級無關，只多一個 `admin` 能力（可開後台）。
+- 會員限定（`lock=members`）文章：`routers/public.py` 的 `get_article` 呼叫 `entitlement_for` 時**沒有傳 `admin_emails`**，要求的是 `READ_VIP_ARTICLES`（只有 `vip` 有）→ admin 不會因為是 admin 讀到 VIP 全文。實測：admin 帳號（`tier=free`）在 cf.aisiwhale.com 看到 VIP 付費牆。✅
+- **例外（既有設計，未改）**：COIN 文章（`lock=coin`）admin 不付費可讀（程式註解：「an admin reads it unpaid」，`reader="staff"`）。這不是 VIP 權限；若不要，另案改。
+
+### 8.2 PAYUNi
+
+| 項目 | 設定 | 與前端網域的關係 |
+|---|---|---|
+| 結帳 | `CHECKOUT_OPEN = False`（寫死在 `entitlement.py`，P8 才開） | 目前無法建立交易 |
+| NotifyURL（伺服器對伺服器，決定開通） | `https://api.aisiwhale.com/api/payments/payuni/notify`（render.yaml） | 在 API，**不受前端切換影響** |
+| ReturnURL（讀者瀏覽器回來） | `https://aisiwhale.com/news/zh-TW/membership/return`（render.yaml） | 由前端處理；表單內容不讀、不授權任何東西，只 303 到 `…/membership/done` |
+| 在 Workers 上 | `POST /news/zh-TW/membership/return` → 303 → `/membership/done` 200（測試資料，未呼叫 PAYUNi） | ✅ |
+
+ReturnURL／NotifyURL 每筆交易帶給 PAYUNi，不在 PAYUNi 後台設定；切換不需改 PAYUNi。開放付款前，PAYUNi 商店審核看的網站頁面（條款、退款、聯絡）需要負責人與電話（見 8.3）。
+
+### 8.3 Workers 環境變數與 Secrets
+
+前端讀的變數：`NEXT_PUBLIC_API_URL`、`API_INTERNAL_URL`、`NEXT_PUBLIC_SITE_COMPANY`、`SITE_COMPANY`、`NEXT_PUBLIC_SITE_URL`、`SITE_BASE_URL`、`SITE_OPERATOR`、`SITE_CONTACT_EMAIL`（都已在 `wrangler.jsonc`），以及：
+
+| 變數 | Vercel 正式環境 | Worker | 處理 |
+|---|---|---|---|
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | 有（Production） | ✅ 已補（第二輪，見 8.6） | 公開值，放 `wrangler.jsonc` 的 `vars` |
+| `SITE_OPERATOR_OWNER` | 沒有 | 沒有 | 選用（Vercel 上也沒有，頁面原本就不顯示）；開放付款前補 |
+| `SITE_CONTACT_PHONE` | 沒有 | 沒有 | 同上 |
+
+設定 secret（互動輸入，值不進 shell 歷史與版控；OpenNext 每個請求把 secret 放進 `process.env`，ISR 頁最多 300 秒後更新）：
+
+```bash
+cd frontend/web && pnpm exec wrangler secret put SITE_OPERATOR_OWNER
+```
+```bash
+cd frontend/web && pnpm exec wrangler secret put SITE_CONTACT_PHONE
+```
+
+Turnstile site key 取自 Cloudflare 帳號裡的 widget `aisiwhale-contact`（API 讀取，沒有解密 Vercel 的值）。
+
+### 8.4 R2、Durable Objects、快取與 DNS 切換後的行為
+
+- 快取鍵：`incremental-cache/<buildId>/<路徑雜湊>`，**不含 host**。cf.aisiwhale.com 暖好的快取，切換後 `aisiwhale.com` 直接共用；兩個網域看到的 HTML 相同（canonical 由 `SITE_URL` 決定，不看 host）。
+- 每次 `cf:deploy` 換 buildId → 該版快取從空開始，舊版物件留在 R2（量小；之後可設 R2 lifecycle 清 30 天前的物件）。
+- 重算：過期後第一個請求拿舊版、DO 佇列在背景重算（同一路徑去重）。DO、R2 綁定在 Worker 上，與網域無關。
+- regional cache：每個機房自己的 Cache API，`long-lived`。
+- Cloudflare CDN 快取不會快取 custom domain Worker 的 HTML；**不要**為這個網域加 "Cache Everything" 類的 Cache Rule。
+- 會員 cookie 是 `.aisiwhale.com`：apex、www、cf 都送得到 API；CORS 已含三者。
+- robots.txt：`aisiwhale.com`、`www.aisiwhale.com` 回正式規則；其他 host（cf）回 `Disallow: /`。
+- 區網方案：**Free**。DNS 紀錄與規則在第二輪用後台確認（見 8.6）。
+
+### 8.5 主網域（已決定）
+
+**主網域 = `https://aisiwhale.com`；`www.aisiwhale.com` 301 永久轉到主網域（保留路徑與查詢字串）。** 程式與 Render 原本就以 apex 為準，不用改設定。Vercel 原本是 apex → www（308），搜尋引擎收錄的 www 網址會經 301＋canonical 換成 apex（短期排名可能波動）。
+
+### 8.6 第二輪：切換前準備（2026-11-11，未切換、未改 DNS、未付款）
+
+**Turnstile**
+- Widget `aisiwhale-contact`（managed）原本允許 `aisiwhale.com`、`www.aisiwhale.com`，本次以 API 加上 `cf.aisiwhale.com`（三個都明列）。
+- `wrangler.jsonc` 加 `NEXT_PUBLIC_TURNSTILE_SITE_KEY`，重新部署 cf（版本 `d5853b86`）；site key 確實在 contact 頁的瀏覽器程式裡。
+- 實測（Chrome，cf.aisiwhale.com）：Turnstile 顯示「成功」、送出一則標明「測試，請忽略」的留言 → API **202**、頁面顯示「已收到你的留言」。對照：不帶 token 直接 POST → **403**（Render 有設 `TURNSTILE_SECRET_KEY`，驗證確實在作用）。Email 欄填的是 `service@aisiwhale.com`。
+
+**VIP 與會員權限（規則未改）**
+- VIP 全文不經過 Worker：Worker 只給「未登入版本」（付費牆）；全文是瀏覽器帶 `.aisiwhale.com` cookie 直接向 `api.aisiwhale.com` 要的。cf 的 CORS 已允許（預檢回 `access-control-allow-origin: https://cf.aisiwhale.com`、credentials true），Watchlist／Coins 走同一條路徑，已在 cf 驗證過。
+- API 測試：`test_a_member_reads_the_whole_thing`（買的）、`test_a_comp_reads_the_whole_thing_until_it_is_ended`（後台贈送），本次新增 `test_an_admin_is_not_a_member`：已驗證信箱、在 `ADMIN_EMAILS` 的 admin，`/api/auth/me` 有 `admin` 能力、等級 `free`，會員限定文章仍是 `locked`。
+- 在 cf 上以真實 VIP 帳號看全文：**尚未做**。安全做法：後台「贈送 VIP」給一個測試帳號 1 天（`admin_comp`，不產生訂單、不收款），在 cf 看一篇會員文章，再於後台結束贈送。會在正式資料庫留下一筆贈送紀錄（設計上保留），所以等你同意再做。
+
+**Cloudflare 區網現況（後台／dashboard API 唯讀）**
+
+| 項目 | 現況 | 切換時 |
+|---|---|---|
+| Worker custom domains | 只有 `cf.aisiwhale.com` → aisiwhale-web | 加 `aisiwhale.com` |
+| Worker routes | 無 | — |
+| Redirect Rules／Cache Rules／Custom WAF／Transform／Origin／Config Rules | 都沒有（各 phase 沒有 entrypoint） | 新增一條 www → apex |
+| Page Rules | 無 | — |
+| Rate limiting | `contact-form-flood`：只比對 `api.aisiwhale.com` 的 `/api/public/contact` POST | 不影響 |
+| Managed rulesets | Cloudflare Free Managed、Normalization、DDoS L7 | 不影響 |
+| SSL/TLS | Full；**Always Use HTTPS = off**；Automatic HTTPS Rewrites on | **要開 Always Use HTTPS**（之前是 Vercel 把 http 308 到 https；改由 Worker 回應後 http 會直接 200） |
+
+**DNS 現況（切換前備份；只會動前兩筆）**
+
+| 名稱 | 類型 | 內容 | Proxy |
+|---|---|---|---|
+| `aisiwhale.com` | CNAME | `cname.vercel-dns.com` | Proxied |
+| `www.aisiwhale.com` | CNAME | `adc91c2b90e38b1a.vercel-dns-017.com` | Proxied |
+| `api.aisiwhale.com` | CNAME | `aisiwhale-api.onrender.com` | Proxied |
+| `img.aisiwhale.com` | R2 | `aisiwhale` | Proxied |
+| `cf.aisiwhale.com` | Worker | `aisiwhale-web` | Proxied |
+| `rsend`／`send.aisiwhale.com` | CNAME | `rsend-apne1.forge.rmta.net`／`send.forge.rmta.net` | DNS only |
+| `aisiwhale.com` | MX ×3 | `route1/2/3.mx.cloudflare.net`（83／14／88） | — |
+| `aisiwhale.com` | TXT | SPF `v=spf1 include:_spf.mx.cloudflare.net ~all` | — |
+| `cf2024-1._domainkey`、`resend._domainkey`、`_dmarc` | TXT | DKIM／DMARC | — |
+
+共 14 筆。切換前在後台 DNS → Records → **Export** 下載 BIND 檔另存（不進版控）。
+
+**網址一致性**
+
+| 項目 | 值 | 與主網域 |
+|---|---|---|
+| canonical | `https://aisiwhale.com/news/…`（cf 上實測首頁、文章） | ✅ |
+| sitemap.xml | 210 個 `<loc>`，全部 `aisiwhale.com` | ✅ |
+| robots.txt | apex／www：正式規則＋`Sitemap: https://aisiwhale.com/sitemap.xml`；cf：`Disallow: /` | ✅ |
+| Google 登入 | `redirect_uri=https://api.aisiwhale.com/api/auth/google/callback`（實測 start 的 303）；登入後 303 回 `SITE_BASE_URL` = apex | ✅ 不用改 Google Console |
+| PAYUNi | ReturnURL `https://aisiwhale.com/news/zh-TW/membership/return`；NotifyURL 在 API；結帳關閉 | ✅ |
+| Email 連結（驗證信、重設密碼） | `SITE_BASE_URL` = apex | ✅ |
+| CORS | 線上 API 允許 apex、www、cf；`render.yaml` 原本少了 cf，本次補上使兩者一致 | ✅ |
+
+### 8.7 切換流程（需你批准後才做）
+
+Vercel 目前停用（apex、www 都回 402），**12/7 前回滾到 Vercel 也是 402**；切換期間的短暫中斷不會比現況差。
+
+1. **備份**：後台 DNS → Export 存檔；確認上表兩筆 Vercel 紀錄。
+2. **apex 給 Worker**：刪除 `aisiwhale.com` CNAME（Worker custom domain 不能和既有紀錄並存）→ `frontend/web/wrangler.jsonc` 的 `routes` 改成
+   `[{ "pattern": "cf.aisiwhale.com", "custom_domain": true }, { "pattern": "aisiwhale.com", "custom_domain": true }]`
+   → `cd frontend/web && pnpm cf:deploy`（Cloudflare 自動建 DNS 與憑證）。
+3. **www 轉址**：`www` 紀錄改成 `AAAA www 100::`（Proxied）；Rules → Redirect Rules → 新增：When `http.host eq "www.aisiwhale.com"` → Dynamic，`concat("https://aisiwhale.com", http.request.uri.path)`，**301**，勾選 Preserve query string。
+4. **HTTPS**：SSL/TLS → Edge Certificates → Always Use HTTPS = On。
+5. **驗證**：
+   ```bash
+   curl -sI https://aisiwhale.com/news/zh-TW | grep -iE "^HTTP|x-opennext-cache"
+   ```
+   ```bash
+   curl -sI "https://www.aisiwhale.com/news/zh-TW?page=2" | grep -iE "^HTTP|^location"
+   ```
+   ```bash
+   curl -sI http://aisiwhale.com/news/zh-TW | grep -iE "^HTTP|^location"
+   ```
+   ```bash
+   curl -s https://aisiwhale.com/robots.txt | head -3
+   ```
+   預期：200；301 → `https://aisiwhale.com/news/zh-TW?page=2`；301 → https；正式 robots。再用瀏覽器確認登入（含 Google）、Watchlist、Coins、聯絡我們，`pnpm exec wrangler tail aisiwhale-web` 看 1 小時。
+6. 一週後確認 Search Console 收錄轉到 apex；穩定後再 commit `routes` 的變更（或切換當下就 commit）。
+
+**回滾（約 2 分鐘）**
+1. Workers → aisiwhale-web → Domains 移除 `aisiwhale.com`（或還原 `routes` 後 `pnpm cf:deploy`）。
+2. 刪除 www 的 Redirect Rule。
+3. 依備份加回 `aisiwhale.com CNAME cname.vercel-dns.com`、`www CNAME adc91c2b90e38b1a.vercel-dns-017.com`（都 Proxied）。
+4. Always Use HTTPS 可維持 On（Vercel 原本也轉 https）。
+
+### 8.8 結論
+
+**技術上已具備切換條件**，剩一項建議在切換前做、需要你同意：
+- 以後台贈送 VIP 給測試帳號（1 天，不收款），在 cf 實看會員文章全文，看完結束贈送。
+
+已完成：主網域決定；Turnstile（cf 實測 202、無 token 403）；區網無衝突規則；canonical／sitemap／robots／Google 登入／PAYUNi 都指向 apex；DNS 備份與切換、回滾步驟。
+
+不阻擋：COIN 文章 admin 可讀（既有設計）；負責人與電話（Vercel 上也沒有，開放付款前補）；PAYUNi 結帳仍關閉，未啟用真實付款。
