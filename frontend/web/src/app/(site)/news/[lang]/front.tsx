@@ -1,0 +1,105 @@
+// The front page (D-015): the list, its tabs, a day, a page, and 持股觀察's cards — what the bare
+// address (page.tsx) and its cached variants (browse/[...facets], see queryRoutes.ts) both show.
+// Nothing here reads the request: what was asked comes in as a plain object.
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { fetchArticlePage, fetchPortfolios, fetchRanking } from "@/features/site/api";
+import { TopRanking } from "@/features/site/Institutions";
+import { listHref } from "@/features/site/links";
+import { isView, KINDS, PortfolioCards, WatchTabs, type View } from "@/features/site/Portfolios";
+import { loadSidebar, taipeiToday } from "@/features/site/sidebarData";
+import { ArticleList, PAGE_SIZE } from "@/features/site/ArticleList";
+import { filterName, isFilter, isLang, isSection, sectionsOf, topicOf, words } from "@/features/site/i18n";
+
+export type Query = Record<string, string | string[] | undefined>;
+
+export function where(query: Query) {
+  const section = isFilter(query.section) ? query.section : null;
+  const page = Math.min(Math.max(Number.parseInt(String(query.page ?? "1"), 10) || 1, 1), 500);
+  // a day to show (D-084): "YYYY-MM-DD", a real one, not after today
+  const asked = typeof query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(query.date) ? query.date : null;
+  const day = asked && !Number.isNaN(Date.parse(`${asked}T00:00:00Z`)) && asked <= taipeiToday() ? asked : null;
+  // 持股觀察's tab (HD-06): asked for, or the stories on a later page or a day, else the big names
+  const view: View | null =
+    section === "watch" ? (isView(query.view) ? query.view : page > 1 || day ? "news" : "people") : null;
+  return { section, page, day, view };
+}
+
+/** The page's own address: what search engines are to list it under, the query in its order. */
+function canonical(lang: Parameters<typeof listHref>[0], query: Query): string {
+  const { section, page, day } = where(query);
+  const href = listHref(lang, section, page, day);
+  return isView(query.view) && section === "watch" ? `${href}${href.includes("?") ? "&" : "?"}view=${query.view}` : href;
+}
+
+export function frontMetadata(lang: string, query: Query): Metadata {
+  if (!isLang(lang)) return {};
+  const { section, day } = where(query);
+  const w = words(lang);
+  const name = [section ? filterName(lang, section) : null, day ? w.calendar.on(day) : null].filter(Boolean);
+  return {
+    title: name.length ? `${name.join(" ")} · ${w.site}` : w.site,
+    alternates: { canonical: canonical(lang, query) },
+  };
+}
+
+export async function FrontPage({ lang, query }: { lang: string; query: Query }) {
+  if (!isLang(lang)) notFound();
+  const { section, page, day, view } = where(query);
+  const company = process.env.SITE_COMPANY || undefined;
+  const w = words(lang);
+  // the calendar opens on the day's month, else this one, its days already marked (D-084)
+  // 持股觀察 opens on its cards (HD-06); a card that cannot be loaded does not take the page down
+  const portfolios = view === "people" || view === "groups";
+  // the institutions' tab ends with the ranking's first ten (HD-11); a ranking that cannot be
+  // loaded leaves the cards alone
+  const [{ articles, total }, sidebar, cards, top] = await Promise.all([
+    // a tab of cards shows no stories: none asked for
+    portfolios
+      ? Promise.resolve({ articles: [], total: 0 })
+      : fetchArticlePage(lang, {
+          company,
+          section: section ? sectionsOf(section) : undefined,
+          limit: PAGE_SIZE,
+          offset: (page - 1) * PAGE_SIZE,
+          day: day ?? undefined,
+        }),
+    loadSidebar(lang, { section, month: (day ?? taipeiToday()).slice(0, 7) }),
+    portfolios ? fetchPortfolios(lang, { company }).catch(() => []) : Promise.resolve([]),
+    view === "groups" ? fetchRanking(lang, { limit: 10 }).catch(() => null) : Promise.resolve(null),
+  ]);
+  return (
+    <ArticleList
+      articles={articles}
+      lang={lang}
+      section={section}
+      page={page}
+      pages={Math.ceil(total / PAGE_SIZE)}
+      day={day}
+      calendar={sidebar.calendar}
+      popular={sidebar.popular}
+      markets={sidebar.markets}
+      events={sidebar.events}
+      sentiment={sidebar.sentiment}
+      // its tabs above the cards or the stories; its sections' stories are its news tab too
+      top={
+        view || (isSection(section) && topicOf(section) === "watch") ? (
+          <WatchTabs lang={lang} view={view ?? "news"} />
+        ) : null
+      }
+      only={
+        view === "people" || view === "groups" ? (
+          <>
+            <PortfolioCards
+              cards={cards.filter((card) => KINDS[view].includes(card.kind))}
+              lang={lang}
+              heading={view === "groups" ? w.portfolio.groupsHeading : undefined}
+            />
+            {top ? <TopRanking ranking={top} lang={lang} /> : null}
+          </>
+        ) : null
+      }
+    />
+  );
+}

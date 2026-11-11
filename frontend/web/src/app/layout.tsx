@@ -1,12 +1,15 @@
 import Script from "next/script";
 import type { ReactNode } from "react";
 
+import { SITE_URL } from "@/config";
 import { THEME_SCRIPT } from "@/features/site/theme";
 
 import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata = {
+  // canonical links and the share cards' images are written as full addresses on this host
+  metadataBase: new URL(SITE_URL),
   // what readers and the back office see is the brand, 艾矽鯨 (D-043); "autora" stays the
   // code's own name
   title: "艾矽鯨",

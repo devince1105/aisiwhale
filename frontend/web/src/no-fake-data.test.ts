@@ -66,8 +66,12 @@ describe("the screen invents nothing (AC-S6)", () => {
     // And the public site's demo office (D-155), the one place a timer *does* move the store: it
     // plays a scripted office to visitors, made-up people labelled 示範畫面 on the page. It
     // invents what it shows on purpose, so it is kept out of the back office (see the test below).
+    // And an institution's page while its 13F is still being read (HD-11): the page is kept for
+    // everybody, so the browser waits and asks the API again, a dozen times at most, as a reload
+    // used to. What it shows is still only what the API says.
     const named = [
       "features/site/PaymentDone.tsx:",
+      "features/site/HoldingsReader.tsx:",
       "features/site/drift.ts:",
       "features/site/Watchlist.tsx:",
       "features/admin-ui/AdminShell.tsx:",

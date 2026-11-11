@@ -2,20 +2,23 @@
 // finish comes back here with ?error=<reason>.
 "use client";
 
-import { use } from "react";
+import { Suspense, use } from "react";
 
+import { Asked } from "@/features/site/Asked";
 import { LoginForm } from "@/features/site/AuthPages";
 import { isLang, type Lang } from "@/features/site/i18n";
 
 export default function LoginPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ lang: string }>;
-  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const { lang } = use(params);
-  const { next, error } = use(searchParams);
   const language: Lang = isLang(lang) ? lang : "zh-TW";
-  return <LoginForm lang={language} next={next} error={error} />;
+  return (
+    // the query is read in the browser, so the page is built once and kept (Asked.tsx)
+    <Suspense fallback={null}>
+      <Asked keys={["next", "error"] as const}>{(q) => <LoginForm lang={language} next={q.next} error={q.error} />}</Asked>
+    </Suspense>
+  );
 }

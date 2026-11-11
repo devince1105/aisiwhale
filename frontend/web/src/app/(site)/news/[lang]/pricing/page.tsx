@@ -2,7 +2,9 @@
 // the same plan cards the paywall shows, so this page and the payment page never disagree. Before
 // membership opens, the same page with 即將開放 for the buttons (D-161): what will be sold, and at
 // what price, is there for a payment provider's reviewer and for readers. Whether it is open is
-// the API's answer (``available``, P2-B), asked on every visit; no answer reads as not yet.
+// the API's answer (``available``, P2-B); no answer reads as not yet. It was asked on every
+// visit; it is asked once a minute now, the page kept between (ISR), so opening membership shows
+// here within a minute. The plan cards ask the API again from the browser as they open (PlanPicker).
 import { notFound } from "next/navigation";
 
 import { SERVER_API_URL, SITE_COMPANY } from "@/config";
@@ -10,7 +12,7 @@ import { isLang, words } from "@/features/site/i18n";
 import { fetchOffer } from "@/features/site/checkout";
 import { PlanPicker } from "@/features/site/PlanPicker";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }) {
   const { lang } = await params;

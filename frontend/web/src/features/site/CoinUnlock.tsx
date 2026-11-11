@@ -9,10 +9,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import { fetchCoins } from "./coins";
 import { words, type Lang } from "./i18n";
+import { ReaderRefresh } from "./readerVersion";
 import { unlockArticle } from "./unlocks";
 
 const BUTTON =
@@ -33,6 +34,7 @@ export function CoinUnlock({
 }) {
   const w = words(lang).unlock;
   const router = useRouter();
+  const refresh = useContext(ReaderRefresh);
   const loginHref = `/news/${lang}/login?next=${encodeURIComponent(path)}`;
   const walletHref = `/news/${lang}/coins`;
   // undefined: still asking; "signed-out"; or what they hold (null: could not be read)
@@ -62,7 +64,10 @@ export function CoinUnlock({
     setBusy(false);
     if (done.kind === "unlocked") {
       setAsking(false);
-      router.refresh(); // the page again, from the server: the whole of it now
+      // the article again, now the reader's: from the browser, since the page itself is kept
+      // for everybody (readerVersion.tsx); outside an article reader, the page from the server
+      if (refresh) refresh();
+      else router.refresh();
     } else if (done.kind === "short") {
       setAsking(false);
       setHeld(done.held);

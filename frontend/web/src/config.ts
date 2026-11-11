@@ -17,3 +17,10 @@ export const SITE_COMPANY = process.env.NEXT_PUBLIC_SITE_COMPANY || undefined;
 /** Cloudflare Turnstile's site key for the 聯絡我們 form (D-166): public by design, baked in at
  * build time. Unset, the form shows no check (the API then does not ask for one either). */
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || undefined;
+
+/** The public site's own address, for canonical links, robots.txt and the sitemap: the same
+ * SITE_BASE_URL the API's emails link to (render.yaml), else production's. */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_BASE_URL || "https://aisiwhale.com").replace(
+  /\/+$/,
+  "",
+);

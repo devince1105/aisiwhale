@@ -38,14 +38,49 @@ export interface SiteClientOptions {
   baseUrl?: string;
   fetch?: typeof fetch;
   /** The reader's cookie, forwarded when the server renders a page for them (D-025). Without
-   * it the API cannot tell a member from anybody else, and a locked article stays locked. */
+   * it the API cannot tell a member from anybody else, and a locked article stays locked. An
+   * answer asked with a cookie is never kept: it is that reader's. */
   cookie?: string;
 }
 
-function client(options: SiteClientOptions) {
+/** How long, in seconds, the server keeps the API's answer to a read nobody signed in made,
+ * shared by every page that asks the same (Next.js's Data Cache). A page is kept no longer than
+ * the shortest of its reads, so none of these is shorter than the pages that use it mean to be
+ * kept (the layout's market strip is on every page). */
+export const KEPT = {
+  /** The front page's list: a story just published is on it within a couple of minutes. */
+  list: 120,
+  /** The market strip, the sidebar: what changes within minutes. */
+  short: 300,
+  /** An article, a stock's page, the holdings: what changes a few times an hour at most. */
+  medium: 600,
+  /** The calendar of events, a stock's daily bars, the office's style. */
+  long: 3600,
+} as const;
+
+/** The fetch a read goes out with. A reader's own read (a cookie) is asked fresh and kept by
+ * nobody; anybody's read is kept ``seconds`` in the Data Cache, under the tag ``public-api``, so
+ * the sidebar's five reads are asked once for every page that shows them, not once per page. */
+export function keptFetch(
+  seconds: number | false,
+  options: SiteClientOptions,
+  onServer: boolean = typeof window === "undefined",
+): typeof fetch {
+  // looked up when called, not when made: tests stub the global fetch after importing this
+  const base: typeof fetch = (input, init) => (options.fetch ?? fetch)(input, init);
+  // in the browser (the strip's quotes, a chart, the calendar's month) the browser's own rules
+  if (!onServer) return base;
+  if (options.cookie || seconds === false) {
+    return (input, init) => base(input, { ...init, cache: "no-store" });
+  }
+  return (input, init) =>
+    base(input, { ...init, cache: "force-cache", next: { revalidate: seconds, tags: ["public-api"] } } as RequestInit);
+}
+
+function client(options: SiteClientOptions, seconds: number | false = KEPT.short) {
   return createClient<paths>({
     baseUrl: options.baseUrl ?? SERVER_API_URL,
-    fetch: options.fetch,
+    fetch: keptFetch(seconds, options),
     headers: options.cookie ? { cookie: options.cookie } : undefined,
   });
 }
@@ -56,7 +91,7 @@ export async function fetchArticle(
   slug: string,
   options: SiteClientOptions = {},
 ): Promise<PublicArticle | null> {
-  const { data, error, response } = await client(options).GET("/api/public/articles/{lang}/{slug}", {
+  const { data, error, response } = await client(options, KEPT.medium).GET("/api/public/articles/{lang}/{slug}", {
     params: { path: { lang, slug } },
   });
   if (response.status === 404) return null;
@@ -86,7 +121,7 @@ export async function fetchSentiment(
   options: SiteClientOptions = {},
 ): Promise<PublicSentiment | null> {
   try {
-    const { data } = await client(options).GET("/api/public/stocks/{symbol}/sentiment", {
+    const { data } = await client(options, KEPT.medium).GET("/api/public/stocks/{symbol}/sentiment", {
       params: { path: { symbol }, query: { lang } },
     });
     return data ?? null;
@@ -109,7 +144,7 @@ export async function fetchSentimentOverview(lang: string, options: SiteClientOp
  * throws: no block, not no page. */
 export async function fetchRatings(symbol: string, options: SiteClientOptions = {}): Promise<PublicRatings | null> {
   try {
-    const { data } = await client(options).GET("/api/public/stocks/{symbol}/analysts", { params: { path: { symbol } } });
+    const { data } = await client(options, KEPT.long).GET("/api/public/stocks/{symbol}/analysts", { params: { path: { symbol } } });
     return data?.latest ? data : null; // anything else is no card, not a broken page
   } catch {
     return null;
@@ -119,7 +154,7 @@ export async function fetchRatings(symbol: string, options: SiteClientOptions = 
 /** 財經行事曆 (D-088). Never throws: no block, not no page. */
 export async function fetchEvents(lang: string, options: SiteClientOptions = {}): Promise<PublicEvent[]> {
   try {
-    const { data } = await client(options).GET("/api/public/events", { params: { query: { lang } } });
+    const { data } = await client(options, KEPT.long).GET("/api/public/events", { params: { query: { lang } } });
     return data ?? [];
   } catch {
     return [];
@@ -170,7 +205,7 @@ export async function fetchArticlePage(
   options: ListOptions = {},
 ): Promise<{ articles: PublicArticleSummary[]; total: number }> {
   const { company, section, limit, offset, day } = options;
-  const { data, error, response } = await client(options).GET("/api/public/articles", {
+  const { data, error, response } = await client(options, KEPT.list).GET("/api/public/articles", {
     params: {
       query: { lang, company, section: section === undefined ? undefined : [section].flat(), limit, offset, day },
     },
@@ -196,7 +231,7 @@ export async function fetchMarkets(options: SiteClientOptions = {}): Promise<Pub
  * Never throws: when the API cannot be reached, the office's default. */
 export async function fetchOfficeTheme(company: string | undefined, options: SiteClientOptions = {}): Promise<OfficeThemeId> {
   try {
-    const { data } = await client(options).GET("/api/public/office-theme", { params: { query: { company } } });
+    const { data } = await client(options, KEPT.long).GET("/api/public/office-theme", { params: { query: { company } } });
     return data?.theme ?? "muji";
   } catch {
     return "muji";
@@ -209,7 +244,7 @@ export type OfficeThemeId = components["schemas"]["PublicOfficeTheme"]["theme"];
  * throws: null is "no chart". */
 export async function fetchFigure(key: string, options: SiteClientOptions = {}): Promise<PublicFigure | null> {
   try {
-    const { data } = await client(options).GET("/api/public/figures/{key}", { params: { path: { key } } });
+    const { data } = await client(options, KEPT.medium).GET("/api/public/figures/{key}", { params: { path: { key } } });
     return data ?? null;
   } catch {
     return null;
@@ -232,7 +267,7 @@ export async function fetchStock(
   lang: string,
   options: SiteClientOptions & { company?: string; articlesOffset?: number } = {},
 ): Promise<PublicStock | null> {
-  const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}", {
+  const { data, error, response } = await client(options, KEPT.short).GET("/api/public/stocks/{symbol}", {
     params: {
       path: { symbol },
       query: { lang, company: options.company, articles_offset: options.articlesOffset || undefined },
@@ -248,7 +283,7 @@ export async function fetchPortfolios(
   lang: string,
   options: SiteClientOptions & { company?: string } = {},
 ): Promise<PublicPortfolioCard[]> {
-  const { data, error, response } = await client(options).GET("/api/public/holdings", {
+  const { data, error, response } = await client(options, KEPT.medium).GET("/api/public/holdings", {
     params: { query: { lang, company: options.company } },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
@@ -262,7 +297,7 @@ export async function fetchPortfolio(
   lang: string,
   options: SiteClientOptions & { company?: string } = {},
 ): Promise<PublicPortfolio | null> {
-  const { data, error, response } = await client(options).GET("/api/public/holdings/people/{slug}", {
+  const { data, error, response } = await client(options, KEPT.medium).GET("/api/public/holdings/people/{slug}", {
     params: { path: { slug }, query: { lang, company: options.company } },
   });
   if (response.status === 404) return null;
@@ -285,7 +320,7 @@ export async function fetchRanking(
   query: RankingQuery = {},
   options: SiteClientOptions = {},
 ): Promise<PublicRanking> {
-  const { data, error, response } = await client(options).GET("/api/public/institutions", {
+  const { data, error, response } = await client(options, KEPT.medium).GET("/api/public/institutions", {
     params: { query: { lang, ...query } },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
@@ -299,7 +334,7 @@ export async function fetchInstitution(
   lang: string,
   options: SiteClientOptions & { period?: string } = {},
 ): Promise<PublicInstitution | null> {
-  const { data, error, response } = await client(options).GET("/api/public/institutions/{cik}", {
+  const { data, error, response } = await client(options, KEPT.short).GET("/api/public/institutions/{cik}", {
     params: { path: { cik }, query: { lang, period: options.period } },
   });
   if (response.status === 404 || response.status === 422) return null;
@@ -316,7 +351,7 @@ export interface FlowQuery {
 /** A trading day's largest net buying or selling by Taiwan's three institutional investors
  * (HD-12): the exchanges' figures, the same for every reader. */
 export async function fetchTwFlows(query: FlowQuery = {}, options: SiteClientOptions = {}): Promise<PublicFlowRanking> {
-  const { data, error, response } = await client(options).GET("/api/public/tw-flows", {
+  const { data, error, response } = await client(options, KEPT.medium).GET("/api/public/tw-flows", {
     params: { query },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
@@ -328,7 +363,7 @@ export async function fetchHistory(
   symbol: string,
   options: SiteClientOptions = {},
 ): Promise<PublicHistory | null> {
-  const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}/history", {
+  const { data, error, response } = await client(options, KEPT.long).GET("/api/public/stocks/{symbol}/history", {
     params: { path: { symbol } },
   });
   if (response.status === 404) return null;
@@ -338,7 +373,7 @@ export async function fetchHistory(
 
 /** A US stock's last five trading days in 15-minute bars (D-059); empty for a Taiwan stock. */
 export async function fetchIntraday(symbol: string, options: SiteClientOptions = {}): Promise<PublicIntraday> {
-  const { data, error, response } = await client(options).GET("/api/public/stocks/{symbol}/intraday", {
+  const { data, error, response } = await client(options, false).GET("/api/public/stocks/{symbol}/intraday", {
     params: { path: { symbol } },
   });
   if (error !== undefined || !data) throw ApiError.from(response, error);
@@ -347,7 +382,7 @@ export async function fetchIntraday(symbol: string, options: SiteClientOptions =
 
 /** Any listed Taiwan or US stock (D-061), by code, ticker or name. */
 export async function searchSecurities(q: string, options: SiteClientOptions = {}): Promise<PublicSecurity[]> {
-  const { data } = await client(options).GET("/api/public/securities", { params: { query: { q, limit: 12 } } });
+  const { data } = await client(options, false).GET("/api/public/securities", { params: { query: { q, limit: 12 } } });
   return data ?? [];
 }
 

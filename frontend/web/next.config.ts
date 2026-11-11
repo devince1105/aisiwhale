@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { queryRewrites } from "./src/features/site/queryRoutes";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   // The browser tests (e2e/) build their own copy against their own API, next to the dev build.
@@ -10,6 +12,15 @@ const nextConfig: NextConfig = {
   // The back office moved under /admin (D-054); old bookmarks and the activity links already
   // stored in the database still say /dashboard, /newsroom/..., so they are sent on.
   // /admin itself has no page: it opens the dashboard, which sends a signed-out visitor to login.
+  // The public lists' query strings (?page=, ?section=, ?sort=…) to cached pages, in the router,
+  // before any function runs (queryRoutes.ts): the address keeps its query, the page is ISR.
+  async rewrites() {
+    return { beforeFiles: queryRewrites(), afterFiles: [], fallback: [] };
+  },
+  // The back office is nobody's to find through a search engine; robots.txt asks the same.
+  async headers() {
+    return [{ source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] }];
+  },
   async redirects() {
     return [
       { source: "/admin", destination: "/admin/dashboard", permanent: false },

@@ -16,6 +16,17 @@ import { SiteName } from "@/features/site/SiteName";
 import { SiteFooter } from "@/features/site/SiteFooter";
 import { ThemeToggle } from "@/features/site/ThemeToggle";
 
+// Every page under a language is built the first time it is asked for, then kept (ISR), instead
+// of rendered for each request. None is built by `next build`: a deploy does not depend on the
+// API being up, and an empty list is never what is kept. Any other "language" is a 404 (below),
+// kept like a page.
+export function generateStaticParams() {
+  return [];
+}
+
+// the market strip on every page is kept 5 minutes (KEPT.short): no page is kept longer
+export const revalidate = 300;
+
 export default async function SiteLayout({
   children,
   params,
