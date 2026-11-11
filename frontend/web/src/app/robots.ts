@@ -2,13 +2,24 @@
 // server time) on the stories. Asking is all it does — a crawler that ignores it is the
 // firewall's (logs/perf/2026-11-11-vercel-function-usage.md).
 import type { MetadataRoute } from "next";
+import { headers } from "next/headers";
 
 import { SITE_URL } from "@/config";
 
 /** Crawlers that index for SEO tools, not for readers, and are known to crawl hard. */
 export const HEAVY_CRAWLERS = ["AhrefsBot", "SemrushBot", "MJ12bot", "DotBot", "PetalBot", "BLEXBot", "DataForSeoBot", "Bytespider"];
 
-export default function robots(): MetadataRoute.Robots {
+/** Whether ``host`` is the site's own (www or not): any other — a workers.dev test deploy, a
+ * preview — is asked not to be crawled at all, so the same build can be tested and then served. */
+export function isSiteHost(host: string | null, site: string = SITE_URL): boolean {
+  const own = new URL(site).host;
+  const asked = (host ?? "").toLowerCase();
+  return asked === own || asked === `www.${own}`;
+}
+
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  // read per request (robots.txt is one small response; it was static before)
+  if (!isSiteHost((await headers()).get("host"))) return { rules: { userAgent: "*", disallow: "/" } };
   return {
     rules: [
       {

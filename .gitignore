@@ -37,3 +37,8 @@ data/
 # TLS keys and certificates never belong in this public repo
 *.key
 *.pem
+
+# Cloudflare Workers build (D-266)
+.open-next/
+.wrangler/
+.dev.vars*

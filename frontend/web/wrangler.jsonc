@@ -1,0 +1,34 @@
+// The public site on Cloudflare Workers (D-266). Deploys to cf.aisiwhale.com for testing;
+// aisiwhale.com is not routed here until the cutover in logs/perf/2026-11-11-cloudflare-workers.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aisiwhale-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // the test host: a Worker custom domain (Cloudflare makes its DNS record and certificate).
+  // aisiwhale.com and www are added only at the cutover, never before it is verified.
+  "routes": [{ "pattern": "cf.aisiwhale.com", "custom_domain": true }],
+  // no *.workers.dev address: the test is on a host the API's cookie and CORS already cover
+  "workers_dev": false,
+  // requests, CPU time and logs in the dashboard (Workers → aisiwhale-web → Metrics, Logs)
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "aisiwhale-web" }],
+  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "aisiwhale-web-opennext-cache" }],
+  "durable_objects": { "bindings": [{ "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }],
+  // Read by the pages when they are built, on the Worker, and by `next build` (cf-build.mjs).
+  // NEXT_PUBLIC_* are baked into the browser's code at build time. SITE_OPERATOR_OWNER and
+  // SITE_CONTACT_PHONE are a person's: Worker secrets (`wrangler secret put`), never here.
+  "vars": {
+    "NEXT_PUBLIC_API_URL": "https://api.aisiwhale.com",
+    "API_INTERNAL_URL": "https://api.aisiwhale.com",
+    "NEXT_PUBLIC_SITE_COMPANY": "aisiwhale",
+    "SITE_COMPANY": "aisiwhale",
+    "NEXT_PUBLIC_SITE_URL": "https://aisiwhale.com",
+    "SITE_BASE_URL": "https://aisiwhale.com",
+    "SITE_OPERATOR": "Nanguado",
+    "SITE_CONTACT_EMAIL": "service@aisiwhale.com"
+  }
+}

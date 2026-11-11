@@ -98,3 +98,13 @@ describe("what the server keeps", () => {
     expect(request.headers.get("cookie")).toBeNull();
   });
 });
+
+describe("robots.txt by host", () => {
+  it("lets the site's own host be crawled and asks every other not to be", async () => {
+    const { isSiteHost } = await import("@/app/robots");
+    expect(isSiteHost("aisiwhale.com", "https://aisiwhale.com")).toBe(true);
+    expect(isSiteHost("www.aisiwhale.com", "https://aisiwhale.com")).toBe(true);
+    expect(isSiteHost("aisiwhale-web.example.workers.dev", "https://aisiwhale.com")).toBe(false);
+    expect(isSiteHost(null, "https://aisiwhale.com")).toBe(false);
+  });
+});

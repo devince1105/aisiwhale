@@ -1,0 +1,4 @@
+# Cloudflare Workers static assets (D-266): Next.js's build files are named by their contents, so a
+# browser may keep them for a year and never ask again. Other files in public/ keep the default.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
