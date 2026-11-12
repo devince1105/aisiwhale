@@ -99,7 +99,25 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -F web exec playwright install --with-deps chromium
+      # The browser comes from Playwright's CDN (kept between runs); only its system packages come
+      # from apt, which has failed for hours at a time on the runner (security.ubuntu.com not
+      # resolving). Those are retried, and if apt stays down the image's own Chrome libraries are
+      # used: a browser that cannot start fails the tests below, so nothing is hidden.
+      - id: playwright
+        run: echo "version=$(pnpm -F web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - run: pnpm -F web exec playwright install chromium
+      - name: Browser system packages (retried; apt may be down)
+        run: |
+          for attempt in 1 2; do
+            if timeout 480 pnpm -F web exec playwright install-deps chromium; then exit 0; fi
+            echo "::warning::playwright install-deps failed (attempt $attempt)"
+            sleep $((attempt * 30))
+          done
+          echo "::warning::apt unavailable; using the runner image's libraries"
       - name: Browser end-to-end tests (two tabs, API restart)
         run: pnpm -F web e2e
       - if: failure()
