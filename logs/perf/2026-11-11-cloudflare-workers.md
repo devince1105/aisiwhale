@@ -190,7 +190,7 @@ Turnstile site key 取自 Cloudflare 帳號裡的 widget `aisiwhale-contact`（A
 **VIP 與會員權限（規則未改）**
 - VIP 全文不經過 Worker：Worker 只給「未登入版本」（付費牆）；全文是瀏覽器帶 `.aisiwhale.com` cookie 直接向 `api.aisiwhale.com` 要的。cf 的 CORS 已允許（預檢回 `access-control-allow-origin: https://cf.aisiwhale.com`、credentials true），Watchlist／Coins 走同一條路徑，已在 cf 驗證過。
 - API 測試：`test_a_member_reads_the_whole_thing`（買的）、`test_a_comp_reads_the_whole_thing_until_it_is_ended`（後台贈送），本次新增 `test_an_admin_is_not_a_member`：已驗證信箱、在 `ADMIN_EMAILS` 的 admin，`/api/auth/me` 有 `admin` 能力、等級 `free`，會員限定文章仍是 `locked`。
-- 在 cf 上以真實 VIP 帳號看全文：**尚未做**。安全做法：後台「贈送 VIP」給一個測試帳號 1 天（`admin_comp`，不產生訂單、不收款），在 cf 看一篇會員文章，再於後台結束贈送。會在正式資料庫留下一筆贈送紀錄（設計上保留），所以等你同意再做。
+- 在 Workers 上看 VIP 全文：不動正式資料庫，改在隔離環境實測，見 8.8。
 
 **Cloudflare 區網現況（後台／dashboard API 唯讀）**
 
@@ -264,11 +264,33 @@ Vercel 目前停用（apex、www 都回 402），**12/7 前回滾到 Vercel 也�
 3. 依備份加回 `aisiwhale.com CNAME cname.vercel-dns.com`、`www CNAME adc91c2b90e38b1a.vercel-dns-017.com`（都 Proxied）。
 4. Always Use HTTPS 可維持 On（Vercel 原本也轉 https）。
 
-### 8.8 結論
+### 8.8 VIP 全文：隔離實測（2026-11-12，未動正式資料庫）
 
-**技術上已具備切換條件**，剩一項建議在切換前做、需要你同意：
-- 以後台贈送 VIP 給測試帳號（1 天，不收款），在 cf 實看會員文章全文，看完結束贈送。
+不在正式資料庫贈送 VIP（會留下永久紀錄）。改在本機隔離環境，用**本 repo 的 Worker 建置、Cloudflare 的 runtime**（`wrangler dev --local`，R2／Durable Object／Cache API 都是本機模擬）實測：
 
-已完成：主網域決定；Turnstile（cf 實測 202、無 token 403）；區網無衝突規則；canonical／sitemap／robots／Google 登入／PAYUNi 都指向 apex；DNS 備份與切換、回滾步驟。
+- 測試專用設定（暫存、測完刪除、從未部署）：Worker 名 `aisiwhale-web-viptest`、R2 只在本機、`NEXT_PUBLIC_API_URL`／`API_INTERNAL_URL` 指向本機替身 API；其餘與 `wrangler.jsonc` 相同。
+- 替身 API：公開讀取**不帶任何 cookie** 轉給正式 API（唯讀，與未登入讀者相同）；只有帶測試 cookie `autora_reader=vip-test` 的請求，`/api/auth/me` 回 `tier=vip`，會員文章回 `locked=false` 並多兩段標記文字 `VIP-ONLY-MARKER-7d57e8`。VIP 判斷本身由 API 測試涵蓋（8.6）。
+- 文章：正式站的會員限定文章 `tsm-backtest-trend-pullback-strategy-lagged-buy-and-hold-in-7d57e8`。
 
-不阻擋：COIN 文章 admin 可讀（既有設計）；負責人與電話（Vercel 上也沒有，開放付款前補）；PAYUNi 結帳仍關閉，未啟用真實付款。
+| 檢查 | 結果 |
+|---|---|
+| 未登入讀者（Chrome headless） | 付費牆「VIP 會員專屬報導」，無標記文字 ✅ |
+| VIP 讀者 | 付費牆消失，「策略規則」之後顯示兩段全文標記 ✅（瀏覽器帶 cookie 向 API 要讀者版本） |
+| VIP 之後再來一位未登入讀者 | 仍是付費牆，無標記 ✅ |
+| Worker 回的 HTML、RSC（帶／不帶 VIP cookie） | 位元組數相同（92,355／47,504）、都是 `x-opennext-cache: HIT`、都 `locked:true`、都沒有標記、都沒有 `Set-Cookie` ✅ |
+| Worker 伺服器端發給 API 的請求 | 20 個，帶 cookie 的 **0** 個 ✅ |
+| 本機 R2 快取／DO／Cache API 的資料（94 個檔，11 MB） | 搜尋標記：**0** 筆 ✅ |
+
+結論：在 Workers runtime 上，VIP 全文只出現在 VIP 讀者自己的瀏覽器；公開快取（R2、regional cache、HTML、RSC）不含會員內容。
+
+### 8.9 E2E（GitHub Actions）
+
+`0a21bde` 的 e2e 兩次都在 `playwright install --with-deps chromium` 失敗：runner（ubuntu-26.04）解析不到 `security.ubuntu.com`，apt 下載字型套件逾時，測試沒有執行。修正（`cf6ea5a`）：Chromium 改從 Playwright CDN 下載並依版本快取；系統套件 `playwright install-deps` 重試 2 次，apt 仍掛時改用 runner 映像內建的 Chrome 函式庫並留下 warning——瀏覽器若真的起不來，後面的測試會失敗，不會被掩蓋。
+
+結果（CI run 43132466523，`cf6ea5a`）：python ✅、web ✅、**e2e ✅ 17 passed、1 skipped**（`office-soak` 長時間測試，本來就跳過，與 11/11 通過的那次相同）。這次 apt 第一次就成功，沒有用到重試；Chromium 快取第一次建立。
+
+### 8.10 結論
+
+**具備正式切換條件。** 主網域 `aisiwhale.com`、`www` 301；切換與回滾步驟見 8.7（尚未執行，等你批准）。VIP 全文與快取隔離已在 Workers runtime 隔離實測通過；Turnstile、canonical、sitemap、Google 登入、PAYUNi return URL 都對齊主網域；區網無衝突規則。
+
+不阻擋：COIN 文章 admin 可讀（既有設計）；負責人與電話（開放付款前補）；PAYUNi 結帳仍關閉，未啟用真實付款。
